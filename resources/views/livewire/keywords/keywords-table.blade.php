@@ -45,15 +45,15 @@
             <div class="overflow-x-auto">
                 <table class="w-full text-sm">
                     <thead>
-                        <tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+                        <tr class="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
                             @if ($view === 'daily')
-                                <th class="px-6 py-3">Date</th>
+                                <x-sort-header column="date" :sortBy="$sortBy" :sortDir="$sortDir">Date</x-sort-header>
                             @endif
-                            <th class="px-6 py-3">Keyword</th>
-                            <th class="px-6 py-3 text-right">Clicks</th>
-                            <th class="px-6 py-3 text-right">Impressions</th>
-                            <th class="px-6 py-3 text-right">CTR</th>
-                            <th class="px-6 py-3 text-right">Position</th>
+                            <x-sort-header column="query" :sortBy="$sortBy" :sortDir="$sortDir">Keyword</x-sort-header>
+                            <x-sort-header column="clicks" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Clicks</x-sort-header>
+                            <x-sort-header column="impressions" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Impressions</x-sort-header>
+                            <x-sort-header column="ctr" :sortBy="$sortBy" :sortDir="$sortDir" align="right">CTR</x-sort-header>
+                            <x-sort-header column="position" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Position</x-sort-header>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">

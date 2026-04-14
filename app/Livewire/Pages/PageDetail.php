@@ -13,6 +13,8 @@ class PageDetail extends Component
 
     public int $websiteId = 0;
     public string $pageUrl = '';
+    public string $sortBy = 'total_clicks';
+    public string $sortDir = 'desc';
 
     public function mount(string $pageUrl): void
     {
@@ -20,10 +22,25 @@ class PageDetail extends Component
         $this->pageUrl = urldecode($pageUrl);
     }
 
+    public function sort(string $column): void
+    {
+        if ($this->sortBy === $column) {
+            $this->sortDir = $this->sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy = $column;
+            $this->sortDir = 'desc';
+        }
+
+        $this->resetPage();
+    }
+
     public function render()
     {
         $summary = null;
         $keywords = collect();
+
+        $allowed = ['query', 'total_clicks', 'total_impressions', 'avg_ctr', 'avg_position'];
+        $sortBy = in_array($this->sortBy, $allowed) ? $this->sortBy : 'total_clicks';
 
         if ($this->websiteId && $this->pageUrl) {
             $summary = SearchConsoleData::query()
@@ -48,7 +65,7 @@ class PageDetail extends Component
                 ->where('website_id', $this->websiteId)
                 ->where('page', $this->pageUrl)
                 ->groupBy('query')
-                ->orderByDesc('total_clicks')
+                ->orderBy($sortBy, $this->sortDir)
                 ->paginate(20);
         }
 

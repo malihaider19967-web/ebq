@@ -15,6 +15,8 @@ class KeywordsTable extends Component
     public int $websiteId = 0;
     public string $search = '';
     public string $view = 'aggregated';
+    public string $sortBy = 'clicks';
+    public string $sortDir = 'desc';
     public ?string $device = null;
     public ?string $from = null;
     public ?string $to = null;
@@ -28,6 +30,18 @@ class KeywordsTable extends Component
     public function switchWebsite(int $websiteId): void
     {
         $this->websiteId = $websiteId;
+        $this->resetPage();
+    }
+
+    public function sort(string $column): void
+    {
+        if ($this->sortBy === $column) {
+            $this->sortDir = $this->sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy = $column;
+            $this->sortDir = 'desc';
+        }
+
         $this->resetPage();
     }
 
@@ -45,6 +59,11 @@ class KeywordsTable extends Component
     {
         $rows = collect();
 
+        $allowedAggregated = ['query', 'clicks', 'impressions', 'ctr', 'position'];
+        $allowedDaily = ['date', 'query', 'clicks', 'impressions', 'ctr', 'position'];
+        $allowed = $this->view === 'daily' ? $allowedDaily : $allowedAggregated;
+        $sortBy = in_array($this->sortBy, $allowed) ? $this->sortBy : 'clicks';
+
         if ($this->websiteId) {
             $base = SearchConsoleData::query()
                 ->where('website_id', $this->websiteId)
@@ -55,8 +74,7 @@ class KeywordsTable extends Component
             if ($this->view === 'daily') {
                 $rows = (clone $base)
                     ->select('date', 'query', 'clicks', 'impressions', 'ctr', 'position')
-                    ->orderByDesc('date')
-                    ->orderByDesc('clicks')
+                    ->orderBy($sortBy, $this->sortDir)
                     ->paginate(25);
             } else {
                 $rows = (clone $base)
@@ -68,7 +86,7 @@ class KeywordsTable extends Component
                         DB::raw('AVG(position) as position'),
                     )
                     ->groupBy('query')
-                    ->orderByDesc('clicks')
+                    ->orderBy($sortBy, $this->sortDir)
                     ->paginate(25);
             }
         }

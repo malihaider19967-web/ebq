@@ -14,6 +14,8 @@ class PagesTable extends Component
 
     public int $websiteId = 0;
     public string $search = '';
+    public string $sortBy = 'total_clicks';
+    public string $sortDir = 'desc';
 
     public function mount(): void
     {
@@ -27,6 +29,18 @@ class PagesTable extends Component
         $this->resetPage();
     }
 
+    public function sort(string $column): void
+    {
+        if ($this->sortBy === $column) {
+            $this->sortDir = $this->sortDir === 'asc' ? 'desc' : 'asc';
+        } else {
+            $this->sortBy = $column;
+            $this->sortDir = 'desc';
+        }
+
+        $this->resetPage();
+    }
+
     public function updatedSearch(): void
     {
         $this->resetPage();
@@ -35,6 +49,9 @@ class PagesTable extends Component
     public function render()
     {
         $rows = collect();
+
+        $allowed = ['page', 'total_clicks', 'total_impressions', 'avg_ctr', 'avg_position'];
+        $sortBy = in_array($this->sortBy, $allowed) ? $this->sortBy : 'total_clicks';
 
         if ($this->websiteId) {
             $rows = SearchConsoleData::query()
@@ -48,7 +65,7 @@ class PagesTable extends Component
                 ->where('website_id', $this->websiteId)
                 ->when($this->search, fn ($q) => $q->where('page', 'like', "%{$this->search}%"))
                 ->groupBy('page')
-                ->orderByDesc('total_clicks')
+                ->orderBy($sortBy, $this->sortDir)
                 ->paginate(20);
         }
 
