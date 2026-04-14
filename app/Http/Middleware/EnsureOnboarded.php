@@ -16,7 +16,7 @@ class EnsureOnboarded
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
-        if ($user && $user->websites()->doesntExist() && ! $request->routeIs('onboarding*', 'google.*', 'settings*')) {
+        if ($user && ! $user->hasAccessibleWebsites() && ! $request->routeIs('onboarding*', 'google.*', 'settings*')) {
             return redirect()->route('onboarding');
         }
 

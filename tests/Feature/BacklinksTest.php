@@ -16,11 +16,24 @@ class BacklinksTest extends TestCase
         $this->get(route('backlinks.index'))->assertRedirect(route('login'));
     }
 
-    public function test_user_without_website_is_redirected_to_onboarding(): void
+    public function test_user_without_accessible_website_is_redirected_to_onboarding(): void
     {
         $user = User::factory()->create();
 
         $this->actingAs($user)->get(route('backlinks.index'))->assertRedirect(route('onboarding'));
+    }
+
+    public function test_user_with_only_shared_website_can_view_backlinks_page(): void
+    {
+        $owner = User::factory()->create();
+        $member = User::factory()->create();
+        $website = Website::factory()->create(['user_id' => $owner->id, 'domain' => 'shared-backlinks.test']);
+        $website->members()->attach($member->id);
+
+        $this->actingAs($member)
+            ->withSession(['current_website_id' => $website->id])
+            ->get(route('backlinks.index'))
+            ->assertOk();
     }
 
     public function test_onboarded_user_can_view_backlinks_page(): void

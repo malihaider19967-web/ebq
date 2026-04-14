@@ -4,6 +4,7 @@ namespace App\Livewire\Dashboard;
 
 use App\Models\AnalyticsData;
 use App\Models\SearchConsoleData;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -27,7 +28,7 @@ class TrafficChart extends Component
     {
         $days = collect();
 
-        if ($this->websiteId) {
+        if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
             $days = Cache::remember("traffic_chart:{$this->websiteId}", 600, function () {
                 $clicks = SearchConsoleData::where('website_id', $this->websiteId)
                     ->selectRaw('date, SUM(clicks) as clicks')

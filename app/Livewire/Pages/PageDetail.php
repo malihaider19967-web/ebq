@@ -3,6 +3,7 @@
 namespace App\Livewire\Pages;
 
 use App\Models\SearchConsoleData;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -42,7 +43,7 @@ class PageDetail extends Component
         $allowed = ['query', 'total_clicks', 'total_impressions', 'avg_ctr', 'avg_position'];
         $sortBy = in_array($this->sortBy, $allowed) ? $this->sortBy : 'total_clicks';
 
-        if ($this->websiteId && $this->pageUrl) {
+        if ($this->websiteId && $this->pageUrl && Auth::user()?->canViewWebsiteId($this->websiteId)) {
             $summary = SearchConsoleData::query()
                 ->select(
                     DB::raw('SUM(clicks) as total_clicks'),

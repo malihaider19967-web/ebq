@@ -3,6 +3,7 @@
 namespace App\Livewire\Pages;
 
 use App\Models\SearchConsoleData;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -53,7 +54,7 @@ class PagesTable extends Component
         $allowed = ['page', 'total_clicks', 'total_impressions', 'avg_ctr', 'avg_position'];
         $sortBy = in_array($this->sortBy, $allowed) ? $this->sortBy : 'total_clicks';
 
-        if ($this->websiteId) {
+        if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
             $rows = SearchConsoleData::query()
                 ->select(
                     'page',

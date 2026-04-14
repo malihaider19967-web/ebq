@@ -3,6 +3,7 @@
 namespace App\Livewire\Keywords;
 
 use App\Models\SearchConsoleData;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -64,7 +65,7 @@ class KeywordsTable extends Component
         $allowed = $this->view === 'daily' ? $allowedDaily : $allowedAggregated;
         $sortBy = in_array($this->sortBy, $allowed) ? $this->sortBy : 'clicks';
 
-        if ($this->websiteId) {
+        if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
             $base = SearchConsoleData::query()
                 ->where('website_id', $this->websiteId)
                 ->forDateRange($this->from, $this->to)

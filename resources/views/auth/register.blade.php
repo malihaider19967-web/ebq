@@ -6,6 +6,15 @@
 
     <form method="POST" action="{{ route('register') }}" class="mt-8 space-y-5">
         @csrf
+        @if (! empty($inviteToken))
+            <input type="hidden" name="invite" value="{{ $inviteToken }}" />
+        @endif
+
+        @if (! empty($invitationEmail))
+            <div class="rounded-lg bg-indigo-50 px-4 py-3 text-sm text-indigo-900">
+                You are registering to accept access to a website. Use the email address this invitation was sent to.
+            </div>
+        @endif
 
         <div>
             <label for="name" class="mb-1.5 block text-xs font-medium text-slate-700">Full name</label>
@@ -18,7 +27,8 @@
 
         <div>
             <label for="email" class="mb-1.5 block text-xs font-medium text-slate-700">Email address</label>
-            <input id="email" name="email" type="email" value="{{ old('email') }}" required autocomplete="username"
+            <input id="email" name="email" type="email" value="{{ old('email', $invitationEmail ?? '') }}" required autocomplete="username"
+                @if(! empty($invitationEmail)) readonly @endif
                 class="block w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm shadow-sm transition placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20" />
             @error('email')
                 <p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>

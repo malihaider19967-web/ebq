@@ -15,8 +15,9 @@ class WebsiteSelector extends Component
     public function mount(): void
     {
         $this->websites = Auth::user()
-            ->websites()
+            ->accessibleWebsitesQuery()
             ->select('id', 'domain')
+            ->orderBy('domain')
             ->get()
             ->map(fn ($w) => ['id' => $w->id, 'domain' => $w->domain])
             ->toArray();
@@ -24,7 +25,7 @@ class WebsiteSelector extends Component
         $sessionId = (int) session('current_website_id', 0);
         $ids = array_column($this->websites, 'id');
 
-        $this->websiteId = in_array($sessionId, $ids) ? $sessionId : ($ids[0] ?? 0);
+        $this->websiteId = in_array($sessionId, $ids, true) ? $sessionId : ($ids[0] ?? 0);
 
         if ($this->websiteId) {
             session(['current_website_id' => $this->websiteId]);
@@ -33,6 +34,12 @@ class WebsiteSelector extends Component
 
     public function updatedWebsiteId(int $value): void
     {
+        $ids = array_column($this->websites, 'id');
+        if (! in_array($value, $ids, true)) {
+            $value = (int) ($ids[0] ?? 0);
+            $this->websiteId = $value;
+        }
+
         session(['current_website_id' => $value]);
         $this->dispatch('website-changed', websiteId: $value);
     }

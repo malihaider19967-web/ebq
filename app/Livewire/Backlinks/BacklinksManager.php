@@ -93,7 +93,7 @@ class BacklinksManager extends Component
 
     public function updatedSheetDate(): void
     {
-        if ($this->sheetOpen && $this->userOwnsWebsite()) {
+        if ($this->sheetOpen && $this->userCanAccessWebsite()) {
             $this->loadSheetRows();
         }
     }
@@ -128,7 +128,7 @@ class BacklinksManager extends Component
 
     public function addBacklink(): void
     {
-        if (! $this->userOwnsWebsite()) {
+        if (! $this->userCanAccessWebsite()) {
             return;
         }
 
@@ -161,7 +161,7 @@ class BacklinksManager extends Component
 
     public function openSheet(): void
     {
-        if (! $this->userOwnsWebsite()) {
+        if (! $this->userCanAccessWebsite()) {
             return;
         }
 
@@ -178,7 +178,7 @@ class BacklinksManager extends Component
     public function openSheetForDate(string $date): void
     {
         $this->sheetDate = $date;
-        if (! $this->userOwnsWebsite()) {
+        if (! $this->userCanAccessWebsite()) {
             return;
         }
         $this->loadSheetRows();
@@ -201,7 +201,7 @@ class BacklinksManager extends Component
 
     public function saveSheet(): void
     {
-        if (! $this->userOwnsWebsite()) {
+        if (! $this->userCanAccessWebsite()) {
             return;
         }
 
@@ -310,7 +310,7 @@ class BacklinksManager extends Component
 
     public function deleteBacklink(int $id): void
     {
-        if (! $this->userOwnsWebsite()) {
+        if (! $this->userCanAccessWebsite()) {
             return;
         }
 
@@ -329,7 +329,7 @@ class BacklinksManager extends Component
             'pageName' => 'page',
         ]);
 
-        if ($this->websiteId && $this->userOwnsWebsite()) {
+        if ($this->websiteId && $this->userCanAccessWebsite()) {
             $sortBy = $this->sortBy;
             $sortDir = $this->sortDir === 'asc' ? 'asc' : 'desc';
 
@@ -359,16 +359,15 @@ class BacklinksManager extends Component
         return view('livewire.backlinks.backlinks-manager', [
             'rows' => $rows,
             'types' => BacklinkType::cases(),
+            'canAccessWebsite' => $this->userCanAccessWebsite(),
         ]);
     }
 
-    private function userOwnsWebsite(): bool
+    private function userCanAccessWebsite(): bool
     {
-        if ($this->websiteId <= 0) {
-            return false;
-        }
+        $user = Auth::user();
 
-        return Auth::user()->websites()->whereKey($this->websiteId)->exists();
+        return $user !== null && $user->canViewWebsiteId($this->websiteId);
     }
 
     private function loadSheetRows(): void

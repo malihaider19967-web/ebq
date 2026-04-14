@@ -4,6 +4,7 @@ namespace App\Livewire\Dashboard;
 
 use App\Models\AnalyticsData;
 use App\Models\SearchConsoleData;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -27,7 +28,7 @@ class KpiCards extends Component
     {
         $data = ['clicks' => 0, 'impressions' => 0, 'users' => 0, 'sessions' => 0];
 
-        if ($this->websiteId) {
+        if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
             $data = Cache::remember("kpis:{$this->websiteId}", 600, function () {
                 return [
                     'clicks' => (int) SearchConsoleData::where('website_id', $this->websiteId)->sum('clicks'),

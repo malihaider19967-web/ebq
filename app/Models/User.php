@@ -6,6 +6,8 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class User extends Authenticatable
@@ -55,5 +57,45 @@ class User extends Authenticatable
     public function websites(): HasMany
     {
         return $this->hasMany(Website::class);
+    }
+
+    public function sharedWebsites(): BelongsToMany
+    {
+        return $this->belongsToMany(Website::class)->withTimestamps();
+    }
+
+    /**
+     * Websites this user owns or has been granted access to.
+     *
+     * @return Builder<Website>
+     */
+    public function accessibleWebsitesQuery(): Builder
+    {
+        return Website::query()
+            ->where(function (Builder $q): void {
+                $q->where('websites.user_id', $this->id)
+                    ->orWhereExists(function ($sub): void {
+                        $sub->selectRaw('1')
+                            ->from('website_user')
+                            ->whereColumn('website_user.website_id', 'websites.id')
+                            ->where('website_user.user_id', $this->id);
+                    });
+            });
+    }
+
+    public function hasAccessibleWebsites(): bool
+    {
+        return $this->accessibleWebsitesQuery()->exists();
+    }
+
+    public function canViewWebsiteId(int $websiteId): bool
+    {
+        if ($websiteId <= 0) {
+            return false;
+        }
+
+        $website = Website::find($websiteId);
+
+        return $website !== null && $this->can('view', $website);
     }
 }

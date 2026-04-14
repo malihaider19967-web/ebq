@@ -7,6 +7,7 @@ use App\Services\Google\GoogleAnalyticsService;
 use App\Services\Google\SearchConsoleService;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
@@ -67,19 +68,26 @@ class WebsitesList extends Component
 
     public function removeWebsite(int $id): void
     {
-        Website::where('id', $id)->where('user_id', Auth::id())->delete();
+        $website = Website::find($id);
+        if (! $website || ! Gate::forUser(Auth::user())->allows('delete', $website)) {
+            return;
+        }
+
+        $website->delete();
 
         if ((int) session('current_website_id') === $id) {
-            $next = Auth::user()->websites()->first();
+            $next = Auth::user()->accessibleWebsitesQuery()->first();
             session(['current_website_id' => $next?->id ?? 0]);
         }
     }
 
     public function render()
     {
-        $websites = Auth::user()->websites()->get();
+        $user = Auth::user();
+        $ownedWebsites = $user->websites()->orderBy('domain')->get();
+        $sharedWebsites = $user->sharedWebsites()->with('user')->orderBy('domain')->get();
 
-        return view('livewire.websites.websites-list', compact('websites'));
+        return view('livewire.websites.websites-list', compact('ownedWebsites', 'sharedWebsites'));
     }
 
     private function fetchGoogleData(): void
