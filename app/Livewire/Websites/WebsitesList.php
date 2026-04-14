@@ -5,6 +5,7 @@ namespace App\Livewire\Websites;
 use App\Models\Website;
 use App\Services\Google\GoogleAnalyticsService;
 use App\Services\Google\SearchConsoleService;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 use Livewire\Component;
@@ -49,10 +50,17 @@ class WebsitesList extends Component
             'gscSiteUrl' => ['required', 'string', 'max:255'],
         ]);
 
-        Website::updateOrCreate(
+        $website = Website::updateOrCreate(
             ['user_id' => Auth::id(), 'domain' => $this->domain],
             ['ga_property_id' => $this->gaPropertyId, 'gsc_site_url' => $this->gscSiteUrl]
         );
+
+        if ($website->wasRecentlyCreated) {
+            Artisan::queue('growthhub:import-historical', [
+                '--days' => 365,
+                '--website' => (string) $website->id,
+            ]);
+        }
 
         $this->reset(['domain', 'gaPropertyId', 'gscSiteUrl', 'showForm', 'fetchError']);
     }
