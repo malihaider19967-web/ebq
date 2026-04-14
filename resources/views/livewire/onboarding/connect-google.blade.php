@@ -70,33 +70,63 @@
         {{-- Step 2: Add Website --}}
         @else
             <div>
-                <h2 class="mb-1 text-lg font-semibold">Add your website</h2>
+                <h2 class="mb-1 text-lg font-semibold">Select your website</h2>
                 <p class="mb-6 text-sm text-slate-500 dark:text-slate-400">
-                    Enter the domain and property IDs from your Google Analytics 4 and Search Console accounts.
+                    Choose a GA4 property and Search Console site from your Google account.
                 </p>
 
+                @if ($fetchError)
+                    <div class="mb-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                        {{ $fetchError }}
+                    </div>
+                @endif
+
                 <form wire:submit="saveWebsite" class="space-y-4">
+                    {{-- GA4 Property --}}
+                    <div>
+                        <label for="gaPropertyId" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">GA4 Property</label>
+                        @if (count($gaProperties))
+                            <select wire:model="gaPropertyId" id="gaPropertyId"
+                                class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800">
+                                <option value="">-- Select a property --</option>
+                                @foreach ($gaProperties as $prop)
+                                    <option value="{{ $prop['id'] }}">{{ $prop['name'] }} ({{ $prop['id'] }})</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <input wire:model="gaPropertyId" id="gaPropertyId" type="text" placeholder="properties/123456789"
+                                class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800" />
+                            <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">GA4 &gt; Admin &gt; Property Settings &gt; Property ID.</p>
+                        @endif
+                        @error('gaPropertyId') <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+
+                    {{-- Search Console Site --}}
+                    <div>
+                        <label for="gscSiteUrl" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Search Console Site</label>
+                        @if (count($gscSites))
+                            <select wire:model.live="gscSiteUrl" id="gscSiteUrl"
+                                class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800">
+                                <option value="">-- Select a site --</option>
+                                @foreach ($gscSites as $site)
+                                    <option value="{{ $site['siteUrl'] }}">{{ $site['siteUrl'] }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <input wire:model.live="gscSiteUrl" id="gscSiteUrl" type="text" placeholder="sc-domain:example.com"
+                                class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800" />
+                            <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Domain property (sc-domain:example.com) or URL prefix (https://example.com/).</p>
+                        @endif
+                        @error('gscSiteUrl') <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+
+                    {{-- Domain (auto-filled from GSC selection) --}}
                     <div>
                         <label for="domain" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Domain</label>
                         <input wire:model="domain" id="domain" type="text" placeholder="example.com"
                             class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800" />
+                        <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Auto-filled from Search Console selection. Edit if needed.</p>
                         @error('domain') <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
-                    </div>
-
-                    <div>
-                        <label for="gaPropertyId" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">GA4 Property ID</label>
-                        <input wire:model="gaPropertyId" id="gaPropertyId" type="text" placeholder="properties/123456789"
-                            class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800" />
-                        <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Find this in GA4 &gt; Admin &gt; Property Settings.</p>
-                        @error('gaPropertyId') <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
-                    </div>
-
-                    <div>
-                        <label for="gscSiteUrl" class="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Search Console Site URL</label>
-                        <input wire:model="gscSiteUrl" id="gscSiteUrl" type="text" placeholder="sc-domain:example.com"
-                            class="block w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800" />
-                        <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Domain property (sc-domain:example.com) or URL prefix (https://example.com/).</p>
-                        @error('gscSiteUrl') <p class="mt-1 text-sm text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
 
                     <div class="flex items-center justify-between pt-2">
