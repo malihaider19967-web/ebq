@@ -1,20 +1,42 @@
 <div>
-    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div class="relative flex-1 sm:max-w-xs">
-            <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
-            <input wire:model.live.debounce.300ms="search" type="text" placeholder="Search keywords..."
-                class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm placeholder-slate-400 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+            <div class="relative flex-1 sm:max-w-xs">
+                <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                <input wire:model.live.debounce.300ms="search" type="text" placeholder="Search keywords..."
+                    class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm placeholder-slate-400 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
+            </div>
+            <div class="flex gap-2">
+                <select wire:model.live="device"
+                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                    <option value="">All devices</option>
+                    <option value="DESKTOP">Desktop</option>
+                    <option value="MOBILE">Mobile</option>
+                    <option value="TABLET">Tablet</option>
+                </select>
+                <input wire:model.live="from" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                <input wire:model.live="to" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+            </div>
         </div>
-        <div class="flex gap-2">
-            <select wire:model.live="device"
-                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
-                <option value="">All devices</option>
-                <option value="DESKTOP">Desktop</option>
-                <option value="MOBILE">Mobile</option>
-                <option value="TABLET">Tablet</option>
-            </select>
-            <input wire:model.live="from" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-            <input wire:model.live="to" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+
+        {{-- View toggle --}}
+        <div class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">
+            <button wire:click="$set('view', 'aggregated')"
+                @class([
+                    'rounded-md px-3 py-1.5 text-xs font-semibold transition',
+                    'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100' => $view === 'aggregated',
+                    'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200' => $view !== 'aggregated',
+                ])>
+                Aggregated
+            </button>
+            <button wire:click="$set('view', 'daily')"
+                @class([
+                    'rounded-md px-3 py-1.5 text-xs font-semibold transition',
+                    'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100' => $view === 'daily',
+                    'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200' => $view !== 'daily',
+                ])>
+                By Date
+            </button>
         </div>
     </div>
 
@@ -24,6 +46,9 @@
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+                            @if ($view === 'daily')
+                                <th class="px-6 py-3">Date</th>
+                            @endif
                             <th class="px-6 py-3">Keyword</th>
                             <th class="px-6 py-3 text-right">Clicks</th>
                             <th class="px-6 py-3 text-right">Impressions</th>
@@ -34,6 +59,9 @@
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                         @foreach ($rows as $row)
                             <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                @if ($view === 'daily')
+                                    <td class="whitespace-nowrap px-6 py-3.5 text-slate-500 dark:text-slate-400">{{ $row->date instanceof \Carbon\Carbon ? $row->date->format('M d, Y') : $row->date }}</td>
+                                @endif
                                 <td class="whitespace-nowrap px-6 py-3.5 font-medium text-slate-900 dark:text-slate-100">{{ $row->query }}</td>
                                 <td class="whitespace-nowrap px-6 py-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->clicks) }}</td>
                                 <td class="whitespace-nowrap px-6 py-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->impressions) }}</td>
