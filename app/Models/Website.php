@@ -32,4 +32,9 @@ class Website extends Model
     {
         return $this->hasMany(SearchConsoleData::class);
     }
+
+    public function backlinks(): HasMany
+    {
+        return $this->hasMany(Backlink::class);
+    }
 }

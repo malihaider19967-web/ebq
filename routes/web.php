@@ -10,6 +10,7 @@ Route::get('/', function () {
 Route::middleware(['auth', 'onboarded'])->group(function () {
     Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::view('/keywords', 'keywords.index')->name('keywords.index');
+    Route::view('/backlinks', 'backlinks.index')->name('backlinks.index');
     Route::view('/pages', 'pages.index')->name('pages.index');
     Route::get('/pages/{id}', fn (string $id) => view('pages.show', ['pageUrl' => $id]))->name('pages.show')->where('id', '.*');
     Route::view('/websites', 'websites.index')->name('websites.index');
