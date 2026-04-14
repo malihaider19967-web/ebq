@@ -11,13 +11,18 @@ class GoogleOAuthService
 {
     public function persistAccount(User $user, SocialiteUser $googleUser): GoogleAccount
     {
+        $data = [
+            'access_token' => $googleUser->token,
+            'expires_at' => Carbon::now()->addSeconds((int) ($googleUser->expiresIn ?? 3600)),
+        ];
+
+        if ($googleUser->refreshToken) {
+            $data['refresh_token'] = $googleUser->refreshToken;
+        }
+
         return GoogleAccount::updateOrCreate(
             ['user_id' => $user->id, 'google_id' => $googleUser->getId()],
-            [
-                'access_token' => $googleUser->token,
-                'refresh_token' => $googleUser->refreshToken,
-                'expires_at' => Carbon::now()->addSeconds((int) ($googleUser->expiresIn ?? 3600)),
-            ],
+            $data,
         );
     }
 }
