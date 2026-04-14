@@ -11,6 +11,14 @@ class ConnectGoogle extends Component
     public string $domain = '';
     public string $gaPropertyId = '';
     public string $gscSiteUrl = '';
+    public bool $googleConnected = false;
+
+    public function mount(): void
+    {
+        $user = Auth::user();
+
+        $this->googleConnected = (bool) $user?->googleAccounts()->exists();
+    }
 
     public function saveSelection(): void
     {
