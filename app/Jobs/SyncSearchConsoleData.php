@@ -15,12 +15,13 @@ class SyncSearchConsoleData implements ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 300;
+    public int $timeout = 600;
     public int $tries = 2;
 
-    public function __construct(public int $websiteId)
-    {
-    }
+    public function __construct(
+        public int $websiteId,
+        public int $days = 30,
+    ) {}
 
     public function handle(SearchConsoleService $service): void
     {
@@ -33,7 +34,7 @@ class SyncSearchConsoleData implements ShouldQueue
         }
 
         $end = Carbon::now();
-        $cursor = Carbon::now()->subDays(30);
+        $cursor = Carbon::now()->subDays($this->days);
 
         while ($cursor->lt($end)) {
             $windowEnd = $cursor->copy()->addDays(6)->min($end);

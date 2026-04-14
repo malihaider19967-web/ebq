@@ -14,12 +14,13 @@ class SyncAnalyticsData implements ShouldQueue
 {
     use Queueable;
 
-    public int $timeout = 300;
+    public int $timeout = 600;
     public int $tries = 2;
 
-    public function __construct(public int $websiteId)
-    {
-    }
+    public function __construct(
+        public int $websiteId,
+        public int $days = 30,
+    ) {}
 
     public function handle(GoogleAnalyticsService $service): void
     {
@@ -34,7 +35,7 @@ class SyncAnalyticsData implements ShouldQueue
         $rows = $service->fetchDailyTraffic(
             $account,
             $website->ga_property_id,
-            Carbon::now()->subDays(30)->toDateString(),
+            Carbon::now()->subDays($this->days)->toDateString(),
             Carbon::now()->toDateString()
         );
 
