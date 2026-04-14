@@ -31,7 +31,7 @@ class Website extends Model
 
     public function members(): BelongsToMany
     {
-        return $this->belongsToMany(User::class)->withTimestamps();
+        return $this->belongsToMany(User::class, 'website_user')->withTimestamps();
     }
 
     public function invitations(): HasMany

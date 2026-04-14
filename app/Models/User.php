@@ -61,7 +61,7 @@ class User extends Authenticatable
 
     public function sharedWebsites(): BelongsToMany
     {
-        return $this->belongsToMany(Website::class)->withTimestamps();
+        return $this->belongsToMany(Website::class, 'website_user')->withTimestamps();
     }
 
     /**
