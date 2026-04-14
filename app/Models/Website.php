@@ -1,0 +1,35 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+
+class Website extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'user_id',
+        'domain',
+        'ga_property_id',
+        'gsc_site_url',
+    ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function analyticsData(): HasMany
+    {
+        return $this->hasMany(AnalyticsData::class);
+    }
+
+    public function searchConsoleData(): HasMany
+    {
+        return $this->hasMany(SearchConsoleData::class);
+    }
+}
