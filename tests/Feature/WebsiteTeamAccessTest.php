@@ -133,6 +133,19 @@ class WebsiteTeamAccessTest extends TestCase
         $this->assertFalse($member->fresh()->can('view', $website));
     }
 
+    public function test_team_page_loads_for_owner_with_selected_website(): void
+    {
+        $owner = User::factory()->create();
+        $website = Website::factory()->create(['user_id' => $owner->id, 'domain' => 'team-page.test']);
+
+        $this->actingAs($owner)
+            ->withSession(['current_website_id' => $website->id])
+            ->get(route('team.index'))
+            ->assertOk()
+            ->assertSee('team-page.test')
+            ->assertSee('Send invite', false);
+    }
+
     public function test_member_cannot_update_website_policy(): void
     {
         $owner = User::factory()->create();

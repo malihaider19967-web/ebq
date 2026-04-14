@@ -94,7 +94,13 @@
     @if ($ownedWebsites->isNotEmpty() || $sharedWebsites->isNotEmpty())
         @if ($ownedWebsites->isNotEmpty())
             <div>
-                <h2 class="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Your websites</h2>
+                <div class="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                    <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Your websites</h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        Team invites for the site selected in the header:
+                        <a href="{{ route('team.index') }}" wire:navigate class="font-medium text-indigo-600 hover:text-indigo-700 dark:text-indigo-400 dark:hover:text-indigo-300">Open Team</a>
+                    </p>
+                </div>
                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     @foreach ($ownedWebsites as $site)
                         <div class="group rounded-xl border border-slate-200 bg-white p-5 transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
@@ -120,9 +126,6 @@
                                     GA4: {{ $site->ga_property_id ?: 'Not set' }}
                                 </span>
                             </div>
-                            @can('update', $site)
-                                <livewire:websites.website-team :website-id="$site->id" :key="'website-team-'.$site->id" />
-                            @endcan
                         </div>
                     @endforeach
                 </div>

@@ -11,22 +11,50 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Livewire\Attributes\On;
 use Livewire\Component;
 
 class WebsiteTeam extends Component
 {
-    public int $websiteId;
+    public int $websiteId = 0;
+
+    public bool $useSessionWebsite = false;
+
+    public bool $readonly = false;
 
     public string $inviteEmail = '';
 
-    public function mount(int $websiteId): void
+    public function mount(int $websiteId = 0, bool $useSessionWebsite = false): void
     {
+        $this->useSessionWebsite = $useSessionWebsite;
+
+        if ($useSessionWebsite) {
+            $this->websiteId = (int) session('current_website_id', 0);
+            $this->applySessionModeFlags();
+        } else {
+            $this->websiteId = $websiteId;
+            Gate::authorize('update', Website::findOrFail($this->websiteId));
+            $this->readonly = false;
+        }
+    }
+
+    #[On('website-changed')]
+    public function onWebsiteChanged(int $websiteId): void
+    {
+        if (! $this->useSessionWebsite) {
+            return;
+        }
+
         $this->websiteId = $websiteId;
-        Gate::authorize('update', Website::findOrFail($websiteId));
+        $this->applySessionModeFlags();
     }
 
     public function inviteMember(): void
     {
+        if ($this->readonly || $this->websiteId <= 0) {
+            return;
+        }
+
         $website = Website::findOrFail($this->websiteId);
         Gate::authorize('update', $website);
 
@@ -75,6 +103,10 @@ class WebsiteTeam extends Component
 
     public function revokeMember(int $userId): void
     {
+        if ($this->readonly || $this->websiteId <= 0) {
+            return;
+        }
+
         $website = Website::findOrFail($this->websiteId);
         Gate::authorize('update', $website);
 
@@ -88,6 +120,10 @@ class WebsiteTeam extends Component
 
     public function cancelInvitation(int $invitationId): void
     {
+        if ($this->readonly || $this->websiteId <= 0) {
+            return;
+        }
+
         $invitation = WebsiteInvitation::findOrFail($invitationId);
         Gate::authorize('update', $invitation->website);
 
@@ -101,10 +137,52 @@ class WebsiteTeam extends Component
 
     public function render()
     {
-        $website = Website::query()
-            ->with(['members', 'invitations'])
-            ->findOrFail($this->websiteId);
+        $emptyReason = null;
+        $website = null;
 
-        return view('livewire.websites.website-team', compact('website'));
+        if ($this->useSessionWebsite) {
+            if ($this->websiteId <= 0) {
+                $emptyReason = 'select_website';
+            } else {
+                $website = Website::query()
+                    ->with(['members', 'invitations', 'user'])
+                    ->find($this->websiteId);
+
+                $user = Auth::user();
+                if (! $website || ! $user?->can('view', $website)) {
+                    $website = null;
+                    $emptyReason = 'no_access';
+                }
+            }
+        } else {
+            $website = Website::query()
+                ->with(['members', 'invitations', 'user'])
+                ->find($this->websiteId);
+        }
+
+        return view('livewire.websites.website-team', [
+            'website' => $website,
+            'emptyReason' => $emptyReason,
+        ]);
+    }
+
+    private function applySessionModeFlags(): void
+    {
+        if ($this->websiteId <= 0) {
+            $this->readonly = true;
+
+            return;
+        }
+
+        $website = Website::find($this->websiteId);
+        $user = Auth::user();
+
+        if (! $website || ! $user?->can('view', $website)) {
+            $this->readonly = true;
+
+            return;
+        }
+
+        $this->readonly = ! $user->can('update', $website);
     }
 }
