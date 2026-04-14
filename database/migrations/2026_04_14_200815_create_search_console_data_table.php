@@ -20,8 +20,8 @@ return new class extends Migration
             $table->unsignedInteger('clicks')->default(0);
             $table->unsignedInteger('impressions')->default(0);
             $table->decimal('position', 8, 2)->default(0);
-            $table->string('country', 10)->nullable();
-            $table->string('device', 20)->nullable();
+            $table->string('country', 10)->default('');
+            $table->string('device', 20)->default('');
             $table->decimal('ctr', 8, 4)->default(0);
             $table->timestamps();
 

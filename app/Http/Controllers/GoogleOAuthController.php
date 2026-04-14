@@ -16,6 +16,7 @@ class GoogleOAuthController extends Controller
                 'https://www.googleapis.com/auth/analytics.readonly',
                 'https://www.googleapis.com/auth/webmasters.readonly',
             ])
+            ->with(['access_type' => 'offline', 'prompt' => 'consent'])
             ->redirect();
     }
 

@@ -36,20 +36,24 @@ class SyncSearchConsoleData implements ShouldQueue
             Carbon::now()->toDateString()
         );
 
-        $rows = array_map(function (array $row) {
-            $row['website_id'] = $this->websiteId;
-            $row['page'] = UrlNormalizer::normalize($row['page']);
-            return $row;
-        }, $rows);
-
         if ($rows === []) {
             return;
         }
 
-        DB::table('search_console_data')->upsert(
-            $rows,
-            ['website_id', 'date', 'query', 'page', 'country', 'device'],
-            ['clicks', 'impressions', 'position', 'ctr', 'updated_at']
-        );
+        foreach (array_chunk($rows, 500) as $chunk) {
+            $prepared = array_map(function (array $row) {
+                $row['website_id'] = $this->websiteId;
+                $row['page'] = UrlNormalizer::normalize($row['page']);
+                $row['country'] = $row['country'] ?? '';
+                $row['device'] = $row['device'] ?? '';
+                return $row;
+            }, $chunk);
+
+            DB::table('search_console_data')->upsert(
+                $prepared,
+                ['website_id', 'date', 'query', 'page', 'country', 'device'],
+                ['clicks', 'impressions', 'position', 'ctr', 'updated_at']
+            );
+        }
     }
 }
