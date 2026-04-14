@@ -33,6 +33,8 @@ class SearchConsoleService
     }
 
     /**
+     * Fetch a single date window (keep to <=7 days for performance).
+     *
      * @return array<int, array<string, mixed>>
      */
     public function fetchSearchAnalytics(GoogleAccount $account, string $siteUrl, string $startDate, string $endDate): array
@@ -43,8 +45,8 @@ class SearchConsoleService
         $request = new SearchAnalyticsQueryRequest();
         $request->setStartDate($startDate);
         $request->setEndDate($endDate);
-        $request->setDimensions(['date', 'query', 'page', 'country', 'device']);
-        $request->setRowLimit(25000);
+        $request->setDimensions(['date', 'query', 'page']);
+        $request->setRowLimit(5000);
 
         $response = $sc->searchanalytics->query($siteUrl, $request);
 
@@ -58,8 +60,8 @@ class SearchConsoleService
                 'date' => $keys[0],
                 'query' => $keys[1],
                 'page' => $keys[2],
-                'country' => $keys[3] ?? '',
-                'device' => $keys[4] ?? '',
+                'country' => '',
+                'device' => '',
                 'clicks' => (int) $row->getClicks(),
                 'impressions' => (int) $row->getImpressions(),
                 'ctr' => round((float) $row->getCtr(), 4),

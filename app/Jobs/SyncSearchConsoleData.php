@@ -15,6 +15,9 @@ class SyncSearchConsoleData implements ShouldQueue
 {
     use Queueable;
 
+    public int $timeout = 300;
+    public int $tries = 2;
+
     public function __construct(public int $websiteId)
     {
     }
@@ -29,13 +32,27 @@ class SyncSearchConsoleData implements ShouldQueue
             return;
         }
 
-        $rows = $service->fetchSearchAnalytics(
-            $account,
-            $website->gsc_site_url,
-            Carbon::now()->subDays(30)->toDateString(),
-            Carbon::now()->toDateString()
-        );
+        $end = Carbon::now();
+        $cursor = Carbon::now()->subDays(30);
 
+        while ($cursor->lt($end)) {
+            $windowEnd = $cursor->copy()->addDays(6)->min($end);
+
+            $rows = $service->fetchSearchAnalytics(
+                $account,
+                $website->gsc_site_url,
+                $cursor->toDateString(),
+                $windowEnd->toDateString()
+            );
+
+            $this->upsertRows($rows);
+
+            $cursor->addDays(7);
+        }
+    }
+
+    private function upsertRows(array $rows): void
+    {
         if ($rows === []) {
             return;
         }

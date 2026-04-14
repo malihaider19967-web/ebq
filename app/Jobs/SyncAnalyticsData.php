@@ -14,6 +14,9 @@ class SyncAnalyticsData implements ShouldQueue
 {
     use Queueable;
 
+    public int $timeout = 300;
+    public int $tries = 2;
+
     public function __construct(public int $websiteId)
     {
     }
