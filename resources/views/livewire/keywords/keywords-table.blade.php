@@ -1,47 +1,64 @@
 <div>
-    <div class="mb-4 flex flex-wrap items-center gap-3">
-        <input wire:model.live.debounce.300ms="search" type="text" placeholder="Search keywords..."
-            class="w-full max-w-xs rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800" />
-        <select wire:model.live="device"
-            class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-800">
-            <option value="">All devices</option>
-            <option value="DESKTOP">Desktop</option>
-            <option value="MOBILE">Mobile</option>
-            <option value="TABLET">Tablet</option>
-        </select>
-        <input wire:model.live="from" type="date" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-800" />
-        <input wire:model.live="to" type="date" class="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-600 dark:bg-slate-800" />
+    <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div class="relative flex-1 sm:max-w-xs">
+            <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+            <input wire:model.live.debounce.300ms="search" type="text" placeholder="Search keywords..."
+                class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm placeholder-slate-400 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
+        </div>
+        <div class="flex gap-2">
+            <select wire:model.live="device"
+                class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                <option value="">All devices</option>
+                <option value="DESKTOP">Desktop</option>
+                <option value="MOBILE">Mobile</option>
+                <option value="TABLET">Tablet</option>
+            </select>
+            <input wire:model.live="from" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+            <input wire:model.live="to" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+        </div>
     </div>
 
     @if ($rows instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $rows->isNotEmpty())
-        <div class="overflow-x-auto rounded-lg bg-white shadow dark:bg-slate-900">
-            <table class="w-full text-left text-sm">
-                <thead>
-                    <tr class="border-b border-slate-200 text-xs uppercase text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                        <th class="px-4 py-3">Keyword</th>
-                        <th class="px-4 py-3 text-right">Clicks</th>
-                        <th class="px-4 py-3 text-right">Impressions</th>
-                        <th class="px-4 py-3 text-right">CTR</th>
-                        <th class="px-4 py-3 text-right">Position</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($rows as $row)
-                        <tr class="border-b border-slate-100 dark:border-slate-800">
-                            <td class="px-4 py-3 font-medium">{{ $row->query }}</td>
-                            <td class="px-4 py-3 text-right">{{ number_format($row->clicks) }}</td>
-                            <td class="px-4 py-3 text-right">{{ number_format($row->impressions) }}</td>
-                            <td class="px-4 py-3 text-right">{{ number_format($row->ctr * 100, 1) }}%</td>
-                            <td class="px-4 py-3 text-right">{{ number_format($row->position, 1) }}</td>
+        <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+                            <th class="px-6 py-3">Keyword</th>
+                            <th class="px-6 py-3 text-right">Clicks</th>
+                            <th class="px-6 py-3 text-right">Impressions</th>
+                            <th class="px-6 py-3 text-right">CTR</th>
+                            <th class="px-6 py-3 text-right">Position</th>
                         </tr>
-                    @endforeach
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                        @foreach ($rows as $row)
+                            <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                <td class="whitespace-nowrap px-6 py-3.5 font-medium text-slate-900 dark:text-slate-100">{{ $row->query }}</td>
+                                <td class="whitespace-nowrap px-6 py-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->clicks) }}</td>
+                                <td class="whitespace-nowrap px-6 py-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->impressions) }}</td>
+                                <td class="whitespace-nowrap px-6 py-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->ctr * 100, 1) }}%</td>
+                                <td class="whitespace-nowrap px-6 py-3.5 text-right">
+                                    <span @class([
+                                        'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',
+                                        'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $row->position <= 3,
+                                        'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400' => $row->position > 3 && $row->position <= 10,
+                                        'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' => $row->position > 10 && $row->position <= 20,
+                                        'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' => $row->position > 20,
+                                    ])>{{ number_format($row->position, 1) }}</span>
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            </div>
         </div>
         <div class="mt-4">{{ $rows->links() }}</div>
     @else
-        <div class="rounded-lg bg-white p-8 text-center text-sm text-slate-400 shadow dark:bg-slate-900">
-            No keyword data yet. Data appears after the daily sync runs.
+        <div class="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-16 dark:border-slate-800 dark:bg-slate-900">
+            <svg class="h-12 w-12 text-slate-300 dark:text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+            <p class="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">No keyword data yet</p>
+            <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Data will appear after the daily sync runs.</p>
         </div>
     @endif
 </div>

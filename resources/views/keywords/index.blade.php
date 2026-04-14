@@ -1,6 +1,9 @@
 <x-layouts.app>
-    <div class="space-y-5">
-        <h1 class="text-xl font-semibold">Keywords</h1>
+    <div class="space-y-6">
+        <div>
+            <h1 class="text-2xl font-bold tracking-tight">Keywords</h1>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Search queries driving traffic to your site</p>
+        </div>
         <livewire:keywords.keywords-table />
     </div>
 </x-layouts.app>
