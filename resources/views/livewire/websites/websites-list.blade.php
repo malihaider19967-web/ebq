@@ -23,26 +23,65 @@
     @if ($showForm)
         <div class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-6 dark:border-indigo-500/20 dark:bg-indigo-500/5">
             <h3 class="mb-4 text-sm font-semibold text-slate-900 dark:text-slate-100">New Website</h3>
-            <form wire:submit="addWebsite" class="grid gap-4 sm:grid-cols-3">
+
+            @if ($fetchError)
+                <div class="mb-4 flex items-center gap-2 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                    <svg class="h-4 w-4 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                    {{ $fetchError }}
+                </div>
+            @endif
+
+            <form wire:submit="addWebsite" class="space-y-4">
+                <div class="grid gap-4 sm:grid-cols-2">
+                    {{-- GA4 Property --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-300">GA4 Property</label>
+                        @if (count($gaProperties))
+                            <select wire:model="gaPropertyId"
+                                class="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                                <option value="">Select a property...</option>
+                                @foreach ($gaProperties as $prop)
+                                    <option value="{{ $prop['id'] }}">{{ $prop['name'] }} ({{ $prop['id'] }})</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <input wire:model="gaPropertyId" type="text" placeholder="properties/123456789"
+                                class="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                            <p class="mt-1 text-xs text-slate-400">GA4 > Admin > Property Settings > Property ID</p>
+                        @endif
+                        @error('gaPropertyId') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+
+                    {{-- Search Console Site --}}
+                    <div>
+                        <label class="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-300">Search Console Site</label>
+                        @if (count($gscSites))
+                            <select wire:model.live="gscSiteUrl"
+                                class="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                                <option value="">Select a site...</option>
+                                @foreach ($gscSites as $site)
+                                    <option value="{{ $site['siteUrl'] }}">{{ $site['siteUrl'] }}</option>
+                                @endforeach
+                            </select>
+                        @else
+                            <input wire:model.live="gscSiteUrl" type="text" placeholder="sc-domain:example.com"
+                                class="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                            <p class="mt-1 text-xs text-slate-400">Domain property (sc-domain:example.com) or URL prefix</p>
+                        @endif
+                        @error('gscSiteUrl') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                    </div>
+                </div>
+
+                {{-- Domain (auto-filled from GSC selection) --}}
                 <div>
                     <label class="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-300">Domain</label>
                     <input wire:model="domain" type="text" placeholder="example.com"
-                        class="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                        class="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 sm:max-w-xs" />
+                    <p class="mt-1 text-xs text-slate-400">Auto-filled from Search Console selection.</p>
                     @error('domain') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
                 </div>
+
                 <div>
-                    <label class="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-300">GA4 Property ID</label>
-                    <input wire:model="gaPropertyId" type="text" placeholder="properties/123456789"
-                        class="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-                    @error('gaPropertyId') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
-                </div>
-                <div>
-                    <label class="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-300">GSC Site URL</label>
-                    <input wire:model="gscSiteUrl" type="text" placeholder="sc-domain:example.com"
-                        class="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-                    @error('gscSiteUrl') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
-                </div>
-                <div class="sm:col-span-3">
                     <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700">
                         <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
                         Save Website
