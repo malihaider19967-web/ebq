@@ -1,22 +1,19 @@
 <?php
 
-namespace App\Livewire\Keywords;
+namespace App\Livewire\Pages;
 
 use App\Models\SearchConsoleData;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
 
-class KeywordsTable extends Component
+class PagesTable extends Component
 {
     use WithPagination;
 
     public int $websiteId = 0;
     public string $search = '';
-    public ?string $country = null;
-    public ?string $device = null;
-    public ?string $from = null;
-    public ?string $to = null;
 
     public function mount(): void
     {
@@ -41,15 +38,20 @@ class KeywordsTable extends Component
 
         if ($this->websiteId) {
             $rows = SearchConsoleData::query()
+                ->select(
+                    'page',
+                    DB::raw('SUM(clicks) as total_clicks'),
+                    DB::raw('SUM(impressions) as total_impressions'),
+                    DB::raw('AVG(position) as avg_position'),
+                    DB::raw('AVG(ctr) as avg_ctr'),
+                )
                 ->where('website_id', $this->websiteId)
-                ->forDateRange($this->from, $this->to)
-                ->when($this->search, fn ($q) => $q->where('query', 'like', "%{$this->search}%"))
-                ->when($this->country, fn ($q) => $q->where('country', $this->country))
-                ->when($this->device, fn ($q) => $q->where('device', $this->device))
-                ->orderByDesc('clicks')
+                ->when($this->search, fn ($q) => $q->where('page', 'like', "%{$this->search}%"))
+                ->groupBy('page')
+                ->orderByDesc('total_clicks')
                 ->paginate(20);
         }
 
-        return view('livewire.keywords.keywords-table', compact('rows'));
+        return view('livewire.pages.pages-table', compact('rows'));
     }
 }

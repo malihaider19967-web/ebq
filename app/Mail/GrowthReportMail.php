@@ -2,6 +2,9 @@
 
 namespace App\Mail;
 
+use App\Models\AnalyticsData;
+use App\Models\SearchConsoleData;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -12,13 +15,21 @@ class GrowthReportMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public \App\Models\User $user)
+    public array $stats = [];
+
+    public function __construct(public User $user)
     {
+        $websiteIds = $user->websites()->pluck('id');
+
+        $this->stats = [
+            'clicks' => (int) SearchConsoleData::whereIn('website_id', $websiteIds)->sum('clicks'),
+            'impressions' => (int) SearchConsoleData::whereIn('website_id', $websiteIds)->sum('impressions'),
+            'users' => (int) AnalyticsData::whereIn('website_id', $websiteIds)->sum('users'),
+            'sessions' => (int) AnalyticsData::whereIn('website_id', $websiteIds)->sum('sessions'),
+            'websites' => $user->websites()->pluck('domain')->toArray(),
+        ];
     }
 
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         return new Envelope(
@@ -26,9 +37,6 @@ class GrowthReportMail extends Mailable
         );
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
         return new Content(
