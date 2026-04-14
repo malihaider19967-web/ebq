@@ -1,6 +1,6 @@
-@props(['column', 'sortBy', 'sortDir', 'align' => 'left'])
+@props(['column', 'sortBy', 'sortDir', 'align' => 'left', 'thClass' => 'px-6 py-3'])
 
-<th class="px-6 py-3 {{ $align === 'right' ? 'text-right' : 'text-left' }}">
+<th @class([$thClass, $align === 'right' ? 'text-right' : 'text-left'])>
     <button wire:click="sort('{{ $column }}')" class="group inline-flex items-center gap-1 uppercase tracking-wider hover:text-slate-700 dark:hover:text-slate-200">
         {{ $slot }}
         <span class="flex flex-col">

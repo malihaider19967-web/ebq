@@ -186,44 +186,55 @@
                 </div>
 
                 @if ($rows->isNotEmpty())
-                    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm">
+                    <div class="max-w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                        <div class="max-w-full overflow-x-auto">
+                            <table class="w-full min-w-0 table-fixed text-sm">
+                                <colgroup>
+                                    <col class="w-[6.5rem]" />
+                                    <col />
+                                    <col />
+                                    <col class="w-12" />
+                                    <col class="w-12" />
+                                    <col class="w-[9rem]" />
+                                    <col class="w-[7.5rem]" />
+                                    <col class="w-[6.25rem]" />
+                                    <col class="w-[6.5rem]" />
+                                </colgroup>
                                 <thead>
                                     <tr class="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
-                                        <x-sort-header column="tracked_date" :sortBy="$sortBy" :sortDir="$sortDir">Date</x-sort-header>
-                                        <x-sort-header column="referring_page_url" :sortBy="$sortBy" :sortDir="$sortDir">Referring URL</x-sort-header>
-                                        <x-sort-header column="target_page_url" :sortBy="$sortBy" :sortDir="$sortDir">Target URL</x-sort-header>
-                                        <x-sort-header column="domain_authority" :sortBy="$sortBy" :sortDir="$sortDir" align="right">DA</x-sort-header>
-                                        <x-sort-header column="spam_score" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Spam</x-sort-header>
-                                        <x-sort-header column="anchor_text" :sortBy="$sortBy" :sortDir="$sortDir">Anchor</x-sort-header>
-                                        <x-sort-header column="type" :sortBy="$sortBy" :sortDir="$sortDir">Type</x-sort-header>
-                                        <x-sort-header column="is_dofollow" :sortBy="$sortBy" :sortDir="$sortDir">Follow</x-sort-header>
-                                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Actions</th>
+                                        <x-sort-header column="tracked_date" :sortBy="$sortBy" :sortDir="$sortDir" th-class="min-w-0 px-2 py-3">Date</x-sort-header>
+                                        <x-sort-header column="referring_page_url" :sortBy="$sortBy" :sortDir="$sortDir" th-class="min-w-0 px-2 py-3">Referring</x-sort-header>
+                                        <x-sort-header column="target_page_url" :sortBy="$sortBy" :sortDir="$sortDir" th-class="min-w-0 px-2 py-3">Target</x-sort-header>
+                                        <x-sort-header column="domain_authority" :sortBy="$sortBy" :sortDir="$sortDir" align="right" th-class="px-2 py-3">DA</x-sort-header>
+                                        <x-sort-header column="spam_score" :sortBy="$sortBy" :sortDir="$sortDir" align="right" th-class="px-2 py-3">Spam</x-sort-header>
+                                        <x-sort-header column="anchor_text" :sortBy="$sortBy" :sortDir="$sortDir" th-class="min-w-0 px-2 py-3">Anchor</x-sort-header>
+                                        <x-sort-header column="type" :sortBy="$sortBy" :sortDir="$sortDir" th-class="min-w-0 px-2 py-3">Type</x-sort-header>
+                                        <x-sort-header column="is_dofollow" :sortBy="$sortBy" :sortDir="$sortDir" th-class="px-2 py-3">Follow</x-sort-header>
+                                        <th class="w-[6.5rem] px-2 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                     @foreach ($rows as $b)
                                         <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                            <td class="whitespace-nowrap px-6 py-3 text-slate-600 dark:text-slate-300">{{ $b->tracked_date->format('M j, Y') }}</td>
-                                            <td class="max-w-[200px] truncate px-6 py-3 text-slate-900 dark:text-slate-100" title="{{ $b->referring_page_url }}">
-                                                <a href="{{ $b->referring_page_url }}" target="_blank" rel="noopener noreferrer" class="font-medium text-indigo-600 hover:underline dark:text-indigo-400">{{ $b->referring_page_url }}</a>
+                                            <td class="whitespace-nowrap px-2 py-2.5 align-top text-slate-600 dark:text-slate-300">{{ $b->tracked_date->format('M j, Y') }}</td>
+                                            <td class="min-w-0 px-2 py-2.5 align-top">
+                                                <a href="{{ $b->referring_page_url }}" target="_blank" rel="noopener noreferrer" title="{{ $b->referring_page_url }}" class="block min-w-0 truncate font-medium text-indigo-600 hover:underline dark:text-indigo-400">{{ $b->referring_page_url }}</a>
                                             </td>
-                                            <td class="max-w-[200px] truncate px-6 py-3 text-slate-700 dark:text-slate-300" title="{{ $b->target_page_url }}">
-                                                <a href="{{ $b->target_page_url }}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline dark:text-indigo-400">{{ $b->target_page_url }}</a>
+                                            <td class="min-w-0 px-2 py-2.5 align-top">
+                                                <a href="{{ $b->target_page_url }}" target="_blank" rel="noopener noreferrer" title="{{ $b->target_page_url }}" class="block min-w-0 truncate text-indigo-600 hover:underline dark:text-indigo-400">{{ $b->target_page_url }}</a>
                                             </td>
-                                            <td class="whitespace-nowrap px-6 py-3 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ $b->domain_authority ?? '—' }}</td>
-                                            <td class="whitespace-nowrap px-6 py-3 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ $b->spam_score ?? '—' }}</td>
-                                            <td class="max-w-[140px] truncate px-6 py-3 text-slate-700 dark:text-slate-300" title="{{ $b->anchor_text }}">{{ $b->anchor_text ?? '—' }}</td>
-                                            <td class="whitespace-nowrap px-6 py-3 text-slate-700 dark:text-slate-300">{{ $b->type->label() }}</td>
-                                            <td class="whitespace-nowrap px-6 py-3">
+                                            <td class="whitespace-nowrap px-2 py-2.5 text-right align-top tabular-nums text-slate-700 dark:text-slate-300">{{ $b->domain_authority ?? '—' }}</td>
+                                            <td class="whitespace-nowrap px-2 py-2.5 text-right align-top tabular-nums text-slate-700 dark:text-slate-300">{{ $b->spam_score ?? '—' }}</td>
+                                            <td class="min-w-0 truncate px-2 py-2.5 align-top text-slate-700 dark:text-slate-300" title="{{ $b->anchor_text }}">{{ $b->anchor_text ?? '—' }}</td>
+                                            <td class="min-w-0 truncate px-2 py-2.5 align-top text-slate-700 dark:text-slate-300" title="{{ $b->type->label() }}">{{ $b->type->label() }}</td>
+                                            <td class="whitespace-nowrap px-2 py-2.5 align-top">
                                                 <span @class([
                                                     'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold',
                                                     'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $b->is_dofollow,
                                                     'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' => ! $b->is_dofollow,
                                                 ])>{{ $b->is_dofollow ? 'Dofollow' : 'Nofollow' }}</span>
                                             </td>
-                                            <td class="whitespace-nowrap px-6 py-3 text-right text-xs">
+                                            <td class="whitespace-nowrap px-2 py-2.5 text-right align-top text-xs leading-tight">
                                                 <button type="button" wire:click="openSheetForDate('{{ $b->tracked_date->format('Y-m-d') }}')" class="font-medium text-indigo-600 hover:underline dark:text-indigo-400">Sheet</button>
                                                 <span class="text-slate-300 dark:text-slate-600">·</span>
                                                 <button type="button" wire:click="deleteBacklink({{ $b->id }})" wire:confirm="Delete this backlink?" class="font-medium text-red-600 hover:underline dark:text-red-400">Delete</button>
