@@ -31,7 +31,7 @@
         </div>
 
         <div class="p-4 sm:p-5">
-            <div class="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+            <div class="mb-5 grid grid-cols-1 gap-2.5 md:grid-cols-3">
                 @include('livewire.reports.partials.kpi-card', ['label' => 'Users', 'metric' => $report['analytics']['users'], 'format' => 'number'])
                 @include('livewire.reports.partials.kpi-card', ['label' => 'Sessions', 'metric' => $report['analytics']['sessions'], 'format' => 'number'])
                 @include('livewire.reports.partials.kpi-card', ['label' => 'Bounce Rate', 'metric' => $report['analytics']['bounce_rate'], 'format' => 'percent', 'changeSuffix' => 'pp'])
