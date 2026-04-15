@@ -44,9 +44,9 @@
     }
 @endphp
 
-<div class="rounded-lg border border-slate-100 p-4 dark:border-slate-800">
-    <p class="text-xs font-medium uppercase tracking-wider text-slate-400">{{ $label }}</p>
-    <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ $formattedValue }}</p>
+<div class="min-w-0 rounded-lg border border-slate-100 p-3 sm:p-4 dark:border-slate-800">
+    <p class="truncate text-xs font-medium uppercase tracking-wider text-slate-400">{{ $label }}</p>
+    <p class="mt-1 truncate text-lg font-bold tabular-nums text-slate-900 sm:text-2xl dark:text-slate-100">{{ $formattedValue }}</p>
     <div class="mt-2 flex items-center gap-2">
         <span class="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-xs font-semibold {{ $changeBg }} {{ $changeColor }}">
             {{ $arrow }} {{ $changeText }}

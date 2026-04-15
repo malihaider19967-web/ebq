@@ -31,8 +31,8 @@
         </div>
 
         <div class="p-6">
-            {{-- KPI Cards --}}
-            <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {{-- KPI Cards: as many per row as fit (min ~9.5rem per card) --}}
+            <div class="mb-6 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,9.5rem),1fr))]">
                 @include('livewire.reports.partials.kpi-card', [
                     'label' => 'Users',
                     'metric' => $report['analytics']['users'],
@@ -93,7 +93,7 @@
 
         <div class="p-6">
             {{-- KPI Cards --}}
-            <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div class="mb-6 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,9.5rem),1fr))]">
                 @include('livewire.reports.partials.kpi-card', [
                     'label' => 'Clicks',
                     'metric' => $report['search_console']['clicks'],
@@ -184,11 +184,11 @@
             {{-- Devices --}}
             @if (count($report['search_console']['devices']) > 0)
                 <h4 class="mb-3 text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Device Breakdown</h4>
-                <div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div class="mb-6 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,9.5rem),1fr))]">
                     @foreach ($report['search_console']['devices'] as $device)
-                        <div class="rounded-lg border border-slate-100 p-4 dark:border-slate-800">
-                            <p class="text-xs font-medium uppercase tracking-wider text-slate-400">{{ ucfirst($device['device']) }}</p>
-                            <p class="mt-1 text-2xl font-bold text-slate-900 dark:text-slate-100">{{ number_format($device['clicks']) }}</p>
+                        <div class="min-w-0 rounded-lg border border-slate-100 p-3 sm:p-4 dark:border-slate-800">
+                            <p class="truncate text-xs font-medium uppercase tracking-wider text-slate-400">{{ ucfirst($device['device']) }}</p>
+                            <p class="mt-1 truncate text-lg font-bold tabular-nums text-slate-900 sm:text-2xl dark:text-slate-100">{{ number_format($device['clicks']) }}</p>
                             <p class="text-xs text-slate-400">{{ $device['percentage'] }}% of clicks</p>
                             <div class="mt-1">@include('livewire.reports.partials.change-badge', ['metric' => $device['change']])</div>
                             <p class="text-xs text-slate-400">was {{ number_format($device['prev_clicks']) }}</p>
@@ -243,7 +243,7 @@
 
         <div class="p-6">
             {{-- KPI Cards --}}
-            <div class="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div class="mb-6 grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(min(100%,9.5rem),1fr))]">
                 @include('livewire.reports.partials.kpi-card', [
                     'label' => 'New Backlinks',
                     'metric' => $report['backlinks']['count'],

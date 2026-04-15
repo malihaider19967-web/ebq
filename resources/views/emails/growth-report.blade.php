@@ -20,9 +20,13 @@
         .section-title { font-size: 16px; font-weight: 700; margin: 0 0 16px; color: #0f172a; }
         .section-divider { border: none; border-top: 1px solid #e2e8f0; margin: 28px 0; }
 
-        .kpi-grid { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
-        .kpi-grid td { padding: 14px 12px; text-align: center; background: #f8fafc; border: 2px solid #ffffff; border-radius: 8px; }
-        .kpi-value { font-size: 24px; font-weight: 700; color: #0f172a; display: block; }
+        .kpi-grid { width: 100%; border-collapse: separate; border-spacing: 6px; margin: 0 -6px 24px; }
+        .kpi-grid td { width: 25%; padding: 12px 8px; text-align: center; vertical-align: top; background: #f8fafc; border: 2px solid #ffffff; border-radius: 8px; }
+        .kpi-grid.kpi-grid-3 td { width: 33.33%; }
+        .kpi-value { font-size: 20px; font-weight: 700; color: #0f172a; display: block; word-break: break-word; }
+        @media only screen and (min-width: 480px) {
+            .kpi-value { font-size: 22px; }
+        }
         .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; display: block; margin-top: 2px; }
         .kpi-change { font-size: 11px; font-weight: 600; display: block; margin-top: 4px; }
         .kpi-prev { font-size: 10px; color: #94a3b8; display: block; margin-top: 2px; }
@@ -69,7 +73,7 @@
         <span class="section-badge badge-analytics">Google Analytics</span>
         <h2 class="section-title">Website Traffic</h2>
 
-        <table class="kpi-grid" role="presentation">
+        <table class="kpi-grid kpi-grid-3" role="presentation">
             <tr>
                 <td>
                     <span class="kpi-value">{{ number_format($report['analytics']['users']['current']) }}</span>
@@ -138,8 +142,6 @@
                     @include('emails.partials.change-badge', ['metric' => $report['search_console']['impressions']])
                     <span class="kpi-prev">was {{ number_format($report['search_console']['impressions']['previous']) }}</span>
                 </td>
-            </tr>
-            <tr>
                 <td>
                     <span class="kpi-value">{{ $report['search_console']['position']['current'] }}</span>
                     <span class="kpi-label">Avg Position</span>
@@ -230,8 +232,16 @@
                     <span class="kpi-prev">was {{ $report['backlinks']['avg_da']['previous'] }}</span>
                 </td>
                 <td>
-                    <span class="kpi-value">{{ $report['backlinks']['dofollow']['current'] }} / {{ $report['backlinks']['nofollow']['current'] }}</span>
-                    <span class="kpi-label">Do / Nofollow</span>
+                    <span class="kpi-value">{{ number_format($report['backlinks']['dofollow']['current']) }}</span>
+                    <span class="kpi-label">Dofollow</span>
+                    @include('emails.partials.change-badge', ['metric' => $report['backlinks']['dofollow']])
+                    <span class="kpi-prev">was {{ number_format($report['backlinks']['dofollow']['previous']) }}</span>
+                </td>
+                <td>
+                    <span class="kpi-value">{{ number_format($report['backlinks']['nofollow']['current']) }}</span>
+                    <span class="kpi-label">Nofollow</span>
+                    @include('emails.partials.change-badge', ['metric' => $report['backlinks']['nofollow']])
+                    <span class="kpi-prev">was {{ number_format($report['backlinks']['nofollow']['previous']) }}</span>
                 </td>
             </tr>
         </table>
