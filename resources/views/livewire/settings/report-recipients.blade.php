@@ -36,7 +36,7 @@
 
             <div class="mt-4 flex items-center gap-3">
                 <button type="button" wire:click="save"
-                    class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700">
+                    class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700">
                     Save Recipients
                 </button>
                 @if ($saved)

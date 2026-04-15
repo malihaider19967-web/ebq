@@ -19,7 +19,7 @@
                 @error('email') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
             </div>
             <div class="flex items-center gap-3 pt-1">
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700">Save Changes</button>
+                <button type="submit" class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700">Save Changes</button>
                 @if ($profileSaved)
                     <span class="text-sm font-medium text-emerald-600 dark:text-emerald-400" wire:transition>Saved successfully</span>
                 @endif
@@ -52,7 +52,7 @@
                     class="block w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
             </div>
             <div class="flex items-center gap-3 pt-1">
-                <button type="submit" class="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700">Update Password</button>
+                <button type="submit" class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700">Update Password</button>
                 @if ($passwordSaved)
                     <span class="text-sm font-medium text-emerald-600 dark:text-emerald-400" wire:transition>Updated successfully</span>
                 @endif
