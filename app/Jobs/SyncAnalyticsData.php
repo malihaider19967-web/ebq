@@ -40,6 +40,8 @@ class SyncAnalyticsData implements ShouldQueue
         );
 
         if ($rows === []) {
+            Website::whereKey($this->websiteId)->update(['last_analytics_sync_at' => now()]);
+
             return;
         }
 
@@ -52,5 +54,7 @@ class SyncAnalyticsData implements ShouldQueue
             ['website_id', 'date', 'source'],
             ['users', 'sessions', 'bounce_rate', 'updated_at']
         );
+
+        Website::whereKey($this->websiteId)->update(['last_analytics_sync_at' => now()]);
     }
 }

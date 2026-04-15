@@ -50,6 +50,8 @@ class SyncSearchConsoleData implements ShouldQueue
 
             $cursor->addDays(7);
         }
+
+        Website::whereKey($this->websiteId)->update(['last_search_console_sync_at' => now()]);
     }
 
     private function upsertRows(array $rows): void

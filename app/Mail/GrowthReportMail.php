@@ -9,6 +9,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
+use Illuminate\Mail\Mailables\Headers;
 use Illuminate\Queue\SerializesModels;
 
 class GrowthReportMail extends Mailable
@@ -34,6 +35,15 @@ class GrowthReportMail extends Mailable
     {
         return new Envelope(
             subject: 'Your GrowthHub Daily Report',
+        );
+    }
+
+    public function headers(): Headers
+    {
+        return new Headers(
+            text: [
+                'X-GrowthHub-Growth-Report-User-Id' => (string) $this->user->id,
+            ],
         );
     }
 

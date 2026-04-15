@@ -17,7 +17,17 @@ class Website extends Model
         'domain',
         'ga_property_id',
         'gsc_site_url',
+        'last_analytics_sync_at',
+        'last_search_console_sync_at',
     ];
+
+    protected function casts(): array
+    {
+        return [
+            'last_analytics_sync_at' => 'datetime',
+            'last_search_console_sync_at' => 'datetime',
+        ];
+    }
 
     public function user(): BelongsTo
     {
