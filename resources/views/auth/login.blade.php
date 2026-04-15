@@ -1,7 +1,7 @@
 <x-layouts.guest>
     <div>
         <h1 class="text-2xl font-bold tracking-tight text-slate-900">Welcome back</h1>
-        <p class="mt-2 text-sm text-slate-600">Sign in to your GrowthHub account</p>
+        <p class="mt-2 text-sm text-slate-600">Sign in to your EBQ account</p>
     </div>
 
     <form method="POST" action="{{ route('login') }}" class="mt-8 space-y-5">

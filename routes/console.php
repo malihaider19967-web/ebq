@@ -8,5 +8,5 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->purpose('Display an inspiring quote');
 
-Schedule::command('growthhub:sync-daily-data')->daily();
-Schedule::command('growthhub:send-reports')->dailyAt('08:00');
+Schedule::command('ebq:sync-daily-data')->daily();
+Schedule::command('ebq:send-reports')->dailyAt('08:00');

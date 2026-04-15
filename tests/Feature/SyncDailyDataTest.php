@@ -20,7 +20,7 @@ class SyncDailyDataTest extends TestCase
         $user = User::factory()->create();
         Website::factory()->create(['user_id' => $user->id]);
 
-        $this->artisan('growthhub:sync-daily-data')->assertSuccessful();
+        $this->artisan('ebq:sync-daily-data')->assertSuccessful();
 
         Queue::assertPushed(SyncAnalyticsData::class);
         Queue::assertPushed(SyncSearchConsoleData::class);

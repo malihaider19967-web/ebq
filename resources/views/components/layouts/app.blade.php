@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>GrowthHub</title>
+    <title>EBQ</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
     @if (! app()->environment('testing'))
@@ -20,7 +20,7 @@
         <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-200 md:static md:translate-x-0 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex h-16 items-center gap-2 border-b border-slate-200 px-6 dark:border-slate-800">
                 <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">G</div>
-                <span class="text-base font-bold tracking-tight">GrowthHub</span>
+                <span class="text-base font-bold tracking-tight">EBQ</span>
             </div>
 
             @php $current = request()->route()?->getName() ?? ''; @endphp

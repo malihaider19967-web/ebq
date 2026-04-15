@@ -10,11 +10,11 @@ class RecordGrowthReportSent
     public function handle(MessageSent $event): void
     {
         $headers = $event->message->getHeaders();
-        if (! $headers->has('X-GrowthHub-Growth-Report-User-Id')) {
+        if (! $headers->has('X-EBQ-Growth-Report-User-Id')) {
             return;
         }
 
-        $header = $headers->get('X-GrowthHub-Growth-Report-User-Id');
+        $header = $headers->get('X-EBQ-Growth-Report-User-Id');
         $userId = (int) trim($header->getBodyAsString());
 
         if ($userId < 1) {

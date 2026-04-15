@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 
 class SyncDailyData extends Command
 {
-    protected $signature = 'growthhub:sync-daily-data';
+    protected $signature = 'ebq:sync-daily-data';
     protected $description = 'Refresh GA4 and GSC data for all websites';
 
     public function handle(): int
@@ -21,7 +21,7 @@ class SyncDailyData extends Command
             }
         });
 
-        $this->info('GrowthHub daily sync jobs dispatched.');
+        $this->info('EBQ daily sync jobs dispatched.');
         return self::SUCCESS;
     }
 }

@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ $title ?? 'GrowthHub' }}</title>
+    <title>{{ $title ?? 'EBQ' }}</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700&display=swap" rel="stylesheet" />
     @if (! app()->environment('testing'))
@@ -15,7 +15,7 @@
     <div class="flex min-h-full">
         <div class="hidden w-1/2 bg-indigo-600 lg:flex lg:flex-col lg:justify-between lg:p-12">
             <div>
-                <span class="text-2xl font-bold text-white">GrowthHub</span>
+                <span class="text-2xl font-bold text-white">EBQ</span>
                 <p class="mt-2 text-indigo-200">SEO & Analytics Dashboard</p>
             </div>
             <div>
@@ -37,11 +37,11 @@
                     </div>
                 </div>
             </div>
-            <p class="text-xs text-indigo-300">&copy; {{ date('Y') }} GrowthHub. All rights reserved.</p>
+            <p class="text-xs text-indigo-300">&copy; {{ date('Y') }} EBQ. All rights reserved.</p>
         </div>
         <div class="flex w-full flex-col items-center justify-center p-6 lg:w-1/2 lg:p-12">
             <div class="mb-8 lg:hidden">
-                <span class="text-xl font-bold text-indigo-600">GrowthHub</span>
+                <span class="text-xl font-bold text-indigo-600">EBQ</span>
             </div>
             <div class="w-full max-w-md">
                 {{ $slot }}

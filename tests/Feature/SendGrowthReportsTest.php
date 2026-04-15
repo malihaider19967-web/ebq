@@ -20,7 +20,7 @@ class SendGrowthReportsTest extends TestCase
         $owner = User::factory()->create();
         Website::factory()->count(2)->create(['user_id' => $owner->id]);
 
-        $this->artisan('growthhub:send-reports')->assertSuccessful();
+        $this->artisan('ebq:send-reports')->assertSuccessful();
 
         $queued = Mail::queued(GrowthReportMail::class);
         $this->assertCount(2, $queued);
@@ -33,7 +33,7 @@ class SendGrowthReportsTest extends TestCase
     {
         Mail::fake();
 
-        $this->artisan('growthhub:send-reports')->assertSuccessful();
+        $this->artisan('ebq:send-reports')->assertSuccessful();
 
         Mail::assertNothingQueued();
     }

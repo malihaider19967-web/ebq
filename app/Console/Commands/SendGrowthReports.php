@@ -10,9 +10,9 @@ use Illuminate\Support\Facades\Mail;
 
 class SendGrowthReports extends Command
 {
-    protected $signature = 'growthhub:send-reports';
+    protected $signature = 'ebq:send-reports';
 
-    protected $description = 'Queue one GrowthHub report email per website recipient for yesterday in the app timezone';
+    protected $description = 'Queue one EBQ report email per website recipient for yesterday in the app timezone';
 
     public function handle(): int
     {

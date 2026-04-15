@@ -50,7 +50,7 @@
 <body>
 <div class="container">
     <div class="card">
-        <h1>GrowthHub {{ ucfirst($reportType) }} Report</h1>
+        <h1>EBQ {{ ucfirst($reportType) }} Report</h1>
         <p class="meta">
             <strong>{{ $website->domain }}</strong> &mdash;
             @if ($startDate === $endDate)
@@ -274,7 +274,7 @@
             <a href="{{ route('reports.index') }}" class="btn">View Full Report in Dashboard</a>
         </div>
     </div>
-    <p class="footer">Sent by GrowthHub &mdash; {{ now()->format('M d, Y') }}</p>
+    <p class="footer">Sent by EBQ &mdash; {{ now()->format('M d, Y') }}</p>
 </div>
 </body>
 </html>

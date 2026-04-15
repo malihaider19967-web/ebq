@@ -57,7 +57,7 @@ class WebsitesList extends Component
         );
 
         if ($website->wasRecentlyCreated) {
-            Artisan::queue('growthhub:import-historical', [
+            Artisan::queue('ebq:import-historical', [
                 '--days' => 365,
                 '--website' => (string) $website->id,
             ]);

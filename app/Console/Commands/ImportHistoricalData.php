@@ -9,7 +9,7 @@ use Illuminate\Console\Command;
 
 class ImportHistoricalData extends Command
 {
-    protected $signature = 'growthhub:import-historical
+    protected $signature = 'ebq:import-historical
                             {--days=480 : Number of days of history to import (GSC max ~16 months)}
                             {--website= : Import only a specific website ID}';
 

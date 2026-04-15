@@ -1,3 +1,3 @@
-<x-layouts.guest :title="'Get Started — GrowthHub'">
+<x-layouts.guest :title="'Get Started — EBQ'">
     <livewire:onboarding.connect-google />
 </x-layouts.guest>

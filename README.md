@@ -1,4 +1,4 @@
-# GrowthHub
+# EBQ
 
 Laravel application that connects to **Google Analytics 4** and **Google Search Console**, syncs metrics into the database, and surfaces them in a Livewire-powered dashboard (KPIs, keywords, pages, and site management). Email growth reports and scheduled syncs run through the queue.
 
@@ -81,13 +81,13 @@ Google OAuth is configured in `config/services.php` under `google` and uses thes
 
 | Command | Description |
 |---------|-------------|
-| `php artisan growthhub:sync-daily-data` | Dispatches `SyncAnalyticsData` and `SyncSearchConsoleData` jobs for every website in chunks. |
-| `php artisan growthhub:send-reports` | Queues `GrowthReportMail` for every user. |
+| `php artisan ebq:sync-daily-data` | Dispatches `SyncAnalyticsData` and `SyncSearchConsoleData` jobs for every website in chunks. |
+| `php artisan ebq:send-reports` | Queues `GrowthReportMail` for every user. |
 
 These are registered on the scheduler in `routes/console.php`:
 
-- `growthhub:sync-daily-data` — daily
-- `growthhub:send-reports` — daily at 08:00
+- `ebq:sync-daily-data` — daily
+- `ebq:send-reports` — daily at 08:00
 
 Run the scheduler locally with:
 

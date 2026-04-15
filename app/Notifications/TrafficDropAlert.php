@@ -30,9 +30,9 @@ class TrafficDropAlert extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         return (new MailMessage)
-            ->subject('GrowthHub Alert: Traffic Drop Detected')
+            ->subject('EBQ Alert: Traffic Drop Detected')
             ->line("A traffic drop was detected for {$this->website->domain}.")
-            ->action('Open GrowthHub', route('dashboard'))
+            ->action('Open EBQ', route('dashboard'))
             ->line('Review traffic sources and keyword changes to investigate.');
     }
 

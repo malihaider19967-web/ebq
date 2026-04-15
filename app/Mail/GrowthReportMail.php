@@ -56,7 +56,7 @@ class GrowthReportMail extends Mailable
             : $start->format('M j').' - '.$end->format('M j, Y');
 
         return new Envelope(
-            subject: "GrowthHub {$typeLabel} Report — {$this->website->domain} ({$dateStr})",
+            subject: "EBQ {$typeLabel} Report — {$this->website->domain} ({$dateStr})",
         );
     }
 
@@ -64,8 +64,8 @@ class GrowthReportMail extends Mailable
     {
         return new Headers(
             text: [
-                'X-GrowthHub-Growth-Report-User-Id' => (string) $this->user->id,
-                'X-GrowthHub-Growth-Report-Website-Id' => (string) $this->website->id,
+                'X-EBQ-Growth-Report-User-Id' => (string) $this->user->id,
+                'X-EBQ-Growth-Report-Website-Id' => (string) $this->website->id,
             ],
         );
     }
