@@ -4,6 +4,7 @@ namespace App\Livewire\Dashboard;
 
 use App\Mail\GrowthReportMail;
 use App\Models\Website;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -42,6 +43,19 @@ class SyncAndReportPanel extends Component
             return;
         }
 
+        if (! $this->websiteId || ! $user->canViewWebsiteId($this->websiteId)) {
+            $this->sendError = 'Select a website to send a report.';
+
+            return;
+        }
+
+        $website = Website::query()->find($this->websiteId);
+        if (! $website) {
+            $this->sendError = 'Website not found.';
+
+            return;
+        }
+
         $key = 'send-growth-report:'.$user->id;
 
         if (RateLimiter::tooManyAttempts($key, 5)) {
@@ -51,9 +65,10 @@ class SyncAndReportPanel extends Component
         }
 
         try {
-            Mail::to($user->email)->send(new GrowthReportMail($user));
+            $reportDate = Carbon::yesterday(config('app.timezone'));
+            Mail::to($user->email)->send(new GrowthReportMail($user, $website, $reportDate));
             RateLimiter::hit($key, 3600);
-            $this->sendSuccess = 'Report sent to '.$user->email.'.';
+            $this->sendSuccess = 'Report for '.$website->domain.' sent to '.$user->email.'.';
         } catch (Throwable $e) {
             $this->sendError = 'Could not send the report. Check your mail configuration.';
             report($e);

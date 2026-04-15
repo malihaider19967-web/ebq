@@ -29,8 +29,8 @@ class SyncAndReportPanelTest extends TestCase
             ->call('sendReport')
             ->assertSee('Report sent');
 
-        Mail::assertSent(GrowthReportMail::class, function (GrowthReportMail $mail) use ($user) {
-            return $mail->user->is($user);
+        Mail::assertSent(GrowthReportMail::class, function (GrowthReportMail $mail) use ($user, $website) {
+            return $mail->user->is($user) && $mail->website->is($website);
         });
     }
 
