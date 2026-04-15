@@ -42,6 +42,21 @@
 
         .sub-heading { font-size: 13px; font-weight: 600; color: #334155; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.03em; }
         .empty-note { color: #94a3b8; font-size: 13px; margin: 0 0 16px; }
+        .mini-grid { width: 100%; border-collapse: separate; border-spacing: 8px; margin: 0 -8px 16px; table-layout: fixed; }
+        .mini-grid td { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; vertical-align: top; }
+        .mini-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin: 0; }
+        .mini-value { font-size: 15px; font-weight: 700; color: #0f172a; margin: 4px 0 2px; }
+        .mini-note { font-size: 11px; color: #64748b; margin: 0; }
+        .insight-cols { width: 100%; border-collapse: separate; border-spacing: 8px; margin: 0 -8px 14px; table-layout: fixed; }
+        .insight-cols td { vertical-align: top; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
+        .insight-list { margin: 0; padding: 0; list-style: none; }
+        .insight-list li { display: block; border: 1px solid #e2e8f0; border-radius: 6px; padding: 7px 8px; margin-bottom: 6px; font-size: 12px; color: #334155; }
+        .insight-list li:last-child { margin-bottom: 0; }
+        .insight-row { display: table; width: 100%; table-layout: fixed; }
+        .insight-row .label { display: table-cell; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; }
+        .insight-row .value { display: table-cell; width: 72px; text-align: right; font-weight: 700; white-space: nowrap; }
+        .value-up { color: #16a34a; }
+        .value-down { color: #dc2626; }
 
         .btn { display: inline-block; background: #4f46e5; color: #ffffff !important; text-decoration: none; border-radius: 8px; padding: 12px 28px; font-size: 14px; font-weight: 600; }
         .footer { text-align: center; color: #94a3b8; font-size: 12px; margin-top: 24px; }
@@ -116,6 +131,54 @@
             </table>
         @else
             <p class="empty-note">No analytics data available for this period.</p>
+        @endif
+
+        <table class="mini-grid" role="presentation">
+            <tr>
+                <td>
+                    <p class="mini-label">Engagement Insight</p>
+                    <p class="mini-value">{{ $report['analytics']['sessions_per_user']['current'] ?? 0 }} sessions/user</p>
+                    <p class="mini-note">was {{ $report['analytics']['sessions_per_user']['previous'] ?? 0 }} in {{ $report['period']['previous_label'] }}</p>
+                </td>
+                <td>
+                    <p class="mini-label">Source Concentration</p>
+                    <p class="mini-value">{{ $report['analytics']['source_concentration_top3'] ?? 0 }}% from top 3 sources</p>
+                    <p class="mini-note">Higher values can indicate channel concentration risk.</p>
+                </td>
+            </tr>
+        </table>
+
+        @if (count($report['analytics']['top_source_gainers'] ?? []) > 0 || count($report['analytics']['top_source_losers'] ?? []) > 0)
+            <table class="insight-cols" role="presentation">
+                <tr>
+                    <td>
+                        <p class="sub-heading" style="margin-bottom:8px;color:#16a34a;">Source Gainers</p>
+                        <ul class="insight-list">
+                            @foreach (($report['analytics']['top_source_gainers'] ?? []) as $item)
+                                <li>
+                                    <span class="insight-row">
+                                        <span class="label">{{ $item['source'] }}</span>
+                                        <span class="value value-up">+{{ number_format($item['change']) }}</span>
+                                    </span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </td>
+                    <td>
+                        <p class="sub-heading" style="margin-bottom:8px;color:#dc2626;">Source Losers</p>
+                        <ul class="insight-list">
+                            @foreach (($report['analytics']['top_source_losers'] ?? []) as $item)
+                                <li>
+                                    <span class="insight-row">
+                                        <span class="label">{{ $item['source'] }}</span>
+                                        <span class="value value-down">{{ number_format($item['change']) }}</span>
+                                    </span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </td>
+                </tr>
+            </table>
         @endif
 
         <hr class="section-divider">
@@ -205,6 +268,93 @@
 
         @if (count($report['search_console']['top_queries']) === 0 && count($report['search_console']['top_pages']) === 0)
             <p class="empty-note">No search console data available for this period.</p>
+        @endif
+
+        @if (! empty($report['search_console']['position_buckets']))
+            <p class="sub-heading">Position Buckets</p>
+            <table class="mini-grid" role="presentation">
+                <tr>
+                    <td>
+                        <p class="mini-label">Top 3</p>
+                        <p class="mini-value">{{ number_format($report['search_console']['position_buckets']['top_3'] ?? 0) }}</p>
+                        <p class="mini-note">keywords</p>
+                    </td>
+                    <td>
+                        <p class="mini-label">4-10</p>
+                        <p class="mini-value">{{ number_format($report['search_console']['position_buckets']['top_10'] ?? 0) }}</p>
+                        <p class="mini-note">keywords</p>
+                    </td>
+                    <td>
+                        <p class="mini-label">11-20</p>
+                        <p class="mini-value">{{ number_format($report['search_console']['position_buckets']['near_page_1'] ?? 0) }}</p>
+                        <p class="mini-note">keywords</p>
+                    </td>
+                    <td>
+                        <p class="mini-label">20+</p>
+                        <p class="mini-value">{{ number_format($report['search_console']['position_buckets']['beyond_20'] ?? 0) }}</p>
+                        <p class="mini-note">keywords</p>
+                    </td>
+                </tr>
+            </table>
+        @endif
+
+        @if (count($report['search_console']['opportunities'] ?? []) > 0)
+            <p class="sub-heading">Optimization Opportunities</p>
+            <table class="data-table" role="presentation">
+                <thead>
+                    <tr>
+                        <th>Query</th>
+                        <th class="right">Impr.</th>
+                        <th class="right">CTR</th>
+                        <th class="right">Pos</th>
+                        <th class="right">Score</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (($report['search_console']['opportunities'] ?? []) as $opp)
+                        <tr>
+                            <td>{{ \Illuminate\Support\Str::limit($opp['query'], 40) }}</td>
+                            <td class="right">{{ number_format($opp['impressions']) }}</td>
+                            <td class="right">{{ $opp['ctr'] }}%</td>
+                            <td class="right">{{ $opp['position'] }}</td>
+                            <td class="right" style="font-weight:700;color:#4f46e5">{{ $opp['score'] }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
+
+        @if (count($report['search_console']['top_query_gainers'] ?? []) > 0 || count($report['search_console']['top_query_losers'] ?? []) > 0)
+            <table class="insight-cols" role="presentation">
+                <tr>
+                    <td>
+                        <p class="sub-heading" style="margin-bottom:8px;color:#16a34a;">Query Gainers</p>
+                        <ul class="insight-list">
+                            @foreach (($report['search_console']['top_query_gainers'] ?? []) as $item)
+                                <li>
+                                    <span class="insight-row">
+                                        <span class="label">{{ \Illuminate\Support\Str::limit($item['query'], 42) }}</span>
+                                        <span class="value value-up">+{{ number_format($item['change']) }}</span>
+                                    </span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </td>
+                    <td>
+                        <p class="sub-heading" style="margin-bottom:8px;color:#dc2626;">Query Losers</p>
+                        <ul class="insight-list">
+                            @foreach (($report['search_console']['top_query_losers'] ?? []) as $item)
+                                <li>
+                                    <span class="insight-row">
+                                        <span class="label">{{ \Illuminate\Support\Str::limit($item['query'], 42) }}</span>
+                                        <span class="value value-down">{{ number_format($item['change']) }}</span>
+                                    </span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </td>
+                </tr>
+            </table>
         @endif
 
         <hr class="section-divider">
