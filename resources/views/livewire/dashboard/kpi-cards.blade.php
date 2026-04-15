@@ -6,23 +6,23 @@
         ['key' => 'sessions', 'label' => 'Sessions (30d)', 'icon' => 'M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5m.75-9l3-3 2.148 2.148A12.061 12.061 0 0116.5 7.605', 'color' => 'text-amber-600 dark:text-amber-400', 'icon-bg' => 'bg-amber-100 dark:bg-amber-500/20'],
     ] as $card)
         @php($metric = $data[$card['key']])
-        <div class="group rounded-xl border border-slate-200 bg-white p-5 transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
+        <div class="group flex min-h-[142px] flex-col rounded-xl border border-slate-200 bg-white p-5 transition hover:shadow-md dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
                 <p class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ $card['label'] }}</p>
                 <span class="{{ $card['icon-bg'] }} flex h-9 w-9 items-center justify-center rounded-lg">
                     <svg class="h-4 w-4 {{ $card['color'] }}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $card['icon'] }}" /></svg>
                 </span>
             </div>
-            <p class="mt-3 text-3xl font-bold tracking-tight {{ $card['color'] }}">{{ number_format($metric['current']) }}</p>
-            <p class="mt-1 text-xs">
+            <p class="mt-3 text-3xl font-bold tracking-tight tabular-nums {{ $card['color'] }}">{{ number_format($metric['current']) }}</p>
+            <p class="mt-auto pt-2 text-xs">
                 @if (is_null($metric['change_percent']))
                     <span class="font-semibold text-slate-500 dark:text-slate-400">new</span>
                 @elseif ($metric['direction'] === 'up')
-                    <span class="font-semibold text-emerald-600 dark:text-emerald-400">+{{ $metric['change_percent'] }}%</span>
+                    <span class="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">+{{ $metric['change_percent'] }}%</span>
                 @elseif ($metric['direction'] === 'down')
-                    <span class="font-semibold text-red-600 dark:text-red-400">{{ $metric['change_percent'] }}%</span>
+                    <span class="font-semibold tabular-nums text-red-600 dark:text-red-400">{{ $metric['change_percent'] }}%</span>
                 @else
-                    <span class="font-semibold text-slate-500 dark:text-slate-400">0.0%</span>
+                    <span class="font-semibold tabular-nums text-slate-500 dark:text-slate-400">0.0%</span>
                 @endif
                 <span class="text-slate-400 dark:text-slate-500">vs previous 30d</span>
             </p>
