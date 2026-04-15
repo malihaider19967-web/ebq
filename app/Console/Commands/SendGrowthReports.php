@@ -12,7 +12,7 @@ class SendGrowthReports extends Command
 {
     protected $signature = 'growthhub:send-reports';
 
-    protected $description = 'Queue one GrowthHub report email per website (owner) for yesterday in the app timezone';
+    protected $description = 'Queue one GrowthHub report email per website recipient for yesterday in the app timezone';
 
     public function handle(): int
     {
@@ -20,18 +20,17 @@ class SendGrowthReports extends Command
 
         Website::query()->with('owner')->chunkById(100, function ($websites) use ($yesterday) {
             foreach ($websites as $website) {
-                $owner = $website->owner;
-                if (! $owner) {
-                    continue;
-                }
+                $recipients = $website->getReportRecipientUsers();
 
-                Mail::to($owner->email)->queue(
-                    new GrowthReportMail($owner, $website, $yesterday, $yesterday, 'daily')
-                );
+                foreach ($recipients as $recipient) {
+                    Mail::to($recipient->email)->queue(
+                        new GrowthReportMail($recipient, $website, $yesterday, $yesterday, 'daily')
+                    );
+                }
             }
         });
 
-        $this->info('Growth reports queued (one per website).');
+        $this->info('Growth reports queued.');
 
         return self::SUCCESS;
     }

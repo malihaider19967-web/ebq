@@ -17,6 +17,7 @@ class Website extends Model
         'domain',
         'ga_property_id',
         'gsc_site_url',
+        'report_recipients',
         'last_analytics_sync_at',
         'last_search_console_sync_at',
     ];
@@ -24,9 +25,26 @@ class Website extends Model
     protected function casts(): array
     {
         return [
+            'report_recipients' => 'array',
             'last_analytics_sync_at' => 'datetime',
             'last_search_console_sync_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Users who should receive reports. Falls back to the owner if none configured.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, User>
+     */
+    public function getReportRecipientUsers(): \Illuminate\Database\Eloquent\Collection
+    {
+        $ids = $this->report_recipients;
+
+        if (empty($ids)) {
+            return User::where('id', $this->user_id)->get();
+        }
+
+        return User::whereIn('id', $ids)->get();
     }
 
     public function user(): BelongsTo

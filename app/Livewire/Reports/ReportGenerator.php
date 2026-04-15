@@ -91,13 +91,20 @@ class ReportGenerator extends Component
         }
 
         $website = Website::find($this->websiteId);
+        $recipients = $website->getReportRecipientUsers();
 
         try {
-            Mail::to($user->email)->send(
-                new GrowthReportMail($user, $website, $this->startDate, $this->endDate, $this->reportType)
-            );
+            $emails = [];
+
+            foreach ($recipients as $recipient) {
+                Mail::to($recipient->email)->send(
+                    new GrowthReportMail($recipient, $website, $this->startDate, $this->endDate, $this->reportType)
+                );
+                $emails[] = $recipient->email;
+            }
+
             RateLimiter::hit($key, 3600);
-            $this->sendSuccess = ucfirst($this->reportType).' report for '.$website->domain.' sent to '.$user->email.'.';
+            $this->sendSuccess = ucfirst($this->reportType).' report for '.$website->domain.' sent to '.implode(', ', $emails).'.';
         } catch (Throwable $e) {
             $this->sendError = 'Could not send the report. Check your mail configuration.';
             report($e);
