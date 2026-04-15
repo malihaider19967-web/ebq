@@ -58,8 +58,6 @@ class ProfileSettings extends Component
 
     public function render()
     {
-        $googleAccount = Auth::user()->googleAccounts()->latest()->first();
-
-        return view('livewire.settings.profile-settings', compact('googleAccount'));
+        return view('livewire.settings.profile-settings');
     }
 }
