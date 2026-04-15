@@ -4,6 +4,7 @@ namespace App\Livewire\Dashboard;
 
 use App\Models\AnalyticsData;
 use App\Models\SearchConsoleData;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\On;
@@ -27,16 +28,29 @@ class TrafficChart extends Component
     public function render()
     {
         $days = collect();
+        $anomalies = [];
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
-            $days = Cache::remember("traffic_chart:{$this->websiteId}", 600, function () {
+            $today = Carbon::today(config('app.timezone'));
+            $end = $today->copy()->subDay();
+            $start = $end->copy()->subDays(29);
+            $cacheKey = sprintf(
+                'traffic_chart:%d:%s:%s',
+                $this->websiteId,
+                $start->toDateString(),
+                $end->toDateString()
+            );
+
+            $days = Cache::remember($cacheKey, 600, function () use ($start, $end) {
                 $clicks = SearchConsoleData::where('website_id', $this->websiteId)
+                    ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
                     ->selectRaw('date, SUM(clicks) as clicks')
                     ->groupBy('date')
                     ->orderBy('date')
                     ->pluck('clicks', 'date');
 
                 $users = AnalyticsData::where('website_id', $this->websiteId)
+                    ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
                     ->selectRaw('date, SUM(users) as users')
                     ->groupBy('date')
                     ->orderBy('date')
@@ -50,8 +64,23 @@ class TrafficChart extends Component
                     'users' => (int) ($users[$d] ?? 0),
                 ]);
             });
+
+            $series = $days->values();
+            $last = $series->last();
+            $prev = $series->count() > 1 ? $series[$series->count() - 2] : null;
+            if ($last && $prev) {
+                if ($prev['users'] > 0 && $last['users'] < ($prev['users'] * 0.75)) {
+                    $anomalies[] = 'Users dropped more than 25% day-over-day.';
+                }
+                if ($prev['clicks'] > 0 && $last['clicks'] < ($prev['clicks'] * 0.75)) {
+                    $anomalies[] = 'Clicks dropped more than 25% day-over-day.';
+                }
+            }
         }
 
-        return view('livewire.dashboard.traffic-chart', ['days' => $days]);
+        return view('livewire.dashboard.traffic-chart', [
+            'days' => $days,
+            'anomalies' => $anomalies,
+        ]);
     }
 }

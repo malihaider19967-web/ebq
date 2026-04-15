@@ -86,11 +86,21 @@ class ReportDataService
             })
             ->toArray();
 
+        $sourceMovers = $this->buildSourceMovers($websiteId, $start, $end, $prevStart, $prevEnd);
+        $sessionsPerUserCurrent = $curUsers > 0 ? round($curSessions / $curUsers, 2) : 0.0;
+        $sessionsPerUserPrevious = $prevUsers > 0 ? round($prevSessions / $prevUsers, 2) : 0.0;
+        $top3Users = collect($topSources)->take(3)->sum('users');
+        $sourceConcentration = $curUsers > 0 ? round(($top3Users / $curUsers) * 100, 1) : 0.0;
+
         return [
             'users' => $this->calcChange($curUsers, $prevUsers, true),
             'sessions' => $this->calcChange($curSessions, $prevSessions, true),
             'bounce_rate' => $this->calcChange($curBounceRate, $prevBounceRate, false),
             'top_sources' => $topSources,
+            'sessions_per_user' => $this->calcChange($sessionsPerUserCurrent, $sessionsPerUserPrevious, true),
+            'source_concentration_top3' => $sourceConcentration,
+            'top_source_gainers' => $sourceMovers['gainers'],
+            'top_source_losers' => $sourceMovers['losers'],
         ];
     }
 
@@ -221,6 +231,11 @@ class ReportDataService
             })
             ->toArray();
 
+        $queryMovers = $this->buildQueryMovers($websiteId, $start, $end, $prevStart, $prevEnd);
+        $pageMovers = $this->buildPageMovers($websiteId, $start, $end, $prevStart, $prevEnd);
+        $positionBuckets = $this->buildPositionBuckets($websiteId, $start, $end);
+        $opportunities = $this->buildOpportunities($websiteId, $start, $end);
+
         return [
             'clicks' => $this->calcChange($curClicks, $prevClicks, true),
             'impressions' => $this->calcChange($curImpressions, $prevImpressions, true),
@@ -230,6 +245,12 @@ class ReportDataService
             'top_pages' => $topPages,
             'devices' => $devices,
             'countries' => $countries,
+            'top_query_gainers' => $queryMovers['gainers'],
+            'top_query_losers' => $queryMovers['losers'],
+            'top_page_gainers' => $pageMovers['gainers'],
+            'top_page_losers' => $pageMovers['losers'],
+            'position_buckets' => $positionBuckets,
+            'opportunities' => $opportunities,
         ];
     }
 
@@ -339,5 +360,155 @@ class ReportDataService
             $days <= 31 => 'Prev Month',
             default => "Preceding {$days} Days",
         };
+    }
+
+    private function buildSourceMovers(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
+    {
+        $current = AnalyticsData::where('website_id', $websiteId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->selectRaw('source, SUM(users) as users')
+            ->groupBy('source')
+            ->pluck('users', 'source');
+        $previous = AnalyticsData::where('website_id', $websiteId)
+            ->whereBetween('date', [$prevStart->toDateString(), $prevEnd->toDateString()])
+            ->selectRaw('source, SUM(users) as users')
+            ->groupBy('source')
+            ->pluck('users', 'source');
+
+        $movements = collect($current)->map(function ($users, $source) use ($previous) {
+            $prev = (int) ($previous[$source] ?? 0);
+            return [
+                'source' => $source ?: '(direct)',
+                'current' => (int) $users,
+                'previous' => $prev,
+                'change' => (int) $users - $prev,
+            ];
+        })->values();
+
+        return [
+            'gainers' => $movements->sortByDesc('change')->take(5)->values()->toArray(),
+            'losers' => $movements->sortBy('change')->take(5)->values()->toArray(),
+        ];
+    }
+
+    private function buildQueryMovers(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
+    {
+        $current = SearchConsoleData::where('website_id', $websiteId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->selectRaw('query, SUM(clicks) as clicks')
+            ->groupBy('query')
+            ->pluck('clicks', 'query');
+        $previous = SearchConsoleData::where('website_id', $websiteId)
+            ->whereBetween('date', [$prevStart->toDateString(), $prevEnd->toDateString()])
+            ->selectRaw('query, SUM(clicks) as clicks')
+            ->groupBy('query')
+            ->pluck('clicks', 'query');
+
+        $movements = collect($current)->map(function ($clicks, $query) use ($previous) {
+            $prev = (int) ($previous[$query] ?? 0);
+            return [
+                'query' => $query,
+                'current' => (int) $clicks,
+                'previous' => $prev,
+                'change' => (int) $clicks - $prev,
+            ];
+        })->values();
+
+        return [
+            'gainers' => $movements->sortByDesc('change')->take(5)->values()->toArray(),
+            'losers' => $movements->sortBy('change')->take(5)->values()->toArray(),
+        ];
+    }
+
+    private function buildPageMovers(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
+    {
+        $current = SearchConsoleData::where('website_id', $websiteId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->selectRaw('page, SUM(clicks) as clicks')
+            ->groupBy('page')
+            ->pluck('clicks', 'page');
+        $previous = SearchConsoleData::where('website_id', $websiteId)
+            ->whereBetween('date', [$prevStart->toDateString(), $prevEnd->toDateString()])
+            ->selectRaw('page, SUM(clicks) as clicks')
+            ->groupBy('page')
+            ->pluck('clicks', 'page');
+
+        $movements = collect($current)->map(function ($clicks, $page) use ($previous) {
+            $prev = (int) ($previous[$page] ?? 0);
+            return [
+                'page' => $page,
+                'current' => (int) $clicks,
+                'previous' => $prev,
+                'change' => (int) $clicks - $prev,
+            ];
+        })->values();
+
+        return [
+            'gainers' => $movements->sortByDesc('change')->take(5)->values()->toArray(),
+            'losers' => $movements->sortBy('change')->take(5)->values()->toArray(),
+        ];
+    }
+
+    private function buildPositionBuckets(int $websiteId, Carbon $start, Carbon $end): array
+    {
+        $rows = SearchConsoleData::where('website_id', $websiteId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->selectRaw('query, AVG(position) as avg_position')
+            ->groupBy('query')
+            ->get();
+
+        $buckets = [
+            'top_3' => 0,
+            'top_10' => 0,
+            'near_page_1' => 0,
+            'beyond_20' => 0,
+        ];
+
+        foreach ($rows as $row) {
+            $pos = (float) $row->avg_position;
+            if ($pos <= 3) {
+                $buckets['top_3']++;
+            } elseif ($pos <= 10) {
+                $buckets['top_10']++;
+            } elseif ($pos <= 20) {
+                $buckets['near_page_1']++;
+            } else {
+                $buckets['beyond_20']++;
+            }
+        }
+
+        return $buckets;
+    }
+
+    private function buildOpportunities(int $websiteId, Carbon $start, Carbon $end): array
+    {
+        return SearchConsoleData::where('website_id', $websiteId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->selectRaw('query, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as avg_position')
+            ->groupBy('query')
+            ->get()
+            ->map(function ($row) {
+                $impressions = (int) $row->impressions;
+                $clicks = (int) $row->clicks;
+                $ctr = $impressions > 0 ? ($clicks / $impressions) * 100 : 0.0;
+                $position = round((float) $row->avg_position, 1);
+                if ($impressions < 200 || $position < 5 || $position > 20) {
+                    return null;
+                }
+                $score = round(($impressions / 100) + (20 - $position) - ($ctr * 0.6), 1);
+                return [
+                    'query' => $row->query,
+                    'impressions' => $impressions,
+                    'clicks' => $clicks,
+                    'ctr' => round($ctr, 2),
+                    'position' => $position,
+                    'score' => $score,
+                ];
+            })
+            ->filter()
+            ->sortByDesc('score')
+            ->take(8)
+            ->values()
+            ->toArray();
     }
 }

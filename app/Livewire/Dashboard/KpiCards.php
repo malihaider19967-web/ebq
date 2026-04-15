@@ -4,6 +4,7 @@ namespace App\Livewire\Dashboard;
 
 use App\Models\AnalyticsData;
 use App\Models\SearchConsoleData;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\On;
@@ -26,19 +27,86 @@ class KpiCards extends Component
 
     public function render()
     {
-        $data = ['clicks' => 0, 'impressions' => 0, 'users' => 0, 'sessions' => 0];
+        $data = [
+            'clicks' => $this->emptyMetric(),
+            'impressions' => $this->emptyMetric(),
+            'users' => $this->emptyMetric(),
+            'sessions' => $this->emptyMetric(),
+        ];
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
-            $data = Cache::remember("kpis:{$this->websiteId}", 600, function () {
+            $today = Carbon::today(config('app.timezone'));
+            $currentEnd = $today->copy()->subDay();
+            $currentStart = $currentEnd->copy()->subDays(29);
+            $previousEnd = $currentStart->copy()->subDay();
+            $previousStart = $previousEnd->copy()->subDays(29);
+            $cacheKey = sprintf(
+                'kpis:%d:%s:%s',
+                $this->websiteId,
+                $currentStart->toDateString(),
+                $currentEnd->toDateString()
+            );
+
+            $data = Cache::remember($cacheKey, 600, function () use ($currentStart, $currentEnd, $previousStart, $previousEnd) {
+                $currentSc = SearchConsoleData::query()
+                    ->where('website_id', $this->websiteId)
+                    ->whereBetween('date', [$currentStart->toDateString(), $currentEnd->toDateString()]);
+                $previousSc = SearchConsoleData::query()
+                    ->where('website_id', $this->websiteId)
+                    ->whereBetween('date', [$previousStart->toDateString(), $previousEnd->toDateString()]);
+                $currentGa = AnalyticsData::query()
+                    ->where('website_id', $this->websiteId)
+                    ->whereBetween('date', [$currentStart->toDateString(), $currentEnd->toDateString()]);
+                $previousGa = AnalyticsData::query()
+                    ->where('website_id', $this->websiteId)
+                    ->whereBetween('date', [$previousStart->toDateString(), $previousEnd->toDateString()]);
+
                 return [
-                    'clicks' => (int) SearchConsoleData::where('website_id', $this->websiteId)->sum('clicks'),
-                    'impressions' => (int) SearchConsoleData::where('website_id', $this->websiteId)->sum('impressions'),
-                    'users' => (int) AnalyticsData::where('website_id', $this->websiteId)->sum('users'),
-                    'sessions' => (int) AnalyticsData::where('website_id', $this->websiteId)->sum('sessions'),
+                    'clicks' => $this->buildMetric(
+                        (int) (clone $currentSc)->sum('clicks'),
+                        (int) (clone $previousSc)->sum('clicks')
+                    ),
+                    'impressions' => $this->buildMetric(
+                        (int) (clone $currentSc)->sum('impressions'),
+                        (int) (clone $previousSc)->sum('impressions')
+                    ),
+                    'users' => $this->buildMetric(
+                        (int) (clone $currentGa)->sum('users'),
+                        (int) (clone $previousGa)->sum('users')
+                    ),
+                    'sessions' => $this->buildMetric(
+                        (int) (clone $currentGa)->sum('sessions'),
+                        (int) (clone $previousGa)->sum('sessions')
+                    ),
                 ];
             });
         }
 
         return view('livewire.dashboard.kpi-cards', compact('data'));
+    }
+
+    private function emptyMetric(): array
+    {
+        return [
+            'current' => 0,
+            'previous' => 0,
+            'change_percent' => 0.0,
+            'direction' => 'flat',
+        ];
+    }
+
+    private function buildMetric(int $current, int $previous): array
+    {
+        $change = $current - $previous;
+        $changePercent = $previous !== 0
+            ? round(($change / abs($previous)) * 100, 1)
+            : ($current !== 0 ? null : 0.0);
+
+        return [
+            'current' => $current,
+            'previous' => $previous,
+            'change_percent' => $changePercent,
+            'direction' => $change > 0 ? 'up' : ($change < 0 ? 'down' : 'flat'),
+        ];
     }
 }

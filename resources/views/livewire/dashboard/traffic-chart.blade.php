@@ -2,7 +2,7 @@
     <div class="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-800">
         <div>
             <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Traffic Overview</h3>
-            <p class="text-xs text-slate-500 dark:text-slate-400">Last 30 days</p>
+            <p class="text-xs text-slate-500 dark:text-slate-400">Last 30 complete days</p>
         </div>
         <div class="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
             <span class="flex items-center gap-1.5"><span class="h-2.5 w-2.5 rounded-full bg-indigo-500"></span> Clicks</span>
@@ -17,6 +17,11 @@
             <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Data will appear after the daily sync runs.</p>
         </div>
     @else
+        @if (! empty($anomalies))
+            <div class="mx-6 mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-700/50 dark:bg-amber-900/20 dark:text-amber-300">
+                {{ implode(' ', $anomalies) }}
+            </div>
+        @endif
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
                 <thead>

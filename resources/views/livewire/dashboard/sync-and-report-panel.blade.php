@@ -16,10 +16,26 @@
 
     {{-- Sync timestamps --}}
     @if ($website)
+        @php
+            $gaAge = $website->last_analytics_sync_at?->diffInHours(now());
+            $gscAge = $website->last_search_console_sync_at?->diffInHours(now());
+        @endphp
         <div class="flex flex-wrap items-center justify-end gap-x-3 gap-y-0.5 text-[11px] text-slate-400 dark:text-slate-500">
-            <span><span class="font-medium text-slate-500 dark:text-slate-400">GA</span> {{ $website->last_analytics_sync_at?->timezone(config('app.timezone'))->format('M j, g:i A') ?? '—' }}</span>
+            <span @class(['text-amber-600 dark:text-amber-400' => is_null($gaAge) || $gaAge > 24])>
+                <span class="font-medium text-slate-500 dark:text-slate-400">GA</span>
+                {{ $website->last_analytics_sync_at?->timezone(config('app.timezone'))->format('M j, g:i A') ?? '—' }}
+                @if (is_null($gaAge) || $gaAge > 24)
+                    <span class="font-semibold">(stale)</span>
+                @endif
+            </span>
             <span class="text-slate-300 dark:text-slate-700">|</span>
-            <span><span class="font-medium text-slate-500 dark:text-slate-400">GSC</span> {{ $website->last_search_console_sync_at?->timezone(config('app.timezone'))->format('M j, g:i A') ?? '—' }}</span>
+            <span @class(['text-amber-600 dark:text-amber-400' => is_null($gscAge) || $gscAge > 24])>
+                <span class="font-medium text-slate-500 dark:text-slate-400">GSC</span>
+                {{ $website->last_search_console_sync_at?->timezone(config('app.timezone'))->format('M j, g:i A') ?? '—' }}
+                @if (is_null($gscAge) || $gscAge > 24)
+                    <span class="font-semibold">(stale)</span>
+                @endif
+            </span>
             <span class="text-slate-300 dark:text-slate-700">|</span>
             <span><span class="font-medium text-slate-500 dark:text-slate-400">Report</span> {{ $user?->last_growth_report_sent_at?->timezone(config('app.timezone'))->format('M j, g:i A') ?? '—' }}</span>
         </div>

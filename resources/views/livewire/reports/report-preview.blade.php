@@ -64,6 +64,52 @@
             @else
                 <p class="text-xs text-slate-400 dark:text-slate-500">No analytics data available for this period.</p>
             @endif
+
+            <div class="mt-5 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+                <div class="rounded-lg border border-slate-100 px-3 py-2 dark:border-slate-800">
+                    <p class="text-[10px] font-medium uppercase tracking-wider text-slate-400">Engagement Insight</p>
+                    <p class="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                        {{ $report['analytics']['sessions_per_user']['current'] }} sessions/user
+                    </p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        was {{ $report['analytics']['sessions_per_user']['previous'] }} in {{ $report['period']['previous_label'] }}
+                    </p>
+                </div>
+                <div class="rounded-lg border border-slate-100 px-3 py-2 dark:border-slate-800">
+                    <p class="text-[10px] font-medium uppercase tracking-wider text-slate-400">Source Concentration</p>
+                    <p class="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">
+                        {{ $report['analytics']['source_concentration_top3'] }}% from top 3 sources
+                    </p>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">Higher values mean channel concentration risk.</p>
+                </div>
+            </div>
+
+            @if (count($report['analytics']['top_source_gainers']) > 0 || count($report['analytics']['top_source_losers']) > 0)
+                <div class="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                        <h4 class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Source Gainers</h4>
+                        <ul class="space-y-1 text-xs">
+                            @foreach ($report['analytics']['top_source_gainers'] as $item)
+                                <li class="flex items-center justify-between rounded border border-slate-100 px-2 py-1 dark:border-slate-800">
+                                    <span class="truncate text-slate-700 dark:text-slate-300">{{ $item['source'] }}</span>
+                                    <span class="font-semibold text-emerald-600 dark:text-emerald-400">+{{ number_format($item['change']) }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-red-600 dark:text-red-400">Source Losers</h4>
+                        <ul class="space-y-1 text-xs">
+                            @foreach ($report['analytics']['top_source_losers'] as $item)
+                                <li class="flex items-center justify-between rounded border border-slate-100 px-2 py-1 dark:border-slate-800">
+                                    <span class="truncate text-slate-700 dark:text-slate-300">{{ $item['source'] }}</span>
+                                    <span class="font-semibold text-red-600 dark:text-red-400">{{ number_format($item['change']) }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                </div>
+            @endif
         </div>
     </div>
 
@@ -186,6 +232,79 @@
                             @endforeach
                         </tbody>
                     </table>
+                </div>
+            @endif
+
+            @if (! empty($report['search_console']['position_buckets']))
+                <h4 class="mb-2 mt-5 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Position Buckets</h4>
+                <div class="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                    @foreach ([
+                        ['label' => 'Top 3', 'value' => $report['search_console']['position_buckets']['top_3']],
+                        ['label' => '4-10', 'value' => $report['search_console']['position_buckets']['top_10']],
+                        ['label' => '11-20', 'value' => $report['search_console']['position_buckets']['near_page_1']],
+                        ['label' => '20+', 'value' => $report['search_console']['position_buckets']['beyond_20']],
+                    ] as $bucket)
+                        <div class="rounded-lg border border-slate-100 px-3 py-2 dark:border-slate-800">
+                            <p class="text-[10px] uppercase tracking-wider text-slate-400">{{ $bucket['label'] }}</p>
+                            <p class="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{{ number_format($bucket['value']) }}</p>
+                            <p class="text-[10px] text-slate-400">keywords</p>
+                        </div>
+                    @endforeach
+                </div>
+            @endif
+
+            @if (count($report['search_console']['opportunities']) > 0)
+                <h4 class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">Optimization Opportunities</h4>
+                <div class="mb-5 overflow-x-auto rounded-lg border border-slate-100 dark:border-slate-800">
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="bg-slate-50 text-left text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                                <th class="px-3 py-2">Query</th>
+                                <th class="px-3 py-2 text-right">Impr.</th>
+                                <th class="px-3 py-2 text-right">CTR</th>
+                                <th class="px-3 py-2 text-right">Pos</th>
+                                <th class="px-3 py-2 text-right">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            @foreach ($report['search_console']['opportunities'] as $opp)
+                                <tr>
+                                    <td class="max-w-[12rem] truncate px-3 py-2 text-slate-700 dark:text-slate-300">{{ $opp['query'] }}</td>
+                                    <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{{ number_format($opp['impressions']) }}</td>
+                                    <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{{ $opp['ctr'] }}%</td>
+                                    <td class="px-3 py-2 text-right text-slate-700 dark:text-slate-300">{{ $opp['position'] }}</td>
+                                    <td class="px-3 py-2 text-right font-semibold text-indigo-600 dark:text-indigo-400">{{ $opp['score'] }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+
+            @if (count($report['search_console']['top_query_gainers']) > 0 || count($report['search_console']['top_query_losers']) > 0)
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div>
+                        <h4 class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">Query Gainers</h4>
+                        <ul class="space-y-1 text-xs">
+                            @foreach ($report['search_console']['top_query_gainers'] as $item)
+                                <li class="flex items-center justify-between rounded border border-slate-100 px-2 py-1 dark:border-slate-800">
+                                    <span class="truncate text-slate-700 dark:text-slate-300">{{ $item['query'] }}</span>
+                                    <span class="font-semibold text-emerald-600 dark:text-emerald-400">+{{ number_format($item['change']) }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                    <div>
+                        <h4 class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-red-600 dark:text-red-400">Query Losers</h4>
+                        <ul class="space-y-1 text-xs">
+                            @foreach ($report['search_console']['top_query_losers'] as $item)
+                                <li class="flex items-center justify-between rounded border border-slate-100 px-2 py-1 dark:border-slate-800">
+                                    <span class="truncate text-slate-700 dark:text-slate-300">{{ $item['query'] }}</span>
+                                    <span class="font-semibold text-red-600 dark:text-red-400">{{ number_format($item['change']) }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
                 </div>
             @endif
 
