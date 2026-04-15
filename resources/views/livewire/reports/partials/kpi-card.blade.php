@@ -44,9 +44,9 @@
     }
 @endphp
 
-<div class="min-w-0 rounded-lg border border-slate-100 px-3 py-2.5 dark:border-slate-800">
+<div class="min-w-0 rounded-lg border border-slate-100 px-3 py-2 dark:border-slate-800">
     <p class="truncate text-[10px] font-medium uppercase tracking-wider text-slate-400">{{ $label }}</p>
-    <p class="mt-0.5 truncate text-lg font-bold tabular-nums leading-tight text-slate-900 dark:text-slate-100">{{ $formattedValue }}</p>
-    <span class="mt-1 inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold {{ $changeBg }} {{ $changeColor }}">{{ $arrow }} {{ $changeText }}</span>
+    <p class="mt-0.5 truncate text-base font-bold tabular-nums leading-tight text-slate-900 dark:text-slate-100">{{ $formattedValue }}</p>
+    <span class="mt-0.5 inline-flex items-center gap-0.5 rounded-full px-1.5 py-px text-[10px] font-semibold {{ $changeBg }} {{ $changeColor }}">{{ $arrow }} {{ $changeText }}</span>
     <p class="mt-0.5 text-[10px] text-slate-400">was {{ $formattedPrev }}</p>
 </div>

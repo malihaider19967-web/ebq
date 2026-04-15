@@ -60,7 +60,7 @@
         </aside>
 
         {{-- Main content --}}
-        <div class="flex flex-1 flex-col">
+        <div class="flex min-w-0 flex-1 flex-col">
             {{-- Top bar --}}
             <header class="sticky top-0 z-20 flex h-16 items-center justify-between border-b border-slate-200 bg-white/80 px-4 backdrop-blur-md md:px-8 dark:border-slate-800 dark:bg-slate-900/80">
                 <div class="flex items-center gap-4">
@@ -80,7 +80,7 @@
                 </div>
             </header>
 
-            <main class="flex-1 p-4 md:p-8">
+            <main class="min-w-0 flex-1 overflow-x-hidden p-4 md:p-8">
                 {{ $slot }}
             </main>
         </div>

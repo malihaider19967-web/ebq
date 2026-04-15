@@ -1,15 +1,15 @@
-<div class="space-y-6">
+<div class="space-y-5">
     {{-- Controls --}}
-    <div class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div class="flex flex-col gap-5 lg:flex-row lg:items-end">
+    <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-end">
             {{-- Report Type --}}
-            <div class="flex-1">
-                <label for="reportType" class="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-300">Report Type</label>
-                <div class="flex rounded-lg border border-slate-200 dark:border-slate-700" role="radiogroup">
+            <div class="min-w-0 flex-1">
+                <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Report Type</label>
+                <div class="flex rounded-md border border-slate-200 dark:border-slate-700" role="radiogroup">
                     @foreach (['daily' => 'Daily', 'weekly' => 'Weekly', 'monthly' => 'Monthly', 'custom' => 'Custom'] as $value => $label)
                         <button type="button" wire:click="$set('reportType', '{{ $value }}')"
                             @class([
-                                'flex-1 px-2 py-1.5 text-xs font-semibold transition-all first:rounded-l-[0.4375rem] last:rounded-r-[0.4375rem]',
+                                'flex-1 h-8 px-2 text-xs font-semibold transition-all first:rounded-l-[0.3125rem] last:rounded-r-[0.3125rem]',
                                 'bg-indigo-600 text-white shadow-sm' => $reportType === $value,
                                 'text-slate-600 hover:bg-slate-50 dark:text-slate-400 dark:hover:bg-slate-800' => $reportType !== $value,
                             ])
@@ -22,47 +22,46 @@
             </div>
 
             {{-- Date Range --}}
-            <div class="flex flex-1 items-end gap-3">
+            <div class="flex flex-1 items-end gap-2">
                 <div class="flex-1">
-                    <label for="startDate" class="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-300">Start Date</label>
-                    <input type="date" id="startDate" wire:model.live="startDate"
-                        class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                    <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Start Date</label>
+                    <input type="date" wire:model.live="startDate"
+                        class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                         @if ($reportType !== 'custom') readonly @endif>
                 </div>
-                <span class="pb-2 text-xs text-slate-400">to</span>
+                <span class="pb-1.5 text-xs text-slate-400">to</span>
                 <div class="flex-1">
-                    <label for="endDate" class="mb-1.5 block text-xs font-medium text-slate-700 dark:text-slate-300">End Date</label>
-                    <input type="date" id="endDate" wire:model.live="endDate"
-                        class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                    <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">End Date</label>
+                    <input type="date" wire:model.live="endDate"
+                        class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
                         @if ($reportType !== 'custom') readonly @endif>
                 </div>
             </div>
 
             {{-- Actions --}}
-            <div class="flex flex-wrap gap-2">
+            <div class="flex shrink-0 gap-2">
                 <button type="button" wire:click="generatePreview" wire:loading.attr="disabled"
-                    class="inline-flex items-center gap-1.5 rounded-md bg-indigo-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400">
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-60">
                     <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>
                     <span wire:loading.remove wire:target="generatePreview">Preview</span>
-                    <span wire:loading wire:target="generatePreview">Loading...</span>
+                    <span wire:loading wire:target="generatePreview">Loading…</span>
                 </button>
                 <button type="button" wire:click="sendReport" wire:loading.attr="disabled"
-                    class="inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
                     <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
                     <span wire:loading.remove wire:target="sendReport">Send via Email</span>
-                    <span wire:loading wire:target="sendReport">Sending...</span>
+                    <span wire:loading wire:target="sendReport">Sending…</span>
                 </button>
             </div>
         </div>
 
-        {{-- Messages --}}
         @if ($sendSuccess)
-            <div class="mt-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" role="status">
+            <div class="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" role="status">
                 {{ $sendSuccess }}
             </div>
         @endif
         @if ($sendError)
-            <div class="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400" role="alert">
+            <div class="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 dark:border-red-800 dark:bg-red-900/30 dark:text-red-400" role="alert">
                 {{ $sendError }}
             </div>
         @endif
