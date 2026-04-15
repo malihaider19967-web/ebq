@@ -20,16 +20,12 @@
         .section-title { font-size: 16px; font-weight: 700; margin: 0 0 16px; color: #0f172a; }
         .section-divider { border: none; border-top: 1px solid #e2e8f0; margin: 28px 0; }
 
-        .kpi-grid { width: 100%; border-collapse: separate; border-spacing: 6px; margin: 0 -6px 24px; }
-        .kpi-grid td { width: 25%; padding: 12px 8px; text-align: center; vertical-align: top; background: #f8fafc; border: 2px solid #ffffff; border-radius: 8px; }
-        .kpi-grid.kpi-grid-3 td { width: 33.33%; }
-        .kpi-value { font-size: 20px; font-weight: 700; color: #0f172a; display: block; word-break: break-word; }
-        @media only screen and (min-width: 480px) {
-            .kpi-value { font-size: 22px; }
-        }
-        .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; display: block; margin-top: 2px; }
-        .kpi-change { font-size: 11px; font-weight: 600; display: block; margin-top: 4px; }
-        .kpi-prev { font-size: 10px; color: #94a3b8; display: block; margin-top: 2px; }
+        .kpi-grid { width: 100%; border-collapse: separate; border-spacing: 4px; margin: 0 -4px 20px; table-layout: fixed; }
+        .kpi-grid td { padding: 10px 6px; text-align: center; vertical-align: top; background: #f8fafc; border-radius: 6px; }
+        .kpi-value { font-size: 18px; font-weight: 700; color: #0f172a; display: block; word-break: break-word; line-height: 1.2; }
+        .kpi-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; display: block; margin-top: 2px; }
+        .kpi-change { font-size: 10px; font-weight: 600; display: block; margin-top: 3px; }
+        .kpi-prev { font-size: 9px; color: #94a3b8; display: block; margin-top: 1px; }
 
         .change-up-good { color: #16a34a; }
         .change-down-good { color: #16a34a; }
@@ -73,7 +69,7 @@
         <span class="section-badge badge-analytics">Google Analytics</span>
         <h2 class="section-title">Website Traffic</h2>
 
-        <table class="kpi-grid kpi-grid-3" role="presentation">
+        <table class="kpi-grid" role="presentation">
             <tr>
                 <td>
                     <span class="kpi-value">{{ number_format($report['analytics']['users']['current']) }}</span>
