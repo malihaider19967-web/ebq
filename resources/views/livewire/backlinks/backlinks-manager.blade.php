@@ -6,59 +6,63 @@
             <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Add a website under Websites if you have not yet.</p>
         </div>
     @else
-        <div class="space-y-8">
+        <div class="space-y-6">
             {{-- Add single --}}
-            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-6">
-                <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Add backlink</h2>
-                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Saved for the selected website and the date you choose.</p>
-                <form wire:submit="addBacklink" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Tracked date</label>
-                        <input wire:model="tracked_date" type="date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-                        @error('tracked_date') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+            <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-6">
+                <div class="border-b border-slate-100 pb-4 dark:border-slate-800">
+                    <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Add backlink</h2>
+                    <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Saved for the selected website on the date you choose.</p>
+                </div>
+                <form wire:submit="addBacklink" class="mt-5 space-y-4">
+                    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Tracked date</label>
+                            <input wire:model="tracked_date" type="date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                            @error('tracked_date') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Referring page URL</label>
+                            <input wire:model="referring_page_url" type="url" placeholder="https://…" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                            @error('referring_page_url') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                        <div class="sm:col-span-2 lg:col-span-3">
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Target page URL (your site)</label>
+                            <input wire:model="target_page_url" type="url" placeholder="https://…" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                            @error('target_page_url') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Domain authority</label>
+                            <input wire:model="domain_authority" type="number" min="0" max="100" placeholder="—" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                            @error('domain_authority') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Spam score</label>
+                            <input wire:model="spam_score" type="number" min="0" max="100" placeholder="—" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                            @error('spam_score') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Type</label>
+                            <select wire:model="type" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                                @foreach ($types as $t)
+                                    <option value="{{ $t->value }}">{{ $t->label() }}</option>
+                                @endforeach
+                            </select>
+                            @error('type') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Anchor text</label>
+                            <input wire:model="anchor_text" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                            @error('anchor_text') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                        </div>
                     </div>
-                    <div class="sm:col-span-2 lg:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Referring page URL</label>
-                        <input wire:model="referring_page_url" type="url" placeholder="https://…" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-                        @error('referring_page_url') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
-                    </div>
-                    <div class="sm:col-span-2 lg:col-span-3">
-                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Target page URL (your site)</label>
-                        <input wire:model="target_page_url" type="url" placeholder="https://…" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-                        @error('target_page_url') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Domain authority</label>
-                        <input wire:model="domain_authority" type="number" min="0" max="100" placeholder="—" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-                        @error('domain_authority') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Spam score</label>
-                        <input wire:model="spam_score" type="number" min="0" max="100" placeholder="—" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-                        @error('spam_score') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
-                    </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Type</label>
-                        <select wire:model="type" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
-                            @foreach ($types as $t)
-                                <option value="{{ $t->value }}">{{ $t->label() }}</option>
-                            @endforeach
-                        </select>
-                        @error('type') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
-                    </div>
-                    <div class="sm:col-span-2">
-                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Anchor text</label>
-                        <input wire:model="anchor_text" type="text" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-                        @error('anchor_text') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
-                    </div>
-                    <div class="flex items-end gap-3">
-                        <label class="flex cursor-pointer items-center gap-2 pb-2 text-sm text-slate-700 dark:text-slate-300">
-                            <input wire:model="is_dofollow" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800" />
-                            Dofollow
+
+                    <div class="flex flex-col-reverse gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+                        <label class="flex cursor-pointer items-center gap-2.5 text-sm font-medium text-slate-700 dark:text-slate-300">
+                            <input wire:model="is_dofollow" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-800" />
+                            Dofollow link
                         </label>
-                    </div>
-                    <div class="flex items-end sm:col-span-2 lg:col-span-3">
-                        <button type="submit" class="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900">
+                        <button type="submit" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900 sm:w-auto">
+                            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
                             Save backlink
                         </button>
                     </div>
@@ -66,40 +70,47 @@
             </div>
 
             {{-- Bulk sheet --}}
-            <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-6">
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Bulk edit by date</h2>
-                        <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Open a sheet for one tracked date to add or update many rows at once.</p>
+            <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-6">
+                <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div class="min-w-0">
+                        <h2 class="text-base font-semibold text-slate-900 dark:text-slate-100">Bulk edit by date</h2>
+                        <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">Open a sheet for one tracked date to add or update many rows at once.</p>
                     </div>
-                    <div class="flex flex-wrap items-end gap-2">
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Sheet date</label>
-                            <input wire:model.live="sheetDate" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
+                    <div class="flex shrink-0 flex-col gap-2 sm:flex-row sm:items-end">
+                        <div class="min-w-[10.5rem]">
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Sheet date</label>
+                            <input wire:model.live="sheetDate" type="date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
                             @error('sheetDate') <p class="mt-1 text-xs text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
                         </div>
-                        @if ($sheetOpen)
-                            <button type="button" wire:click="closeSheet" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">Close sheet</button>
-                        @else
-                            <button type="button" wire:click="openSheet" class="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-800 dark:bg-indigo-600 dark:hover:bg-indigo-500">Open sheet</button>
-                        @endif
+                        <div class="flex gap-2">
+                            @if ($sheetOpen)
+                                <button type="button" wire:click="closeSheet" class="inline-flex flex-1 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 sm:flex-initial">
+                                    Close sheet
+                                </button>
+                            @else
+                                <button type="button" wire:click="openSheet" class="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 sm:flex-initial">
+                                    <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" /></svg>
+                                    Open sheet
+                                </button>
+                            @endif
+                        </div>
                     </div>
                 </div>
 
                 @if ($sheetOpen)
-                    <div class="mt-4 space-y-3">
+                    <div class="mt-6 space-y-4 border-t border-slate-100 pt-6 dark:border-slate-800">
                         <div class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
                             <table class="min-w-[900px] w-full text-xs">
                                 <thead>
                                     <tr class="border-b border-slate-200 bg-slate-50 text-left font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
                                         <th class="px-2 py-2">Referring URL</th>
                                         <th class="px-2 py-2">Target URL</th>
-                                        <th class="px-2 py-2 w-16">DA</th>
-                                        <th class="px-2 py-2 w-16">Spam</th>
+                                        <th class="w-16 px-2 py-2">DA</th>
+                                        <th class="w-16 px-2 py-2">Spam</th>
                                         <th class="px-2 py-2">Anchor</th>
                                         <th class="px-2 py-2">Type</th>
                                         <th class="px-2 py-2">Follow</th>
-                                        <th class="px-2 py-2 w-20"></th>
+                                        <th class="w-24 px-2 py-2"></th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -133,8 +144,8 @@
                                                     <option value="0">Nofollow</option>
                                                 </select>
                                             </td>
-                                            <td class="p-1 whitespace-nowrap">
-                                                <button type="button" wire:click="removeSheetRow({{ $i }})" class="text-xs font-medium text-red-600 hover:underline dark:text-red-400">Remove</button>
+                                            <td class="whitespace-nowrap p-1">
+                                                <button type="button" wire:click="removeSheetRow({{ $i }})" class="rounded-md px-2 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">Remove</button>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -148,9 +159,14 @@
                                 </div>
                             @endif
                         @endforeach
-                        <div class="flex flex-wrap gap-2">
-                            <button type="button" wire:click="addSheetRow" class="rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">Add row</button>
-                            <button type="button" wire:click="saveSheet" class="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white hover:bg-indigo-500">Save sheet</button>
+                        <div class="flex flex-col-reverse gap-2 sm:flex-row sm:items-center sm:justify-end">
+                            <button type="button" wire:click="addSheetRow" class="inline-flex w-full items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 sm:w-auto">
+                                Add row
+                            </button>
+                            <button type="button" wire:click="saveSheet" class="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 sm:w-auto">
+                                <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                Save sheet
+                            </button>
                         </div>
                     </div>
                 @endif
@@ -158,30 +174,56 @@
 
             {{-- Filters + table --}}
             <div>
-                <div class="mb-4 flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end lg:justify-between">
-                    <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-                        <div class="relative flex-1 sm:max-w-xs">
+                <div class="mb-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:p-5">
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Filter backlinks</h3>
+                    <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Narrow the list below. Filters apply immediately.</p>
+                    <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        <div class="relative sm:col-span-2 lg:col-span-1 xl:col-span-1">
                             <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
                             <input wire:model.live.debounce.300ms="search" type="text" placeholder="Search URLs or anchor…"
-                                class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm placeholder-slate-400 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
+                                class="w-full min-w-0 rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm placeholder-slate-400 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
                         </div>
-                        <input wire:model.live="from" type="date" title="From" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
-                        <input wire:model.live="to" type="date" title="To" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
-                        <select wire:model.live="typeFilter" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                            <option value="">All types</option>
-                            @foreach ($types as $t)
-                                <option value="{{ $t->value }}">{{ $t->label() }}</option>
-                            @endforeach
-                        </select>
-                        <select wire:model.live="followFilter" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                            <option value="">All links</option>
-                            <option value="dofollow">Dofollow</option>
-                            <option value="nofollow">Nofollow</option>
-                        </select>
-                        <input wire:model.live="daMin" type="number" min="0" max="100" placeholder="DA min" class="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
-                        <input wire:model.live="daMax" type="number" min="0" max="100" placeholder="DA max" class="w-24 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
-                        <input wire:model.live="spamMin" type="number" min="0" max="100" placeholder="Spam min" class="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
-                        <input wire:model.live="spamMax" type="number" min="0" max="100" placeholder="Spam max" class="w-28 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">From</label>
+                            <input wire:model.live="from" type="date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">To</label>
+                            <input wire:model.live="to" type="date" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Type</label>
+                            <select wire:model.live="typeFilter" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                                <option value="">All types</option>
+                                @foreach ($types as $t)
+                                    <option value="{{ $t->value }}">{{ $t->label() }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Follow</label>
+                            <select wire:model.live="followFilter" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                                <option value="">All links</option>
+                                <option value="dofollow">Dofollow</option>
+                                <option value="nofollow">Nofollow</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">DA min</label>
+                            <input wire:model.live="daMin" type="number" min="0" max="100" placeholder="0" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">DA max</label>
+                            <input wire:model.live="daMax" type="number" min="0" max="100" placeholder="100" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Spam min</label>
+                            <input wire:model.live="spamMin" type="number" min="0" max="100" placeholder="0" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
+                        </div>
+                        <div>
+                            <label class="mb-1.5 block text-xs font-medium text-slate-600 dark:text-slate-400">Spam max</label>
+                            <input wire:model.live="spamMax" type="number" min="0" max="100" placeholder="100" class="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
+                        </div>
                     </div>
                 </div>
 
@@ -198,7 +240,7 @@
                                     <col class="w-[9rem]" />
                                     <col class="w-[7.5rem]" />
                                     <col class="w-[6.25rem]" />
-                                    <col class="w-[6.5rem]" />
+                                    <col class="w-[7.5rem]" />
                                 </colgroup>
                                 <thead>
                                     <tr class="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
@@ -210,7 +252,7 @@
                                         <x-sort-header column="anchor_text" :sortBy="$sortBy" :sortDir="$sortDir" th-class="min-w-0 px-2 py-3">Anchor</x-sort-header>
                                         <x-sort-header column="type" :sortBy="$sortBy" :sortDir="$sortDir" th-class="min-w-0 px-2 py-3">Type</x-sort-header>
                                         <x-sort-header column="is_dofollow" :sortBy="$sortBy" :sortDir="$sortDir" th-class="px-2 py-3">Follow</x-sort-header>
-                                        <th class="w-[6.5rem] px-2 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Actions</th>
+                                        <th class="px-2 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -234,10 +276,11 @@
                                                     'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' => ! $b->is_dofollow,
                                                 ])>{{ $b->is_dofollow ? 'Dofollow' : 'Nofollow' }}</span>
                                             </td>
-                                            <td class="whitespace-nowrap px-2 py-2.5 text-right align-top text-xs leading-tight">
-                                                <button type="button" wire:click="openSheetForDate('{{ $b->tracked_date->format('Y-m-d') }}')" class="font-medium text-indigo-600 hover:underline dark:text-indigo-400">Sheet</button>
-                                                <span class="text-slate-300 dark:text-slate-600">·</span>
-                                                <button type="button" wire:click="deleteBacklink({{ $b->id }})" wire:confirm="Delete this backlink?" class="font-medium text-red-600 hover:underline dark:text-red-400">Delete</button>
+                                            <td class="px-2 py-2 align-top">
+                                                <div class="flex flex-wrap items-center justify-end gap-1.5">
+                                                    <button type="button" wire:click="openSheetForDate('{{ $b->tracked_date->format('Y-m-d') }}')" class="rounded-md border border-transparent px-2 py-1 text-xs font-semibold text-indigo-600 transition hover:border-indigo-100 hover:bg-indigo-50 dark:text-indigo-400 dark:hover:border-indigo-500/30 dark:hover:bg-indigo-500/10">Sheet</button>
+                                                    <button type="button" wire:click="deleteBacklink({{ $b->id }})" wire:confirm="Delete this backlink?" class="rounded-md border border-transparent px-2 py-1 text-xs font-semibold text-red-600 transition hover:border-red-100 hover:bg-red-50 dark:text-red-400 dark:hover:border-red-500/30 dark:hover:bg-red-500/10">Delete</button>
+                                                </div>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -248,9 +291,9 @@
                     <div class="mt-4">{{ $rows->links() }}</div>
                 @else
                     <div class="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-16 dark:border-slate-800 dark:bg-slate-900">
-                        <svg class="h-12 w-12 text-slate-300 dark:text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 011.242 7.244l-4.5 4.5a4.5 4.5 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 00-6.364-6.364l-4.5 4.5a4.5 4.5 001.242 7.244" /></svg>
+                        <svg class="h-12 w-12 text-slate-300 dark:text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
                         <p class="mt-3 text-sm font-medium text-slate-500 dark:text-slate-400">No backlinks yet</p>
-                        <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Use the form above or open a sheet for a date to add entries.</p>
+                        <p class="mt-1 text-center text-xs text-slate-400 dark:text-slate-500">Use the form above or open a sheet for a date to add entries.</p>
                     </div>
                 @endif
             </div>
