@@ -2,12 +2,9 @@
 
 namespace App\Mail;
 
-use App\Models\AnalyticsData;
-use App\Models\Backlink;
-use App\Models\SearchConsoleData;
 use App\Models\User;
 use App\Models\Website;
-use Carbon\CarbonInterface;
+use App\Services\ReportDataService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -15,52 +12,51 @@ use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Mail\Mailables\Headers;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Collection;
 
 class GrowthReportMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public Carbon $reportDate;
+    public string $startDate;
 
-    /** @var array{clicks: int, impressions: int, users: int, sessions: int} */
-    public array $stats = [];
+    public string $endDate;
 
-    /** @var Collection<int, Backlink> */
-    public Collection $backlinks;
+    public string $reportType;
+
+    public array $report = [];
 
     public function __construct(
         public User $user,
         public Website $website,
-        ?CarbonInterface $reportDate = null,
+        ?string $startDate = null,
+        ?string $endDate = null,
+        ?string $reportType = null,
     ) {
-        $this->reportDate = Carbon::parse(
-            $reportDate ?? Carbon::yesterday(config('app.timezone'))
-        )->startOfDay();
+        $tz = config('app.timezone');
 
-        $day = $this->reportDate->toDateString();
-        $websiteId = $this->website->id;
+        $this->endDate = $endDate ?? Carbon::yesterday($tz)->toDateString();
+        $this->startDate = $startDate ?? $this->endDate;
+        $this->reportType = $reportType ?? 'daily';
 
-        $this->stats = [
-            'clicks' => (int) SearchConsoleData::where('website_id', $websiteId)->whereDate('date', $day)->sum('clicks'),
-            'impressions' => (int) SearchConsoleData::where('website_id', $websiteId)->whereDate('date', $day)->sum('impressions'),
-            'users' => (int) AnalyticsData::where('website_id', $websiteId)->whereDate('date', $day)->sum('users'),
-            'sessions' => (int) AnalyticsData::where('website_id', $websiteId)->whereDate('date', $day)->sum('sessions'),
-        ];
-
-        $this->backlinks = Backlink::query()
-            ->where('website_id', $websiteId)
-            ->whereDate('tracked_date', $day)
-            ->orderByDesc('domain_authority')
-            ->orderBy('referring_page_url')
-            ->limit(100)
-            ->get();
+        $this->report = app(ReportDataService::class)->generate(
+            $this->website->id,
+            $this->startDate,
+            $this->endDate,
+        );
     }
 
     public function envelope(): Envelope
     {
+        $typeLabel = ucfirst($this->reportType);
+        $start = Carbon::parse($this->startDate);
+        $end = Carbon::parse($this->endDate);
+
+        $dateStr = $start->eq($end)
+            ? $start->format('M j, Y')
+            : $start->format('M j').' - '.$end->format('M j, Y');
+
         return new Envelope(
-            subject: 'GrowthHub report — '.$this->website->domain.' ('.$this->reportDate->format('M j, Y').')',
+            subject: "GrowthHub {$typeLabel} Report — {$this->website->domain} ({$dateStr})",
         );
     }
 

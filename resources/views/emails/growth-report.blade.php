@@ -2,84 +2,271 @@
 <html>
 <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.6; margin: 0; padding: 0; background: #f1f5f9; }
-        .container { max-width: 640px; margin: 0 auto; padding: 32px 16px; }
-        .card { background: #ffffff; border-radius: 8px; padding: 32px; }
-        h1 { font-size: 20px; margin: 0 0 8px; }
-        .meta { color: #64748b; margin: 0 0 20px; font-size: 14px; }
-        .greeting { color: #64748b; margin: 0 0 24px; font-size: 14px; }
-        .stats { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 28px; }
-        .stat { background: #f8fafc; border-radius: 6px; padding: 16px; flex: 1 1 120px; text-align: center; }
-        .stat-value { font-size: 22px; font-weight: 700; color: #4f46e5; }
-        .stat-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: #94a3b8; margin-top: 4px; }
-        h2 { font-size: 15px; margin: 0 0 12px; color: #0f172a; }
-        .bl-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 8px; }
-        .bl-table th { text-align: left; padding: 8px 6px; border-bottom: 1px solid #e2e8f0; color: #64748b; font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.04em; }
-        .bl-table td { padding: 10px 6px; border-bottom: 1px solid #f1f5f9; vertical-align: top; word-break: break-word; }
-        .bl-empty { color: #94a3b8; font-size: 13px; margin: 0 0 24px; }
-        .btn { display: inline-block; background: #4f46e5; color: #ffffff !important; text-decoration: none; border-radius: 6px; padding: 10px 24px; font-size: 14px; font-weight: 500; }
+        .container { max-width: 680px; margin: 0 auto; padding: 32px 16px; }
+        .card { background: #ffffff; border-radius: 12px; padding: 32px; margin-bottom: 16px; }
+        h1 { font-size: 22px; margin: 0 0 4px; font-weight: 700; }
+        .meta { color: #64748b; margin: 0 0 4px; font-size: 14px; }
+        .compare-line { color: #94a3b8; margin: 0 0 24px; font-size: 13px; font-style: italic; }
+        .greeting { color: #475569; margin: 0 0 28px; font-size: 14px; }
+
+        .section-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #fff; margin-bottom: 14px; }
+        .badge-analytics { background: #3b82f6; }
+        .badge-search { background: #8b5cf6; }
+        .badge-backlinks { background: #10b981; }
+
+        .section-title { font-size: 16px; font-weight: 700; margin: 0 0 16px; color: #0f172a; }
+        .section-divider { border: none; border-top: 1px solid #e2e8f0; margin: 28px 0; }
+
+        .kpi-grid { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+        .kpi-grid td { padding: 14px 12px; text-align: center; background: #f8fafc; border: 2px solid #ffffff; border-radius: 8px; }
+        .kpi-value { font-size: 24px; font-weight: 700; color: #0f172a; display: block; }
+        .kpi-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #94a3b8; display: block; margin-top: 2px; }
+        .kpi-change { font-size: 11px; font-weight: 600; display: block; margin-top: 4px; }
+        .kpi-prev { font-size: 10px; color: #94a3b8; display: block; margin-top: 2px; }
+
+        .change-up-good { color: #16a34a; }
+        .change-down-good { color: #16a34a; }
+        .change-up-bad { color: #dc2626; }
+        .change-down-bad { color: #dc2626; }
+        .change-flat { color: #94a3b8; }
+
+        .data-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 8px; }
+        .data-table th { text-align: left; padding: 8px 10px; border-bottom: 2px solid #e2e8f0; color: #64748b; font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; }
+        .data-table th.right { text-align: right; }
+        .data-table td { padding: 10px; border-bottom: 1px solid #f1f5f9; }
+        .data-table td.right { text-align: right; }
+        .data-table tr:last-child td { border-bottom: none; }
+
+        .sub-heading { font-size: 13px; font-weight: 600; color: #334155; margin: 0 0 10px; text-transform: uppercase; letter-spacing: 0.03em; }
+        .empty-note { color: #94a3b8; font-size: 13px; margin: 0 0 16px; }
+
+        .btn { display: inline-block; background: #4f46e5; color: #ffffff !important; text-decoration: none; border-radius: 8px; padding: 12px 28px; font-size: 14px; font-weight: 600; }
         .footer { text-align: center; color: #94a3b8; font-size: 12px; margin-top: 24px; }
     </style>
 </head>
 <body>
 <div class="container">
     <div class="card">
-        <h1>GrowthHub daily report</h1>
-        <p class="meta"><strong>{{ $website->domain }}</strong> &mdash; {{ $reportDate->format('l, F j, Y') }}</p>
-        <p class="greeting">Hello {{ $user->name }}, here is the performance summary for this site on the date above.</p>
+        <h1>GrowthHub {{ ucfirst($reportType) }} Report</h1>
+        <p class="meta">
+            <strong>{{ $website->domain }}</strong> &mdash;
+            @if ($startDate === $endDate)
+                {{ \Illuminate\Support\Carbon::parse($startDate)->format('l, F j, Y') }}
+            @else
+                {{ \Illuminate\Support\Carbon::parse($startDate)->format('M j') }} &ndash; {{ \Illuminate\Support\Carbon::parse($endDate)->format('M j, Y') }}
+            @endif
+        </p>
+        <p class="compare-line">
+            Compared to {{ $report['period']['previous_label'] }}
+            ({{ \Illuminate\Support\Carbon::parse($report['period']['prev_start'])->format('M j') }} &ndash; {{ \Illuminate\Support\Carbon::parse($report['period']['prev_end'])->format('M j, Y') }})
+        </p>
+        <p class="greeting">Hello {{ $user->name }}, here is the performance summary for your website.</p>
 
-        <div class="stats">
-            <div class="stat">
-                <div class="stat-value">{{ number_format($stats['clicks']) }}</div>
-                <div class="stat-label">Clicks</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">{{ number_format($stats['impressions']) }}</div>
-                <div class="stat-label">Impressions</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">{{ number_format($stats['users']) }}</div>
-                <div class="stat-label">Users</div>
-            </div>
-            <div class="stat">
-                <div class="stat-value">{{ number_format($stats['sessions']) }}</div>
-                <div class="stat-label">Sessions</div>
-            </div>
-        </div>
+        {{-- ==================== GOOGLE ANALYTICS ==================== --}}
+        <span class="section-badge badge-analytics">Google Analytics</span>
+        <h2 class="section-title">Website Traffic</h2>
 
-        <h2>Backlinks recorded for this date</h2>
-        @if ($backlinks->isEmpty())
-            <p class="bl-empty">No backlinks were recorded for this date.</p>
-        @else
-            <table class="bl-table" role="presentation">
+        <table class="kpi-grid" role="presentation">
+            <tr>
+                <td>
+                    <span class="kpi-value">{{ number_format($report['analytics']['users']['current']) }}</span>
+                    <span class="kpi-label">Users</span>
+                    @include('emails.partials.change-badge', ['metric' => $report['analytics']['users']])
+                    <span class="kpi-prev">was {{ number_format($report['analytics']['users']['previous']) }}</span>
+                </td>
+                <td>
+                    <span class="kpi-value">{{ number_format($report['analytics']['sessions']['current']) }}</span>
+                    <span class="kpi-label">Sessions</span>
+                    @include('emails.partials.change-badge', ['metric' => $report['analytics']['sessions']])
+                    <span class="kpi-prev">was {{ number_format($report['analytics']['sessions']['previous']) }}</span>
+                </td>
+                <td>
+                    <span class="kpi-value">{{ $report['analytics']['bounce_rate']['current'] }}%</span>
+                    <span class="kpi-label">Bounce Rate</span>
+                    @include('emails.partials.change-badge', ['metric' => $report['analytics']['bounce_rate'], 'suffix' => 'pp'])
+                    <span class="kpi-prev">was {{ $report['analytics']['bounce_rate']['previous'] }}%</span>
+                </td>
+            </tr>
+        </table>
+
+        @if (count($report['analytics']['top_sources']) > 0)
+            <p class="sub-heading">Top Traffic Sources</p>
+            <table class="data-table" role="presentation">
                 <thead>
                     <tr>
-                        <th>Referring page</th>
-                        <th>Target</th>
-                        <th>Type</th>
-                        <th>DA</th>
-                        <th>Follow</th>
+                        <th>Source</th>
+                        <th class="right">Users</th>
+                        <th class="right">Prev</th>
+                        <th class="right">Change</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach ($backlinks as $b)
+                    @foreach ($report['analytics']['top_sources'] as $source)
                         <tr>
-                            <td><a href="{{ $b->referring_page_url }}">{{ \Illuminate\Support\Str::limit($b->referring_page_url, 48) }}</a></td>
-                            <td><a href="{{ $b->target_page_url }}">{{ \Illuminate\Support\Str::limit($b->target_page_url, 40) }}</a></td>
-                            <td>{{ $b->type->label() }}</td>
-                            <td>{{ $b->domain_authority ?? '—' }}</td>
-                            <td>{{ $b->is_dofollow ? 'Do' : 'No' }}</td>
+                            <td>{{ $source['source'] }}</td>
+                            <td class="right">{{ number_format($source['users']) }}</td>
+                            <td class="right" style="color:#94a3b8">{{ number_format($source['prev_users']) }}</td>
+                            <td class="right">@include('emails.partials.change-inline', ['metric' => $source['change']])</td>
                         </tr>
                     @endforeach
                 </tbody>
             </table>
-            @if ($backlinks->count() >= 100)
-                <p class="bl-empty" style="margin-top: 0;">Showing the first 100 backlinks for this date.</p>
-            @endif
+        @else
+            <p class="empty-note">No analytics data available for this period.</p>
         @endif
 
-        <a href="{{ route('dashboard') }}" class="btn">Open dashboard</a>
+        <hr class="section-divider">
+
+        {{-- ==================== GOOGLE SEARCH CONSOLE ==================== --}}
+        <span class="section-badge badge-search">Google Search Console</span>
+        <h2 class="section-title">Search Performance</h2>
+
+        <table class="kpi-grid" role="presentation">
+            <tr>
+                <td>
+                    <span class="kpi-value">{{ number_format($report['search_console']['clicks']['current']) }}</span>
+                    <span class="kpi-label">Clicks</span>
+                    @include('emails.partials.change-badge', ['metric' => $report['search_console']['clicks']])
+                    <span class="kpi-prev">was {{ number_format($report['search_console']['clicks']['previous']) }}</span>
+                </td>
+                <td>
+                    <span class="kpi-value">{{ number_format($report['search_console']['impressions']['current']) }}</span>
+                    <span class="kpi-label">Impressions</span>
+                    @include('emails.partials.change-badge', ['metric' => $report['search_console']['impressions']])
+                    <span class="kpi-prev">was {{ number_format($report['search_console']['impressions']['previous']) }}</span>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <span class="kpi-value">{{ $report['search_console']['position']['current'] }}</span>
+                    <span class="kpi-label">Avg Position</span>
+                    @include('emails.partials.change-badge', ['metric' => $report['search_console']['position']])
+                    <span class="kpi-prev">was {{ $report['search_console']['position']['previous'] }}</span>
+                </td>
+                <td>
+                    <span class="kpi-value">{{ $report['search_console']['ctr']['current'] }}%</span>
+                    <span class="kpi-label">Avg CTR</span>
+                    @include('emails.partials.change-badge', ['metric' => $report['search_console']['ctr'], 'suffix' => 'pp'])
+                    <span class="kpi-prev">was {{ $report['search_console']['ctr']['previous'] }}%</span>
+                </td>
+            </tr>
+        </table>
+
+        @if (count($report['search_console']['top_queries']) > 0)
+            <p class="sub-heading">Top Search Queries</p>
+            <table class="data-table" role="presentation">
+                <thead>
+                    <tr>
+                        <th>Query</th>
+                        <th class="right">Clicks</th>
+                        <th class="right">Prev</th>
+                        <th class="right">Pos</th>
+                        <th class="right">Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($report['search_console']['top_queries'] as $q)
+                        <tr>
+                            <td>{{ \Illuminate\Support\Str::limit($q['query'], 40) }}</td>
+                            <td class="right">{{ number_format($q['clicks']) }}</td>
+                            <td class="right" style="color:#94a3b8">{{ number_format($q['prev_clicks']) }}</td>
+                            <td class="right">{{ $q['position'] }}</td>
+                            <td class="right">@include('emails.partials.change-inline', ['metric' => $q['change']])</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
+
+        @if (count($report['search_console']['top_pages']) > 0)
+            <p class="sub-heading">Top Pages</p>
+            <table class="data-table" role="presentation">
+                <thead>
+                    <tr>
+                        <th>Page</th>
+                        <th class="right">Clicks</th>
+                        <th class="right">Prev</th>
+                        <th class="right">Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($report['search_console']['top_pages'] as $p)
+                        <tr>
+                            <td>{{ \Illuminate\Support\Str::limit($p['page'], 50) }}</td>
+                            <td class="right">{{ number_format($p['clicks']) }}</td>
+                            <td class="right" style="color:#94a3b8">{{ number_format($p['prev_clicks']) }}</td>
+                            <td class="right">@include('emails.partials.change-inline', ['metric' => $p['change']])</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @endif
+
+        @if (count($report['search_console']['top_queries']) === 0 && count($report['search_console']['top_pages']) === 0)
+            <p class="empty-note">No search console data available for this period.</p>
+        @endif
+
+        <hr class="section-divider">
+
+        {{-- ==================== BACKLINKS ==================== --}}
+        <span class="section-badge badge-backlinks">Backlinks</span>
+        <h2 class="section-title">Link Profile</h2>
+
+        <table class="kpi-grid" role="presentation">
+            <tr>
+                <td>
+                    <span class="kpi-value">{{ number_format($report['backlinks']['count']['current']) }}</span>
+                    <span class="kpi-label">New Backlinks</span>
+                    @include('emails.partials.change-badge', ['metric' => $report['backlinks']['count']])
+                    <span class="kpi-prev">was {{ number_format($report['backlinks']['count']['previous']) }}</span>
+                </td>
+                <td>
+                    <span class="kpi-value">{{ $report['backlinks']['avg_da']['current'] }}</span>
+                    <span class="kpi-label">Avg DA</span>
+                    @include('emails.partials.change-badge', ['metric' => $report['backlinks']['avg_da']])
+                    <span class="kpi-prev">was {{ $report['backlinks']['avg_da']['previous'] }}</span>
+                </td>
+                <td>
+                    <span class="kpi-value">{{ $report['backlinks']['dofollow']['current'] }} / {{ $report['backlinks']['nofollow']['current'] }}</span>
+                    <span class="kpi-label">Do / Nofollow</span>
+                </td>
+            </tr>
+        </table>
+
+        @if (count($report['backlinks']['top_backlinks']) > 0)
+            <p class="sub-heading">Top Backlinks by Domain Authority</p>
+            <table class="data-table" role="presentation">
+                <thead>
+                    <tr>
+                        <th>Referring Page</th>
+                        <th>Target</th>
+                        <th class="right">DA</th>
+                        <th>Follow</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach ($report['backlinks']['top_backlinks'] as $b)
+                        <tr>
+                            <td><a href="{{ $b['referring_page_url'] }}" style="color:#4f46e5">{{ \Illuminate\Support\Str::limit($b['referring_page_url'], 40) }}</a></td>
+                            <td>{{ \Illuminate\Support\Str::limit($b['target_page_url'], 35) }}</td>
+                            <td class="right">{{ $b['domain_authority'] ?? '—' }}</td>
+                            <td>{{ $b['is_dofollow'] ? 'Do' : 'No' }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @else
+            <p class="empty-note">No backlinks recorded for this period.</p>
+        @endif
+
+        <hr class="section-divider">
+
+        <div style="text-align: center; padding-top: 8px;">
+            <a href="{{ route('reports.index') }}" class="btn">View Full Report in Dashboard</a>
+        </div>
     </div>
     <p class="footer">Sent by GrowthHub &mdash; {{ now()->format('M d, Y') }}</p>
 </div>

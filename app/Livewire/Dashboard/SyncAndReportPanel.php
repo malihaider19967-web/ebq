@@ -65,8 +65,10 @@ class SyncAndReportPanel extends Component
         }
 
         try {
-            $reportDate = Carbon::yesterday(config('app.timezone'));
-            Mail::to($user->email)->send(new GrowthReportMail($user, $website, $reportDate));
+            $yesterday = Carbon::yesterday(config('app.timezone'))->toDateString();
+            Mail::to($user->email)->send(
+                new GrowthReportMail($user, $website, $yesterday, $yesterday, 'daily')
+            );
             RateLimiter::hit($key, 3600);
             $this->sendSuccess = 'Report for '.$website->domain.' sent to '.$user->email.'.';
         } catch (Throwable $e) {

@@ -16,16 +16,18 @@ class SendGrowthReports extends Command
 
     public function handle(): int
     {
-        $reportDate = Carbon::yesterday(config('app.timezone'));
+        $yesterday = Carbon::yesterday(config('app.timezone'))->toDateString();
 
-        Website::query()->with('owner')->chunkById(100, function ($websites) use ($reportDate) {
+        Website::query()->with('owner')->chunkById(100, function ($websites) use ($yesterday) {
             foreach ($websites as $website) {
                 $owner = $website->owner;
                 if (! $owner) {
                     continue;
                 }
 
-                Mail::to($owner->email)->queue(new GrowthReportMail($owner, $website, $reportDate));
+                Mail::to($owner->email)->queue(
+                    new GrowthReportMail($owner, $website, $yesterday, $yesterday, 'daily')
+                );
             }
         });
 
