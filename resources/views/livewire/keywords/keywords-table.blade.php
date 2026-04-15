@@ -1,29 +1,26 @@
 <div>
     <div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div class="flex flex-1 flex-col gap-3 sm:flex-row sm:items-center">
+        <div class="flex flex-1 items-center gap-2">
             <div class="relative flex-1 sm:max-w-xs">
-                <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
-                <input wire:model.live.debounce.300ms="search" type="text" placeholder="Search keywords..."
-                    class="w-full rounded-lg border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm placeholder-slate-400 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
+                <svg class="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
+                <input wire:model.live.debounce.300ms="search" type="text" placeholder="Search keywords…"
+                    class="h-8 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2.5 text-xs placeholder-slate-400 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
             </div>
-            <div class="flex gap-2">
-                <select wire:model.live="device"
-                    class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
-                    <option value="">All devices</option>
-                    <option value="DESKTOP">Desktop</option>
-                    <option value="MOBILE">Mobile</option>
-                    <option value="TABLET">Tablet</option>
-                </select>
-                <input wire:model.live="from" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-                <input wire:model.live="to" type="date" class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-            </div>
+            <select wire:model.live="device"
+                class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                <option value="">All devices</option>
+                <option value="DESKTOP">Desktop</option>
+                <option value="MOBILE">Mobile</option>
+                <option value="TABLET">Tablet</option>
+            </select>
+            <input wire:model.live="from" type="date" class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+            <input wire:model.live="to" type="date" class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
         </div>
 
-        {{-- View toggle --}}
-        <div class="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">
+        <div class="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">
             <button wire:click="$set('view', 'aggregated')"
                 @class([
-                    'rounded-md px-3 py-1.5 text-xs font-semibold transition',
+                    'h-7 rounded px-2.5 text-xs font-semibold transition',
                     'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100' => $view === 'aggregated',
                     'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200' => $view !== 'aggregated',
                 ])>
@@ -31,7 +28,7 @@
             </button>
             <button wire:click="$set('view', 'daily')"
                 @class([
-                    'rounded-md px-3 py-1.5 text-xs font-semibold transition',
+                    'h-7 rounded px-2.5 text-xs font-semibold transition',
                     'bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-slate-100' => $view === 'daily',
                     'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200' => $view !== 'daily',
                 ])>
@@ -43,9 +40,9 @@
     @if ($rows instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $rows->isNotEmpty())
         <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="overflow-x-auto">
-                <table class="w-full text-sm">
+                <table class="w-full text-xs">
                     <thead>
-                        <tr class="border-b border-slate-200 bg-slate-50 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
+                        <tr class="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
                             @if ($view === 'daily')
                                 <x-sort-header column="date" :sortBy="$sortBy" :sortDir="$sortDir">Date</x-sort-header>
                             @endif
@@ -60,15 +57,15 @@
                         @foreach ($rows as $row)
                             <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                 @if ($view === 'daily')
-                                    <td class="whitespace-nowrap px-6 py-3.5 text-slate-500 dark:text-slate-400">{{ $row->date instanceof \Carbon\Carbon ? $row->date->format('M d, Y') : $row->date }}</td>
+                                    <td class="whitespace-nowrap px-4 py-2.5 text-slate-500 dark:text-slate-400">{{ $row->date instanceof \Carbon\Carbon ? $row->date->format('M d, Y') : $row->date }}</td>
                                 @endif
-                                <td class="whitespace-nowrap px-6 py-3.5 font-medium text-slate-900 dark:text-slate-100">{{ $row->query }}</td>
-                                <td class="whitespace-nowrap px-6 py-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->clicks) }}</td>
-                                <td class="whitespace-nowrap px-6 py-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->impressions) }}</td>
-                                <td class="whitespace-nowrap px-6 py-3.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->ctr * 100, 1) }}%</td>
-                                <td class="whitespace-nowrap px-6 py-3.5 text-right">
+                                <td class="whitespace-nowrap px-4 py-2.5 font-medium text-slate-900 dark:text-slate-100">{{ $row->query }}</td>
+                                <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->clicks) }}</td>
+                                <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->impressions) }}</td>
+                                <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->ctr * 100, 1) }}%</td>
+                                <td class="whitespace-nowrap px-4 py-2.5 text-right">
                                     <span @class([
-                                        'inline-flex rounded-full px-2 py-0.5 text-xs font-semibold tabular-nums',
+                                        'inline-flex rounded-full px-1.5 py-px text-[10px] font-semibold tabular-nums',
                                         'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $row->position <= 3,
                                         'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400' => $row->position > 3 && $row->position <= 10,
                                         'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' => $row->position > 10 && $row->position <= 20,
@@ -81,7 +78,7 @@
                 </table>
             </div>
         </div>
-        <div class="mt-4">{{ $rows->links() }}</div>
+        <div class="mt-3">{{ $rows->links() }}</div>
     @else
         <div class="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-16 dark:border-slate-800 dark:bg-slate-900">
             <svg class="h-12 w-12 text-slate-300 dark:text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>
