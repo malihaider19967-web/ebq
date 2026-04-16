@@ -53,11 +53,12 @@ class PagesTable extends Component
 
         $allowed = ['page', 'total_clicks', 'total_impressions', 'avg_ctr', 'avg_position', 'last_indexed_at'];
         $sortBy = in_array($this->sortBy, $allowed) ? $this->sortBy : 'total_clicks';
+        $sortColumn = $sortBy === 'page' ? 'search_console_data.page' : $sortBy;
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
             $rows = SearchConsoleData::query()
                 ->select(
-                    'page',
+                    DB::raw('search_console_data.page as page'),
                     DB::raw('SUM(clicks) as total_clicks'),
                     DB::raw('SUM(impressions) as total_impressions'),
                     DB::raw('AVG(position) as avg_position'),
@@ -69,9 +70,9 @@ class PagesTable extends Component
                         ->on('page_indexing_statuses.page', '=', 'search_console_data.page');
                 })
                 ->where('search_console_data.website_id', $this->websiteId)
-                ->when($this->search, fn ($q) => $q->where('page', 'like', "%{$this->search}%"))
-                ->groupBy('page')
-                ->orderBy($sortBy, $this->sortDir)
+                ->when($this->search, fn ($q) => $q->where('search_console_data.page', 'like', "%{$this->search}%"))
+                ->groupBy('search_console_data.page')
+                ->orderBy($sortColumn, $this->sortDir)
                 ->paginate(20);
         }
 
