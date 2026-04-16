@@ -38,6 +38,9 @@ class PageDetail extends Component
     {
         $this->websiteId = (int) session('current_website_id', 0);
         $this->pageUrl = urldecode($pageUrl);
+        if ($this->pageUrl !== '') {
+            $this->generateGoogleSnippet();
+        }
     }
 
     public function sort(string $column): void
