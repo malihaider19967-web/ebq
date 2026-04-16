@@ -151,7 +151,7 @@ class BacklinksManager extends Component
             'is_dofollow' => ['boolean'],
         ]);
 
-        Backlink::query()->create([
+        $backlink = Backlink::query()->create([
             'website_id' => $this->websiteId,
             'tracked_date' => $this->tracked_date,
             'referring_page_url' => $this->referring_page_url,
@@ -162,6 +162,8 @@ class BacklinksManager extends Component
             'type' => BacklinkType::from($this->type),
             'is_dofollow' => $this->is_dofollow,
         ]);
+
+        $this->safeAudit($backlink->id);
 
         $this->reset(['referring_page_url', 'target_page_url', 'domain_authority', 'spam_score', 'anchor_text']);
         $this->resetPage();
@@ -260,7 +262,9 @@ class BacklinksManager extends Component
 
         $toDelete = array_values(array_diff($this->sheetLoadedIds, $keptIds));
 
-        DB::transaction(function () use ($toDelete): void {
+        $savedIds = [];
+
+        DB::transaction(function () use ($toDelete, &$savedIds): void {
             if ($toDelete !== []) {
                 Backlink::query()
                     ->where('website_id', $this->websiteId)
@@ -306,11 +310,17 @@ class BacklinksManager extends Component
                             'type' => $payload['type'],
                             'is_dofollow' => $payload['is_dofollow'],
                         ]);
+                    $savedIds[] = $id;
                 } else {
-                    Backlink::query()->create($payload);
+                    $created = Backlink::query()->create($payload);
+                    $savedIds[] = $created->id;
                 }
             }
         });
+
+        foreach ($savedIds as $id) {
+            $this->safeAudit($id);
+        }
 
         $this->loadSheetRows();
         $this->resetPage();
@@ -401,6 +411,24 @@ class BacklinksManager extends Component
             'types' => BacklinkType::cases(),
             'canAccessWebsite' => $this->userCanAccessWebsite(),
         ]);
+    }
+
+    private function safeAudit(int $id): void
+    {
+        $backlink = Backlink::query()
+            ->where('website_id', $this->websiteId)
+            ->whereKey($id)
+            ->first();
+
+        if ($backlink === null) {
+            return;
+        }
+
+        try {
+            app(BacklinkAuditService::class)->audit($backlink);
+        } catch (\Throwable $e) {
+            // Auto-audit must never block the save; the Audit button can retry.
+        }
     }
 
     private function filteredQuery()

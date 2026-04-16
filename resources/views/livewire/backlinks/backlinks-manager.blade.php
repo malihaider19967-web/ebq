@@ -258,6 +258,18 @@
                                         $isAuditing = in_array($b->id, $auditingIds, true);
                                         $isExpanded = $expandedAuditId === $b->id;
                                         $auditResult = is_array($b->audit_result) ? $b->audit_result : null;
+                                        $seenByField = [];
+                                        if ($auditResult !== null) {
+                                            foreach (($auditResult['matches'] ?? []) as $c) {
+                                                $seenByField[$c['field']] = ['check' => $c, 'matched' => true];
+                                            }
+                                            foreach (($auditResult['mismatches'] ?? []) as $c) {
+                                                $seenByField[$c['field']] = ['check' => $c, 'matched' => false];
+                                            }
+                                        }
+                                        $linkPresent = $auditResult !== null ? (bool) ($auditResult['link_present'] ?? false) : null;
+                                        $anchorSeen = $seenByField['anchor_text'] ?? null;
+                                        $followSeen = $seenByField['is_dofollow'] ?? null;
                                     @endphp
                                     <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                         <td class="whitespace-nowrap px-2 py-2 text-slate-600 dark:text-slate-300">{{ $b->tracked_date->format('M j, Y') }}</td>
@@ -269,14 +281,32 @@
                                         </td>
                                         <td class="whitespace-nowrap px-2 py-2 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ $b->domain_authority ?? '—' }}</td>
                                         <td class="whitespace-nowrap px-2 py-2 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ $b->spam_score ?? '—' }}</td>
-                                        <td class="max-w-[8rem] truncate px-2 py-2 text-slate-700 dark:text-slate-300" title="{{ $b->anchor_text }}">{{ $b->anchor_text ?? '—' }}</td>
+                                        <td class="max-w-[10rem] px-2 py-2 text-slate-700 dark:text-slate-300">
+                                            <div class="truncate" title="{{ $b->anchor_text }}">{{ $b->anchor_text ?? '—' }}</div>
+                                            @if ($anchorSeen && $linkPresent)
+                                                @php
+                                                    $seenText = (string) ($anchorSeen['check']['actual'] ?? '');
+                                                @endphp
+                                                <div class="truncate text-[10px] {{ $anchorSeen['matched'] ? 'text-slate-400 dark:text-slate-500' : 'text-amber-700 dark:text-amber-400' }}" title="{{ $seenText }}">
+                                                    seen: {{ $seenText !== '' ? '"'.$seenText.'"' : '—' }}
+                                                </div>
+                                            @elseif ($linkPresent === false)
+                                                <div class="text-[10px] text-rose-600 dark:text-rose-400">seen: link not found</div>
+                                            @endif
+                                        </td>
                                         <td class="whitespace-nowrap px-2 py-2 text-slate-700 dark:text-slate-300">{{ $b->type->label() }}</td>
                                         <td class="whitespace-nowrap px-2 py-2">
                                             <span @class([
                                                 'inline-flex rounded-full px-1.5 py-px text-[10px] font-semibold',
                                                 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $b->is_dofollow,
-                                                'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:bg-slate-700 dark:text-slate-300' => ! $b->is_dofollow,
+                                                'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300' => ! $b->is_dofollow,
                                             ])>{{ $b->is_dofollow ? 'Do' : 'No' }}</span>
+                                            @if ($followSeen && $linkPresent)
+                                                @php $seenDofollow = (bool) ($followSeen['check']['actual'] ?? false); @endphp
+                                                <div class="mt-0.5 text-[10px] {{ $followSeen['matched'] ? 'text-slate-400 dark:text-slate-500' : 'text-amber-700 dark:text-amber-400' }}">
+                                                    seen: {{ $seenDofollow ? 'Do' : 'No' }}
+                                                </div>
+                                            @endif
                                         </td>
                                         <td class="whitespace-nowrap px-2 py-2">
                                             <div class="flex flex-col items-start gap-0.5">
