@@ -51,7 +51,7 @@ class PagesTable extends Component
     {
         $rows = collect();
 
-        $allowed = ['page', 'total_clicks', 'total_impressions', 'avg_ctr', 'avg_position'];
+        $allowed = ['page', 'total_clicks', 'total_impressions', 'avg_ctr', 'avg_position', 'last_indexed_at'];
         $sortBy = in_array($this->sortBy, $allowed) ? $this->sortBy : 'total_clicks';
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
@@ -62,8 +62,13 @@ class PagesTable extends Component
                     DB::raw('SUM(impressions) as total_impressions'),
                     DB::raw('AVG(position) as avg_position'),
                     DB::raw('AVG(ctr) as avg_ctr'),
+                    DB::raw('MAX(page_indexing_statuses.last_indexed_at) as last_indexed_at'),
                 )
-                ->where('website_id', $this->websiteId)
+                ->leftJoin('page_indexing_statuses', function ($join): void {
+                    $join->on('page_indexing_statuses.website_id', '=', 'search_console_data.website_id')
+                        ->on('page_indexing_statuses.page', '=', 'search_console_data.page');
+                })
+                ->where('search_console_data.website_id', $this->websiteId)
                 ->when($this->search, fn ($q) => $q->where('page', 'like', "%{$this->search}%"))
                 ->groupBy('page')
                 ->orderBy($sortBy, $this->sortDir)

@@ -3,9 +3,11 @@
 namespace App\Livewire\Pages;
 
 use App\Models\GoogleAccount;
+use App\Models\PageIndexingStatus;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Services\Google\GoogleClientFactory;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
@@ -22,6 +24,7 @@ class PageDetail extends Component
     public string $sortDir = 'desc';
     public ?string $reindexMessage = null;
     public string $reindexMessageKind = 'info';
+    public bool $needsGoogleReconnect = false;
 
     public function mount(string $pageUrl): void
     {
@@ -44,6 +47,7 @@ class PageDetail extends Component
     public function requestReindex(GoogleClientFactory $googleClientFactory): void
     {
         $this->reindexMessage = null;
+        $this->needsGoogleReconnect = false;
 
         $user = Auth::user();
         if (! $user || ! $user->canViewWebsiteId($this->websiteId) || $this->pageUrl === '') {
@@ -80,6 +84,18 @@ class PageDetail extends Component
                 ]);
 
             if ($response->successful()) {
+                $lastIndexedAt = data_get($response->json(), 'urlNotificationMetadata.latestUpdate.notifyTime');
+                $parsedIndexedAt = is_string($lastIndexedAt) ? Carbon::parse($lastIndexedAt) : now();
+                PageIndexingStatus::query()->updateOrCreate(
+                    [
+                        'website_id' => $this->websiteId,
+                        'page' => $this->pageUrl,
+                    ],
+                    [
+                        'last_indexed_at' => $parsedIndexedAt,
+                    ]
+                );
+
                 $this->setReindexMessage('Reindex request sent to Google. Processing is not guaranteed and may take time.', 'success');
 
                 return;
@@ -88,9 +104,13 @@ class PageDetail extends Component
             $apiMessage = (string) data_get($response->json(), 'error.message', 'Google rejected the request.');
             if (str_contains(strtolower($apiMessage), 'insufficient')) {
                 $apiMessage .= ' Reconnect Google to grant indexing scope.';
+                $this->needsGoogleReconnect = true;
             }
             $this->setReindexMessage($apiMessage, 'error');
         } catch (\Throwable $e) {
+            if (str_contains(strtolower($e->getMessage()), 'insufficient')) {
+                $this->needsGoogleReconnect = true;
+            }
             $this->setReindexMessage($e->getMessage(), 'error');
         }
     }
@@ -99,6 +119,7 @@ class PageDetail extends Component
     {
         $summary = null;
         $keywords = collect();
+        $lastIndexedAt = null;
 
         $allowed = ['query', 'total_clicks', 'total_impressions', 'avg_ctr', 'avg_position'];
         $sortBy = in_array($this->sortBy, $allowed) ? $this->sortBy : 'total_clicks';
@@ -128,9 +149,14 @@ class PageDetail extends Component
                 ->groupBy('query')
                 ->orderBy($sortBy, $this->sortDir)
                 ->paginate(20);
+
+            $lastIndexedAt = PageIndexingStatus::query()
+                ->where('website_id', $this->websiteId)
+                ->where('page', $this->pageUrl)
+                ->value('last_indexed_at');
         }
 
-        return view('livewire.pages.page-detail', compact('summary', 'keywords'));
+        return view('livewire.pages.page-detail', compact('summary', 'keywords', 'lastIndexedAt'));
     }
 
     private function setReindexMessage(string $message, string $kind = 'info'): void

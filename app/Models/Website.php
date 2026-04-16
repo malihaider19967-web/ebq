@@ -81,4 +81,9 @@ class Website extends Model
     {
         return $this->hasMany(Backlink::class);
     }
+
+    public function pageIndexingStatuses(): HasMany
+    {
+        return $this->hasMany(PageIndexingStatus::class);
+    }
 }

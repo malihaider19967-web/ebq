@@ -13,14 +13,23 @@
             </button>
             <p class="text-[11px] text-slate-500 dark:text-slate-400">Uses Google Indexing API. URL processing is not guaranteed.</p>
         </div>
+        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            Last indexing request:
+            <span class="font-medium text-slate-700 dark:text-slate-300">{{ $lastIndexedAt ? \Illuminate\Support\Carbon::parse($lastIndexedAt)->format('M j, Y g:i A') : 'Never requested' }}</span>
+        </p>
         @if ($reindexMessage)
-            <div class="mt-2">
+            <div class="mt-2 flex flex-wrap items-center gap-2">
                 <span @class([
                     'inline-flex rounded-md px-2 py-1 text-xs font-medium',
                     'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $reindexMessageKind === 'success',
                     'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' => $reindexMessageKind === 'info',
                     'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $reindexMessageKind === 'error',
                 ])>{{ $reindexMessage }}</span>
+                @if ($needsGoogleReconnect)
+                    <a href="{{ route('google.redirect') }}" class="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                        Reconnect Google
+                    </a>
+                @endif
             </div>
         @endif
     </div>
