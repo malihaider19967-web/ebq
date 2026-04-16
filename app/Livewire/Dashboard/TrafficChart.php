@@ -37,7 +37,7 @@ class TrafficChart extends Component
             $end = $today->copy()->subDay();
             $start = $end->copy()->subDays(29);
             $cacheKey = sprintf(
-                'traffic_chart:%d:%s:%s',
+                'traffic_chart:v2:%d:%s:%s',
                 $this->websiteId,
                 $start->toDateString(),
                 $end->toDateString()
@@ -72,9 +72,14 @@ class TrafficChart extends Component
                 ];
             });
 
-            $days = collect($cached['days'] ?? []);
-            $latestClicksPair = $cached['clicks_pair'] ?? null;
-            $latestUsersPair = $cached['users_pair'] ?? null;
+            // Backward compatibility in case an older cache payload is present.
+            if ($cached instanceof \Illuminate\Support\Collection) {
+                $days = $cached;
+            } else {
+                $days = collect($cached['days'] ?? []);
+                $latestClicksPair = $cached['clicks_pair'] ?? null;
+                $latestUsersPair = $cached['users_pair'] ?? null;
+            }
 
             if (is_array($latestUsersPair) && count($latestUsersPair) === 2) {
                 [$prevUsers, $lastUsers] = array_map('intval', $latestUsersPair);
