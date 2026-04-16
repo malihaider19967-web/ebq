@@ -271,8 +271,14 @@
                                         $anchorSeen = $seenByField['anchor_text'] ?? null;
                                         $followSeen = $seenByField['is_dofollow'] ?? null;
                                     @endphp
-                                    <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                        <td class="whitespace-nowrap px-2 py-2 text-slate-600 dark:text-slate-300">{{ $b->tracked_date->format('M j, Y') }}</td>
+                                    <tr @class([
+                                        'transition',
+                                        'bg-rose-50 hover:bg-rose-100 dark:bg-rose-950/30 dark:hover:bg-rose-900/40' => in_array($b->audit_status, ['missing', 'unreachable'], true),
+                                        'bg-amber-50 hover:bg-amber-100 dark:bg-amber-950/30 dark:hover:bg-amber-900/40' => $b->audit_status === 'mismatched',
+                                        'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40' => $b->audit_status === 'matched',
+                                        'hover:bg-slate-50 dark:hover:bg-slate-800/50' => ! in_array($b->audit_status, ['missing', 'unreachable', 'mismatched', 'matched'], true),
+                                    ])>
+                                        <td class="whitespace-nowrap px-2 py-2 text-slate-700 dark:text-slate-200">{{ $b->tracked_date->format('M j, Y') }}</td>
                                         <td class="max-w-[14rem] truncate px-2 py-2">
                                             <a href="{{ $b->referring_page_url }}" target="_blank" rel="noopener noreferrer" title="{{ $b->referring_page_url }}" class="font-medium text-indigo-600 hover:underline dark:text-indigo-400">{{ $b->referring_page_url }}</a>
                                         </td>
