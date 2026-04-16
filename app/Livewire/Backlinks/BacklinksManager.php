@@ -4,6 +4,7 @@ namespace App\Livewire\Backlinks;
 
 use App\Enums\BacklinkType;
 use App\Models\Backlink;
+use App\Services\BacklinkAuditService;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -66,6 +67,13 @@ class BacklinksManager extends Component
 
     public string $sortDir = 'desc';
 
+    public ?int $expandedAuditId = null;
+
+    /** @var list<int> */
+    public array $auditingIds = [];
+
+    public ?string $auditFilter = null;
+
     public function mount(): void
     {
         $this->websiteId = (int) session('current_website_id', 0);
@@ -86,7 +94,7 @@ class BacklinksManager extends Component
 
     public function updated(string $property): void
     {
-        if (in_array($property, ['search', 'from', 'to', 'typeFilter', 'followFilter', 'daMin', 'daMax', 'spamMin', 'spamMax'], true)) {
+        if (in_array($property, ['search', 'from', 'to', 'typeFilter', 'followFilter', 'daMin', 'daMax', 'spamMin', 'spamMax', 'auditFilter'], true)) {
             $this->resetPage();
         }
     }
@@ -308,6 +316,56 @@ class BacklinksManager extends Component
         $this->resetPage();
     }
 
+    public function auditBacklink(int $id, BacklinkAuditService $auditor): void
+    {
+        if (! $this->userCanAccessWebsite()) {
+            return;
+        }
+
+        $backlink = Backlink::query()
+            ->where('website_id', $this->websiteId)
+            ->whereKey($id)
+            ->first();
+
+        if ($backlink === null) {
+            return;
+        }
+
+        $this->auditingIds = array_values(array_unique([...$this->auditingIds, $id]));
+
+        try {
+            $auditor->audit($backlink);
+        } finally {
+            $this->auditingIds = array_values(array_diff($this->auditingIds, [$id]));
+        }
+
+        $this->expandedAuditId = $id;
+    }
+
+    public function auditAllOnPage(BacklinkAuditService $auditor): void
+    {
+        if (! $this->userCanAccessWebsite()) {
+            return;
+        }
+
+        $ids = $this->visibleBacklinkIds();
+        foreach ($ids as $id) {
+            $backlink = Backlink::query()
+                ->where('website_id', $this->websiteId)
+                ->whereKey($id)
+                ->first();
+            if ($backlink === null) {
+                continue;
+            }
+            $auditor->audit($backlink);
+        }
+    }
+
+    public function toggleAuditDetails(int $id): void
+    {
+        $this->expandedAuditId = $this->expandedAuditId === $id ? null : $id;
+    }
+
     public function deleteBacklink(int $id): void
     {
         if (! $this->userCanAccessWebsite()) {
@@ -333,25 +391,7 @@ class BacklinksManager extends Component
             $sortBy = $this->sortBy;
             $sortDir = $this->sortDir === 'asc' ? 'asc' : 'desc';
 
-            $rows = Backlink::query()
-                ->where('website_id', $this->websiteId)
-                ->when($this->search !== '', function ($q): void {
-                    $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $this->search).'%';
-                    $q->where(function ($q2) use ($term): void {
-                        $q2->where('referring_page_url', 'like', $term)
-                            ->orWhere('target_page_url', 'like', $term)
-                            ->orWhere('anchor_text', 'like', $term);
-                    });
-                })
-                ->when($this->from, fn ($q) => $q->whereDate('tracked_date', '>=', $this->from))
-                ->when($this->to, fn ($q) => $q->whereDate('tracked_date', '<=', $this->to))
-                ->when($this->typeFilter, fn ($q) => $q->where('type', $this->typeFilter))
-                ->when($this->followFilter === 'dofollow', fn ($q) => $q->where('is_dofollow', true))
-                ->when($this->followFilter === 'nofollow', fn ($q) => $q->where('is_dofollow', false))
-                ->when($this->daMin !== null && $this->daMin !== '', fn ($q) => $q->where('domain_authority', '>=', (int) $this->daMin))
-                ->when($this->daMax !== null && $this->daMax !== '', fn ($q) => $q->where('domain_authority', '<=', (int) $this->daMax))
-                ->when($this->spamMin !== null && $this->spamMin !== '', fn ($q) => $q->where('spam_score', '>=', (int) $this->spamMin))
-                ->when($this->spamMax !== null && $this->spamMax !== '', fn ($q) => $q->where('spam_score', '<=', (int) $this->spamMax))
+            $rows = $this->filteredQuery()
                 ->orderBy($sortBy, $sortDir)
                 ->paginate(25);
         }
@@ -361,6 +401,47 @@ class BacklinksManager extends Component
             'types' => BacklinkType::cases(),
             'canAccessWebsite' => $this->userCanAccessWebsite(),
         ]);
+    }
+
+    private function filteredQuery()
+    {
+        return Backlink::query()
+            ->where('website_id', $this->websiteId)
+            ->when($this->search !== '', function ($q): void {
+                $term = '%'.str_replace(['%', '_'], ['\\%', '\\_'], $this->search).'%';
+                $q->where(function ($q2) use ($term): void {
+                    $q2->where('referring_page_url', 'like', $term)
+                        ->orWhere('target_page_url', 'like', $term)
+                        ->orWhere('anchor_text', 'like', $term);
+                });
+            })
+            ->when($this->from, fn ($q) => $q->whereDate('tracked_date', '>=', $this->from))
+            ->when($this->to, fn ($q) => $q->whereDate('tracked_date', '<=', $this->to))
+            ->when($this->typeFilter, fn ($q) => $q->where('type', $this->typeFilter))
+            ->when($this->followFilter === 'dofollow', fn ($q) => $q->where('is_dofollow', true))
+            ->when($this->followFilter === 'nofollow', fn ($q) => $q->where('is_dofollow', false))
+            ->when($this->daMin !== null && $this->daMin !== '', fn ($q) => $q->where('domain_authority', '>=', (int) $this->daMin))
+            ->when($this->daMax !== null && $this->daMax !== '', fn ($q) => $q->where('domain_authority', '<=', (int) $this->daMax))
+            ->when($this->spamMin !== null && $this->spamMin !== '', fn ($q) => $q->where('spam_score', '>=', (int) $this->spamMin))
+            ->when($this->spamMax !== null && $this->spamMax !== '', fn ($q) => $q->where('spam_score', '<=', (int) $this->spamMax))
+            ->when($this->auditFilter === 'unaudited', fn ($q) => $q->whereNull('audit_status'))
+            ->when($this->auditFilter !== null && $this->auditFilter !== '' && $this->auditFilter !== 'unaudited', fn ($q) => $q->where('audit_status', $this->auditFilter));
+    }
+
+    /**
+     * @return list<int>
+     */
+    private function visibleBacklinkIds(): array
+    {
+        $sortDir = $this->sortDir === 'asc' ? 'asc' : 'desc';
+        $page = max(1, (int) request()->query('page', 1));
+        $perPage = 25;
+
+        return $this->filteredQuery()
+            ->orderBy($this->sortBy, $sortDir)
+            ->forPage($page, $perPage)
+            ->pluck('id')
+            ->all();
     }
 
     private function userCanAccessWebsite(): bool

@@ -3,9 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\GoogleOAuthController;
 
-Route::get('/', function () {
-    return redirect()->route('dashboard');
-});
+Route::view('/', 'landing')->name('landing');
 
 Route::middleware(['auth', 'onboarded'])->group(function () {
     Route::view('/dashboard', 'dashboard')->name('dashboard');

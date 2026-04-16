@@ -22,6 +22,9 @@ class Backlink extends Model
         'anchor_text',
         'type',
         'is_dofollow',
+        'audit_status',
+        'audit_checked_at',
+        'audit_result',
     ];
 
     /**
@@ -33,6 +36,8 @@ class Backlink extends Model
             'tracked_date' => 'date',
             'is_dofollow' => 'boolean',
             'type' => BacklinkType::class,
+            'audit_checked_at' => 'datetime',
+            'audit_result' => 'array',
         ];
     }
 

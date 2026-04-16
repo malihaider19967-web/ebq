@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php -l app/Services/BacklinkAuditService.php)",
+      "Bash(php -l app/Livewire/Backlinks/BacklinksManager.php)",
+      "Bash(php -l app/Models/Backlink.php)",
+      "Bash(php -l database/migrations/2026_04_16_120000_add_audit_columns_to_backlinks_table.php)",
+      "Bash(command -v php.exe)",
+      "Read(//c/Program Files/**)",
+      "Bash(where php *)",
+      "Bash(/c/laragon/bin/php/php-8.3.16-Win32-vs16-x64/php.exe -l app/Services/BacklinkAuditService.php)",
+      "Bash(/c/laragon/bin/php/php-8.3.16-Win32-vs16-x64/php.exe -l app/Livewire/Backlinks/BacklinksManager.php)",
+      "Bash(/c/laragon/bin/php/php-8.3.16-Win32-vs16-x64/php.exe -l app/Models/Backlink.php)",
+      "Bash(/c/laragon/bin/php/php-8.3.16-Win32-vs16-x64/php.exe -l database/migrations/2026_04_16_120000_add_audit_columns_to_backlinks_table.php)"
+    ]
+  }
+}

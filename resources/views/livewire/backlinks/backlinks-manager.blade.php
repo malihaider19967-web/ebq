@@ -180,6 +180,14 @@
                         <option value="dofollow">Dofollow</option>
                         <option value="nofollow">Nofollow</option>
                     </select>
+                    <select wire:model.live="auditFilter" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                        <option value="">Any audit status</option>
+                        <option value="unaudited">Not audited</option>
+                        <option value="matched">Matched</option>
+                        <option value="mismatched">Mismatched</option>
+                        <option value="missing">Link missing</option>
+                        <option value="unreachable">Unreachable</option>
+                    </select>
                     <input wire:model.live="daMin" type="number" min="0" max="100" placeholder="DA min" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800" />
                     <input wire:model.live="daMax" type="number" min="0" max="100" placeholder="DA max" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800" />
                     <input wire:model.live="spamMin" type="number" min="0" max="100" placeholder="Spam min" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800" />
@@ -189,6 +197,43 @@
 
             {{-- Table --}}
             @if ($rows->isNotEmpty())
+                @php
+                    $auditBadge = function (?string $status) {
+                        return match ($status) {
+                            'matched' => ['Matched', 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400'],
+                            'mismatched' => ['Mismatch', 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400'],
+                            'missing' => ['Missing', 'bg-red-50 text-red-700 dark:bg-red-500/10 dark:text-red-400'],
+                            'unreachable' => ['Unreachable', 'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400'],
+                            default => ['Not audited', 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300'],
+                        };
+                    };
+                    $fieldLabel = fn (string $field) => match ($field) {
+                        'link_present' => 'Link present',
+                        'anchor_text' => 'Anchor text',
+                        'is_dofollow' => 'Dofollow',
+                        default => $field,
+                    };
+                    $renderValue = function ($value) {
+                        if ($value === true) {
+                            return 'Yes';
+                        }
+                        if ($value === false) {
+                            return 'No';
+                        }
+                        if ($value === null || $value === '') {
+                            return '—';
+                        }
+                        return (string) $value;
+                    };
+                @endphp
+                <div class="flex items-center justify-between gap-3">
+                    <p class="text-[11px] text-slate-500 dark:text-slate-400">Audit visits the referring page and verifies the link to your target.</p>
+                    <button type="button" wire:click="auditAllOnPage" wire:loading.attr="disabled" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                        <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span wire:loading.remove wire:target="auditAllOnPage">Audit visible</span>
+                        <span wire:loading wire:target="auditAllOnPage">Auditing…</span>
+                    </button>
+                </div>
                 <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
                     <div class="overflow-x-auto">
                         <table class="w-full text-xs">
@@ -202,11 +247,18 @@
                                     <x-sort-header column="anchor_text" :sortBy="$sortBy" :sortDir="$sortDir" th-class="px-2 py-2">Anchor</x-sort-header>
                                     <x-sort-header column="type" :sortBy="$sortBy" :sortDir="$sortDir" th-class="px-2 py-2">Type</x-sort-header>
                                     <x-sort-header column="is_dofollow" :sortBy="$sortBy" :sortDir="$sortDir" th-class="px-2 py-2">Follow</x-sort-header>
+                                    <th class="px-2 py-2">Audit</th>
                                     <th class="px-2 py-2 text-right">Actions</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                 @foreach ($rows as $b)
+                                    @php
+                                        [$badgeLabel, $badgeClass] = $auditBadge($b->audit_status);
+                                        $isAuditing = in_array($b->id, $auditingIds, true);
+                                        $isExpanded = $expandedAuditId === $b->id;
+                                        $auditResult = is_array($b->audit_result) ? $b->audit_result : null;
+                                    @endphp
                                     <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                         <td class="whitespace-nowrap px-2 py-2 text-slate-600 dark:text-slate-300">{{ $b->tracked_date->format('M j, Y') }}</td>
                                         <td class="max-w-[14rem] truncate px-2 py-2">
@@ -223,14 +275,91 @@
                                             <span @class([
                                                 'inline-flex rounded-full px-1.5 py-px text-[10px] font-semibold',
                                                 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $b->is_dofollow,
-                                                'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-300' => ! $b->is_dofollow,
+                                                'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:bg-slate-700 dark:text-slate-300' => ! $b->is_dofollow,
                                             ])>{{ $b->is_dofollow ? 'Do' : 'No' }}</span>
                                         </td>
+                                        <td class="whitespace-nowrap px-2 py-2">
+                                            <div class="flex flex-col items-start gap-0.5">
+                                                <span class="inline-flex rounded-full px-1.5 py-px text-[10px] font-semibold {{ $badgeClass }}">{{ $badgeLabel }}</span>
+                                                @if ($b->audit_checked_at)
+                                                    <button type="button" wire:click="toggleAuditDetails({{ $b->id }})" class="text-[10px] text-slate-500 underline-offset-2 hover:underline dark:text-slate-400">{{ $b->audit_checked_at->diffForHumans() }}</button>
+                                                @endif
+                                            </div>
+                                        </td>
                                         <td class="whitespace-nowrap px-2 py-1.5 text-right">
+                                            <button type="button" wire:click="auditBacklink({{ $b->id }})" wire:loading.attr="disabled" wire:target="auditBacklink({{ $b->id }})" class="rounded px-1.5 py-0.5 text-[10px] font-semibold text-emerald-600 transition hover:bg-emerald-50 disabled:opacity-50 dark:text-emerald-400 dark:hover:bg-emerald-500/10">
+                                                <span wire:loading.remove wire:target="auditBacklink({{ $b->id }})">{{ $b->audit_checked_at ? 'Re-audit' : 'Audit' }}</span>
+                                                <span wire:loading wire:target="auditBacklink({{ $b->id }})">…</span>
+                                            </button>
                                             <button type="button" wire:click="openSheetForDate('{{ $b->tracked_date->format('Y-m-d') }}')" class="rounded px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 transition hover:bg-indigo-50 dark:text-indigo-400 dark:hover:bg-indigo-500/10">Sheet</button>
                                             <button type="button" wire:click="deleteBacklink({{ $b->id }})" wire:confirm="Delete this backlink?" class="rounded px-1.5 py-0.5 text-[10px] font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">Delete</button>
                                         </td>
                                     </tr>
+                                    @if ($isExpanded && $auditResult !== null)
+                                        <tr class="bg-slate-50/70 dark:bg-slate-800/40">
+                                            <td colspan="10" class="px-3 py-3">
+                                                <div class="space-y-2 text-[11px] text-slate-600 dark:text-slate-300">
+                                                    <div class="flex flex-wrap items-center gap-x-4 gap-y-1">
+                                                        <span><span class="font-semibold">Status:</span> {{ $badgeLabel }}</span>
+                                                        @if (! empty($auditResult['http_status']))
+                                                            <span><span class="font-semibold">HTTP:</span> {{ $auditResult['http_status'] }}</span>
+                                                        @endif
+                                                        @if ($b->audit_checked_at)
+                                                            <span><span class="font-semibold">Checked:</span> {{ $b->audit_checked_at->format('M j, Y g:i a') }}</span>
+                                                        @endif
+                                                    </div>
+                                                    @if (! empty($auditResult['message']))
+                                                        <p class="text-[11px] text-rose-600 dark:text-rose-400">{{ $auditResult['message'] }}</p>
+                                                    @endif
+
+                                                    @if (! empty($auditResult['mismatches']))
+                                                        <div>
+                                                            <p class="font-semibold text-amber-700 dark:text-amber-400">Mismatched fields</p>
+                                                            <ul class="mt-1 space-y-0.5">
+                                                                @foreach ($auditResult['mismatches'] as $m)
+                                                                    <li>
+                                                                        <span class="font-medium">{{ $fieldLabel($m['field']) }}:</span>
+                                                                        expected <code class="rounded bg-white px-1 py-px text-[10px] dark:bg-slate-900">{{ $renderValue($m['expected']) }}</code>,
+                                                                        found <code class="rounded bg-white px-1 py-px text-[10px] dark:bg-slate-900">{{ $renderValue($m['actual']) }}</code>
+                                                                    </li>
+                                                                @endforeach
+                                                            </ul>
+                                                        </div>
+                                                    @endif
+
+                                                    @if (! empty($auditResult['matches']))
+                                                        <div>
+                                                            <p class="font-semibold text-emerald-700 dark:text-emerald-400">Matched fields</p>
+                                                            <ul class="mt-1 space-y-0.5">
+                                                                @foreach ($auditResult['matches'] as $m)
+                                                                    <li>
+                                                                        <span class="font-medium">{{ $fieldLabel($m['field']) }}:</span>
+                                                                        <code class="rounded bg-white px-1 py-px text-[10px] dark:bg-slate-900">{{ $renderValue($m['actual']) }}</code>
+                                                                    </li>
+                                                                @endforeach
+                                                            </ul>
+                                                        </div>
+                                                    @endif
+
+                                                    @if (! empty($auditResult['found_links']))
+                                                        <div>
+                                                            <p class="font-semibold">Links found on referring page</p>
+                                                            <ul class="mt-1 space-y-0.5">
+                                                                @foreach ($auditResult['found_links'] as $link)
+                                                                    <li class="truncate">
+                                                                        <a href="{{ $link['href'] }}" target="_blank" rel="noopener noreferrer" class="text-indigo-600 hover:underline dark:text-indigo-400">{{ $link['href'] }}</a>
+                                                                        — anchor "{{ $link['anchor'] !== '' ? $link['anchor'] : '—' }}",
+                                                                        rel "{{ $link['rel'] !== '' ? $link['rel'] : '—' }}"
+                                                                        ({{ $link['is_dofollow'] ? 'dofollow' : 'nofollow' }})
+                                                                    </li>
+                                                                @endforeach
+                                                            </ul>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    @endif
                                 @endforeach
                             </tbody>
                         </table>
