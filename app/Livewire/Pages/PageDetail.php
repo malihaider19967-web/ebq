@@ -2,9 +2,13 @@
 
 namespace App\Livewire\Pages;
 
+use App\Models\GoogleAccount;
 use App\Models\SearchConsoleData;
+use App\Models\Website;
+use App\Services\Google\GoogleClientFactory;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -16,6 +20,8 @@ class PageDetail extends Component
     public string $pageUrl = '';
     public string $sortBy = 'total_clicks';
     public string $sortDir = 'desc';
+    public ?string $reindexMessage = null;
+    public string $reindexMessageKind = 'info';
 
     public function mount(string $pageUrl): void
     {
@@ -33,6 +39,60 @@ class PageDetail extends Component
         }
 
         $this->resetPage();
+    }
+
+    public function requestReindex(GoogleClientFactory $googleClientFactory): void
+    {
+        $this->reindexMessage = null;
+
+        $user = Auth::user();
+        if (! $user || ! $user->canViewWebsiteId($this->websiteId) || $this->pageUrl === '') {
+            return;
+        }
+
+        $website = Website::query()->find($this->websiteId);
+        if (! $website) {
+            $this->setReindexMessage('Website not found.', 'error');
+
+            return;
+        }
+
+        /** @var GoogleAccount|null $account */
+        $account = $user->googleAccounts()->latest('id')->first();
+        if (! $account) {
+            $this->setReindexMessage('Connect your Google account first in Settings.', 'error');
+
+            return;
+        }
+
+        try {
+            $client = $googleClientFactory->make($account);
+            $accessToken = (string) ($client->getAccessToken()['access_token'] ?? '');
+            if ($accessToken === '') {
+                throw new \RuntimeException('Missing Google access token. Please reconnect your Google account.');
+            }
+
+            $response = Http::withToken($accessToken)
+                ->acceptJson()
+                ->post('https://indexing.googleapis.com/v3/urlNotifications:publish', [
+                    'url' => $this->pageUrl,
+                    'type' => 'URL_UPDATED',
+                ]);
+
+            if ($response->successful()) {
+                $this->setReindexMessage('Reindex request sent to Google. Processing is not guaranteed and may take time.', 'success');
+
+                return;
+            }
+
+            $apiMessage = (string) data_get($response->json(), 'error.message', 'Google rejected the request.');
+            if (str_contains(strtolower($apiMessage), 'insufficient')) {
+                $apiMessage .= ' Reconnect Google to grant indexing scope.';
+            }
+            $this->setReindexMessage($apiMessage, 'error');
+        } catch (\Throwable $e) {
+            $this->setReindexMessage($e->getMessage(), 'error');
+        }
     }
 
     public function render()
@@ -71,5 +131,11 @@ class PageDetail extends Component
         }
 
         return view('livewire.pages.page-detail', compact('summary', 'keywords'));
+    }
+
+    private function setReindexMessage(string $message, string $kind = 'info'): void
+    {
+        $this->reindexMessage = $message;
+        $this->reindexMessageKind = in_array($kind, ['success', 'info', 'error'], true) ? $kind : 'info';
     }
 }

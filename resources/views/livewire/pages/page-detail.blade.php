@@ -5,6 +5,24 @@
             Back to pages
         </a>
         <h1 class="mt-1.5 truncate text-base font-bold tracking-tight text-slate-900 dark:text-slate-100">{{ $pageUrl }}</h1>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+            <button type="button" wire:click="requestReindex" wire:loading.attr="disabled" wire:target="requestReindex" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
+                <span wire:loading.remove wire:target="requestReindex">Request Google reindex</span>
+                <span wire:loading wire:target="requestReindex">Requesting…</span>
+            </button>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400">Uses Google Indexing API. URL processing is not guaranteed.</p>
+        </div>
+        @if ($reindexMessage)
+            <div class="mt-2">
+                <span @class([
+                    'inline-flex rounded-md px-2 py-1 text-xs font-medium',
+                    'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $reindexMessageKind === 'success',
+                    'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' => $reindexMessageKind === 'info',
+                    'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $reindexMessageKind === 'error',
+                ])>{{ $reindexMessage }}</span>
+            </div>
+        @endif
     </div>
 
     @if ($summary)
