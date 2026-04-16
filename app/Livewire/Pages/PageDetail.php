@@ -11,6 +11,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -27,6 +28,11 @@ class PageDetail extends Component
     public bool $needsGoogleReconnect = false;
     public ?string $googleStatusMessage = null;
     public string $googleStatusMessageKind = 'info';
+    public ?string $snippetTitle = null;
+    public ?string $snippetDescription = null;
+    public ?string $snippetDisplayUrl = null;
+    public ?string $snippetMessage = null;
+    public string $snippetMessageKind = 'info';
 
     public function mount(string $pageUrl): void
     {
@@ -171,6 +177,41 @@ class PageDetail extends Component
         }
     }
 
+    public function generateGoogleSnippet(): void
+    {
+        $this->snippetMessage = null;
+
+        if ($this->pageUrl === '') {
+            $this->setSnippetMessage('No page URL available for snippet generation.', 'error');
+
+            return;
+        }
+
+        try {
+            $response = Http::timeout(20)->get($this->pageUrl);
+            if (! $response->successful()) {
+                $this->setSnippetMessage('Could not fetch page content to generate snippet.', 'error');
+
+                return;
+            }
+
+            $html = (string) $response->body();
+            if (trim($html) === '') {
+                $this->setSnippetMessage('Page content is empty, unable to generate snippet.', 'error');
+
+                return;
+            }
+
+            [$title, $description] = $this->extractSnippetParts($html);
+            $this->snippetTitle = $title !== '' ? Str::limit($title, 60) : Str::limit(parse_url($this->pageUrl, PHP_URL_HOST) ?: $this->pageUrl, 60);
+            $this->snippetDescription = $description !== '' ? Str::limit($description, 155) : 'No meta description found. Add one to improve search snippet quality.';
+            $this->snippetDisplayUrl = $this->buildDisplayUrl($this->pageUrl);
+            $this->setSnippetMessage('Snippet generated from the live page HTML.', 'success');
+        } catch (\Throwable $e) {
+            $this->setSnippetMessage('Failed to generate snippet: '.$e->getMessage(), 'error');
+        }
+    }
+
     public function render()
     {
         $summary = null;
@@ -227,6 +268,12 @@ class PageDetail extends Component
         $this->googleStatusMessageKind = in_array($kind, ['success', 'info', 'error'], true) ? $kind : 'info';
     }
 
+    private function setSnippetMessage(string $message, string $kind = 'info'): void
+    {
+        $this->snippetMessage = $message;
+        $this->snippetMessageKind = in_array($kind, ['success', 'info', 'error'], true) ? $kind : 'info';
+    }
+
     private function resolveGoogleAccessToken(GoogleClientFactory $googleClientFactory, $user): string
     {
         /** @var GoogleAccount|null $account */
@@ -242,5 +289,40 @@ class PageDetail extends Component
         }
 
         return $accessToken;
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private function extractSnippetParts(string $html): array
+    {
+        libxml_use_internal_errors(true);
+        $dom = new \DOMDocument();
+        $dom->loadHTML($html);
+        libxml_clear_errors();
+
+        $xpath = new \DOMXPath($dom);
+
+        $title = trim((string) $xpath->evaluate('string(//title)'));
+        $metaDescription = trim((string) $xpath->evaluate('string(//meta[translate(@name, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")="description"]/@content)'));
+
+        if ($metaDescription === '') {
+            $ogDescription = trim((string) $xpath->evaluate('string(//meta[@property="og:description"]/@content)'));
+            $metaDescription = $ogDescription;
+        }
+
+        return [$title, $metaDescription];
+    }
+
+    private function buildDisplayUrl(string $url): string
+    {
+        $parts = parse_url($url);
+        $host = (string) ($parts['host'] ?? $url);
+        $path = (string) ($parts['path'] ?? '');
+        $trimmedPath = trim($path, '/');
+
+        return $trimmedPath !== ''
+            ? $host.' › '.str_replace('/', ' › ', $trimmedPath)
+            : $host;
     }
 }
