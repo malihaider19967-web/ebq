@@ -29,6 +29,8 @@ class TrafficChart extends Component
     {
         $days = collect();
         $anomalies = [];
+        $latestClicksPair = null;
+        $latestUsersPair = null;
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
             $today = Carbon::today(config('app.timezone'));
@@ -41,7 +43,7 @@ class TrafficChart extends Component
                 $end->toDateString()
             );
 
-            $days = Cache::remember($cacheKey, 600, function () use ($start, $end) {
+            $cached = Cache::remember($cacheKey, 600, function () use ($start, $end) {
                 $clicks = SearchConsoleData::where('website_id', $this->websiteId)
                     ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
                     ->selectRaw('date, SUM(clicks) as clicks')
@@ -58,21 +60,32 @@ class TrafficChart extends Component
 
                 $allDates = $clicks->keys()->merge($users->keys())->unique()->sort()->values();
 
-                return $allDates->map(fn ($d) => [
-                    'date' => $d instanceof \DateTimeInterface ? $d->format('M d') : $d,
-                    'clicks' => (int) ($clicks[$d] ?? 0),
-                    'users' => (int) ($users[$d] ?? 0),
-                ]);
+                return [
+                    'days' => $allDates->map(fn ($d) => [
+                        'date' => $d instanceof \DateTimeInterface ? $d->format('M d') : $d,
+                        'clicks' => (int) ($clicks[$d] ?? 0),
+                        'users' => (int) ($users[$d] ?? 0),
+                    ]),
+                    // Keep anomaly comparison on real metric samples only.
+                    'clicks_pair' => $clicks->count() >= 2 ? $clicks->slice(-2, 2, true)->values()->all() : null,
+                    'users_pair' => $users->count() >= 2 ? $users->slice(-2, 2, true)->values()->all() : null,
+                ];
             });
 
-            $series = $days->values();
-            $last = $series->last();
-            $prev = $series->count() > 1 ? $series[$series->count() - 2] : null;
-            if ($last && $prev) {
-                if ($prev['users'] > 0 && $last['users'] < ($prev['users'] * 0.75)) {
+            $days = collect($cached['days'] ?? []);
+            $latestClicksPair = $cached['clicks_pair'] ?? null;
+            $latestUsersPair = $cached['users_pair'] ?? null;
+
+            if (is_array($latestUsersPair) && count($latestUsersPair) === 2) {
+                [$prevUsers, $lastUsers] = array_map('intval', $latestUsersPair);
+                if ($prevUsers > 0 && $lastUsers < ($prevUsers * 0.75)) {
                     $anomalies[] = 'Users dropped more than 25% day-over-day.';
                 }
-                if ($prev['clicks'] > 0 && $last['clicks'] < ($prev['clicks'] * 0.75)) {
+            }
+
+            if (is_array($latestClicksPair) && count($latestClicksPair) === 2) {
+                [$prevClicks, $lastClicks] = array_map('intval', $latestClicksPair);
+                if ($prevClicks > 0 && $lastClicks < ($prevClicks * 0.75)) {
                     $anomalies[] = 'Clicks dropped more than 25% day-over-day.';
                 }
             }
