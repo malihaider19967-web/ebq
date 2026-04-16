@@ -16,6 +16,11 @@
                 <span wire:loading.remove wire:target="refreshGoogleIndexingStatus">Refresh Google status</span>
                 <span wire:loading wire:target="refreshGoogleIndexingStatus">Refreshing…</span>
             </button>
+            <button type="button" wire:click="generateGoogleSnippet" wire:loading.attr="disabled" wire:target="generateGoogleSnippet" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h3m6-9H6a2.25 2.25 0 0 0-2.25 2.25v8.25A2.25 2.25 0 0 0 6 19.75h12a2.25 2.25 0 0 0 2.25-2.25V9.25A2.25 2.25 0 0 0 18 7Zm0 0V5.75A1.75 1.75 0 0 0 16.25 4h-8.5A1.75 1.75 0 0 0 6 5.75V7" /></svg>
+                <span wire:loading.remove wire:target="generateGoogleSnippet">Generate snippet</span>
+                <span wire:loading wire:target="generateGoogleSnippet">Generating…</span>
+            </button>
             <p class="text-[11px] text-slate-500 dark:text-slate-400">Uses Google Indexing API. URL processing is not guaranteed.</p>
         </div>
         <div class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-900/60">
@@ -55,6 +60,23 @@
                         Reconnect Google
                     </a>
                 @endif
+            </div>
+        @endif
+        @if ($snippetTitle || $snippetDescription)
+            <div class="mt-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/60">
+                <p class="text-xs text-emerald-700 dark:text-emerald-400">{{ $snippetDisplayUrl }}</p>
+                <p class="mt-1 text-base font-medium text-blue-700 dark:text-blue-400">{{ $snippetTitle }}</p>
+                <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{{ $snippetDescription }}</p>
+            </div>
+        @endif
+        @if ($snippetMessage)
+            <div class="mt-2">
+                <span @class([
+                    'inline-flex rounded-md px-2 py-1 text-xs font-medium',
+                    'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $snippetMessageKind === 'success',
+                    'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' => $snippetMessageKind === 'info',
+                    'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $snippetMessageKind === 'error',
+                ])>{{ $snippetMessage }}</span>
             </div>
         @endif
     </div>
