@@ -15,11 +15,17 @@ return new class extends Migration
             $table->id();
             $table->foreignId('website_id')->constrained()->cascadeOnDelete();
             $table->string('page', 2048);
-            $table->timestamp('last_indexed_at')->nullable();
+            $table->timestamp('last_reindex_requested_at')->nullable();
+            $table->timestamp('last_google_status_checked_at')->nullable();
+            $table->string('google_verdict')->nullable();
+            $table->string('google_coverage_state')->nullable();
+            $table->string('google_indexing_state')->nullable();
+            $table->timestamp('google_last_crawl_at')->nullable();
+            $table->json('google_status_payload')->nullable();
             $table->timestamps();
 
             $table->unique(['website_id', 'page']);
-            $table->index(['website_id', 'last_indexed_at']);
+            $table->index(['website_id', 'last_google_status_checked_at']);
         });
     }
 

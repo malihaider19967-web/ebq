@@ -11,12 +11,22 @@
                 <span wire:loading.remove wire:target="requestReindex">Request Google reindex</span>
                 <span wire:loading wire:target="requestReindex">Requesting…</span>
             </button>
+            <button type="button" wire:click="refreshGoogleIndexingStatus" wire:loading.attr="disabled" wire:target="refreshGoogleIndexingStatus" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5v5.25h5.25M19.5 19.5v-5.25h-5.25M4.5 9.75a7.5 7.5 0 0 1 13.307-4.914L19.5 6.75m0 7.5a7.5 7.5 0 0 1-13.307 4.914L4.5 17.25" /></svg>
+                <span wire:loading.remove wire:target="refreshGoogleIndexingStatus">Refresh Google status</span>
+                <span wire:loading wire:target="refreshGoogleIndexingStatus">Refreshing…</span>
+            </button>
             <p class="text-[11px] text-slate-500 dark:text-slate-400">Uses Google Indexing API. URL processing is not guaranteed.</p>
         </div>
-        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
-            Last indexing request:
-            <span class="font-medium text-slate-700 dark:text-slate-300">{{ $lastIndexedAt ? \Illuminate\Support\Carbon::parse($lastIndexedAt)->format('M j, Y g:i A') : 'Never requested' }}</span>
-        </p>
+        <div class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-900/60">
+            <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                <p class="text-slate-600 dark:text-slate-300">Last Google check: <span class="font-semibold text-slate-800 dark:text-slate-100">{{ $indexingStatus?->last_google_status_checked_at?->format('M j, Y g:i A') ?? 'Never' }}</span></p>
+                <p class="text-slate-600 dark:text-slate-300">Verdict: <span class="font-semibold text-slate-800 dark:text-slate-100">{{ $indexingStatus?->google_verdict ?? 'Unknown' }}</span></p>
+                <p class="text-slate-600 dark:text-slate-300">Coverage: <span class="font-semibold text-slate-800 dark:text-slate-100">{{ $indexingStatus?->google_coverage_state ?? 'Unknown' }}</span></p>
+                <p class="text-slate-600 dark:text-slate-300">Last crawl: <span class="font-semibold text-slate-800 dark:text-slate-100">{{ $indexingStatus?->google_last_crawl_at?->format('M j, Y g:i A') ?? 'Unknown' }}</span></p>
+            </div>
+            <p class="mt-2 text-slate-600 dark:text-slate-300">Last reindex request: <span class="font-semibold text-slate-800 dark:text-slate-100">{{ $indexingStatus?->last_reindex_requested_at?->format('M j, Y g:i A') ?? 'Never requested' }}</span></p>
+        </div>
         @if ($reindexMessage)
             <div class="mt-2 flex flex-wrap items-center gap-2">
                 <span @class([
@@ -25,6 +35,21 @@
                     'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' => $reindexMessageKind === 'info',
                     'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $reindexMessageKind === 'error',
                 ])>{{ $reindexMessage }}</span>
+                @if ($needsGoogleReconnect)
+                    <a href="{{ route('google.redirect') }}" class="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                        Reconnect Google
+                    </a>
+                @endif
+            </div>
+        @endif
+        @if ($googleStatusMessage)
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+                <span @class([
+                    'inline-flex rounded-md px-2 py-1 text-xs font-medium',
+                    'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $googleStatusMessageKind === 'success',
+                    'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' => $googleStatusMessageKind === 'info',
+                    'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $googleStatusMessageKind === 'error',
+                ])>{{ $googleStatusMessage }}</span>
                 @if ($needsGoogleReconnect)
                     <a href="{{ route('google.redirect') }}" class="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
                         Reconnect Google

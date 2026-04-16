@@ -374,4 +374,82 @@
             @endif
         </div>
     </div>
+
+    {{-- INDEXING STATUS --}}
+    <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div class="border-b border-slate-100 px-4 py-3 dark:border-slate-800 sm:px-5">
+            <div class="flex items-center gap-2">
+                <span class="inline-flex items-center rounded-md bg-cyan-50 px-2 py-0.5 text-[11px] font-semibold text-cyan-700 ring-1 ring-cyan-600/20 ring-inset dark:bg-cyan-500/10 dark:text-cyan-400 dark:ring-cyan-500/30">Indexing</span>
+                <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Latest Google Indexing Status</h3>
+            </div>
+        </div>
+
+        <div class="p-4 sm:p-5">
+            <div class="mb-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                <div class="rounded-lg border border-slate-100 px-3 py-2 dark:border-slate-800">
+                    <p class="text-[10px] uppercase tracking-wider text-slate-400">Tracked Pages</p>
+                    <p class="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{{ number_format($report['indexing']['summary']['tracked_pages'] ?? 0) }}</p>
+                </div>
+                <div class="rounded-lg border border-slate-100 px-3 py-2 dark:border-slate-800">
+                    <p class="text-[10px] uppercase tracking-wider text-slate-400">Checked Pages</p>
+                    <p class="mt-1 text-lg font-bold text-slate-900 dark:text-slate-100">{{ number_format($report['indexing']['summary']['checked_pages'] ?? 0) }}</p>
+                </div>
+                <div class="rounded-lg border border-slate-100 px-3 py-2 dark:border-slate-800">
+                    <p class="text-[10px] uppercase tracking-wider text-slate-400">PASS Verdict</p>
+                    <p class="mt-1 text-lg font-bold text-emerald-600 dark:text-emerald-400">{{ number_format($report['indexing']['summary']['pass_pages'] ?? 0) }}</p>
+                </div>
+                <div class="rounded-lg border border-slate-100 px-3 py-2 dark:border-slate-800">
+                    <p class="text-[10px] uppercase tracking-wider text-slate-400">FAIL Verdict</p>
+                    <p class="mt-1 text-lg font-bold text-rose-600 dark:text-rose-400">{{ number_format($report['indexing']['summary']['fail_pages'] ?? 0) }}</p>
+                </div>
+            </div>
+
+            <p class="mb-2 text-xs text-slate-500 dark:text-slate-400">
+                Last checked:
+                <span class="font-medium text-slate-700 dark:text-slate-200">
+                    {{ !empty($report['indexing']['summary']['last_checked_at']) ? \Illuminate\Support\Carbon::parse($report['indexing']['summary']['last_checked_at'])->format('M j, Y g:i A') : 'Never' }}
+                </span>
+            </p>
+
+            @if (count($report['indexing']['latest'] ?? []) > 0)
+                <div class="overflow-x-auto rounded-lg border border-slate-100 dark:border-slate-800">
+                    <table class="w-full text-xs">
+                        <thead>
+                            <tr class="bg-slate-50 text-left text-[11px] font-medium uppercase tracking-wider text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
+                                <th class="px-3 py-2">Page</th>
+                                <th class="px-3 py-2">Verdict</th>
+                                <th class="px-3 py-2">Coverage</th>
+                                <th class="px-3 py-2 text-right">Last Crawl</th>
+                                <th class="px-3 py-2 text-right">Checked</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            @foreach (($report['indexing']['latest'] ?? []) as $row)
+                                <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                    <td class="max-w-[16rem] truncate px-3 py-2 font-medium text-slate-700 dark:text-slate-300" title="{{ $row['page'] }}">{{ \Illuminate\Support\Str::limit($row['page'], 70) }}</td>
+                                    <td class="px-3 py-2">
+                                        <span @class([
+                                            'inline-flex rounded-full px-1.5 py-px text-[10px] font-semibold',
+                                            'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $row['verdict'] === 'PASS',
+                                            'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $row['verdict'] === 'FAIL',
+                                            'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300' => !in_array($row['verdict'], ['PASS', 'FAIL'], true),
+                                        ])>{{ $row['verdict'] }}</span>
+                                    </td>
+                                    <td class="px-3 py-2 text-slate-700 dark:text-slate-300">{{ $row['coverage_state'] }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2 text-right text-slate-600 dark:text-slate-300">
+                                        {{ $row['last_crawl_at'] ? \Illuminate\Support\Carbon::parse($row['last_crawl_at'])->format('M j, Y') : '—' }}
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-2 text-right text-slate-600 dark:text-slate-300">
+                                        {{ $row['checked_at'] ? \Illuminate\Support\Carbon::parse($row['checked_at'])->format('M j, Y g:i A') : '—' }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @else
+                <p class="text-xs text-slate-400 dark:text-slate-500">No indexing status checks recorded yet.</p>
+            @endif
+        </div>
+    </div>
 </div>

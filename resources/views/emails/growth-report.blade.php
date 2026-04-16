@@ -420,6 +420,71 @@
 
         <hr class="section-divider">
 
+        {{-- ==================== INDEXING STATUS ==================== --}}
+        <span class="section-badge" style="background:#0891b2">Indexing</span>
+        <h2 class="section-title">Latest Google Indexing Status</h2>
+
+        <table class="mini-grid" role="presentation">
+            <tr>
+                <td>
+                    <p class="mini-label">Tracked Pages</p>
+                    <p class="mini-value">{{ number_format($report['indexing']['summary']['tracked_pages'] ?? 0) }}</p>
+                </td>
+                <td>
+                    <p class="mini-label">Checked Pages</p>
+                    <p class="mini-value">{{ number_format($report['indexing']['summary']['checked_pages'] ?? 0) }}</p>
+                </td>
+                <td>
+                    <p class="mini-label">PASS Verdict</p>
+                    <p class="mini-value" style="color:#16a34a">{{ number_format($report['indexing']['summary']['pass_pages'] ?? 0) }}</p>
+                </td>
+                <td>
+                    <p class="mini-label">FAIL Verdict</p>
+                    <p class="mini-value" style="color:#dc2626">{{ number_format($report['indexing']['summary']['fail_pages'] ?? 0) }}</p>
+                </td>
+            </tr>
+        </table>
+
+        <p class="meta" style="margin-top:-6px; margin-bottom:12px;">
+            Last checked:
+            <strong>
+                {{ !empty($report['indexing']['summary']['last_checked_at']) ? \Illuminate\Support\Carbon::parse($report['indexing']['summary']['last_checked_at'])->format('M j, Y g:i A') : 'Never' }}
+            </strong>
+        </p>
+
+        @if (count($report['indexing']['latest'] ?? []) > 0)
+            <table class="data-table" role="presentation">
+                <thead>
+                    <tr>
+                        <th>Page</th>
+                        <th>Verdict</th>
+                        <th>Coverage</th>
+                        <th class="right">Last Crawl</th>
+                        <th class="right">Checked</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (($report['indexing']['latest'] ?? []) as $row)
+                        <tr>
+                            <td>{{ \Illuminate\Support\Str::limit($row['page'], 55) }}</td>
+                            <td>
+                                <span style="font-weight:700;color:{{ $row['verdict'] === 'PASS' ? '#16a34a' : ($row['verdict'] === 'FAIL' ? '#dc2626' : '#64748b') }}">
+                                    {{ $row['verdict'] }}
+                                </span>
+                            </td>
+                            <td>{{ $row['coverage_state'] }}</td>
+                            <td class="right">{{ $row['last_crawl_at'] ? \Illuminate\Support\Carbon::parse($row['last_crawl_at'])->format('M j, Y') : '—' }}</td>
+                            <td class="right">{{ $row['checked_at'] ? \Illuminate\Support\Carbon::parse($row['checked_at'])->format('M j, Y g:i A') : '—' }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        @else
+            <p class="empty-note">No indexing status checks recorded yet.</p>
+        @endif
+
+        <hr class="section-divider">
+
         <div style="text-align: center; padding-top: 8px;">
             <a href="{{ route('reports.index') }}" class="btn">View Full Report in Dashboard</a>
         </div>

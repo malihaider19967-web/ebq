@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AnalyticsData;
 use App\Models\Backlink;
+use App\Models\PageIndexingStatus;
 use App\Models\SearchConsoleData;
 use Illuminate\Support\Carbon;
 
@@ -36,6 +37,7 @@ class ReportDataService
             'analytics' => $this->buildAnalytics($websiteId, $start, $end, $prevStart, $prevEnd),
             'search_console' => $this->buildSearchConsole($websiteId, $start, $end, $prevStart, $prevEnd),
             'backlinks' => $this->buildBacklinks($websiteId, $start, $end, $prevStart, $prevEnd),
+            'indexing' => $this->buildIndexing($websiteId),
         ];
     }
 
@@ -297,6 +299,53 @@ class ReportDataService
             'dofollow' => $this->calcChange($curDofollow, $prevDofollow, true),
             'nofollow' => $this->calcChange($curNofollow, $prevNofollow, true),
             'top_backlinks' => $topBacklinks,
+        ];
+    }
+
+    private function buildIndexing(int $websiteId): array
+    {
+        $rows = PageIndexingStatus::query()
+            ->where('website_id', $websiteId)
+            ->whereNotNull('last_google_status_checked_at')
+            ->orderByDesc('last_google_status_checked_at')
+            ->limit(10)
+            ->get();
+
+        $totalTracked = PageIndexingStatus::query()
+            ->where('website_id', $websiteId)
+            ->count();
+
+        $checkedCount = PageIndexingStatus::query()
+            ->where('website_id', $websiteId)
+            ->whereNotNull('last_google_status_checked_at')
+            ->count();
+
+        $passCount = PageIndexingStatus::query()
+            ->where('website_id', $websiteId)
+            ->where('google_verdict', 'PASS')
+            ->count();
+
+        $failCount = PageIndexingStatus::query()
+            ->where('website_id', $websiteId)
+            ->where('google_verdict', 'FAIL')
+            ->count();
+
+        return [
+            'summary' => [
+                'tracked_pages' => $totalTracked,
+                'checked_pages' => $checkedCount,
+                'pass_pages' => $passCount,
+                'fail_pages' => $failCount,
+                'last_checked_at' => $rows->first()?->last_google_status_checked_at?->toDateTimeString(),
+            ],
+            'latest' => $rows->map(fn (PageIndexingStatus $row) => [
+                'page' => $row->page,
+                'verdict' => $row->google_verdict ?: 'UNKNOWN',
+                'coverage_state' => $row->google_coverage_state ?: 'Unknown',
+                'indexing_state' => $row->google_indexing_state ?: 'Unknown',
+                'last_crawl_at' => $row->google_last_crawl_at?->toDateTimeString(),
+                'checked_at' => $row->last_google_status_checked_at?->toDateTimeString(),
+            ])->toArray(),
         ];
     }
 
