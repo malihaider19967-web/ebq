@@ -74,6 +74,10 @@ class BacklinksManager extends Component
 
     public ?string $auditFilter = null;
 
+    public ?string $sheetMessage = null;
+
+    public string $sheetMessageKind = 'success';
+
     public function mount(): void
     {
         $this->websiteId = (int) session('current_website_id', 0);
@@ -176,6 +180,7 @@ class BacklinksManager extends Component
         }
 
         $this->validate(['sheetDate' => ['required', 'date']]);
+        $this->sheetMessage = null;
         $this->loadSheetRows();
         $this->sheetOpen = true;
     }
@@ -183,6 +188,7 @@ class BacklinksManager extends Component
     public function closeSheet(): void
     {
         $this->sheetOpen = false;
+        $this->sheetMessage = null;
     }
 
     public function openSheetForDate(string $date): void
@@ -191,6 +197,7 @@ class BacklinksManager extends Component
         if (! $this->userCanAccessWebsite()) {
             return;
         }
+        $this->sheetMessage = null;
         $this->loadSheetRows();
         $this->sheetOpen = true;
     }
@@ -215,6 +222,7 @@ class BacklinksManager extends Component
             return;
         }
 
+        $this->sheetMessage = null;
         $this->validate(['sheetDate' => ['required', 'date']]);
 
         $rules = [];
@@ -233,15 +241,20 @@ class BacklinksManager extends Component
         }
 
         if ($rules === []) {
-            DB::transaction(function (): void {
+            $removed = 0;
+            DB::transaction(function () use (&$removed): void {
                 if ($this->sheetLoadedIds !== []) {
-                    Backlink::query()
+                    $removed = Backlink::query()
                         ->where('website_id', $this->websiteId)
                         ->whereDate('tracked_date', $this->sheetDate)
                         ->whereIn('id', $this->sheetLoadedIds)
                         ->delete();
                 }
             });
+            $this->setSheetMessage(
+                $removed > 0 ? "Removed {$removed} backlink(s) for this date." : 'No changes to save.',
+                'success'
+            );
             $this->loadSheetRows();
             $this->resetPage();
 
@@ -321,6 +334,20 @@ class BacklinksManager extends Component
         foreach ($savedIds as $id) {
             $this->safeAudit($id);
         }
+
+        $savedCount = count($savedIds);
+        $removedCount = count($toDelete);
+        $parts = [];
+        if ($savedCount > 0) {
+            $parts[] = "Saved {$savedCount} backlink(s)";
+        }
+        if ($removedCount > 0) {
+            $parts[] = "removed {$removedCount}";
+        }
+        $this->setSheetMessage(
+            $parts === [] ? 'No changes to save.' : implode(', ', $parts).'.',
+            'success'
+        );
 
         $this->loadSheetRows();
         $this->resetPage();
@@ -411,6 +438,12 @@ class BacklinksManager extends Component
             'types' => BacklinkType::cases(),
             'canAccessWebsite' => $this->userCanAccessWebsite(),
         ]);
+    }
+
+    private function setSheetMessage(string $message, string $kind = 'success'): void
+    {
+        $this->sheetMessage = $message;
+        $this->sheetMessageKind = in_array($kind, ['success', 'info', 'error'], true) ? $kind : 'success';
     }
 
     private function safeAudit(int $id): void

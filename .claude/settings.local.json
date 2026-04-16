@@ -22,7 +22,18 @@
       "Bash(\"/c/Users/malih/.config/herd/bin/php.bat\" artisan *)",
       "Bash(git stash *)",
       "Bash(\"/c/xampp/php/php.exe\" -l app/Livewire/Backlinks/BacklinksManager.php)",
-      "Bash(\"/c/xampp/php/php.exe\" -v)"
+      "Bash(\"/c/xampp/php/php.exe\" -v)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:8765/)",
+      "Bash(curl -s http://127.0.0.1:8765/)",
+      "Bash(curl -s -o /dev/null -w \"css: %{http_code}\\\\n\" http://127.0.0.1:8765/build/assets/app-BYgd6nGh.css)",
+      "Bash(curl -s http://127.0.0.1:8765/build/assets/app-BYgd6nGh.css)",
+      "Bash(ps -W)",
+      "Bash(awk '{print $1}')",
+      "Bash(xargs -r -I {} taskkill //PID {} //F)",
+      "Bash(taskkill //F //FI \"WINDOWTITLE eq *artisan*\" //T)",
+      "Bash(netstat -ano)",
+      "Bash(awk '{print $5}')",
+      "Bash(xargs -r -I {} taskkill //F //PID {})"
     ]
   }
 }

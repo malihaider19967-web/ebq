@@ -98,41 +98,51 @@
                 @if ($sheetOpen)
                     <div class="mt-4 space-y-3 border-t border-slate-100 pt-4 dark:border-slate-800">
                         <div class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
-                            <table class="min-w-[860px] w-full text-xs">
+                            <table class="w-full min-w-[1100px] table-fixed text-xs">
+                                <colgroup>
+                                    <col class="w-[28%]" />
+                                    <col class="w-[28%]" />
+                                    <col class="w-[4rem]" />
+                                    <col class="w-[4rem]" />
+                                    <col class="w-[16%]" />
+                                    <col class="w-[9rem]" />
+                                    <col class="w-[5rem]" />
+                                    <col class="w-[4.5rem]" />
+                                </colgroup>
                                 <thead>
                                     <tr class="border-b border-slate-200 bg-slate-50 text-left font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
-                                        <th class="px-1.5 py-1.5">Referring URL</th>
-                                        <th class="px-1.5 py-1.5">Target URL</th>
-                                        <th class="w-14 px-1.5 py-1.5">DA</th>
-                                        <th class="w-14 px-1.5 py-1.5">Spam</th>
-                                        <th class="px-1.5 py-1.5">Anchor</th>
-                                        <th class="w-28 px-1.5 py-1.5">Type</th>
-                                        <th class="w-20 px-1.5 py-1.5">Follow</th>
-                                        <th class="w-16 px-1.5 py-1.5"></th>
+                                        <th class="px-2 py-2">Referring URL</th>
+                                        <th class="px-2 py-2">Target URL</th>
+                                        <th class="px-2 py-2 text-right">DA</th>
+                                        <th class="px-2 py-2 text-right">Spam</th>
+                                        <th class="px-2 py-2">Anchor</th>
+                                        <th class="px-2 py-2">Type</th>
+                                        <th class="px-2 py-2">Follow</th>
+                                        <th class="px-2 py-2"></th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                     @foreach ($sheetRows as $i => $row)
-                                        <tr wire:key="sheet-row-{{ $i }}" class="align-top">
-                                            <td class="p-0.5"><input wire:model.blur="sheetRows.{{ $i }}.referring_page_url" type="url" class="h-7 w-full min-w-[160px] rounded border border-slate-200 bg-white px-1.5 text-[11px] dark:border-slate-600 dark:bg-slate-800" /></td>
-                                            <td class="p-0.5"><input wire:model.blur="sheetRows.{{ $i }}.target_page_url" type="url" class="h-7 w-full min-w-[160px] rounded border border-slate-200 bg-white px-1.5 text-[11px] dark:border-slate-600 dark:bg-slate-800" /></td>
-                                            <td class="p-0.5"><input wire:model.blur="sheetRows.{{ $i }}.domain_authority" type="number" min="0" max="100" class="h-7 w-full rounded border border-slate-200 bg-white px-1.5 text-[11px] dark:border-slate-600 dark:bg-slate-800" /></td>
-                                            <td class="p-0.5"><input wire:model.blur="sheetRows.{{ $i }}.spam_score" type="number" min="0" max="100" class="h-7 w-full rounded border border-slate-200 bg-white px-1.5 text-[11px] dark:border-slate-600 dark:bg-slate-800" /></td>
-                                            <td class="p-0.5"><input wire:model.blur="sheetRows.{{ $i }}.anchor_text" type="text" class="h-7 w-full min-w-[80px] rounded border border-slate-200 bg-white px-1.5 text-[11px] dark:border-slate-600 dark:bg-slate-800" /></td>
-                                            <td class="p-0.5">
-                                                <select wire:model.live="sheetRows.{{ $i }}.type" class="h-7 w-full rounded border border-slate-200 bg-white px-1.5 text-[11px] dark:border-slate-600 dark:bg-slate-800">
+                                        <tr wire:key="sheet-row-{{ $i }}" class="align-middle">
+                                            <td class="p-1"><input wire:model.blur="sheetRows.{{ $i }}.referring_page_url" type="url" placeholder="https://…" class="h-8 w-full rounded border border-slate-200 bg-white px-2 text-[11px] shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 dark:border-slate-600 dark:bg-slate-800" /></td>
+                                            <td class="p-1"><input wire:model.blur="sheetRows.{{ $i }}.target_page_url" type="url" placeholder="https://…" class="h-8 w-full rounded border border-slate-200 bg-white px-2 text-[11px] shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 dark:border-slate-600 dark:bg-slate-800" /></td>
+                                            <td class="p-1"><input wire:model.blur="sheetRows.{{ $i }}.domain_authority" type="number" min="0" max="100" class="h-8 w-full rounded border border-slate-200 bg-white px-2 text-right text-[11px] shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 dark:border-slate-600 dark:bg-slate-800" /></td>
+                                            <td class="p-1"><input wire:model.blur="sheetRows.{{ $i }}.spam_score" type="number" min="0" max="100" class="h-8 w-full rounded border border-slate-200 bg-white px-2 text-right text-[11px] shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 dark:border-slate-600 dark:bg-slate-800" /></td>
+                                            <td class="p-1"><input wire:model.blur="sheetRows.{{ $i }}.anchor_text" type="text" class="h-8 w-full rounded border border-slate-200 bg-white px-2 text-[11px] shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 dark:border-slate-600 dark:bg-slate-800" /></td>
+                                            <td class="p-1">
+                                                <select wire:model.live="sheetRows.{{ $i }}.type" class="h-8 w-full rounded border border-slate-200 bg-white px-2 text-[11px] shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 dark:border-slate-600 dark:bg-slate-800">
                                                     @foreach ($types as $t)
                                                         <option value="{{ $t->value }}">{{ $t->label() }}</option>
                                                     @endforeach
                                                 </select>
                                             </td>
-                                            <td class="p-0.5">
-                                                <select wire:model.live="sheetRows.{{ $i }}.is_dofollow" class="h-7 w-full rounded border border-slate-200 bg-white px-1.5 text-[11px] dark:border-slate-600 dark:bg-slate-800">
+                                            <td class="p-1">
+                                                <select wire:model.live="sheetRows.{{ $i }}.is_dofollow" class="h-8 w-full rounded border border-slate-200 bg-white px-2 text-[11px] shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500/30 dark:border-slate-600 dark:bg-slate-800">
                                                     <option value="1">Do</option>
                                                     <option value="0">No</option>
                                                 </select>
                                             </td>
-                                            <td class="p-0.5 text-center"><button type="button" wire:click="removeSheetRow({{ $i }})" class="rounded px-1.5 py-0.5 text-[10px] font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">Remove</button></td>
+                                            <td class="p-1 text-center"><button type="button" wire:click="removeSheetRow({{ $i }})" class="rounded px-1.5 py-1 text-[10px] font-semibold text-red-600 transition hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-500/10">Remove</button></td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -145,14 +155,30 @@
                                 </div>
                             @endif
                         @endforeach
-                        <div class="flex items-center justify-end gap-2">
-                            <button type="button" wire:click="addSheetRow" class="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
-                                Add row
-                            </button>
-                            <button type="button" wire:click="saveSheet" class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500">
-                                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                                Save sheet
-                            </button>
+                        <div class="flex flex-col-reverse items-stretch gap-2 sm:flex-row sm:items-center sm:justify-between">
+                            <div class="min-h-[1.25rem] text-[11px]">
+                                @if ($sheetMessage)
+                                    <span @class([
+                                        'inline-flex items-center gap-1 rounded-md px-2 py-1 font-medium',
+                                        'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $sheetMessageKind === 'success',
+                                        'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' => $sheetMessageKind === 'info',
+                                        'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $sheetMessageKind === 'error',
+                                    ])>
+                                        <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                        {{ $sheetMessage }}
+                                    </span>
+                                @endif
+                                <span wire:loading wire:target="saveSheet" class="text-slate-500 dark:text-slate-400">Saving…</span>
+                            </div>
+                            <div class="flex items-center justify-end gap-2">
+                                <button type="button" wire:click="addSheetRow" class="inline-flex h-8 items-center rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+                                    Add row
+                                </button>
+                                <button type="button" wire:click="saveSheet" wire:loading.attr="disabled" wire:target="saveSheet" class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-60">
+                                    <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                    Save sheet
+                                </button>
+                            </div>
                         </div>
                     </div>
                 @endif
