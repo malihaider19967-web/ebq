@@ -82,4 +82,27 @@ class PageLocalePresentation
 
         return implode(', ', $parts);
     }
+
+    /**
+     * Whether to show the SERP sample region line in audit UI (hidden when Serper `hl` is English).
+     *
+     * @param  array<string, mixed>|null  $serpLocale  Benchmark {@code serp_locale} as sent to Serper
+     */
+    public static function shouldShowSerpLocationNote(?array $serpLocale): bool
+    {
+        if (self::serpParamsLine($serpLocale) === null) {
+            return false;
+        }
+
+        $hl = isset($serpLocale['hl']) && is_string($serpLocale['hl']) && $serpLocale['hl'] !== ''
+            ? strtolower($serpLocale['hl'])
+            : '';
+        if ($hl === '') {
+            return true;
+        }
+
+        $primary = explode('-', $hl, 2)[0];
+
+        return $primary !== 'en';
+    }
 }

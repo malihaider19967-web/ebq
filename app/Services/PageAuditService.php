@@ -10,6 +10,7 @@ use App\Support\Audit\KeywordStrategyAnalyzer;
 use App\Support\Audit\PageLocaleResolver;
 use App\Support\Audit\RecommendationEngine;
 use App\Support\Audit\SafeHttpGuard;
+use App\Support\Audit\SerpLocaleDefaults;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\DB;
@@ -181,6 +182,7 @@ class PageAuditService
                 $serpKeywordArg,
                 $pageLocaleResolved['gl'],
                 $pageLocaleResolved['hl'],
+                $pageLocaleResolved['bcp47'],
             );
             if ($benchmark !== null) {
                 $result['benchmark'] = $benchmark;
@@ -234,17 +236,21 @@ class PageAuditService
      * @param  array<string, mixed>  $keywordsPayload
      * @return array<string, mixed>|null null when Serper is not configured
      */
-    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch, int $yourWordCount, int $yourImageCount, ?array $yourStack = null, ?string $serpKeywordOverride = null, ?string $serpGl = null, ?string $serpHl = null): ?array
+    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch, int $yourWordCount, int $yourImageCount, ?array $yourStack = null, ?string $serpKeywordOverride = null, ?string $serpGl = null, ?string $serpHl = null, ?string $serpBcp47 = null): ?array
     {
         $apiKey = config('services.serper.key');
         if (! is_string($apiKey) || trim($apiKey) === '') {
             return null;
         }
 
+        $effective = SerpLocaleDefaults::forSerperRequest($serpGl, $serpHl, $serpBcp47);
+        $effectiveGl = $effective['gl'];
+        $effectiveHl = $effective['hl'];
+
         $keywordContext = null;
 
         try {
-            $serpLocaleOut = $this->compactSerpLocale($serpGl, $serpHl);
+            $serpLocaleOut = $this->compactSerpLocale($effectiveGl, $effectiveHl);
             $override = $serpKeywordOverride !== null ? trim($serpKeywordOverride) : '';
             $useManualSerpKeyword = $override !== '';
             $keywordSource = null;
@@ -281,7 +287,7 @@ class PageAuditService
                 ];
             }
 
-            $payload = app(SerperSearchClient::class)->search($keyword, 20, $serpGl, $serpHl);
+            $payload = app(SerperSearchClient::class)->search($keyword, 20, $effectiveGl, $effectiveHl);
             if ($payload === null) {
                 return [
                     'keyword' => $keyword,
@@ -387,7 +393,7 @@ class PageAuditService
                 'your_flesch' => $yourFlesch,
                 'competitors' => [],
                 'skipped_reason' => 'benchmark_error',
-                'serp_locale' => $this->compactSerpLocale($serpGl, $serpHl),
+                'serp_locale' => $this->compactSerpLocale($effectiveGl, $effectiveHl),
             ];
         }
     }

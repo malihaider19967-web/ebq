@@ -505,9 +505,11 @@
                 @endif
                 <p class="muted" style="margin-bottom: 10px;">
                     Organic URLs via <strong>Serper.dev</strong>. Flesch scores are from HTML fetched at audit time; rankings are approximate and not identical to live Google.
-                    @php $exportSerpLoc = \App\Support\Audit\PageLocalePresentation::serpParamsLine($benchmark['serp_locale'] ?? null); @endphp
-                    @if ($exportSerpLoc)
-                        <br><span style="display: inline-block; margin-top: 4px;">SERP sample region: <span style="font-family: ui-monospace, monospace;">{{ $exportSerpLoc }}</span></span>
+                    @if (\App\Support\Audit\PageLocalePresentation::shouldShowSerpLocationNote($benchmark['serp_locale'] ?? null))
+                        @php $exportSerpLoc = \App\Support\Audit\PageLocalePresentation::serpParamsLine($benchmark['serp_locale'] ?? null); @endphp
+                        @if ($exportSerpLoc)
+                            <br><span style="display: inline-block; margin-top: 4px;">SERP sample region: <span style="font-family: ui-monospace, monospace;">{{ $exportSerpLoc }}</span></span>
+                        @endif
                     @endif
                 </p>
                 @if (! empty($benchmark['keyword']))

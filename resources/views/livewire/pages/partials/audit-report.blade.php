@@ -513,9 +513,11 @@
                         @endif
                         <p class="mb-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
                             Organic URLs from <strong class="text-slate-600 dark:text-slate-300">Serper.dev</strong>; Flesch scores computed from HTML fetched at audit time. Not identical to live Google rankings; use as a directional sample.
-                            @php $serpLocLine = \App\Support\Audit\PageLocalePresentation::serpParamsLine($benchmark['serp_locale'] ?? null); @endphp
-                            @if ($serpLocLine)
-                                <span class="mt-1 block text-slate-500 dark:text-slate-400">SERP sample region: <span class="font-mono text-slate-700 dark:text-slate-300">{{ $serpLocLine }}</span></span>
+                            @if (\App\Support\Audit\PageLocalePresentation::shouldShowSerpLocationNote($benchmark['serp_locale'] ?? null))
+                                @php $serpLocLine = \App\Support\Audit\PageLocalePresentation::serpParamsLine($benchmark['serp_locale'] ?? null); @endphp
+                                @if ($serpLocLine)
+                                    <span class="mt-1 block text-slate-500 dark:text-slate-400">SERP sample region: <span class="font-mono text-slate-700 dark:text-slate-300">{{ $serpLocLine }}</span></span>
+                                @endif
                             @endif
                         </p>
                         @if (! empty($benchmark['keyword']))

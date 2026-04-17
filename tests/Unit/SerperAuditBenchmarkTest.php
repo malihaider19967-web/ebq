@@ -68,7 +68,7 @@ class SerperAuditBenchmarkTest extends TestCase
             'primary' => ['query' => 'sample keyword'],
         ];
 
-        $bench = $method->invoke($svc, 'https://audited-site.test/article', $keywords, 55.0, 1446, 0, null, null, null, null);
+        $bench = $method->invoke($svc, 'https://audited-site.test/article', $keywords, 55.0, 1446, 0, null, null, null, null, null);
 
         $this->assertIsArray($bench);
         $this->assertSame('sample keyword', $bench['keyword']);
@@ -150,7 +150,7 @@ class SerperAuditBenchmarkTest extends TestCase
         $bench = $method->invoke($svc, 'https://www.audited-site.test/article/', [
             'available' => true,
             'primary' => ['query' => 'my keyword'],
-        ], 60.0, 900, 3, null, null, null, null);
+        ], 60.0, 900, 3, null, null, null, null, null);
 
         $this->assertTrue($bench['your_serp']['found']);
         $this->assertSame(2, $bench['your_serp']['position']);
@@ -357,7 +357,7 @@ class SerperAuditBenchmarkTest extends TestCase
         $bench = $method->invoke($svc, 'https://audited-site.test/page', [
             'available' => true,
             'primary' => ['query' => 'primary query'],
-        ], 62.5, 0, 0, null, null, null, null);
+        ], 62.5, 0, 0, null, null, null, null, null);
 
         $this->assertIsArray($bench);
         $this->assertSame('benchmark_error', $bench['skipped_reason']);
@@ -407,7 +407,7 @@ class SerperAuditBenchmarkTest extends TestCase
         $bench = $method->invoke($svc, 'https://audited-site.test/page', [
             'available' => true,
             'primary' => ['query' => 'ignored from gsc'],
-        ], 50.0, 100, 1, null, '  override phrase  ', null, null);
+        ], 50.0, 100, 1, null, '  override phrase  ', null, null, null);
 
         $this->assertSame('override phrase', $bench['keyword']);
         $this->assertSame('manual', $bench['keyword_source']);
@@ -453,9 +453,54 @@ class SerperAuditBenchmarkTest extends TestCase
         $bench = $method->invoke($svc, 'https://audited-site.test/page', [
             'available' => true,
             'primary' => ['query' => 'test query'],
-        ], 50.0, 100, 1, null, null, 'fr', 'fr');
+        ], 50.0, 100, 1, null, null, 'fr', 'fr', null);
 
         $this->assertSame(['gl' => 'fr', 'hl' => 'fr'], $bench['serp_locale']);
         $this->assertSame('test query', $bench['keyword']);
+    }
+
+    public function test_serper_request_infers_gl_when_only_hl_provided(): void
+    {
+        $guard = Mockery::mock(SafeHttpGuard::class);
+        $guard->shouldReceive('check')->andReturn(['ok' => true]);
+        $this->app->instance(SafeHttpGuard::class, $guard);
+
+        Config::set('services.serper.key', 'test-serper-key');
+        Config::set('services.serper.search_url', 'https://google.serper.dev/search');
+
+        $html = '<!DOCTYPE html><html><head><title>C</title></head><body><p>'
+            .str_repeat('Word. ', 200)
+            .'</p></body></html>';
+
+        Http::fake(function (Request $request) use ($html) {
+            $url = $request->url();
+            if (str_contains($url, 'serper.dev/search')) {
+                $body = $request->data();
+                $this->assertSame('jp', $body['gl'] ?? null);
+                $this->assertSame('ja', $body['hl'] ?? null);
+
+                return Http::response([
+                    'organic' => [
+                        ['link' => 'https://only-comp.test/p', 'title' => 'C', 'position' => 1],
+                    ],
+                ], 200);
+            }
+            if ($url === 'https://only-comp.test/p') {
+                return Http::response($html, 200, ['Content-Type' => 'text/html']);
+            }
+
+            return Http::response('unexpected URL: '.$url, 500);
+        });
+
+        $svc = $this->app->make(PageAuditService::class);
+        $method = new ReflectionMethod(PageAuditService::class, 'buildSerperReadabilityBenchmark');
+        $method->setAccessible(true);
+
+        $bench = $method->invoke($svc, 'https://audited-site.test/page', [
+            'available' => true,
+            'primary' => ['query' => 'test query'],
+        ], 50.0, 100, 1, null, null, null, 'ja', null);
+
+        $this->assertSame(['gl' => 'jp', 'hl' => 'ja'], $bench['serp_locale']);
     }
 }
