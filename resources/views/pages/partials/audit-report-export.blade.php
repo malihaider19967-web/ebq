@@ -348,6 +348,27 @@
         </div>
 
         {{-- 4. Technical --}}
+        @php
+            $stackExp = $technical['stack'] ?? null;
+            $stackLabelExp = $stackExp['label'] ?? 'Unknown';
+            $stackTypeExp = $stackExp['type'] ?? 'unknown';
+            $stackToneClassExp = match ($stackTypeExp) {
+                'modern' => 'ok',
+                'cms' => 'warn',
+                default => '',
+            };
+            $stackGapRowExp = null;
+            foreach (data_get($result, 'benchmark.gap_table.rows', []) as $gapRowExp) {
+                if (($gapRowExp['key'] ?? null) === 'stack') { $stackGapRowExp = $gapRowExp; break; }
+            }
+            $deltaKindExp = $stackGapRowExp['delta_kind'] ?? null;
+            $gapChipColorExp = match ($deltaKindExp) {
+                'moat' => ['bg' => '#d1fae5', 'fg' => '#047857', 'label' => 'Moat vs Top 3'],
+                'disadvantage' => ['bg' => '#fee2e2', 'fg' => '#b91c1c', 'label' => 'Gap vs Top 3'],
+                'parity' => ['bg' => '#f1f5f9', 'fg' => '#334155', 'label' => 'Parity vs Top 3'],
+                default => null,
+            };
+        @endphp
         <div class="card">
             <h2>4. Technical Performance</h2>
             <div class="row">
@@ -356,6 +377,13 @@
                 <div class="kpi"><div class="label">Page size</div><div class="value">{{ isset($technical['page_size_bytes']) ? number_format($technical['page_size_bytes'] / 1024, 1).' KB' : '—' }}</div></div>
                 <div class="kpi"><div class="label">Compression</div><div class="value" style="font-size: 14px;">{{ $technical['compression'] ?? 'none' }}</div></div>
                 <div class="kpi"><div class="label">HTTPS</div><div class="value {{ ($technical['is_https'] ?? false) ? 'ok' : 'warn' }}" style="font-size: 14px;">{{ ($technical['is_https'] ?? false) ? 'Yes' : 'No' }}</div></div>
+                <div class="kpi">
+                    <div class="label">Tech stack</div>
+                    <div class="value {{ $stackToneClassExp }}" style="font-size: 14px;">{{ $stackLabelExp }}</div>
+                    @if ($gapChipColorExp)
+                        <span class="badge" style="margin-top: 4px; background: {{ $gapChipColorExp['bg'] }}; color: {{ $gapChipColorExp['fg'] }};">{{ $gapChipColorExp['label'] }}</span>
+                    @endif
+                </div>
             </div>
         </div>
 

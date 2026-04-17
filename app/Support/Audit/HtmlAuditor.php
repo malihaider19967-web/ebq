@@ -323,4 +323,171 @@ class HtmlAuditor
 
         return $scheme . '://' . $host . $port . $basePath . $href;
     }
+
+    /**
+     * Detect the page's underlying stack from response headers + DOM fingerprints.
+     *
+     * @param  array<string, string>  $responseHeaders  lowercased key => value (e.g. 'server', 'x-powered-by', 'x-generator')
+     * @return array{label: string, type: 'modern'|'cms'|'static'|'unknown', signals: list<string>}
+     */
+    public function technology(array $responseHeaders): array
+    {
+        $headers = array_change_key_case($responseHeaders, CASE_LOWER);
+        $signals = [];
+
+        $h = fn (string $key): string => (string) ($headers[$key] ?? '');
+        $anyHeaderContains = function (string $needle) use ($headers, &$signals): bool {
+            foreach (['server', 'x-powered-by', 'x-generator'] as $k) {
+                $v = (string) ($headers[$k] ?? '');
+                if ($v !== '' && stripos($v, $needle) !== false) {
+                    $signals[] = "{$k}: {$v}";
+
+                    return true;
+                }
+            }
+
+            return false;
+        };
+
+        // 1) Response headers — strong signals for Next.js / Drupal / Shopify / WP hosting.
+        if ($anyHeaderContains('Next.js')) {
+            return ['label' => 'Next.js', 'type' => 'modern', 'signals' => array_slice($signals, 0, 5)];
+        }
+        if (stripos($h('x-generator'), 'Drupal') !== false) {
+            $signals[] = 'x-generator: ' . $h('x-generator');
+
+            return ['label' => 'Drupal', 'type' => 'cms', 'signals' => array_slice($signals, 0, 5)];
+        }
+        if ($anyHeaderContains('Shopify')) {
+            return ['label' => 'Shopify', 'type' => 'cms', 'signals' => array_slice($signals, 0, 5)];
+        }
+        if ($anyHeaderContains('WP Engine')) {
+            $signals[] = 'WP Engine → WordPress';
+
+            return ['label' => 'WordPress', 'type' => 'cms', 'signals' => array_slice($signals, 0, 5)];
+        }
+
+        // 2) <meta name="generator"> — verbatim signal.
+        $gen = trim((string) $this->xpath->evaluate(
+            'string(//meta[translate(@name, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")="generator"]/@content)'
+        ));
+        if ($gen !== '') {
+            $signals[] = "meta-generator: {$gen}";
+            $genMatch = $this->matchGenerator($gen);
+            if ($genMatch !== null) {
+                return $genMatch + ['signals' => array_slice($signals, 0, 5)];
+            }
+        }
+
+        // 3) DOM / asset fingerprints.
+        $assetContains = fn (string $needle): bool => ((int) $this->xpath->evaluate(
+            'count(//*[contains(@src, "' . $this->escapeXpathString($needle) . '") or contains(@href, "' . $this->escapeXpathString($needle) . '")])'
+        )) > 0;
+
+        // Next.js
+        if ((int) $this->xpath->evaluate('count(//script[@id="__NEXT_DATA__"])') > 0 || $assetContains('/_next/static/')) {
+            $signals[] = '__NEXT_DATA__ / _next/static';
+
+            return ['label' => 'Next.js', 'type' => 'modern', 'signals' => array_slice($signals, 0, 5)];
+        }
+        // Nuxt
+        if ($assetContains('/_nuxt/') || (int) $this->xpath->evaluate('count(//script[contains(., "__NUXT__")])') > 0) {
+            $signals[] = '_nuxt / __NUXT__';
+
+            return ['label' => 'Nuxt', 'type' => 'modern', 'signals' => array_slice($signals, 0, 5)];
+        }
+        // Astro
+        if ((int) $this->xpath->evaluate('count(//*[@data-astro-cid])') > 0) {
+            $signals[] = 'data-astro-cid';
+
+            return ['label' => 'Astro', 'type' => 'modern', 'signals' => array_slice($signals, 0, 5)];
+        }
+        // Shopify (DOM)
+        if ($assetContains('cdn.shopify.com') || (int) $this->xpath->evaluate('count(//script[contains(., "Shopify.shop")])') > 0) {
+            $signals[] = 'cdn.shopify.com / Shopify.shop';
+
+            return ['label' => 'Shopify', 'type' => 'cms', 'signals' => array_slice($signals, 0, 5)];
+        }
+        // Wix
+        if ($assetContains('static.wixstatic.com')) {
+            $signals[] = 'static.wixstatic.com';
+
+            return ['label' => 'Wix', 'type' => 'cms', 'signals' => array_slice($signals, 0, 5)];
+        }
+        // Squarespace
+        if ($assetContains('squarespace-cdn.com')) {
+            $signals[] = 'squarespace-cdn.com';
+
+            return ['label' => 'Squarespace', 'type' => 'cms', 'signals' => array_slice($signals, 0, 5)];
+        }
+        // Webflow
+        if ($assetContains('assets.website-files.com') || (int) $this->xpath->evaluate('count(//@*[starts-with(name(), "data-wf-")])') > 0) {
+            $signals[] = 'webflow cdn / data-wf-*';
+
+            return ['label' => 'Webflow', 'type' => 'cms', 'signals' => array_slice($signals, 0, 5)];
+        }
+        // Drupal (DOM)
+        if ($assetContains('/sites/default/files/')) {
+            $signals[] = '/sites/default/files/';
+
+            return ['label' => 'Drupal', 'type' => 'cms', 'signals' => array_slice($signals, 0, 5)];
+        }
+        // WordPress (DOM)
+        if ($assetContains('/wp-content/') || $assetContains('/wp-includes/') || $assetContains('wp-json')) {
+            $signals[] = 'wp-content / wp-includes / wp-json';
+
+            return ['label' => 'WordPress', 'type' => 'cms', 'signals' => array_slice($signals, 0, 5)];
+        }
+        // Laravel + Vite (needs BOTH build-assets and wire:* attributes to avoid false positives).
+        $hasBuildAssets = $assetContains('/build/assets/');
+        $hasLivewire = (int) $this->xpath->evaluate('count(//@*[starts-with(name(), "wire:")])') > 0;
+        if ($hasBuildAssets && $hasLivewire) {
+            $signals[] = '/build/assets/ + wire:*';
+
+            return ['label' => 'Laravel (Vite)', 'type' => 'modern', 'signals' => array_slice($signals, 0, 5)];
+        }
+
+        return ['label' => 'Unknown', 'type' => 'unknown', 'signals' => array_slice($signals, 0, 5)];
+    }
+
+    /**
+     * @return array{label: string, type: 'modern'|'cms'|'static'|'unknown'}|null
+     */
+    private function matchGenerator(string $generator): ?array
+    {
+        $g = strtolower($generator);
+        $map = [
+            'wordpress' => ['WordPress', 'cms'],
+            'drupal' => ['Drupal', 'cms'],
+            'joomla' => ['Joomla', 'cms'],
+            'magento' => ['Magento', 'cms'],
+            'shopify' => ['Shopify', 'cms'],
+            'wix' => ['Wix', 'cms'],
+            'squarespace' => ['Squarespace', 'cms'],
+            'webflow' => ['Webflow', 'cms'],
+            'hubspot' => ['Hubspot', 'cms'],
+            'ghost' => ['Ghost', 'cms'],
+            'astro' => ['Astro', 'modern'],
+            'next.js' => ['Next.js', 'modern'],
+            'nuxt' => ['Nuxt', 'modern'],
+            'gatsby' => ['Gatsby', 'modern'],
+            'hugo' => ['Hugo', 'static'],
+            'jekyll' => ['Jekyll', 'static'],
+        ];
+        foreach ($map as $needle => [$label, $type]) {
+            if (str_contains($g, $needle)) {
+                return ['label' => $label, 'type' => $type];
+            }
+        }
+
+        return null;
+    }
+
+    private function escapeXpathString(string $s): string
+    {
+        // Strings used inside contains() are wrapped in double quotes by the caller,
+        // so we only need to defuse embedded double quotes. Replace with empty to stay
+        // safe for the narrow set of literal fingerprints we pass in.
+        return str_replace('"', '', $s);
+    }
 }

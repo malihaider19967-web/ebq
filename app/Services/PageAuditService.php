@@ -75,6 +75,7 @@ class PageAuditService
                 'page_size_bytes' => $fetch['size'],
                 'compression' => $fetch['compression'],
                 'is_https' => str_starts_with(strtolower($pageUrl), 'https://'),
+                'stack' => $auditor->technology($fetch['headers'] ?? []),
             ];
 
             $result = [
@@ -113,7 +114,8 @@ class PageAuditService
                 $result['keywords'],
                 is_numeric($readability['flesch'] ?? null) ? (float) $readability['flesch'] : null,
                 (int) ($content['word_count'] ?? 0),
-                (int) ($images['total'] ?? 0)
+                (int) ($images['total'] ?? 0),
+                $technical['stack'] ?? null,
             );
             if ($benchmark !== null) {
                 $result['benchmark'] = $benchmark;
@@ -147,7 +149,7 @@ class PageAuditService
      * @param  array<string, mixed>  $keywordsPayload
      * @return array<string, mixed>|null null when Serper is not configured
      */
-    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch, int $yourWordCount, int $yourImageCount): ?array
+    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch, int $yourWordCount, int $yourImageCount, ?array $yourStack = null): ?array
     {
         $apiKey = config('services.serper.key');
         if (! is_string($apiKey) || trim($apiKey) === '') {
@@ -246,6 +248,7 @@ class PageAuditService
                     $compBody = $compContent['body_text'] ?? '';
                     $compRead = $compAuditor->readability($compBody);
                     $compImages = $compAuditor->images();
+                    $compStack = $compAuditor->technology($fetch['headers'] ?? []);
                     $competitors[] = [
                         'url' => $entry['url'],
                         'title' => $entry['title'] !== '' ? $entry['title'] : '',
@@ -254,13 +257,15 @@ class PageAuditService
                         'image_count' => max(0, (int) ($compImages['total'] ?? 0)),
                         'flesch' => is_numeric($compRead['flesch'] ?? null) ? (float) $compRead['flesch'] : null,
                         'grade' => $compRead['grade'] ?? null,
+                        'stack_label' => $compStack['label'] ?? 'Unknown',
+                        'stack_type' => $compStack['type'] ?? 'unknown',
                     ];
                 } catch (\Throwable) {
                     continue;
                 }
             }
 
-            $gapTable = $this->buildBenchmarkGapTable($yourWordCount, $yourFlesch, $yourImageCount, $competitors);
+            $gapTable = $this->buildBenchmarkGapTable($yourWordCount, $yourFlesch, $yourImageCount, $competitors, $yourStack);
 
             return [
                 'keyword' => $keyword,
@@ -292,7 +297,7 @@ class PageAuditService
      * @param  list<array<string, mixed>>  $competitors
      * @return array{rows: list<array<string, mixed>>}|null
      */
-    private function buildBenchmarkGapTable(int $yourWords, ?float $yourFlesch, int $yourImages, array $competitors): ?array
+    private function buildBenchmarkGapTable(int $yourWords, ?float $yourFlesch, int $yourImages, array $competitors, ?array $yourStack = null): ?array
     {
         if ($competitors === []) {
             return null;
@@ -357,7 +362,72 @@ class PageAuditService
             ];
         }
 
+        $stackRow = $this->buildStackGapRow($yourStack, $competitors);
+        if ($stackRow !== null) {
+            $rows[] = $stackRow;
+        }
+
         return $rows === [] ? null : ['rows' => $rows];
+    }
+
+    /**
+     * @param  array{label: string, type: string}|null  $yourStack
+     * @param  list<array<string, mixed>>  $competitors
+     * @return array<string, mixed>|null
+     */
+    private function buildStackGapRow(?array $yourStack, array $competitors): ?array
+    {
+        $yourType = is_array($yourStack) ? (string) ($yourStack['type'] ?? 'unknown') : 'unknown';
+        $yourLabel = is_array($yourStack) ? (string) ($yourStack['label'] ?? 'Unknown') : 'Unknown';
+        if ($yourType === 'unknown' || $yourLabel === 'Unknown') {
+            return null;
+        }
+
+        $compTypes = [];
+        $compLabels = [];
+        foreach ($competitors as $c) {
+            $ct = (string) ($c['stack_type'] ?? 'unknown');
+            $cl = (string) ($c['stack_label'] ?? 'Unknown');
+            if ($ct === 'unknown' || $cl === 'Unknown') {
+                continue;
+            }
+            $compTypes[] = $ct;
+            $compLabels[] = $cl;
+        }
+        if (count($compTypes) < 2) {
+            return null;
+        }
+
+        $labelCounts = array_count_values($compLabels);
+        arsort($labelCounts);
+        $topLabel = array_key_first($labelCounts);
+        $topCount = $labelCounts[$topLabel];
+        $summary = $topCount > 1 ? "{$topLabel} ×{$topCount}" : $topLabel;
+
+        $typeCounts = array_count_values($compTypes);
+        arsort($typeCounts);
+        $dominantType = array_key_first($typeCounts);
+
+        $deltaKind = 'parity';
+        if ($yourType === 'modern' && $dominantType === 'cms') {
+            $deltaKind = 'moat';
+        } elseif ($yourType === 'cms' && $dominantType === 'modern') {
+            $deltaKind = 'disadvantage';
+        }
+
+        return [
+            'key' => 'stack',
+            'metric' => 'Tech stack',
+            'yours' => $yourLabel,
+            'market_avg' => $summary,
+            'delta' => null,
+            'delta_kind' => $deltaKind,
+            'status' => match ($deltaKind) {
+                'moat' => 'Competitive moat',
+                'disadvantage' => 'Stack gap',
+                default => 'Parity',
+            },
+        ];
     }
 
     /**
@@ -529,12 +599,21 @@ class PageAuditService
             }
             $encoding = strtolower((string) $response->header('Content-Encoding'));
 
+            $stackHeaders = [];
+            foreach (['server', 'x-powered-by', 'x-generator', 'via', 'cf-cache-status'] as $hName) {
+                $val = (string) $response->header($hName);
+                if ($val !== '') {
+                    $stackHeaders[$hName] = $val;
+                }
+            }
+
             return [
                 'body' => $body,
                 'http_status' => $response->status(),
                 'ttfb_ms' => $ttfb,
                 'size' => $fullSize,
                 'compression' => $encoding !== '' ? $encoding : null,
+                'headers' => $stackHeaders,
             ];
         } catch (\Throwable $e) {
             return [

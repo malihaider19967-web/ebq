@@ -37,6 +37,11 @@ class RecommendationEngine
         } catch (\Throwable) {
             // Benchmark recs are optional; never fail the audit recommendation pass.
         }
+        try {
+            $recs = array_merge($recs, $this->market($result));
+        } catch (\Throwable) {
+            // Market-delta recs are optional; never fail the audit recommendation pass.
+        }
 
         $order = [
             self::SEV_CRITICAL => 0,
@@ -532,5 +537,99 @@ class RecommendationEngine
     private function rec(string $id, string $section, string $severity, string $title, string $why, string $fix): array
     {
         return compact('id', 'section', 'severity', 'title', 'why', 'fix');
+    }
+
+    /**
+     * Sharp, delta-indexed recommendations from the SERP benchmark gap table.
+     * Complements {@see serpBenchmark()} (which stays advisory) with concrete
+     * thresholds for word-count, readability, image, and tech-stack gaps.
+     *
+     * @return list<array{id: string, section: string, severity: string, title: string, why: string, fix: string}>
+     */
+    private function market(array $result): array
+    {
+        $rows = data_get($result, 'benchmark.gap_table.rows');
+        if (! is_array($rows) || $rows === []) {
+            return [];
+        }
+
+        $byKey = [];
+        foreach ($rows as $row) {
+            if (is_array($row) && isset($row['key'])) {
+                $byKey[(string) $row['key']] = $row;
+            }
+        }
+
+        $out = [];
+
+        // Word count deltas
+        if (isset($byKey['word_count'])) {
+            $wc = $byKey['word_count'];
+            $delta = is_numeric($wc['delta'] ?? null) ? (float) $wc['delta'] : null;
+            $yours = (int) ($wc['yours'] ?? 0);
+            $avg = (int) round((float) ($wc['market_avg'] ?? 0));
+            if ($delta !== null && $delta < -500) {
+                $out[] = $this->rec('market.word_count.thin', 'SERP benchmark', self::SEV_CRITICAL,
+                    'Content is significantly thinner than the Top 3',
+                    "Your content is significantly thinner than the Top 3. This is likely the primary reason for your current ranking ceiling. Your page is ~{$yours} words; the sampled Top 3 average ≈{$avg} (delta " . round($delta, 0) . ').',
+                    'Add depth first, length second — cover adjacent questions (FAQs, comparisons, checklists), cite primary sources, and include expert context. Re-audit after changes so you can see the delta close.');
+            } elseif ($delta !== null && $delta > 1000) {
+                $out[] = $this->rec('market.word_count.bloat', 'SERP benchmark', self::SEV_INFO,
+                    'Content is substantially longer than the Top 3',
+                    "Your page is ~{$yours} words while the Top 3 average ≈{$avg} (delta +" . round($delta, 0) . '). Length past what competitors need risks padding and can dilute topical focus.',
+                    'Audit for padding. Keep depth where it earns its keep (examples, data, original analysis), but cut repetition and filler. Aim for density, not length.');
+            }
+        }
+
+        // Readability deltas
+        if (isset($byKey['flesch'])) {
+            $fl = $byKey['flesch'];
+            $delta = is_numeric($fl['delta'] ?? null) ? (float) $fl['delta'] : null;
+            if ($delta !== null && $delta > 15) {
+                $out[] = $this->rec('market.readability.accessible', 'SERP benchmark', self::SEV_GOOD,
+                    'Much more accessible than competitors',
+                    'Your content is much more accessible than competitors. This is a strong retention signal; do not increase complexity even if you add length.',
+                    'Keep plain sentences, short paragraphs, and scannable structure. If you expand coverage, preserve the reading level that is winning engagement for you today.');
+            } elseif ($delta !== null && $delta < -15) {
+                $out[] = $this->rec('market.readability.complex', 'SERP benchmark', self::SEV_WARNING,
+                    'Significantly harder to read than the Top 3',
+                    "Your Flesch score is " . round($delta, 1) . ' points below the Top 3 average. Pages with a readability gap of this size typically have lower dwell time and weaker engagement on the same intent.',
+                    'Shorten sentences (≤20 words), replace jargon with plain language, and break paragraphs. Keep depth but improve delivery.');
+            }
+        }
+
+        // Image deltas
+        if (isset($byKey['images'])) {
+            $img = $byKey['images'];
+            $delta = is_numeric($img['delta'] ?? null) ? (float) $img['delta'] : null;
+            if ($delta !== null && $delta < -3) {
+                $avg = round((float) ($img['market_avg'] ?? 0), 1);
+                $out[] = $this->rec('market.images.light', 'SERP benchmark', self::SEV_WARNING,
+                    'Competitors visualize more than you',
+                    "You have {$img['yours']} images; the Top 3 average ≈{$avg} (delta " . round($delta, 1) . '). Visuals are correlated with dwell time and shareability — a persistent image gap suppresses engagement metrics.',
+                    'Add 3–5 targeted visuals: screenshots, diagrams, data charts, or annotated examples. Use descriptive alt text and modern formats (WebP/AVIF).');
+            }
+        }
+
+        // Tech-stack moat / disadvantage
+        if (isset($byKey['stack'])) {
+            $st = $byKey['stack'];
+            $kind = (string) ($st['delta_kind'] ?? 'parity');
+            $yourLabel = (string) ($st['yours'] ?? 'your stack');
+            $compLabel = (string) ($st['market_avg'] ?? 'the Top 3');
+            if ($kind === 'moat') {
+                $out[] = $this->rec('market.stack.moat', 'SERP benchmark', self::SEV_GOOD,
+                    'Competitive moat: modern stack vs. CMS-heavy Top 3',
+                    "You are on {$yourLabel} while the Top 3 are mostly {$compLabel}. Expect a real Core Web Vitals advantage (faster LCP/INP) versus the competitor set — that translates to measurably better mobile rankings over time.",
+                    'Lean on speed in your UX and content — mention load-time or ease-of-use where relevant, and keep the bundle disciplined so you do not surrender the edge.');
+            } elseif ($kind === 'disadvantage') {
+                $out[] = $this->rec('market.stack.disadvantage', 'SERP benchmark', self::SEV_WARNING,
+                    'Stack gap: Top 3 run a modern stack, you run a CMS',
+                    "The Top 3 are on {$compLabel}; you are on {$yourLabel}. A heavy CMS can cap Core Web Vitals — inflating LCP/INP beyond thresholds that Google uses as a ranking signal for mobile.",
+                    'Before fighting for ranking marginals, invest in performance: full-page caching, headless/static output, image CDN, and trimming render-blocking plugins. Measure Core Web Vitals before and after.');
+            }
+        }
+
+        return $out;
     }
 }

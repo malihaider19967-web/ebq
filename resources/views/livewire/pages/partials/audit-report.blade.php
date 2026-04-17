@@ -772,13 +772,59 @@
                         $size = $technical['page_size_bytes'] ?? null;
                         $compression = $technical['compression'] ?? 'none';
                         $https = $technical['is_https'] ?? false;
+                        $stack = $technical['stack'] ?? null;
+                        $stackLabel = $stack['label'] ?? 'Unknown';
+                        $stackType = $stack['type'] ?? 'unknown';
+                        $stackTone = match ($stackType) {
+                            'modern' => 'good',
+                            'cms' => 'warn',
+                            default => 'neutral',
+                        };
+
+                        $stackGapRow = null;
+                        foreach (data_get($result, 'benchmark.gap_table.rows', []) as $gapRow) {
+                            if (($gapRow['key'] ?? null) === 'stack') { $stackGapRow = $gapRow; break; }
+                        }
+                        $deltaKind = $stackGapRow['delta_kind'] ?? null;
+                        $gapChipClass = match ($deltaKind) {
+                            'moat' => 'bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-900/40',
+                            'disadvantage' => 'bg-rose-100 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-900/40',
+                            'parity' => 'bg-slate-100 text-slate-700 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700',
+                            default => null,
+                        };
+                        $gapChipLabel = match ($deltaKind) {
+                            'moat' => 'Moat vs Top 3',
+                            'disadvantage' => 'Gap vs Top 3',
+                            'parity' => 'Parity vs Top 3',
+                            default => null,
+                        };
                     @endphp
-                    <div class="grid gap-3 grid-cols-2 md:grid-cols-5">
+                    <div class="grid gap-3 grid-cols-2 md:grid-cols-6">
                         <x-audit.stat label="HTTP status" :value="$httpStatus ?: '—'" :tone="$httpStatus > 0 && $httpStatus < 400 ? 'good' : 'bad'" />
                         <x-audit.stat label="Response time" :value="$ttfb !== null ? $ttfb.' ms' : '—'" :tone="$ttfb === null ? 'neutral' : ($ttfb < 500 ? 'good' : ($ttfb < 1000 ? 'warn' : 'bad'))" />
                         <x-audit.stat label="Page size" :value="$size !== null ? number_format($size / 1024, 1).' KB' : '—'" tone="neutral" />
                         <x-audit.stat label="Compression" :value="$compression === '' || $compression === 'none' ? 'None' : strtoupper($compression)" :tone="in_array($compression, ['br', 'brotli']) ? 'good' : ($compression === 'gzip' ? 'warn' : 'bad')" />
                         <x-audit.stat label="HTTPS" :value="$https ? 'Secure' : 'Insecure'" :tone="$https ? 'good' : 'bad'" />
+                        <div class="rounded-lg border border-slate-200 bg-white p-3 transition hover:shadow-sm dark:border-slate-700 dark:bg-slate-900">
+                            <div class="flex items-center justify-between">
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Tech stack</p>
+                                <span @class([
+                                    'h-1.5 w-1.5 rounded-full',
+                                    'bg-emerald-500' => $stackTone === 'good',
+                                    'bg-amber-500' => $stackTone === 'warn',
+                                    'bg-slate-300 dark:bg-slate-600' => $stackTone === 'neutral',
+                                ])></span>
+                            </div>
+                            <p @class([
+                                'mt-1.5 text-xl font-bold tabular-nums leading-none',
+                                'text-emerald-600 dark:text-emerald-400' => $stackTone === 'good',
+                                'text-amber-600 dark:text-amber-400' => $stackTone === 'warn',
+                                'text-slate-800 dark:text-slate-100' => $stackTone === 'neutral',
+                            ])>{{ $stackLabel }}</p>
+                            @if ($gapChipLabel)
+                                <span class="mt-2 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 {{ $gapChipClass }}">{{ $gapChipLabel }}</span>
+                            @endif
+                        </div>
                     </div>
                 </section>
 
