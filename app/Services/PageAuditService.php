@@ -159,7 +159,7 @@ class PageAuditService
                 ];
             }
 
-            $payload = app(SerperSearchClient::class)->search($keyword, 10);
+            $payload = app(SerperSearchClient::class)->search($keyword, 20);
             if ($payload === null) {
                 return [
                     'keyword' => $keyword,
@@ -167,6 +167,7 @@ class PageAuditService
                     'your_flesch' => $yourFlesch,
                     'competitors' => [],
                     'skipped_reason' => 'serper_request_failed',
+                    'your_serp' => $this->emptyYourSerpSnapshot(),
                 ];
             }
 
@@ -178,23 +179,19 @@ class PageAuditService
                     'your_flesch' => $yourFlesch,
                     'competitors' => [],
                     'skipped_reason' => 'no_organic_results',
+                    'your_serp' => $this->emptyYourSerpSnapshot(),
                 ];
             }
+
+            $yourSerp = $this->resolveYourSerpPosition($pageUrl, $organic);
 
             $auditedHost = $this->normalizeHostForBenchmark($pageUrl);
             $auditedCanonical = $this->canonicalUrlForBenchmark($pageUrl);
 
             $candidates = [];
             foreach ($organic as $row) {
-                if (! is_array($row)) {
-                    continue;
-                }
-                $link = $row['link'] ?? '';
-                if (! is_string($link) || $link === '') {
-                    continue;
-                }
-                $linkLower = strtolower($link);
-                if (! str_starts_with($linkLower, 'http://') && ! str_starts_with($linkLower, 'https://')) {
+                $link = $this->organicRowHttpUrl(is_array($row) ? $row : null);
+                if ($link === null) {
                     continue;
                 }
                 $host = $this->normalizeHostForBenchmark($link);
@@ -244,6 +241,7 @@ class PageAuditService
                 'your_flesch' => $yourFlesch,
                 'competitors' => $competitors,
                 'skipped_reason' => $competitors === [] ? 'no_competitor_pages_fetched' : null,
+                'your_serp' => $yourSerp,
             ];
         } catch (\Throwable $e) {
             Log::warning("PageAuditService: Serper benchmark failed for {$pageUrl}: {$e->getMessage()}");
@@ -256,6 +254,87 @@ class PageAuditService
                 'skipped_reason' => 'benchmark_error',
             ];
         }
+    }
+
+    /**
+     * @return array{found: bool, position: int|null, on_first_page: bool|null, organic_sample_size: int}
+     */
+    private function emptyYourSerpSnapshot(): array
+    {
+        return [
+            'found' => false,
+            'position' => null,
+            'on_first_page' => null,
+            'organic_sample_size' => 0,
+        ];
+    }
+
+    /**
+     * Match audited URL against Serper organic rows (host + path; ignores query string differences).
+     *
+     * @param  list<array<string, mixed>>  $organic
+     * @return array{found: bool, position: int|null, on_first_page: bool|null, organic_sample_size: int}
+     */
+    private function resolveYourSerpPosition(string $pageUrl, array $organic): array
+    {
+        $auditedCanon = $this->canonicalUrlForBenchmark($pageUrl);
+        $totalValid = 0;
+        foreach ($organic as $row) {
+            if ($this->organicRowHttpUrl($row) !== null) {
+                $totalValid++;
+            }
+        }
+
+        $ordinal = 0;
+        foreach ($organic as $row) {
+            $link = $this->organicRowHttpUrl($row);
+            if ($link === null) {
+                continue;
+            }
+            $ordinal++;
+            $rowCanon = $this->canonicalUrlForBenchmark($link);
+            $matches = $auditedCanon !== null && $rowCanon !== null && $auditedCanon === $rowCanon;
+            if (! $matches && $auditedCanon === null) {
+                $matches = strtolower(rtrim($link, '/')) === strtolower(rtrim($pageUrl, '/'));
+            }
+            if ($matches && is_array($row)) {
+                $pos = is_numeric($row['position'] ?? null) ? (int) $row['position'] : $ordinal;
+
+                return [
+                    'found' => true,
+                    'position' => $pos,
+                    'on_first_page' => $pos <= 10,
+                    'organic_sample_size' => $totalValid,
+                ];
+            }
+        }
+
+        return [
+            'found' => false,
+            'position' => null,
+            'on_first_page' => null,
+            'organic_sample_size' => $totalValid,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $row
+     */
+    private function organicRowHttpUrl(?array $row): ?string
+    {
+        if (! is_array($row)) {
+            return null;
+        }
+        $link = $row['link'] ?? '';
+        if (! is_string($link) || $link === '') {
+            return null;
+        }
+        $linkLower = strtolower($link);
+        if (! str_starts_with($linkLower, 'http://') && ! str_starts_with($linkLower, 'https://')) {
+            return null;
+        }
+
+        return $link;
     }
 
     private function normalizeHostForBenchmark(string $url): ?string

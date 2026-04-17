@@ -372,6 +372,29 @@
                 @if (! empty($benchmark['keyword']))
                     <p><strong>Primary query:</strong> <span style="font-family: ui-monospace, monospace;">{{ $benchmark['keyword'] }}</span></p>
                 @endif
+                @if (! empty($benchmark['your_serp']) && is_array($benchmark['your_serp']))
+                    @php
+                        $ys = $benchmark['your_serp'];
+                        $ysFound = ! empty($ys['found']);
+                        $ysPos = $ys['position'] ?? null;
+                        $ysFirst = $ys['on_first_page'] ?? null;
+                        $ysN = (int) ($ys['organic_sample_size'] ?? 0);
+                    @endphp
+                    <div style="margin-top: 10px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px;">
+                        <p style="margin: 0 0 6px; font-weight: 700;">Your page in this SERP sample</p>
+                        @if ($ysFound && is_numeric($ysPos))
+                            @if ($ysFirst === true)
+                                <p style="margin: 0;">This URL appears in the <strong>top 10</strong> organic results at <strong>position {{ $ysPos }}</strong> for the query above (Serper snapshot).</p>
+                            @else
+                                <p style="margin: 0;">This URL appears at <strong>position {{ $ysPos }}</strong> in the sample — <strong>outside the first page</strong> (positions 1–10) in this snapshot.</p>
+                            @endif
+                        @elseif ($ysN === 0)
+                            <p style="margin: 0;">Your rank in this sample could not be checked (no organic links in the response).</p>
+                        @else
+                            <p style="margin: 0;">This URL was <strong>not found</strong> among the {{ $ysN }} organic links in this snapshot. Check Search Console for your real average position.</p>
+                        @endif
+                    </div>
+                @endif
                 @if (! empty($benchmark['skipped_reason']) && empty($benchmark['competitors']))
                     <p class="warn"><strong>Benchmark skipped:</strong> {{ str_replace('_', ' ', $benchmark['skipped_reason']) }}</p>
                 @endif

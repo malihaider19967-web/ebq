@@ -403,6 +403,29 @@
                         @if (! empty($benchmark['keyword']))
                             <p class="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">Primary query: <span class="font-mono text-slate-900 dark:text-slate-100">{{ $benchmark['keyword'] }}</span></p>
                         @endif
+                        @if (! empty($benchmark['your_serp']) && is_array($benchmark['your_serp']))
+                            @php
+                                $ys = $benchmark['your_serp'];
+                                $ysFound = ! empty($ys['found']);
+                                $ysPos = $ys['position'] ?? null;
+                                $ysFirst = $ys['on_first_page'] ?? null;
+                                $ysN = (int) ($ys['organic_sample_size'] ?? 0);
+                            @endphp
+                            <div class="mb-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-xs leading-relaxed text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
+                                <p class="font-semibold text-slate-900 dark:text-slate-100">Your page in this SERP sample</p>
+                                @if ($ysFound && is_numeric($ysPos))
+                                    @if ($ysFirst === true)
+                                        <p class="mt-1">This URL appears in the <strong>top 10</strong> organic results at <strong class="tabular-nums">position {{ $ysPos }}</strong> for the query above (Serper snapshot; not identical to live Google).</p>
+                                    @else
+                                        <p class="mt-1">This URL appears in the sampled results at <strong class="tabular-nums">position {{ $ysPos }}</strong> — <strong>outside the first page</strong> (positions 1–10) in this snapshot.</p>
+                                    @endif
+                                @elseif ($ysN === 0)
+                                    <p class="mt-1">Your rank in this sample could not be checked (no organic links were available in the response).</p>
+                                @else
+                                    <p class="mt-1">This URL was <strong>not found</strong> among the {{ $ysN }} organic links returned in this snapshot. That does not prove you are not ranking; try Search Console or a live SERP check.</p>
+                                @endif
+                            </div>
+                        @endif
                         @if (! empty($benchmark['skipped_reason']) && empty($benchmark['competitors']))
                             <div class="rounded-lg border border-dashed border-amber-200 bg-amber-50/50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-500/5 dark:text-amber-200">
                                 Benchmark skipped: {{ str_replace('_', ' ', $benchmark['skipped_reason']) }}

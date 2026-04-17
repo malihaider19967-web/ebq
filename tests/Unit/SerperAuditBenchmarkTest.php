@@ -77,6 +77,77 @@ class SerperAuditBenchmarkTest extends TestCase
         }
         $this->assertArrayHasKey('skipped_reason', $bench);
         $this->assertNull($bench['skipped_reason']);
+        $this->assertArrayHasKey('your_serp', $bench);
+        $this->assertFalse($bench['your_serp']['found']);
+        $this->assertSame(3, $bench['your_serp']['organic_sample_size']);
+    }
+
+    public function test_your_serp_detected_when_audited_url_appears_in_organic(): void
+    {
+        Config::set('services.serper.key', 'test-serper-key');
+        Config::set('services.serper.search_url', 'https://google.serper.dev/search');
+
+        $html = '<!DOCTYPE html><html><head><title>T</title></head><body><p>'
+            .str_repeat('Word. ', 200)
+            .'</p></body></html>';
+
+        Http::fake(function (Request $request) use ($html) {
+            $url = $request->url();
+            if (str_contains($url, 'serper.dev/search')) {
+                return Http::response([
+                    'organic' => [
+                        ['link' => 'https://alpha-comp.test/p1', 'title' => 'A', 'position' => 1],
+                        ['link' => 'https://audited-site.test/article', 'title' => 'You', 'position' => 2],
+                        ['link' => 'https://beta-comp.test/p2', 'title' => 'B', 'position' => 3],
+                        ['link' => 'https://gamma-comp.test/p3', 'title' => 'G', 'position' => 4],
+                    ],
+                ], 200);
+            }
+            if (in_array($url, [
+                'https://alpha-comp.test/p1',
+                'https://beta-comp.test/p2',
+                'https://gamma-comp.test/p3',
+            ], true)) {
+                return Http::response($html, 200, ['Content-Type' => 'text/html']);
+            }
+
+            return Http::response('unexpected URL: '.$url, 500);
+        });
+
+        $svc = new PageAuditService;
+        $method = new ReflectionMethod(PageAuditService::class, 'buildSerperReadabilityBenchmark');
+        $method->setAccessible(true);
+
+        $bench = $method->invoke($svc, 'https://www.audited-site.test/article/', [
+            'available' => true,
+            'primary' => ['query' => 'my keyword'],
+        ], 60.0);
+
+        $this->assertTrue($bench['your_serp']['found']);
+        $this->assertSame(2, $bench['your_serp']['position']);
+        $this->assertTrue($bench['your_serp']['on_first_page']);
+        $this->assertSame(4, $bench['your_serp']['organic_sample_size']);
+    }
+
+    public function test_resolve_your_serp_position_outside_first_page(): void
+    {
+        $svc = new PageAuditService;
+        $method = new ReflectionMethod(PageAuditService::class, 'resolveYourSerpPosition');
+        $method->setAccessible(true);
+
+        $organic = [];
+        for ($i = 1; $i <= 10; $i++) {
+            $organic[] = ['link' => "https://other.test/u{$i}", 'position' => $i];
+        }
+        $organic[] = ['link' => 'https://audited.test/page', 'position' => 11];
+        $organic[] = ['link' => 'https://other.test/u12', 'position' => 12];
+
+        $out = $method->invoke($svc, 'https://audited.test/page', $organic);
+
+        $this->assertTrue($out['found']);
+        $this->assertSame(11, $out['position']);
+        $this->assertFalse($out['on_first_page']);
+        $this->assertSame(12, $out['organic_sample_size']);
     }
 
     public function test_readability_benchmark_recommendation_when_flesch_lags_median(): void
