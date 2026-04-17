@@ -216,6 +216,11 @@
                             <span class="ml-auto text-[11px] text-slate-500 dark:text-slate-400">{{ $keywordData['coverage']['total'] ?? 0 }} target keyword{{ ($keywordData['coverage']['total'] ?? 0) === 1 ? '' : 's' }}</span>
                         @endif
                     </div>
+                    @if (isset($keywordData['gsc_lookback_days']) && is_numeric($keywordData['gsc_lookback_days']))
+                        <p class="mb-3 text-[11px] text-slate-500 dark:text-slate-400">
+                            Based on Search Console for the last <span class="font-semibold text-slate-700 dark:text-slate-300">{{ (int) $keywordData['gsc_lookback_days'] }}</span> days (saved with this audit).
+                        </p>
+                    @endif
 
                     @if (! $kwAvailable)
                         <div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">

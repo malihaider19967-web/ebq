@@ -292,9 +292,17 @@ class PageDetail extends Component
         $allowed = ['query', 'total_clicks', 'total_impressions', 'avg_ctr', 'avg_position'];
         $sortBy = in_array($this->sortBy, $allowed) ? $this->sortBy : 'total_clicks';
 
+        $gscKeywordLookbackDays = null;
+        $gscKeywordWindowFrom = null;
+
         if ($this->websiteId && $this->pageUrl && Auth::user()?->canViewWebsiteId($this->websiteId)) {
             $pageUrl = $this->pageUrl;
             $pageHash = hash('sha256', $pageUrl);
+            $websiteRow = Website::query()->find($this->websiteId);
+            if ($websiteRow) {
+                $gscKeywordLookbackDays = $websiteRow->effectiveGscKeywordLookbackDays();
+                $gscKeywordWindowFrom = $websiteRow->gscKeywordWindowStartDate();
+            }
             $pageAuditRuns = CustomPageAudit::query()
                 ->where('website_id', $this->websiteId)
                 ->where(function ($q) use ($pageHash, $pageUrl): void {
@@ -316,6 +324,7 @@ class PageDetail extends Component
                 )
                 ->where('website_id', $this->websiteId)
                 ->where('page', $this->pageUrl)
+                ->when($gscKeywordWindowFrom, fn ($q) => $q->whereDate('date', '>=', $gscKeywordWindowFrom))
                 ->first();
 
             $keywords = SearchConsoleData::query()
@@ -328,6 +337,7 @@ class PageDetail extends Component
                 )
                 ->where('website_id', $this->websiteId)
                 ->where('page', $this->pageUrl)
+                ->when($gscKeywordWindowFrom, fn ($q) => $q->whereDate('date', '>=', $gscKeywordWindowFrom))
                 ->groupBy('query')
                 ->orderBy($sortBy, $this->sortDir)
                 ->paginate(20);
@@ -343,7 +353,14 @@ class PageDetail extends Component
                 ->first();
         }
 
-        return view('livewire.pages.page-detail', compact('summary', 'keywords', 'indexingStatus', 'auditReport', 'pageAuditRuns'));
+        return view('livewire.pages.page-detail', compact(
+            'summary',
+            'keywords',
+            'indexingStatus',
+            'auditReport',
+            'pageAuditRuns',
+            'gscKeywordLookbackDays',
+        ));
     }
 
     private function setReindexMessage(string $message, string $kind = 'info'): void

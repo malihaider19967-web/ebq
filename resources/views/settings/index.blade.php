@@ -43,8 +43,9 @@
                 <livewire:settings.integrations-panel />
             </div>
 
-            <div x-show="tab === 'reports'" x-cloak>
+            <div x-show="tab === 'reports'" x-cloak class="space-y-6">
                 <livewire:settings.report-recipients />
+                <livewire:settings.gsc-keyword-window />
             </div>
         </div>
     </div>

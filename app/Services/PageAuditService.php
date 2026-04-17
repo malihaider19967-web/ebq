@@ -52,11 +52,11 @@ class PageAuditService
         }
 
         if ($enforceUrlBelongsToWebsite) {
-            $website = Website::query()->find($websiteId);
-            if (! $website instanceof Website) {
+            $websiteForDomain = Website::query()->find($websiteId);
+            if (! $websiteForDomain instanceof Website) {
                 return $this->persistFailure($websiteId, $pageUrl, 'Website not found.', null, null, $failurePrimaryKeyword, $failurePrimarySource);
             }
-            if (! $website->isAuditUrlForThisSite($pageUrl)) {
+            if (! $websiteForDomain->isAuditUrlForThisSite($pageUrl)) {
                 return $this->persistFailure(
                     $websiteId,
                     $pageUrl,
@@ -70,6 +70,19 @@ class PageAuditService
         }
 
         try {
+            $website = Website::query()->find($websiteId);
+            if (! $website instanceof Website) {
+                return $this->persistFailure(
+                    $websiteId,
+                    $pageUrl,
+                    'Website not found.',
+                    null,
+                    null,
+                    $failurePrimaryKeyword,
+                    $failurePrimarySource,
+                );
+            }
+
             $fetch = $this->fetch($pageUrl);
 
             if (! isset($fetch['body'])) {
@@ -138,7 +151,7 @@ class PageAuditService
                 ],
             ];
 
-            $targetKeywords = $this->fetchTargetKeywords($websiteId, $pageUrl);
+            $targetKeywords = $this->fetchTargetKeywords($website, $pageUrl);
             $h1Texts = array_values(array_filter(array_map(
                 fn ($h) => $h['level'] === 1 ? ($h['text'] ?? '') : null,
                 $headings['headings'] ?? []
@@ -153,6 +166,10 @@ class PageAuditService
                 'body_text' => $bodyText,
                 'keyword_density' => $content['keyword_density'] ?? [],
             ], $serpKeywordArg);
+
+            if (is_array($result['keywords'])) {
+                $result['keywords']['gsc_lookback_days'] = $website->effectiveGscKeywordLookbackDays();
+            }
 
             $benchmark = $this->buildSerperReadabilityBenchmark(
                 $pageUrl,
@@ -720,12 +737,15 @@ class PageAuditService
         return preg_replace('/^www\./', '', $host) ?: null;
     }
 
-    private function fetchTargetKeywords(int $websiteId, string $pageUrl): array
+    private function fetchTargetKeywords(Website $website, string $pageUrl): array
     {
+        $from = $website->gscKeywordWindowStartDate();
+
         return SearchConsoleData::query()
             ->select('query', DB::raw('SUM(clicks) as clicks'), DB::raw('SUM(impressions) as impressions'), DB::raw('AVG(position) as position'))
-            ->where('website_id', $websiteId)
+            ->where('website_id', $website->id)
             ->where('page', $pageUrl)
+            ->whereDate('date', '>=', $from)
             ->where('query', '!=', '')
             ->groupBy('query')
             ->orderByDesc('impressions')

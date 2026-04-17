@@ -110,6 +110,9 @@
                 </div>
             @endforeach
         </div>
+        @if (! empty($gscKeywordLookbackDays))
+            <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Figures above use Search Console data from the last {{ (int) $gscKeywordLookbackDays }} days.</p>
+        @endif
     @endif
 
     {{-- ═══ Indexing + Snippet ═══ --}}
@@ -256,12 +259,17 @@
 
     {{-- ═══ Keywords ═══ --}}
     <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3 dark:border-slate-800">
+        <div class="flex flex-col gap-1 border-b border-slate-200 px-5 py-3 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
             <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Keywords ranking for this page</h3>
             @if ($keywords instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $keywords->total() > 0)
                 <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ number_format($keywords->total()) }} total</span>
             @endif
         </div>
+        @if (! empty($gscKeywordLookbackDays))
+            <p class="border-b border-slate-200 px-5 py-2 text-[11px] text-slate-500 dark:border-slate-800 dark:text-slate-400">
+                Search Console queries aggregated for the last <span class="font-semibold text-slate-700 dark:text-slate-300">{{ (int) $gscKeywordLookbackDays }}</span> days (same window as page audits).
+            </p>
+        @endif
 
         @if ($keywords instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $keywords->isNotEmpty())
             <div class="overflow-x-auto">

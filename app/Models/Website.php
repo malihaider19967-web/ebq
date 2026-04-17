@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 
 class Website extends Model
 {
@@ -18,6 +19,7 @@ class Website extends Model
         'domain',
         'ga_property_id',
         'gsc_site_url',
+        'gsc_keyword_lookback_days',
         'report_recipients',
         'last_analytics_sync_at',
         'last_search_console_sync_at',
@@ -27,6 +29,7 @@ class Website extends Model
     {
         return [
             'report_recipients' => 'array',
+            'gsc_keyword_lookback_days' => 'integer',
             'last_analytics_sync_at' => 'datetime',
             'last_search_console_sync_at' => 'datetime',
         ];
@@ -46,6 +49,33 @@ class Website extends Model
         }
 
         return User::whereIn('id', $ids)->get();
+    }
+
+    /**
+     * Rolling window (days) for Search Console rows used in page audits and page-level GSC UI.
+     */
+    public function effectiveGscKeywordLookbackDays(): int
+    {
+        $default = (int) config('audit.gsc_keyword_lookback_days_default', 28);
+        $min = (int) config('audit.gsc_keyword_lookback_days_min', 7);
+        $max = (int) config('audit.gsc_keyword_lookback_days_max', 480);
+        $raw = $this->gsc_keyword_lookback_days;
+
+        if ($raw === null) {
+            return max($min, min($max, $default));
+        }
+
+        return max($min, min($max, (int) $raw));
+    }
+
+    /**
+     * Inclusive lower bound date (Y-m-d) for GSC keyword aggregates: date >= today - N days.
+     */
+    public function gscKeywordWindowStartDate(?Carbon $today = null): string
+    {
+        $today ??= Carbon::today();
+
+        return $today->copy()->subDays($this->effectiveGscKeywordLookbackDays())->toDateString();
     }
 
     public function user(): BelongsTo
