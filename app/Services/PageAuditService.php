@@ -3,9 +3,12 @@
 namespace App\Services;
 
 use App\Models\PageAuditReport;
+use App\Models\SearchConsoleData;
 use App\Support\Audit\HtmlAuditor;
+use App\Support\Audit\KeywordStrategyAnalyzer;
 use App\Support\Audit\RecommendationEngine;
 use Illuminate\Http\Client\Pool;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -69,6 +72,22 @@ class PageAuditService
                 ],
             ];
 
+            $targetKeywords = $this->fetchTargetKeywords($websiteId, $pageUrl);
+            $h1Texts = array_values(array_filter(array_map(
+                fn ($h) => $h['level'] === 1 ? ($h['text'] ?? '') : null,
+                $headings['headings'] ?? []
+            )));
+            $allHeadingsText = implode(' ', array_map(fn ($h) => $h['text'] ?? '', $headings['headings'] ?? []));
+
+            $result['keywords'] = app(KeywordStrategyAnalyzer::class)->analyze($targetKeywords, [
+                'title' => $metadata['title'] ?? '',
+                'meta_description' => $metadata['meta_description'] ?? '',
+                'h1_text' => implode(' ', $h1Texts),
+                'all_headings_text' => $allHeadingsText,
+                'body_text' => $bodyText,
+                'keyword_density' => $content['keyword_density'] ?? [],
+            ]);
+
             $result['recommendations'] = app(RecommendationEngine::class)->analyze($result);
 
             return PageAuditReport::updateOrCreate(
@@ -88,6 +107,26 @@ class PageAuditService
 
             return $this->persistFailure($websiteId, $pageUrl, $e->getMessage(), null, (int) round((microtime(true) - $startedAt) * 1000));
         }
+    }
+
+    private function fetchTargetKeywords(int $websiteId, string $pageUrl): array
+    {
+        return SearchConsoleData::query()
+            ->select('query', DB::raw('SUM(clicks) as clicks'), DB::raw('SUM(impressions) as impressions'), DB::raw('AVG(position) as position'))
+            ->where('website_id', $websiteId)
+            ->where('page', $pageUrl)
+            ->where('query', '!=', '')
+            ->groupBy('query')
+            ->orderByDesc('impressions')
+            ->limit(50)
+            ->get()
+            ->map(fn ($row) => [
+                'query' => (string) $row->query,
+                'clicks' => (int) $row->clicks,
+                'impressions' => (int) $row->impressions,
+                'position' => round((float) $row->position, 1),
+            ])
+            ->all();
     }
 
     private function fetch(string $url): array

@@ -24,6 +24,7 @@ class RecommendationEngine
         $recs = array_merge($recs, $this->technical($result['technical'] ?? []));
         $recs = array_merge($recs, $this->advanced($result['advanced'] ?? []));
         $recs = array_merge($recs, $this->links($result['links'] ?? []));
+        $recs = array_merge($recs, $this->keywords($result['keywords'] ?? []));
 
         $order = [self::SEV_CRITICAL => 0, self::SEV_WARNING => 1, self::SEV_INFO => 2, self::SEV_GOOD => 3];
         usort($recs, fn ($a, $b) => ($order[$a['severity']] ?? 9) <=> ($order[$b['severity']] ?? 9));
@@ -310,6 +311,85 @@ class RecommendationEngine
                 count($broken) . ' broken outbound link(s)',
                 'Broken links leak link equity, damage user trust, and are a known low-quality signal to Google.',
                 'Either update each broken URL to a working equivalent or remove the link. Re-audit after changes to confirm.');
+        }
+
+        return $out;
+    }
+
+    private function keywords(array $kw): array
+    {
+        $out = [];
+        if (empty($kw) || ! ($kw['available'] ?? false)) {
+            return $out;
+        }
+
+        // 1. Power Placement
+        $pp = $kw['power_placement'] ?? [];
+        $primary = $pp['keyword'] ?? '';
+        if ($primary !== '') {
+            if (! ($pp['in_title'] ?? false)) {
+                $out[] = $this->rec('kw.placement.title', 'Keywords', self::SEV_CRITICAL,
+                    "Primary keyword missing from <title>: \"{$primary}\"",
+                    'The title tag is the single strongest on-page ranking signal. A primary keyword that Google is already sending you impressions for, but which is absent from the title, is leaving ranking power on the table.',
+                    "Rewrite the <title> to include \"{$primary}\" near the front, ideally in the first 50 characters.");
+            }
+            if (! ($pp['in_h1'] ?? false)) {
+                $out[] = $this->rec('kw.placement.h1', 'Keywords', self::SEV_WARNING,
+                    "Primary keyword missing from <h1>: \"{$primary}\"",
+                    'The H1 tells Google (and readers) the page topic. Missing the query you rank for weakens topical relevance and makes CTR from SERPs harder to lift.',
+                    "Use \"{$primary}\" (or a natural variant) in the page's H1 — this is a high-priority relevance signal.");
+            }
+            if (! ($pp['in_meta_description'] ?? false)) {
+                $out[] = $this->rec('kw.placement.desc', 'Keywords', self::SEV_WARNING,
+                    "Primary keyword missing from meta description: \"{$primary}\"",
+                    "While not a direct ranking factor, Google bolds matched query terms in the SERP snippet. Missing the keyword means your result looks less relevant next to competitors'.",
+                    "Include \"{$primary}\" naturally in the meta description, ideally in the first 120 characters.");
+            }
+        }
+
+        // 2. Coverage
+        $cov = $kw['coverage'] ?? [];
+        $score = (float) ($cov['score'] ?? 0);
+        $verdict = $cov['verdict'] ?? null;
+        if ($verdict === 'expansion_needed') {
+            $missingTerms = array_slice(array_map(fn ($m) => $m['query'], $cov['missing'] ?? []), 0, 6);
+            $list = $missingTerms ? ' (e.g. ' . implode(', ', array_map(fn ($t) => '"' . $t . '"', $missingTerms)) . ')' : '';
+            $out[] = $this->rec('kw.coverage.low', 'Keywords', self::SEV_WARNING,
+                "Topical coverage is low ({$score}%)",
+                "Your page ranks for " . ($cov['total'] ?? 0) . " queries in Search Console, but only " . ($cov['found_count'] ?? 0) . " of those phrases actually appear in the body. Google infers topical depth from lexical breadth — a thin overlap caps your ranking ceiling.",
+                "Expand the article to cover the missing queries{$list}. Weave each in naturally once or twice; don't force exact matches.");
+        } elseif ($verdict === 'high_authority') {
+            $out[] = $this->rec('kw.coverage.high', 'Keywords', self::SEV_GOOD,
+                "Strong topical coverage ({$score}%)",
+                'Your body text references most of the queries Google already sends you. This is a strong topical-authority signal.',
+                'Maintain this breadth when editing. Audit again after substantial content changes.');
+        }
+
+        // 3. Intent alignment
+        $intent = $kw['intent'] ?? [];
+        if (($intent['dominant'] ?? null) === 'informational' && ($intent['informational_count'] ?? 0) >= 3) {
+            $out[] = $this->rec('kw.intent.informational', 'Keywords', self::SEV_INFO,
+                'Informational search intent detected',
+                'Several of your ranking queries use how-to / guide / tutorial phrasing. Pages serving informational intent win more rich-result real estate when structured for it.',
+                'Add FAQ schema (JSON-LD FAQPage) for answered questions, and a Table of Contents anchor list near the top — both dramatically increase SERP footprint and dwell time.');
+        } elseif (($intent['dominant'] ?? null) === 'utility' && ($intent['utility_count'] ?? 0) >= 3) {
+            $out[] = $this->rec('kw.intent.utility', 'Keywords', self::SEV_INFO,
+                'Utility / transactional search intent detected',
+                'Queries like "generator", "tool", "maker", "online" indicate users want to *do* something, not just read. Pages that bury the tool under intro copy have far lower conversion.',
+                'Move the interactive tool above-the-fold. Keep descriptive copy below. Add clear step-by-step usage instructions for SERP feature eligibility.');
+        }
+
+        // 4. Accidental authority
+        foreach ($kw['accidental'] ?? [] as $entry) {
+            $term = $entry['term'] ?? '';
+            $density = $entry['density'] ?? 0;
+            if ($term === '') {
+                continue;
+            }
+            $out[] = $this->rec('kw.accidental.' . md5($term), 'Keywords', self::SEV_INFO,
+                "Accidental authority: \"{$term}\" ({$density}% density)",
+                "You use \"{$term}\" frequently in the body, but it is not among your tracked target keywords and does not appear in the title or H1. You may be ranking for it without intent — and missing the chance to rank higher.",
+                "If \"{$term}\" is relevant to this page, add it to the title or H1 to capture the unexpected search traffic.");
         }
 
         return $out;

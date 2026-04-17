@@ -34,8 +34,12 @@
         'good'     => ['label' => 'Good',     'badge' => 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-900/40', 'bar' => 'border-l-emerald-500 bg-emerald-50/40 dark:bg-emerald-500/5', 'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
     ];
 
+    $keywordData = $result['keywords'] ?? [];
+    $kwAvailable = (bool) ($keywordData['available'] ?? false);
+
     $sections = [
         ['key' => 'recommendations', 'label' => 'Recommendations', 'count' => count($recs), 'show' => ! empty($recs)],
+        ['key' => 'keywords',        'label' => 'Keywords',        'count' => $kwAvailable ? (int) ($keywordData['coverage']['total'] ?? 0) : null, 'show' => true],
         ['key' => 'metadata',        'label' => 'Metadata',        'count' => null,         'show' => true],
         ['key' => 'content',         'label' => 'Content',         'count' => null,         'show' => true],
         ['key' => 'links',           'label' => 'Images & Links',  'count' => null,         'show' => true],
@@ -157,6 +161,186 @@
                         </div>
                     </section>
                 @endif
+
+                {{-- ══════ Keywords ══════ --}}
+                <section id="audit-keywords" class="scroll-mt-16">
+                    <div class="mb-3 flex items-center gap-2">
+                        <div class="flex h-7 w-7 items-center justify-center rounded-md bg-teal-100 text-teal-600 dark:bg-teal-500/10 dark:text-teal-400">
+                            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z M6 6h.008v.008H6V6z" /></svg>
+                        </div>
+                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Keyword Strategy</h3>
+                        @if ($kwAvailable)
+                            <span class="ml-auto text-[11px] text-slate-500 dark:text-slate-400">{{ $keywordData['coverage']['total'] ?? 0 }} target keyword{{ ($keywordData['coverage']['total'] ?? 0) === 1 ? '' : 's' }}</span>
+                        @endif
+                    </div>
+
+                    @if (! $kwAvailable)
+                        <div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
+                            {{ $keywordData['reason'] ?? 'No Search Console data for this page yet.' }}
+                        </div>
+                    @else
+                        @php
+                            $pp = $keywordData['power_placement'] ?? [];
+                            $cov = $keywordData['coverage'] ?? [];
+                            $intent = $keywordData['intent'] ?? [];
+                            $accidental = $keywordData['accidental'] ?? [];
+                            $primary = $keywordData['primary'] ?? null;
+                            $covScore = (float) ($cov['score'] ?? 0);
+                            $covTone = $covScore >= 80 ? 'good' : ($covScore >= 50 ? 'warn' : 'bad');
+                            $covClass = $covTone === 'good' ? 'text-emerald-600' : ($covTone === 'warn' ? 'text-amber-600' : 'text-rose-600');
+                            $covBar = $covTone === 'good' ? 'bg-emerald-500' : ($covTone === 'warn' ? 'bg-amber-500' : 'bg-rose-500');
+                        @endphp
+
+                        {{-- Primary keyword + Power Placement --}}
+                        @if ($primary)
+                            <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                                <div class="flex flex-wrap items-center justify-between gap-2">
+                                    <div class="min-w-0">
+                                        <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Primary keyword</p>
+                                        <p class="mt-0.5 truncate text-sm font-bold text-slate-900 dark:text-slate-100">{{ $primary['query'] }}</p>
+                                    </div>
+                                    <div class="flex items-center gap-3 text-[11px] text-slate-500">
+                                        <span><span class="font-semibold text-slate-700 dark:text-slate-200">{{ number_format($primary['clicks'] ?? 0) }}</span> clicks</span>
+                                        <span><span class="font-semibold text-slate-700 dark:text-slate-200">{{ number_format($primary['impressions'] ?? 0) }}</span> impressions</span>
+                                        <span>Pos <span class="font-semibold text-slate-700 dark:text-slate-200">{{ number_format($primary['position'] ?? 0, 1) }}</span></span>
+                                    </div>
+                                </div>
+                                <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
+                                    @foreach ([['in_title', 'Title'], ['in_h1', 'H1'], ['in_meta_description', 'Meta description']] as [$key, $label])
+                                        @php $present = (bool) ($pp[$key] ?? false); @endphp
+                                        <div class="rounded-md border {{ $present ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/40 dark:bg-emerald-500/5' : 'border-rose-200 bg-rose-50/50 dark:border-rose-900/40 dark:bg-rose-500/5' }} px-2.5 py-2">
+                                            <div class="flex items-center justify-between">
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider {{ $present ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-700 dark:text-rose-400' }}">{{ $label }}</p>
+                                                @if ($present)
+                                                    <svg class="h-3.5 w-3.5 text-emerald-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                                @else
+                                                    <svg class="h-3.5 w-3.5 text-rose-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                                                @endif
+                                            </div>
+                                            <p class="mt-1 text-[11px] font-semibold {{ $present ? 'text-emerald-800 dark:text-emerald-300' : 'text-rose-800 dark:text-rose-300' }}">
+                                                {{ $present ? 'Present' : 'Missing' }}
+                                            </p>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        {{-- Coverage --}}
+                        <div class="mt-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                            <div class="flex items-center justify-between">
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Topical coverage</p>
+                                <span class="text-xs font-bold tabular-nums {{ $covClass }}">{{ $cov['found_count'] ?? 0 }}/{{ $cov['total'] ?? 0 }} · {{ $covScore }}%</span>
+                            </div>
+                            <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800">
+                                <div class="h-full rounded-full transition-all {{ $covBar }}" style="width: {{ min(100, $covScore) }}%"></div>
+                            </div>
+                            <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+                                @if ($covScore >= 80)
+                                    High topical authority — most ranking queries appear in the body.
+                                @elseif ($covScore < 50)
+                                    Low coverage — many ranking queries aren't mentioned in the body.
+                                @else
+                                    Partial coverage — some ranking queries aren't mentioned.
+                                @endif
+                            </p>
+
+                            @if (! empty($cov['missing']))
+                                <details class="group/miss mt-2 rounded-md border border-slate-200 dark:border-slate-700">
+                                    <summary class="flex cursor-pointer list-none items-center justify-between px-2.5 py-1.5 text-[11px] font-semibold text-slate-600 dark:text-slate-300 [&::-webkit-details-marker]:hidden">
+                                        <span>Missing from body · {{ $cov['missing_count'] ?? count($cov['missing']) }}</span>
+                                        <svg class="h-3 w-3 transition-transform group-open/miss:rotate-180" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                                    </summary>
+                                    <ul class="max-h-48 space-y-0.5 overflow-auto border-t border-slate-200 px-2.5 py-1.5 text-xs dark:border-slate-700">
+                                        @foreach ($cov['missing'] as $m)
+                                            <li class="flex items-center justify-between gap-2">
+                                                <span class="truncate text-slate-700 dark:text-slate-200">{{ $m['query'] }}</span>
+                                                <span class="shrink-0 text-[10px] text-slate-500">{{ number_format($m['impressions'] ?? 0) }} impr</span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </details>
+                            @endif
+                        </div>
+
+                        {{-- Intent --}}
+                        <div class="mt-3 grid gap-2 sm:grid-cols-2">
+                            <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Search intent</p>
+                                @php $dom = $intent['dominant'] ?? 'unclear'; @endphp
+                                <p class="mt-1 text-sm font-bold text-slate-900 dark:text-slate-100">
+                                    @switch($dom)
+                                        @case('informational') Informational @break
+                                        @case('utility') Utility / Transactional @break
+                                        @case('mixed') Mixed (info + utility) @break
+                                        @default Unclear
+                                    @endswitch
+                                </p>
+                                <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                                    {{ $intent['informational_count'] ?? 0 }} informational · {{ $intent['utility_count'] ?? 0 }} utility triggers
+                                </p>
+                            </div>
+                            <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Accidental authority</p>
+                                @if (empty($accidental))
+                                    <p class="mt-1 text-sm font-semibold text-slate-700 dark:text-slate-200">None detected</p>
+                                    <p class="mt-0.5 text-[11px] text-slate-500">No high-density terms missing from title/H1.</p>
+                                @else
+                                    <p class="mt-1 text-sm font-bold text-amber-600">{{ count($accidental) }} candidate{{ count($accidental) === 1 ? '' : 's' }}</p>
+                                    <div class="mt-1 flex flex-wrap gap-1">
+                                        @foreach ($accidental as $a)
+                                            <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">
+                                                <strong>{{ $a['term'] }}</strong> <span class="opacity-70">{{ $a['density'] }}%</span>
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+
+                        {{-- Target keyword table --}}
+                        @if (! empty($keywordData['target_keywords']))
+                            <details class="group/kw mt-3 rounded-lg border border-slate-200 dark:border-slate-700">
+                                <summary class="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 [&::-webkit-details-marker]:hidden">
+                                    <span>Target keywords from Search Console · {{ count($keywordData['target_keywords']) }}</span>
+                                    <svg class="h-3 w-3 transition-transform group-open/kw:rotate-180" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                                </summary>
+                                <div class="max-h-72 overflow-auto border-t border-slate-200 dark:border-slate-700">
+                                    @php $foundSet = collect($cov['missing'] ?? [])->pluck('query')->map(fn ($q) => mb_strtolower($q))->flip(); @endphp
+                                    <table class="w-full text-xs">
+                                        <thead>
+                                            <tr class="sticky top-0 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/80 dark:text-slate-400">
+                                                <th class="px-3 py-1.5 text-left">Keyword</th>
+                                                <th class="px-3 py-1.5 text-right">Clicks</th>
+                                                <th class="px-3 py-1.5 text-right">Impr.</th>
+                                                <th class="px-3 py-1.5 text-right">Pos</th>
+                                                <th class="px-3 py-1.5 text-center">In body</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                            @foreach ($keywordData['target_keywords'] as $t)
+                                                @php $missing = isset($foundSet[mb_strtolower($t['query'])]); @endphp
+                                                <tr>
+                                                    <td class="px-3 py-1.5 text-slate-800 dark:text-slate-100">{{ $t['query'] }}</td>
+                                                    <td class="px-3 py-1.5 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ number_format($t['clicks']) }}</td>
+                                                    <td class="px-3 py-1.5 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ number_format($t['impressions']) }}</td>
+                                                    <td class="px-3 py-1.5 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ number_format($t['position'], 1) }}</td>
+                                                    <td class="px-3 py-1.5 text-center">
+                                                        @if ($missing)
+                                                            <span class="inline-flex rounded-full bg-rose-100 px-1.5 py-px text-[9px] font-bold text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">NO</span>
+                                                        @else
+                                                            <span class="inline-flex rounded-full bg-emerald-100 px-1.5 py-px text-[9px] font-bold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400">YES</span>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </details>
+                        @endif
+                    @endif
+                </section>
 
                 {{-- ══════ Metadata ══════ --}}
                 <section id="audit-metadata" class="scroll-mt-16">

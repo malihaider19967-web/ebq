@@ -6,6 +6,8 @@
     $links = $result['links'] ?? [];
     $technical = $result['technical'] ?? [];
     $advanced = $result['advanced'] ?? [];
+    $keywordData = $result['keywords'] ?? [];
+    $kwAvailable = (bool) ($keywordData['available'] ?? false);
     $failed = $auditReport->status === 'failed';
 @endphp
 <!doctype html>
@@ -104,6 +106,103 @@
                         <p><strong>Fix:</strong> {{ $r['fix'] }}</p>
                     </div>
                 @endforeach
+            </div>
+        @endif
+
+        {{-- Keyword Strategy --}}
+        @if ($kwAvailable)
+            @php
+                $pp = $keywordData['power_placement'] ?? [];
+                $cov = $keywordData['coverage'] ?? [];
+                $intent = $keywordData['intent'] ?? [];
+                $accidental = $keywordData['accidental'] ?? [];
+                $primary = $keywordData['primary'] ?? null;
+                $covScore = (float) ($cov['score'] ?? 0);
+                $covColor = $covScore >= 80 ? '#047857' : ($covScore >= 50 ? '#b45309' : '#b91c1c');
+                $covBg = $covScore >= 80 ? '#d1fae5' : ($covScore >= 50 ? '#fef3c7' : '#fee2e2');
+            @endphp
+            <div class="card">
+                <h2>Keyword Strategy</h2>
+
+                @if ($primary)
+                    <p><strong>Primary keyword:</strong> "{{ $primary['query'] }}" &nbsp;·&nbsp; {{ number_format($primary['clicks'] ?? 0) }} clicks · {{ number_format($primary['impressions'] ?? 0) }} impressions · position {{ number_format($primary['position'] ?? 0, 1) }}</p>
+                    <div class="row" style="margin-top: 8px;">
+                        @foreach ([['in_title', 'Title'], ['in_h1', 'H1'], ['in_meta_description', 'Meta description']] as [$key, $label])
+                            @php $present = (bool) ($pp[$key] ?? false); @endphp
+                            <div class="kpi" style="border-color: {{ $present ? '#a7f3d0' : '#fecaca' }}; background: {{ $present ? '#ecfdf5' : '#fef2f2' }};">
+                                <div class="label" style="color: {{ $present ? '#047857' : '#b91c1c' }};">{{ $label }}</div>
+                                <div class="value" style="color: {{ $present ? '#047857' : '#b91c1c' }}; font-size: 14px;">{{ $present ? 'Present' : 'Missing' }}</div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                <h3 style="margin-top: 14px;">Topical coverage</h3>
+                <p>
+                    <span style="display: inline-block; background: {{ $covBg }}; color: {{ $covColor }}; border-radius: 6px; padding: 4px 10px; font-weight: 700;">
+                        {{ $cov['found_count'] ?? 0 }} / {{ $cov['total'] ?? 0 }} · {{ $covScore }}%
+                    </span>
+                    <span class="muted" style="margin-left: 8px;">
+                        @if ($covScore >= 80) High topical authority
+                        @elseif ($covScore < 50) Expansion needed
+                        @else Partial coverage @endif
+                    </span>
+                </p>
+
+                @if (! empty($cov['missing']))
+                    <h3 style="margin-top: 12px;">Missing from body ({{ $cov['missing_count'] ?? count($cov['missing']) }})</h3>
+                    <ul class="list">
+                        @foreach (array_slice($cov['missing'], 0, 30) as $m)
+                            <li><strong>{{ $m['query'] }}</strong> <span class="muted">— {{ number_format($m['impressions'] ?? 0) }} impressions · position {{ number_format($m['position'] ?? 0, 1) }}</span></li>
+                        @endforeach
+                    </ul>
+                @endif
+
+                <h3 style="margin-top: 14px;">Search intent</h3>
+                <p>
+                    <strong>
+                        @switch($intent['dominant'] ?? 'unclear')
+                            @case('informational') Informational @break
+                            @case('utility') Utility / Transactional @break
+                            @case('mixed') Mixed @break
+                            @default Unclear
+                        @endswitch
+                    </strong>
+                    <span class="muted">({{ $intent['informational_count'] ?? 0 }} informational · {{ $intent['utility_count'] ?? 0 }} utility triggers)</span>
+                </p>
+
+                @if (! empty($accidental))
+                    <h3 style="margin-top: 14px;">Accidental authority candidates</h3>
+                    <div>
+                        @foreach ($accidental as $a)
+                            <span class="tag" style="background: #fef3c7; color: #b45309;"><strong>{{ $a['term'] }}</strong> — {{ $a['density'] }}%</span>
+                        @endforeach
+                    </div>
+                @endif
+
+                @if (! empty($keywordData['target_keywords']))
+                    <h3 style="margin-top: 14px;">Target keywords from Search Console ({{ count($keywordData['target_keywords']) }})</h3>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
+                        <thead>
+                            <tr style="background: #f1f5f9;">
+                                <th style="text-align: left; padding: 4px 6px;">Keyword</th>
+                                <th style="text-align: right; padding: 4px 6px;">Clicks</th>
+                                <th style="text-align: right; padding: 4px 6px;">Impr.</th>
+                                <th style="text-align: right; padding: 4px 6px;">Pos</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($keywordData['target_keywords'] as $t)
+                                <tr style="border-top: 1px solid #e2e8f0;">
+                                    <td style="padding: 4px 6px;">{{ $t['query'] }}</td>
+                                    <td style="padding: 4px 6px; text-align: right;">{{ number_format($t['clicks']) }}</td>
+                                    <td style="padding: 4px 6px; text-align: right;">{{ number_format($t['impressions']) }}</td>
+                                    <td style="padding: 4px 6px; text-align: right;">{{ number_format($t['position'], 1) }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
             </div>
         @endif
 

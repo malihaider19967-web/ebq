@@ -1,40 +1,63 @@
-Role: Expert SEO Strategist and System Architect.
+This prompt is designed for an AI agent to build a Keyword Intelligence & Content Strategy Layer into your system. Since you've already implemented the basic audit and the general recommendations, this focus is strictly on Keyword Coverage, Search Intent, and Competitive Gap Analysis.
 
-Objective: Extend current audit report Create a comprehensive "Recommendation Logic Engine" for a website auditing tool. I need a set of static, rule-based mappings that link specific audit data points to actionable advice for the customer.
+AI Agent Prompt: Keyword Strategy Logic Architect
+Role: Senior SEO Data Engineer and Content Strategist.
 
-Context: My system collects data on Metadata, Structure, Performance, and Technical SEO. I do not want to use AI to generate these insights on the fly. Instead, I need you to provide the "Extra Value" logic that I will hard-code into my reporting templates.
+Objective: Design a rule-based logic engine to analyze "Target Keywords" against "Crawled Page Data." This engine must produce actionable "Extra Value" recommendations for the user without requiring AI during the actual audit run.
 
-Task: For each of the following data points found in my audit reports, provide:
+Inputs Available in the System:
 
-Threshold/Condition: What specific value or "Warning" status should trigger a recommendation?
+Target Keyword List: A user-provided list of keywords they want to rank for.
 
-Highlight Text: A concise explanation of why this matters (the "Extra Value").
+Page Component Map: Extracted text from <title>, <meta-description>, <h1>, <h2>-<h6>, and the first 200 words of <body>.
 
-Actionable Recommendation: The specific step the user should take.
+Keyword Frequency: A count of how many times each Target Keyword appears in the full body text.
 
-Data Points to Map:
+Task: Create a technical specification (pseudo-code) and a dictionary of "Recommendation Strings" for the following four logic modules:
 
-Metadata: Title Tag length (under/over 60), Meta Description length (120-160 range), and OpenGraph/Twitter tag presence.
+1. The "Power Placement" Check (SEO Basics)
+Logic: For the Primary Keyword (the first one in the user's list), check presence in: Title, H1, and Meta Description.
 
-Structure: Heading Order (e.g., skipped levels), Word Count (high vs. low), and Keyword Density percentages.
+Trigger: If False for any location.
 
-Technical: Compression status (None vs. Gzip/Brotli), Response Time (TTFB) thresholds (e.g., >500ms), and HTTPS status.
+Recommendation String: Create specific alerts for each missing location (e.g., "Your primary keyword is missing from the H1, which is a high-priority signal for Google.")
 
-Engagement: Image count (specifically when word count is high but images are 0).
+2. Topical Coverage & Semantic Gap
+Logic: Compare the total list of Target Keywords against the words found on the page.
 
-Advanced: Schema (JSON-LD) presence and Flesch Readability scores.
+Calculation: Coverage Score = (Keywords Found / Total Target Keywords) * 100.
 
-Output Format: Provide the logic in a table or structured list that my developers can easily translate into if/else statements for our reporting engine.
+Recommendation Logic: * If score < 50%: Suggest "Topical Expansion" and list the specific keywords that are missing.
 
-Why this works for your system
-Consistency: Every customer who has "Skipped Heading Levels" will get the same high-quality explanation and fix.
+If score > 80%: Validate as "High Topical Authority."
 
-Speed: Since the logic is hard-coded (e.g., if (wordCount > 1000 && imageCount == 0)), the report remains instant and doesn't rely on expensive or slow AI API calls during the audit.
+3. Intent-Type Alignment
+Logic: Parse the Target Keywords for "Intent Triggers":
 
-Authority: It transforms a "Page Audit" into a "Consultancy Report" by explaining the why behind the numbers, like how a 7th-grade readability score is the "sweet spot" for gaming tools.
+Informational: "How to", "Why", "Guide", "Tips", "Tutorial".
 
-Quick Tip for your System:
-You can use the Keyword Density data to provide a "Diversity Alert". If one keyword is over 3%, have your system automatically suggest 3-4 synonyms (LSI keywords) to help the user avoid "Keyword Stuffing" penalties.
+Utility/Transactional: "Generator", "Tool", "Maker", "Online", "Download".
 
-Additional:
-Also update the report download and email
+Recommendation Logic: * If Informational triggers are found, recommend adding "FAQ Schema" or "Table of Contents."
+
+If Utility triggers are found, recommend "Above-the-fold" tool placement and "Step-by-Step" instructions.
+
+4. The "Accidental Authority" Detector
+Logic: Find any phrase in the body text that has high density (>2%) but is NOT in the user's Target Keyword list and NOT in the Title/H1.
+
+Recommendation String: "Observation: You are using the term '[Term]' frequently. If this is a relevant keyword, consider adding it to your Title or H1 to capture unexpected search traffic."
+
+Constraints for the Agent:
+
+Deliver the output as a JSON-like dictionary of Conditions and Response_Templates.
+
+The logic must be strictly computational (counting, string matching, or regex) so it can be hard-coded into a Laravel/PHP or Python backend.
+
+The tone of the recommendations should be professional, encouraging, and data-driven.
+
+How to use this with your current system:
+By adding this logic, your report for pubgnamegenerator.net would go from saying:
+
+"Word count is 1,580" To saying:
+
+"Word count is 1,580 (High). However, your target keyword 'PUBG font styles' only appears once. You have plenty of space to increase the coverage of this keyword to improve your ranking." This makes the report feel like a personalized manual written by a human expert.
