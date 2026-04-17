@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\PageAuditReport;
 use App\Models\SearchConsoleData;
+use App\Models\Website;
 use App\Support\Audit\HtmlAuditor;
 use App\Support\Audit\KeywordStrategyAnalyzer;
 use App\Support\Audit\RecommendationEngine;
@@ -27,7 +28,7 @@ class PageAuditService
 
     public function __construct(private readonly SafeHttpGuard $guard) {}
 
-    public function audit(int $websiteId, string $pageUrl): PageAuditReport
+    public function audit(int $websiteId, string $pageUrl, ?string $serpTargetKeyword = null, bool $enforceUrlBelongsToWebsite = false): PageAuditReport
     {
         $startedAt = microtime(true);
 
@@ -36,10 +37,26 @@ class PageAuditService
             return $this->persistFailure(
                 $websiteId,
                 $pageUrl,
-                'Audit target rejected: ' . ($guardCheck['reason'] ?? 'unsafe_url'),
+                'Audit target rejected: '.($guardCheck['reason'] ?? 'unsafe_url'),
                 null,
                 null
             );
+        }
+
+        if ($enforceUrlBelongsToWebsite) {
+            $website = Website::query()->find($websiteId);
+            if (! $website instanceof Website) {
+                return $this->persistFailure($websiteId, $pageUrl, 'Website not found.', null, null);
+            }
+            if (! $website->isAuditUrlForThisSite($pageUrl)) {
+                return $this->persistFailure(
+                    $websiteId,
+                    $pageUrl,
+                    'The URL must use your website domain (or a subdomain of it).',
+                    null,
+                    null
+                );
+            }
         }
 
         try {
@@ -109,6 +126,7 @@ class PageAuditService
                 'keyword_density' => $content['keyword_density'] ?? [],
             ]);
 
+            $serpKeyword = $serpTargetKeyword !== null ? trim($serpTargetKeyword) : '';
             $benchmark = $this->buildSerperReadabilityBenchmark(
                 $pageUrl,
                 $result['keywords'],
@@ -116,6 +134,7 @@ class PageAuditService
                 (int) ($content['word_count'] ?? 0),
                 (int) ($images['total'] ?? 0),
                 $technical['stack'] ?? null,
+                $serpKeyword !== '' ? $serpKeyword : null,
             );
             if ($benchmark !== null) {
                 $result['benchmark'] = $benchmark;
@@ -149,7 +168,7 @@ class PageAuditService
      * @param  array<string, mixed>  $keywordsPayload
      * @return array<string, mixed>|null null when Serper is not configured
      */
-    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch, int $yourWordCount, int $yourImageCount, ?array $yourStack = null): ?array
+    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch, int $yourWordCount, int $yourImageCount, ?array $yourStack = null, ?string $serpKeywordOverride = null): ?array
     {
         $apiKey = config('services.serper.key');
         if (! is_string($apiKey) || trim($apiKey) === '') {
@@ -159,21 +178,33 @@ class PageAuditService
         $keywordContext = null;
 
         try {
-            if (empty($keywordsPayload['available']) || empty($keywordsPayload['primary']['query'])) {
-                return [
-                    'keyword' => null,
-                    'source' => 'serper',
-                    'your_flesch' => $yourFlesch,
-                    'competitors' => [],
-                    'skipped_reason' => 'no_primary_keyword',
-                ];
+            $override = $serpKeywordOverride !== null ? trim($serpKeywordOverride) : '';
+            $useManualSerpKeyword = $override !== '';
+            $keywordSource = null;
+
+            if (! $useManualSerpKeyword) {
+                if (empty($keywordsPayload['available']) || empty($keywordsPayload['primary']['query'])) {
+                    return [
+                        'keyword' => null,
+                        'keyword_source' => null,
+                        'source' => 'serper',
+                        'your_flesch' => $yourFlesch,
+                        'competitors' => [],
+                        'skipped_reason' => 'no_primary_keyword',
+                    ];
+                }
+                $keyword = trim((string) $keywordsPayload['primary']['query']);
+                $keywordSource = 'gsc_primary';
+            } else {
+                $keyword = $override;
+                $keywordSource = 'manual';
             }
 
-            $keyword = trim((string) $keywordsPayload['primary']['query']);
             $keywordContext = $keyword !== '' ? $keyword : null;
             if ($keyword === '') {
                 return [
                     'keyword' => null,
+                    'keyword_source' => null,
                     'source' => 'serper',
                     'your_flesch' => $yourFlesch,
                     'competitors' => [],
@@ -185,6 +216,7 @@ class PageAuditService
             if ($payload === null) {
                 return [
                     'keyword' => $keyword,
+                    'keyword_source' => $keywordSource,
                     'source' => 'serper',
                     'your_flesch' => $yourFlesch,
                     'competitors' => [],
@@ -197,6 +229,7 @@ class PageAuditService
             if (! is_array($organic) || $organic === []) {
                 return [
                     'keyword' => $keyword,
+                    'keyword_source' => $keywordSource,
                     'source' => 'serper',
                     'your_flesch' => $yourFlesch,
                     'competitors' => [],
@@ -269,6 +302,7 @@ class PageAuditService
 
             return [
                 'keyword' => $keyword,
+                'keyword_source' => $keywordSource,
                 'source' => 'serper',
                 'your_flesch' => $yourFlesch,
                 'your_word_count' => $yourWordCount,
@@ -283,6 +317,7 @@ class PageAuditService
 
             return [
                 'keyword' => $keywordContext,
+                'keyword_source' => null,
                 'source' => 'serper',
                 'your_flesch' => $yourFlesch,
                 'competitors' => [],
@@ -562,7 +597,7 @@ class PageAuditService
         $guardCheck = $this->guard->check($url);
         if (! $guardCheck['ok']) {
             return [
-                'error' => 'blocked: ' . ($guardCheck['reason'] ?? 'unsafe_url'),
+                'error' => 'blocked: '.($guardCheck['reason'] ?? 'unsafe_url'),
                 'http_status' => null,
                 'ttfb_ms' => 0,
             ];
@@ -584,7 +619,7 @@ class PageAuditService
                         'on_redirect' => function ($request, $response, $uri) {
                             $check = $this->guard->check((string) $uri);
                             if (! $check['ok']) {
-                                throw new \RuntimeException('blocked redirect: ' . ($check['reason'] ?? 'unsafe_url'));
+                                throw new \RuntimeException('blocked redirect: '.($check['reason'] ?? 'unsafe_url'));
                             }
                         },
                     ],
@@ -595,7 +630,7 @@ class PageAuditService
             $fullSize = strlen($fullBody);
             $body = $fullSize > self::MAX_BODY_BYTES ? substr($fullBody, 0, self::MAX_BODY_BYTES) : $fullBody;
             if ($fullSize > self::MAX_BODY_BYTES) {
-                Log::info("PageAuditService: truncated oversized response body for {$url} ({$fullSize} -> " . self::MAX_BODY_BYTES . ' bytes)');
+                Log::info("PageAuditService: truncated oversized response body for {$url} ({$fullSize} -> ".self::MAX_BODY_BYTES.' bytes)');
             }
             $encoding = strtolower((string) $response->header('Content-Encoding'));
 
@@ -674,7 +709,7 @@ class PageAuditService
                                 'on_redirect' => function ($request, $response, $uri) {
                                     $check = $this->guard->check((string) $uri);
                                     if (! $check['ok']) {
-                                        throw new \RuntimeException('blocked redirect: ' . ($check['reason'] ?? 'unsafe_url'));
+                                        throw new \RuntimeException('blocked redirect: '.($check['reason'] ?? 'unsafe_url'));
                                     }
                                 },
                             ],
@@ -733,7 +768,7 @@ class PageAuditService
                         'on_redirect' => function ($request, $response, $uri) {
                             $check = $this->guard->check((string) $uri);
                             if (! $check['ok']) {
-                                throw new \RuntimeException('blocked redirect: ' . ($check['reason'] ?? 'unsafe_url'));
+                                throw new \RuntimeException('blocked redirect: '.($check['reason'] ?? 'unsafe_url'));
                             }
                         },
                     ],

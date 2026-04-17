@@ -465,7 +465,14 @@
                             Organic URLs from <strong class="text-slate-600 dark:text-slate-300">Serper.dev</strong>; Flesch scores computed from HTML fetched at audit time. Not identical to live Google rankings; use as a directional sample.
                         </p>
                         @if (! empty($benchmark['keyword']))
-                            <p class="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">Primary query: <span class="font-mono text-slate-900 dark:text-slate-100">{{ $benchmark['keyword'] }}</span></p>
+                            <p class="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">
+                                <span>SERP keyword: <span class="font-mono text-slate-900 dark:text-slate-100">{{ $benchmark['keyword'] }}</span></span>
+                                @if (($benchmark['keyword_source'] ?? null) === 'manual')
+                                    <span class="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-800 dark:bg-violet-500/20 dark:text-violet-200">Custom audit</span>
+                                @elseif (($benchmark['keyword_source'] ?? null) === 'gsc_primary')
+                                    <span class="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-slate-700 dark:text-slate-300">From Search Console</span>
+                                @endif
+                            </p>
                         @endif
                         @php $skippedLabel = $skippedReasonLabel($benchmark['skipped_reason'] ?? null); @endphp
                         @if ($skippedLabel && empty($benchmark['competitors']))

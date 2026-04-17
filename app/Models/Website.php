@@ -2,11 +2,12 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
 
 class Website extends Model
 {
@@ -34,9 +35,9 @@ class Website extends Model
     /**
      * Users who should receive reports. Falls back to the owner if none configured.
      *
-     * @return \Illuminate\Database\Eloquent\Collection<int, User>
+     * @return Collection<int, User>
      */
-    public function getReportRecipientUsers(): \Illuminate\Database\Eloquent\Collection
+    public function getReportRecipientUsers(): Collection
     {
         $ids = $this->report_recipients;
 
@@ -85,5 +86,27 @@ class Website extends Model
     public function pageIndexingStatuses(): HasMany
     {
         return $this->hasMany(PageIndexingStatus::class);
+    }
+
+    /**
+     * Whether a page URL is on this website's domain or a subdomain of it (www normalized).
+     */
+    public function isAuditUrlForThisSite(string $url): bool
+    {
+        $domain = strtolower(trim((string) $this->domain));
+        $domain = preg_replace('/^www\./', '', $domain) ?: $domain;
+        if ($domain === '') {
+            return false;
+        }
+
+        $host = parse_url($url, PHP_URL_HOST);
+        if (! is_string($host) || $host === '') {
+            return false;
+        }
+
+        $host = strtolower($host);
+        $host = preg_replace('/^www\./', '', $host) ?: $host;
+
+        return $host === $domain || str_ends_with($host, '.'.$domain);
     }
 }

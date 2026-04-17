@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Services\PageAuditService;
 use App\Services\SerperSearchClient;
 use App\Support\Audit\RecommendationEngine;
+use App\Support\Audit\SafeHttpGuard;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Config;
 use Illuminate\Support\Facades\Http;
@@ -25,6 +26,10 @@ class SerperAuditBenchmarkTest extends TestCase
 
     public function test_page_audit_benchmark_includes_competitor_flesch_scores(): void
     {
+        $guard = Mockery::mock(SafeHttpGuard::class);
+        $guard->shouldReceive('check')->andReturn(['ok' => true]);
+        $this->app->instance(SafeHttpGuard::class, $guard);
+
         Config::set('services.serper.key', 'test-serper-key');
         Config::set('services.serper.search_url', 'https://google.serper.dev/search');
 
@@ -54,7 +59,7 @@ class SerperAuditBenchmarkTest extends TestCase
             return Http::response('unexpected URL: '.$url, 500);
         });
 
-        $svc = new PageAuditService;
+        $svc = $this->app->make(PageAuditService::class);
         $method = new ReflectionMethod(PageAuditService::class, 'buildSerperReadabilityBenchmark');
         $method->setAccessible(true);
 
@@ -63,10 +68,11 @@ class SerperAuditBenchmarkTest extends TestCase
             'primary' => ['query' => 'sample keyword'],
         ];
 
-        $bench = $method->invoke($svc, 'https://audited-site.test/article', $keywords, 55.0, 1446, 0);
+        $bench = $method->invoke($svc, 'https://audited-site.test/article', $keywords, 55.0, 1446, 0, null, null);
 
         $this->assertIsArray($bench);
         $this->assertSame('sample keyword', $bench['keyword']);
+        $this->assertSame('gsc_primary', $bench['keyword_source']);
         $this->assertSame('serper', $bench['source']);
         $this->assertSame(55.0, $bench['your_flesch']);
         $this->assertSame(1446, $bench['your_word_count']);
@@ -92,6 +98,10 @@ class SerperAuditBenchmarkTest extends TestCase
 
     public function test_your_serp_detected_when_audited_url_appears_in_organic(): void
     {
+        $guard = Mockery::mock(SafeHttpGuard::class);
+        $guard->shouldReceive('check')->andReturn(['ok' => true]);
+        $this->app->instance(SafeHttpGuard::class, $guard);
+
         Config::set('services.serper.key', 'test-serper-key');
         Config::set('services.serper.search_url', 'https://google.serper.dev/search');
 
@@ -122,24 +132,25 @@ class SerperAuditBenchmarkTest extends TestCase
             return Http::response('unexpected URL: '.$url, 500);
         });
 
-        $svc = new PageAuditService;
+        $svc = $this->app->make(PageAuditService::class);
         $method = new ReflectionMethod(PageAuditService::class, 'buildSerperReadabilityBenchmark');
         $method->setAccessible(true);
 
         $bench = $method->invoke($svc, 'https://www.audited-site.test/article/', [
             'available' => true,
             'primary' => ['query' => 'my keyword'],
-        ], 60.0, 900, 3);
+        ], 60.0, 900, 3, null, null);
 
         $this->assertTrue($bench['your_serp']['found']);
         $this->assertSame(2, $bench['your_serp']['position']);
         $this->assertTrue($bench['your_serp']['on_first_page']);
         $this->assertSame(4, $bench['your_serp']['organic_sample_size']);
+        $this->assertSame('gsc_primary', $bench['keyword_source']);
     }
 
     public function test_build_benchmark_gap_table_computes_deltas(): void
     {
-        $svc = new PageAuditService;
+        $svc = $this->app->make(PageAuditService::class);
         $method = new ReflectionMethod(PageAuditService::class, 'buildBenchmarkGapTable');
         $method->setAccessible(true);
 
@@ -148,7 +159,7 @@ class SerperAuditBenchmarkTest extends TestCase
             ['word_count' => 1842, 'flesch' => 63.3, 'image_count' => 8],
         ];
 
-        $out = $method->invoke($svc, 1446, 83.4, 0, $competitors);
+        $out = $method->invoke($svc, 1446, 83.4, 0, $competitors, null);
 
         $this->assertNotNull($out);
         $wc = collect($out['rows'])->firstWhere('key', 'word_count');
@@ -164,7 +175,7 @@ class SerperAuditBenchmarkTest extends TestCase
 
     public function test_resolve_your_serp_position_outside_first_page(): void
     {
-        $svc = new PageAuditService;
+        $svc = $this->app->make(PageAuditService::class);
         $method = new ReflectionMethod(PageAuditService::class, 'resolveYourSerpPosition');
         $method->setAccessible(true);
 
@@ -273,19 +284,65 @@ class SerperAuditBenchmarkTest extends TestCase
         $mock->shouldReceive('search')->once()->andThrow(new RuntimeException('simulated Serper failure'));
         $this->app->instance(SerperSearchClient::class, $mock);
 
-        $svc = new PageAuditService;
+        $svc = $this->app->make(PageAuditService::class);
         $method = new ReflectionMethod(PageAuditService::class, 'buildSerperReadabilityBenchmark');
         $method->setAccessible(true);
 
         $bench = $method->invoke($svc, 'https://audited-site.test/page', [
             'available' => true,
             'primary' => ['query' => 'primary query'],
-        ], 62.5, 0, 0);
+        ], 62.5, 0, 0, null, null);
 
         $this->assertIsArray($bench);
         $this->assertSame('benchmark_error', $bench['skipped_reason']);
         $this->assertSame('primary query', $bench['keyword']);
+        $this->assertNull($bench['keyword_source'] ?? null);
         $this->assertSame([], $bench['competitors']);
         $this->assertSame(62.5, $bench['your_flesch']);
+    }
+
+    public function test_manual_serp_keyword_override_is_used_and_tagged(): void
+    {
+        $guard = Mockery::mock(SafeHttpGuard::class);
+        $guard->shouldReceive('check')->andReturn(['ok' => true]);
+        $this->app->instance(SafeHttpGuard::class, $guard);
+
+        Config::set('services.serper.key', 'test-serper-key');
+        Config::set('services.serper.search_url', 'https://google.serper.dev/search');
+
+        $html = '<!DOCTYPE html><html><head><title>C</title></head><body><p>'
+            .str_repeat('Word. ', 200)
+            .'</p></body></html>';
+
+        Http::fake(function (Request $request) use ($html) {
+            $url = $request->url();
+            if (str_contains($url, 'serper.dev/search')) {
+                $body = $request->data();
+                $this->assertSame('override phrase', $body['q'] ?? null);
+
+                return Http::response([
+                    'organic' => [
+                        ['link' => 'https://only-comp.test/p', 'title' => 'C', 'position' => 1],
+                    ],
+                ], 200);
+            }
+            if ($url === 'https://only-comp.test/p') {
+                return Http::response($html, 200, ['Content-Type' => 'text/html']);
+            }
+
+            return Http::response('unexpected URL: '.$url, 500);
+        });
+
+        $svc = $this->app->make(PageAuditService::class);
+        $method = new ReflectionMethod(PageAuditService::class, 'buildSerperReadabilityBenchmark');
+        $method->setAccessible(true);
+
+        $bench = $method->invoke($svc, 'https://audited-site.test/page', [
+            'available' => true,
+            'primary' => ['query' => 'ignored from gsc'],
+        ], 50.0, 100, 1, null, '  override phrase  ');
+
+        $this->assertSame('override phrase', $bench['keyword']);
+        $this->assertSame('manual', $bench['keyword_source']);
     }
 }

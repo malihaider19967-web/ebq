@@ -457,7 +457,15 @@
                     Organic URLs via <strong>Serper.dev</strong>. Flesch scores are from HTML fetched at audit time; rankings are approximate and not identical to live Google.
                 </p>
                 @if (! empty($benchmark['keyword']))
-                    <p><strong>Primary query:</strong> <span style="font-family: ui-monospace, monospace;">{{ $benchmark['keyword'] }}</span></p>
+                    <p>
+                        <strong>SERP keyword:</strong>
+                        <span style="font-family: ui-monospace, monospace;">{{ $benchmark['keyword'] }}</span>
+                        @if (($benchmark['keyword_source'] ?? null) === 'manual')
+                            <span style="margin-left: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #5b21b6;">(custom audit)</span>
+                        @elseif (($benchmark['keyword_source'] ?? null) === 'gsc_primary')
+                            <span class="muted" style="margin-left: 6px; font-size: 10px;">(Search Console)</span>
+                        @endif
+                    </p>
                 @endif
                 @php $skippedLabel = $skippedReasonLabel($benchmark['skipped_reason'] ?? null); @endphp
                 @if ($skippedLabel && empty($benchmark['competitors']))
