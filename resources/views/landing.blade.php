@@ -6,8 +6,7 @@
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#020617">
 
-    <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
-    <link rel="alternate icon" type="image/x-icon" href="{{ asset('favicon.ico') }}">
+    @include('partials.favicon-links')
 
     <title>EBQ - SEO Operations Platform</title>
     <meta name="description" content="EBQ helps growth teams manage SEO with clear dashboards, backlink verification, and reporting automation.">
