@@ -41,4 +41,9 @@ return [
         'redirect' => env('GOOGLE_REDIRECT_URI'),
     ],
 
+    'serper' => [
+        'key' => env('SERPER_API_KEY'),
+        'search_url' => env('SERPER_SEARCH_URL', 'https://google.serper.dev/search'),
+    ],
+
 ];

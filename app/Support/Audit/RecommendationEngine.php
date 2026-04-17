@@ -28,6 +28,11 @@ class RecommendationEngine
         $recs = array_merge($recs, $this->advanced($result['advanced'] ?? []));
         $recs = array_merge($recs, $this->links($result['links'] ?? []));
         $recs = array_merge($recs, $this->keywords($result['keywords'] ?? []));
+        try {
+            $recs = array_merge($recs, $this->readabilityBenchmark($result));
+        } catch (\Throwable) {
+            // Benchmark recs are optional; never fail the audit recommendation pass.
+        }
 
         $order = [self::SEV_CRITICAL => 0, self::SEV_WARNING => 1, self::SEV_INFO => 2, self::SEV_GOOD => 3];
         usort($recs, fn ($a, $b) => ($order[$a['severity']] ?? 9) <=> ($order[$b['severity']] ?? 9));
@@ -429,6 +434,56 @@ class RecommendationEngine
         }
 
         return $out;
+    }
+
+    /**
+     * @return list<array{id: string, section: string, severity: string, title: string, why: string, fix: string}>
+     */
+    private function readabilityBenchmark(array $result): array
+    {
+        $bench = $result['benchmark'] ?? null;
+        if (! is_array($bench)) {
+            return [];
+        }
+
+        $comps = $bench['competitors'] ?? [];
+        if (! is_array($comps) || count($comps) < 2) {
+            return [];
+        }
+
+        $values = [];
+        foreach ($comps as $c) {
+            if (is_array($c) && isset($c['flesch']) && is_numeric($c['flesch'])) {
+                $values[] = (float) $c['flesch'];
+            }
+        }
+        if (count($values) < 2) {
+            return [];
+        }
+
+        sort($values);
+        $n = count($values);
+        $median = ($n % 2 === 1)
+            ? $values[(int) ($n / 2)]
+            : ($values[$n / 2 - 1] + $values[$n / 2]) / 2.0;
+
+        $yours = $bench['your_flesch'] ?? null;
+        if (! is_numeric($yours)) {
+            return [];
+        }
+        $y = (float) $yours;
+        if ($y >= $median - 10) {
+            return [];
+        }
+
+        $kw = (string) ($bench['keyword'] ?? 'this query');
+        $medRounded = round($median, 1);
+
+        return [$this->rec('bench.readability.below_median', 'Keywords', self::SEV_INFO,
+            'Readability below SERP sample median',
+            "For primary query \"{$kw}\", your Flesch score ({$y}) is more than 10 points below the median (≈{$medRounded}) of top organic pages we could fetch. That does not mean you should match competitors blindly—search intent still rules—but large readability gaps can correlate with weaker engagement for the same intent.",
+            'If your audience is broad, shorten sentences, simplify jargon, and add definition boxes for acronyms. If the topic is intentionally expert-level, keep difficulty but improve structure: headings, lists, and scannable summaries so users still get value quickly.',
+        )];
     }
 
     private function rec(string $id, string $section, string $severity, string $title, string $why, string $fix): array

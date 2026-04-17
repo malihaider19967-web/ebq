@@ -36,10 +36,13 @@
 
     $keywordData = $result['keywords'] ?? [];
     $kwAvailable = (bool) ($keywordData['available'] ?? false);
+    $benchmark = $result['benchmark'] ?? null;
+    $benchmarkNav = is_array($benchmark);
 
     $sections = [
         ['key' => 'recommendations', 'label' => 'Recommendations', 'count' => count($recs), 'show' => ! empty($recs)],
         ['key' => 'keywords',        'label' => 'Keywords',        'count' => $kwAvailable ? (int) ($keywordData['coverage']['total'] ?? 0) : null, 'show' => true],
+        ['key' => 'benchmark',       'label' => 'SERP benchmark',  'count' => is_array($benchmark) ? count($benchmark['competitors'] ?? []) : null, 'show' => $benchmarkNav],
         ['key' => 'metadata',        'label' => 'Metadata',        'count' => null,         'show' => true],
         ['key' => 'content',         'label' => 'Content',         'count' => null,         'show' => true],
         ['key' => 'links',           'label' => 'Images & Links',  'count' => null,         'show' => true],
@@ -382,6 +385,61 @@
                         @endif
                     @endif
                 </section>
+
+                @if ($benchmarkNav)
+                    {{-- ══════ SERP readability benchmark (Serper) ══════ --}}
+                    <section id="audit-benchmark" class="scroll-mt-16">
+                        <div class="mb-3 flex items-center gap-2">
+                            <div class="flex h-7 w-7 items-center justify-center rounded-md bg-violet-100 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400">
+                                <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h2.25M3.75 3h-1.5m1.5 0h16.5m0 0h1.5m-1.5 0v11.25A2.25 2.25 0 0118 16.5h-2.25m-7.5 0h7.5m-7.5 0l-1 3m8.5-3l1 3m0 0l.5 1.5m-.5-1.5h-9.5m0 0l-.5 1.5M9 11.25v1.5M12 9v3.75m3-6v6" /></svg>
+                            </div>
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">SERP readability benchmark</h3>
+                        </div>
+                        <p class="mb-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                            Organic URLs from <strong class="text-slate-600 dark:text-slate-300">Serper.dev</strong>; Flesch scores computed from HTML fetched at audit time. Not identical to live Google rankings; use as a directional sample.
+                        </p>
+                        @if (! empty($benchmark['keyword']))
+                            <p class="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">Primary query: <span class="font-mono text-slate-900 dark:text-slate-100">{{ $benchmark['keyword'] }}</span></p>
+                        @endif
+                        @if (! empty($benchmark['skipped_reason']) && empty($benchmark['competitors']))
+                            <div class="rounded-lg border border-dashed border-amber-200 bg-amber-50/50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-500/5 dark:text-amber-200">
+                                Benchmark skipped: {{ str_replace('_', ' ', $benchmark['skipped_reason']) }}
+                            </div>
+                        @endif
+                        @if (! empty($benchmark['competitors']))
+                            <div class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                                <table class="w-full min-w-[320px] text-xs">
+                                    <thead>
+                                        <tr class="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400">
+                                            <th class="px-3 py-2 text-left">Page</th>
+                                            <th class="px-3 py-2 text-right">Flesch</th>
+                                            <th class="px-3 py-2 text-left">Grade band</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                        <tr class="bg-indigo-50/40 dark:bg-indigo-500/5">
+                                            <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-100">This page (audited)</td>
+                                            <td class="px-3 py-2 text-right tabular-nums font-semibold text-slate-900 dark:text-slate-100">{{ is_numeric($benchmark['your_flesch'] ?? null) ? $benchmark['your_flesch'] : '—' }}</td>
+                                            <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ data_get($advanced, 'readability.grade') ?? '—' }}</td>
+                                        </tr>
+                                        @foreach ($benchmark['competitors'] as $row)
+                                            <tr>
+                                                <td class="max-w-[200px] px-3 py-2">
+                                                    <a href="{{ $row['url'] }}" target="_blank" rel="noopener noreferrer" class="font-medium text-indigo-600 hover:underline dark:text-indigo-400">{{ \Illuminate\Support\Str::limit($row['title'] ?: $row['url'], 48) }}</a>
+                                                    @if (isset($row['position']))
+                                                        <span class="ml-1 text-[10px] text-slate-400">#{{ $row['position'] }}</span>
+                                                    @endif
+                                                </td>
+                                                <td class="px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-100">{{ is_numeric($row['flesch'] ?? null) ? $row['flesch'] : '—' }}</td>
+                                                <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ $row['grade'] ?? '—' }}</td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                        @endif
+                    </section>
+                @endif
 
                 {{-- ══════ Metadata ══════ --}}
                 <section id="audit-metadata" class="scroll-mt-16">

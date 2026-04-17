@@ -8,6 +8,7 @@ use App\Support\Audit\HtmlAuditor;
 use App\Support\Audit\KeywordStrategyAnalyzer;
 use App\Support\Audit\RecommendationEngine;
 use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -15,7 +16,9 @@ use Illuminate\Support\Facades\Log;
 class PageAuditService
 {
     private const MAX_LINKS_CHECKED = 100;
+
     private const LINK_TIMEOUT = 8;
+
     private const LINK_POOL_CONCURRENCY = 10;
 
     public function audit(int $websiteId, string $pageUrl): PageAuditReport
@@ -88,6 +91,15 @@ class PageAuditService
                 'keyword_density' => $content['keyword_density'] ?? [],
             ]);
 
+            $benchmark = $this->buildSerperReadabilityBenchmark(
+                $pageUrl,
+                $result['keywords'],
+                is_numeric($readability['flesch'] ?? null) ? (float) $readability['flesch'] : null
+            );
+            if ($benchmark !== null) {
+                $result['benchmark'] = $benchmark;
+            }
+
             $result['recommendations'] = app(RecommendationEngine::class)->analyze($result);
 
             return PageAuditReport::updateOrCreate(
@@ -107,6 +119,166 @@ class PageAuditService
 
             return $this->persistFailure($websiteId, $pageUrl, $e->getMessage(), null, (int) round((microtime(true) - $startedAt) * 1000));
         }
+    }
+
+    /**
+     * Optional SERP readability benchmark via Serper (fail-closed: never throws).
+     *
+     * @param  array<string, mixed>  $keywordsPayload
+     * @return array<string, mixed>|null null when Serper is not configured
+     */
+    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch): ?array
+    {
+        $apiKey = config('services.serper.key');
+        if (! is_string($apiKey) || trim($apiKey) === '') {
+            return null;
+        }
+
+        $keywordContext = null;
+
+        try {
+            if (empty($keywordsPayload['available']) || empty($keywordsPayload['primary']['query'])) {
+                return [
+                    'keyword' => null,
+                    'source' => 'serper',
+                    'your_flesch' => $yourFlesch,
+                    'competitors' => [],
+                    'skipped_reason' => 'no_primary_keyword',
+                ];
+            }
+
+            $keyword = trim((string) $keywordsPayload['primary']['query']);
+            $keywordContext = $keyword !== '' ? $keyword : null;
+            if ($keyword === '') {
+                return [
+                    'keyword' => null,
+                    'source' => 'serper',
+                    'your_flesch' => $yourFlesch,
+                    'competitors' => [],
+                    'skipped_reason' => 'no_primary_keyword',
+                ];
+            }
+
+            $payload = app(SerperSearchClient::class)->search($keyword, 10);
+            if ($payload === null) {
+                return [
+                    'keyword' => $keyword,
+                    'source' => 'serper',
+                    'your_flesch' => $yourFlesch,
+                    'competitors' => [],
+                    'skipped_reason' => 'serper_request_failed',
+                ];
+            }
+
+            $organic = $payload['organic'] ?? [];
+            if (! is_array($organic) || $organic === []) {
+                return [
+                    'keyword' => $keyword,
+                    'source' => 'serper',
+                    'your_flesch' => $yourFlesch,
+                    'competitors' => [],
+                    'skipped_reason' => 'no_organic_results',
+                ];
+            }
+
+            $auditedHost = $this->normalizeHostForBenchmark($pageUrl);
+            $auditedCanonical = $this->canonicalUrlForBenchmark($pageUrl);
+
+            $candidates = [];
+            foreach ($organic as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $link = $row['link'] ?? '';
+                if (! is_string($link) || $link === '') {
+                    continue;
+                }
+                $linkLower = strtolower($link);
+                if (! str_starts_with($linkLower, 'http://') && ! str_starts_with($linkLower, 'https://')) {
+                    continue;
+                }
+                $host = $this->normalizeHostForBenchmark($link);
+                if ($auditedHost !== null && $host !== null && $host === $auditedHost) {
+                    continue;
+                }
+                if ($auditedCanonical !== null && $this->canonicalUrlForBenchmark($link) === $auditedCanonical) {
+                    continue;
+                }
+                $candidates[] = [
+                    'url' => $link,
+                    'title' => is_string($row['title'] ?? null) ? $row['title'] : '',
+                    'position' => is_numeric($row['position'] ?? null) ? (int) $row['position'] : null,
+                ];
+                if (count($candidates) >= 3) {
+                    break;
+                }
+            }
+
+            $competitors = [];
+            foreach ($candidates as $entry) {
+                $fetch = $this->fetch($entry['url']);
+                if (! isset($fetch['body'])) {
+                    continue;
+                }
+                try {
+                    $compAuditor = new HtmlAuditor($fetch['body'], $entry['url']);
+                    $compContent = $compAuditor->content();
+                    $compBody = $compContent['body_text'] ?? '';
+                    $compRead = $compAuditor->readability($compBody);
+                    $competitors[] = [
+                        'url' => $entry['url'],
+                        'title' => $entry['title'] !== '' ? $entry['title'] : '',
+                        'position' => $entry['position'],
+                        'flesch' => is_numeric($compRead['flesch'] ?? null) ? (float) $compRead['flesch'] : null,
+                        'grade' => $compRead['grade'] ?? null,
+                    ];
+                } catch (\Throwable) {
+                    continue;
+                }
+            }
+
+            return [
+                'keyword' => $keyword,
+                'source' => 'serper',
+                'your_flesch' => $yourFlesch,
+                'competitors' => $competitors,
+                'skipped_reason' => $competitors === [] ? 'no_competitor_pages_fetched' : null,
+            ];
+        } catch (\Throwable $e) {
+            Log::warning("PageAuditService: Serper benchmark failed for {$pageUrl}: {$e->getMessage()}");
+
+            return [
+                'keyword' => $keywordContext,
+                'source' => 'serper',
+                'your_flesch' => $yourFlesch,
+                'competitors' => [],
+                'skipped_reason' => 'benchmark_error',
+            ];
+        }
+    }
+
+    private function normalizeHostForBenchmark(string $url): ?string
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (! is_string($host) || $host === '') {
+            return null;
+        }
+        $host = strtolower($host);
+
+        return preg_replace('/^www\./', '', $host) ?: null;
+    }
+
+    private function canonicalUrlForBenchmark(string $url): ?string
+    {
+        $parts = parse_url($url);
+        if (! is_array($parts) || empty($parts['host'])) {
+            return null;
+        }
+        $host = strtolower((string) $parts['host']);
+        $host = preg_replace('/^www\./', '', $host) ?? $host;
+        $path = $parts['path'] ?? '/';
+
+        return $host.rtrim((string) $path, '/');
     }
 
     private function fetchTargetKeywords(int $websiteId, string $pageUrl): array
@@ -196,7 +368,7 @@ class PageAuditService
                 $status = null;
                 $error = null;
 
-                if ($resp instanceof \Illuminate\Http\Client\Response) {
+                if ($resp instanceof Response) {
                     $status = $resp->status();
                     if (in_array($status, [403, 405, 501], true)) {
                         $status = $this->getFallback($link['href']);
