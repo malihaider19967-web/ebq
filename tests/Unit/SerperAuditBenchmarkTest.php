@@ -63,23 +63,31 @@ class SerperAuditBenchmarkTest extends TestCase
             'primary' => ['query' => 'sample keyword'],
         ];
 
-        $bench = $method->invoke($svc, 'https://audited-site.test/article', $keywords, 55.0);
+        $bench = $method->invoke($svc, 'https://audited-site.test/article', $keywords, 55.0, 1446, 0);
 
         $this->assertIsArray($bench);
         $this->assertSame('sample keyword', $bench['keyword']);
         $this->assertSame('serper', $bench['source']);
         $this->assertSame(55.0, $bench['your_flesch']);
+        $this->assertSame(1446, $bench['your_word_count']);
+        $this->assertSame(0, $bench['your_image_count']);
         $this->assertCount(3, $bench['competitors']);
         foreach ($bench['competitors'] as $row) {
             $this->assertArrayHasKey('url', $row);
             $this->assertArrayHasKey('flesch', $row);
             $this->assertIsNumeric($row['flesch']);
+            $this->assertArrayHasKey('image_count', $row);
         }
         $this->assertArrayHasKey('skipped_reason', $bench);
         $this->assertNull($bench['skipped_reason']);
         $this->assertArrayHasKey('your_serp', $bench);
         $this->assertFalse($bench['your_serp']['found']);
         $this->assertSame(3, $bench['your_serp']['organic_sample_size']);
+        $this->assertNotEmpty($bench['gap_table']['rows']);
+        $gapKeys = array_column($bench['gap_table']['rows'], 'key');
+        $this->assertContains('word_count', $gapKeys);
+        $this->assertContains('flesch', $gapKeys);
+        $this->assertContains('images', $gapKeys);
     }
 
     public function test_your_serp_detected_when_audited_url_appears_in_organic(): void
@@ -121,12 +129,37 @@ class SerperAuditBenchmarkTest extends TestCase
         $bench = $method->invoke($svc, 'https://www.audited-site.test/article/', [
             'available' => true,
             'primary' => ['query' => 'my keyword'],
-        ], 60.0);
+        ], 60.0, 900, 3);
 
         $this->assertTrue($bench['your_serp']['found']);
         $this->assertSame(2, $bench['your_serp']['position']);
         $this->assertTrue($bench['your_serp']['on_first_page']);
         $this->assertSame(4, $bench['your_serp']['organic_sample_size']);
+    }
+
+    public function test_build_benchmark_gap_table_computes_deltas(): void
+    {
+        $svc = new PageAuditService;
+        $method = new ReflectionMethod(PageAuditService::class, 'buildBenchmarkGapTable');
+        $method->setAccessible(true);
+
+        $competitors = [
+            ['word_count' => 1842, 'flesch' => 63.3, 'image_count' => 8],
+            ['word_count' => 1842, 'flesch' => 63.3, 'image_count' => 8],
+        ];
+
+        $out = $method->invoke($svc, 1446, 83.4, 0, $competitors);
+
+        $this->assertNotNull($out);
+        $wc = collect($out['rows'])->firstWhere('key', 'word_count');
+        $this->assertSame(-396.0, $wc['delta']);
+        $this->assertSame('Add content', $wc['status']);
+        $fl = collect($out['rows'])->firstWhere('key', 'flesch');
+        $this->assertSame(20.1, round((float) $fl['delta'], 1));
+        $this->assertSame('Better UX', $fl['status']);
+        $im = collect($out['rows'])->firstWhere('key', 'images');
+        $this->assertSame(-8.0, $im['delta']);
+        $this->assertSame('Add visuals', $im['status']);
     }
 
     public function test_resolve_your_serp_position_outside_first_page(): void
@@ -247,7 +280,7 @@ class SerperAuditBenchmarkTest extends TestCase
         $bench = $method->invoke($svc, 'https://audited-site.test/page', [
             'available' => true,
             'primary' => ['query' => 'primary query'],
-        ], 62.5);
+        ], 62.5, 0, 0);
 
         $this->assertIsArray($bench);
         $this->assertSame('benchmark_error', $bench['skipped_reason']);

@@ -366,12 +366,6 @@
         @if (is_array($benchmark))
             <div class="card">
                 <h2>6. SERP readability benchmark</h2>
-                <p class="muted" style="margin-bottom: 10px;">
-                    Organic URLs via <strong>Serper.dev</strong>. Flesch scores are from HTML fetched at audit time; rankings are approximate and not identical to live Google.
-                </p>
-                @if (! empty($benchmark['keyword']))
-                    <p><strong>Primary query:</strong> <span style="font-family: ui-monospace, monospace;">{{ $benchmark['keyword'] }}</span></p>
-                @endif
                 @if (! empty($benchmark['your_serp']) && is_array($benchmark['your_serp']))
                     @php
                         $ys = $benchmark['your_serp'];
@@ -379,21 +373,49 @@
                         $ysPos = $ys['position'] ?? null;
                         $ysFirst = $ys['on_first_page'] ?? null;
                         $ysN = (int) ($ys['organic_sample_size'] ?? 0);
+                        $ysBoxBg = $ysFound && is_numeric($ysPos)
+                            ? ($ysFirst === true ? 'linear-gradient(135deg, #ecfdf5 0%, #ffffff 100%)' : 'linear-gradient(135deg, #fffbeb 0%, #ffffff 100%)')
+                            : '#f8fafc';
+                        $ysBoxBorder = $ysFound && is_numeric($ysPos)
+                            ? ($ysFirst === true ? '#34d399' : '#fbbf24')
+                            : '#cbd5e1';
                     @endphp
-                    <div style="margin-top: 10px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 12px;">
-                        <p style="margin: 0 0 6px; font-weight: 700;">Your page in this SERP sample</p>
+                    <div style="margin: 0 0 16px; padding: 16px 20px; border-radius: 14px; border: 2px solid {{ $ysBoxBorder }}; background: {{ $ysBoxBg }};">
                         @if ($ysFound && is_numeric($ysPos))
-                            @if ($ysFirst === true)
-                                <p style="margin: 0;">This URL appears in the <strong>top 10</strong> organic results at <strong>position {{ $ysPos }}</strong> for the query above (Serper snapshot).</p>
-                            @else
-                                <p style="margin: 0;">This URL appears at <strong>position {{ $ysPos }}</strong> in the sample — <strong>outside the first page</strong> (positions 1–10) in this snapshot.</p>
-                            @endif
+                            <table style="width: 100%; border-collapse: collapse;">
+                                <tr>
+                                    <td style="width: 160px; vertical-align: middle; text-align: center; padding: 8px 16px 8px 0;">
+                                        <p style="margin: 0; font-size: 9px; font-weight: 800; letter-spacing: 0.15em; color: #64748b; text-transform: uppercase;">Organic rank</p>
+                                        <p style="margin: 6px 0 0; font-size: 42px; font-weight: 900; line-height: 1; letter-spacing: -0.02em; color: {{ $ysFirst === true ? '#059669' : '#d97706' }};">#{{ $ysPos }}</p>
+                                        <p style="margin: 8px 0 0;">
+                                            <span style="display: inline-block; padding: 4px 10px; border-radius: 999px; font-size: 9px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: #fff; background: {{ $ysFirst === true ? '#059669' : '#d97706' }};">{{ $ysFirst === true ? 'First page' : 'Page 2+' }}</span>
+                                        </p>
+                                    </td>
+                                    <td style="vertical-align: middle; padding-left: 12px; border-left: 1px solid rgba(148,163,184,0.5); font-size: 12px; line-height: 1.55; color: #334155;">
+                                        <strong style="color: #0f172a;">Search position (Serper snapshot)</strong><br>
+                                        @if ($ysFirst === true)
+                                            Your URL appears in the <strong>top 10</strong> organic results for the primary query. Use Search Console for official average position.
+                                        @else
+                                            Position <strong>#{{ $ysPos }}</strong> in this sample — <strong>outside the first page</strong> (positions 1–10).
+                                        @endif
+                                        <br><span class="muted" style="font-size: 10px;">{{ $ysN }} organic listings in sample.</span>
+                                    </td>
+                                </tr>
+                            </table>
                         @elseif ($ysN === 0)
-                            <p style="margin: 0;">Your rank in this sample could not be checked (no organic links in the response).</p>
+                            <p style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">Search position</p>
+                            <p style="margin: 6px 0 0; font-size: 12px; color: #475569;">Rank could not be checked — no organic links in the Serper response.</p>
                         @else
-                            <p style="margin: 0;">This URL was <strong>not found</strong> among the {{ $ysN }} organic links in this snapshot. Check Search Console for your real average position.</p>
+                            <p style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">Not in top {{ $ysN }} of this sample</p>
+                            <p style="margin: 6px 0 0; font-size: 12px; color: #475569;">Your URL did not match the {{ $ysN }} organic URLs returned. Check Search Console for your real average position.</p>
                         @endif
                     </div>
+                @endif
+                <p class="muted" style="margin-bottom: 10px;">
+                    Organic URLs via <strong>Serper.dev</strong>. Flesch scores are from HTML fetched at audit time; rankings are approximate and not identical to live Google.
+                </p>
+                @if (! empty($benchmark['keyword']))
+                    <p><strong>Primary query:</strong> <span style="font-family: ui-monospace, monospace;">{{ $benchmark['keyword'] }}</span></p>
                 @endif
                 @if (! empty($benchmark['skipped_reason']) && empty($benchmark['competitors']))
                     <p class="warn"><strong>Benchmark skipped:</strong> {{ str_replace('_', ' ', $benchmark['skipped_reason']) }}</p>
@@ -423,6 +445,44 @@
                                     </td>
                                     <td style="padding: 4px 6px; text-align: right;">{{ is_numeric($row['flesch'] ?? null) ? $row['flesch'] : '—' }}</td>
                                     <td style="padding: 4px 6px;">{{ $row['grade'] ?? '—' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                @endif
+                @if (! empty($benchmark['gap_table']['rows']))
+                    <h3 style="margin: 18px 0 6px; font-size: 13px;">You vs. market average</h3>
+                    <p class="muted" style="margin: 0 0 10px; font-size: 11px;">Mean of competitor pages fetched for this benchmark. Image counts reflect visual engagement gaps that word count misses.</p>
+                    <table style="width: 100%; border-collapse: collapse; font-size: 11px; border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden;">
+                        <thead>
+                            <tr style="background: #f1f5f9;">
+                                <th style="text-align: left; padding: 6px 8px;">Metric</th>
+                                <th style="text-align: right; padding: 6px 8px;">Your page</th>
+                                <th style="text-align: right; padding: 6px 8px;">Market avg</th>
+                                <th style="text-align: left; padding: 6px 8px;">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($benchmark['gap_table']['rows'] as $g)
+                                @php
+                                    $gk = $g['key'] ?? '';
+                                    $yoursFmt = $gk === 'word_count'
+                                        ? number_format((int) ($g['yours'] ?? 0))
+                                        : (($gk === 'flesch') ? number_format((float) ($g['yours'] ?? 0), 1) : number_format((int) ($g['yours'] ?? 0)));
+                                    $avgFmt = $gk === 'word_count'
+                                        ? number_format((int) round((float) ($g['market_avg'] ?? 0)))
+                                        : (($gk === 'flesch') ? number_format((float) ($g['market_avg'] ?? 0), 1) : number_format((float) ($g['market_avg'] ?? 0), 1));
+                                    $d = (float) ($g['delta'] ?? 0);
+                                    $sign = $d > 0 ? '+' : '';
+                                    $deltaFmt = $gk === 'word_count'
+                                        ? $sign.number_format((int) round($d), 0, '.', ',')
+                                        : $sign.number_format($d, 1);
+                                @endphp
+                                <tr style="border-top: 1px solid #e2e8f0;">
+                                    <td style="padding: 6px 8px; font-weight: 600;">{{ $g['metric'] ?? '' }}</td>
+                                    <td style="padding: 6px 8px; text-align: right;">{{ $yoursFmt }}</td>
+                                    <td style="padding: 6px 8px; text-align: right;">{{ $avgFmt }}</td>
+                                    <td style="padding: 6px 8px;">{{ $deltaFmt }} <span class="muted">({{ $g['status'] ?? '' }})</span></td>
                                 </tr>
                             @endforeach
                         </tbody>

@@ -397,12 +397,6 @@
                             </div>
                             <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">SERP readability benchmark</h3>
                         </div>
-                        <p class="mb-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                            Organic URLs from <strong class="text-slate-600 dark:text-slate-300">Serper.dev</strong>; Flesch scores computed from HTML fetched at audit time. Not identical to live Google rankings; use as a directional sample.
-                        </p>
-                        @if (! empty($benchmark['keyword']))
-                            <p class="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">Primary query: <span class="font-mono text-slate-900 dark:text-slate-100">{{ $benchmark['keyword'] }}</span></p>
-                        @endif
                         @if (! empty($benchmark['your_serp']) && is_array($benchmark['your_serp']))
                             @php
                                 $ys = $benchmark['your_serp'];
@@ -410,21 +404,58 @@
                                 $ysPos = $ys['position'] ?? null;
                                 $ysFirst = $ys['on_first_page'] ?? null;
                                 $ysN = (int) ($ys['organic_sample_size'] ?? 0);
+                                $ysHeroBorder = $ysFound && is_numeric($ysPos)
+                                    ? ($ysFirst === true
+                                        ? 'border-emerald-400/80 bg-gradient-to-br from-emerald-50 to-white ring-2 ring-emerald-500/20 dark:border-emerald-500/50 dark:from-emerald-950/40 dark:to-slate-900 dark:ring-emerald-400/15'
+                                        : 'border-amber-400/80 bg-gradient-to-br from-amber-50 to-white ring-2 ring-amber-500/20 dark:border-amber-500/50 dark:from-amber-950/30 dark:to-slate-900 dark:ring-amber-400/15')
+                                    : 'border-slate-300 bg-slate-50 ring-1 ring-slate-200/80 dark:border-slate-600 dark:bg-slate-800/60 dark:ring-slate-700/80';
                             @endphp
-                            <div class="mb-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-2.5 text-xs leading-relaxed text-slate-700 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300">
-                                <p class="font-semibold text-slate-900 dark:text-slate-100">Your page in this SERP sample</p>
-                                @if ($ysFound && is_numeric($ysPos))
-                                    @if ($ysFirst === true)
-                                        <p class="mt-1">This URL appears in the <strong>top 10</strong> organic results at <strong class="tabular-nums">position {{ $ysPos }}</strong> for the query above (Serper snapshot; not identical to live Google).</p>
+                            <div class="mb-4 overflow-hidden rounded-2xl border-2 shadow-sm {{ $ysHeroBorder }}">
+                                <div class="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:gap-6 sm:p-5">
+                                    @if ($ysFound && is_numeric($ysPos))
+                                        <div class="flex shrink-0 flex-col items-center justify-center rounded-xl bg-white/90 px-6 py-4 shadow-inner dark:bg-slate-950/50 sm:min-w-[140px] sm:px-8 sm:py-5">
+                                            <p class="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500 dark:text-slate-400">Organic rank</p>
+                                            <p class="mt-1 text-5xl font-black leading-none tabular-nums tracking-tight {{ $ysFirst === true ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400' }}">#{{ $ysPos }}</p>
+                                            @if ($ysFirst === true)
+                                                <span class="mt-2 inline-flex items-center rounded-full bg-emerald-600 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm dark:bg-emerald-500">First page</span>
+                                            @else
+                                                <span class="mt-2 inline-flex items-center rounded-full bg-amber-600 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm dark:bg-amber-500">Page 2+</span>
+                                            @endif
+                                        </div>
+                                        <div class="min-w-0 flex-1 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
+                                            <p class="font-bold text-slate-900 dark:text-slate-100">Search position in this snapshot</p>
+                                            @if ($ysFirst === true)
+                                                <p class="mt-1.5">Your audited URL appears in the <strong>top 10</strong> organic results for the primary query below. Serper approximates Google; use Search Console for official average position.</p>
+                                            @else
+                                                <p class="mt-1.5">Your URL shows at <strong class="tabular-nums">#{{ $ysPos }}</strong> in this sample — <strong>outside the first results page</strong> (positions 1–10) in this snapshot.</p>
+                                            @endif
+                                            <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Sample: {{ $ysN }} organic listings checked.</p>
+                                        </div>
+                                    @elseif ($ysN === 0)
+                                        <div class="flex w-full flex-col items-center justify-center py-2 text-center sm:flex-row sm:gap-6 sm:text-left">
+                                            <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-slate-200/80 text-2xl font-black text-slate-500 dark:bg-slate-700 dark:text-slate-400">—</div>
+                                            <div class="mt-3 min-w-0 flex-1 text-sm sm:mt-0">
+                                                <p class="font-bold text-slate-900 dark:text-slate-100">Search position</p>
+                                                <p class="mt-1 text-slate-600 dark:text-slate-400">Rank could not be checked — no organic links were returned in the Serper response.</p>
+                                            </div>
+                                        </div>
                                     @else
-                                        <p class="mt-1">This URL appears in the sampled results at <strong class="tabular-nums">position {{ $ysPos }}</strong> — <strong>outside the first page</strong> (positions 1–10) in this snapshot.</p>
+                                        <div class="flex w-full flex-col items-center justify-center py-2 sm:flex-row sm:items-center sm:gap-6 sm:text-left">
+                                            <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white/80 text-xl font-black text-slate-400 dark:border-slate-600 dark:bg-slate-900/50 dark:text-slate-500">?</div>
+                                            <div class="mt-3 min-w-0 flex-1 text-sm sm:mt-0">
+                                                <p class="font-bold text-slate-900 dark:text-slate-100">Not in top {{ $ysN }} of this sample</p>
+                                                <p class="mt-1 text-slate-600 dark:text-slate-400">Your URL did not match any of the {{ $ysN }} organic URLs returned. That does not mean you are not ranking — verify in Search Console or a live SERP.</p>
+                                            </div>
+                                        </div>
                                     @endif
-                                @elseif ($ysN === 0)
-                                    <p class="mt-1">Your rank in this sample could not be checked (no organic links were available in the response).</p>
-                                @else
-                                    <p class="mt-1">This URL was <strong>not found</strong> among the {{ $ysN }} organic links returned in this snapshot. That does not prove you are not ranking; try Search Console or a live SERP check.</p>
-                                @endif
+                                </div>
                             </div>
+                        @endif
+                        <p class="mb-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                            Organic URLs from <strong class="text-slate-600 dark:text-slate-300">Serper.dev</strong>; Flesch scores computed from HTML fetched at audit time. Not identical to live Google rankings; use as a directional sample.
+                        </p>
+                        @if (! empty($benchmark['keyword']))
+                            <p class="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">Primary query: <span class="font-mono text-slate-900 dark:text-slate-100">{{ $benchmark['keyword'] }}</span></p>
                         @endif
                         @if (! empty($benchmark['skipped_reason']) && empty($benchmark['competitors']))
                             <div class="rounded-lg border border-dashed border-amber-200 bg-amber-50/50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-500/5 dark:text-amber-200">
@@ -461,6 +492,50 @@
                                         @endforeach
                                     </tbody>
                                 </table>
+                            </div>
+                        @endif
+                        @if (! empty($benchmark['gap_table']['rows']))
+                            <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-700 dark:bg-slate-900/40">
+                                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">You vs. market average</h4>
+                                <p class="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">Mean of the competitor pages fetched for this benchmark (same snapshot as the table above). Word count alone does not capture visual engagement — image counts highlight that gap.</p>
+                                <div class="mt-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                                    <table class="w-full min-w-[360px] text-xs">
+                                        <thead>
+                                            <tr class="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400">
+                                                <th class="px-3 py-2 text-left">Metric</th>
+                                                <th class="px-3 py-2 text-right">Your page</th>
+                                                <th class="px-3 py-2 text-right">Market avg</th>
+                                                <th class="px-3 py-2 text-left">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                            @foreach ($benchmark['gap_table']['rows'] as $g)
+                                                @php
+                                                    $gk = $g['key'] ?? '';
+                                                    $yoursFmt = $gk === 'word_count'
+                                                        ? number_format((int) ($g['yours'] ?? 0))
+                                                        : (($gk === 'flesch') ? number_format((float) ($g['yours'] ?? 0), 1) : number_format((int) ($g['yours'] ?? 0)));
+                                                    $avgFmt = $gk === 'word_count'
+                                                        ? number_format((int) round((float) ($g['market_avg'] ?? 0)))
+                                                        : (($gk === 'flesch') ? number_format((float) ($g['market_avg'] ?? 0), 1) : number_format((float) ($g['market_avg'] ?? 0), 1));
+                                                    $d = (float) ($g['delta'] ?? 0);
+                                                    $sign = $d > 0 ? '+' : '';
+                                                    $deltaFmt = $gk === 'word_count'
+                                                        ? $sign.number_format((int) round($d), 0, '.', ',')
+                                                        : $sign.number_format($d, 1);
+                                                    $st = (string) ($g['status'] ?? '');
+                                                    $deltaTone = $d < -0.5 ? 'text-rose-600 dark:text-rose-400' : ($d > 0.5 ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-600 dark:text-slate-400');
+                                                @endphp
+                                                <tr>
+                                                    <td class="px-3 py-2 font-medium text-slate-900 dark:text-slate-100">{{ $g['metric'] ?? '' }}</td>
+                                                    <td class="px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-100">{{ $yoursFmt }}</td>
+                                                    <td class="px-3 py-2 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ $avgFmt }}</td>
+                                                    <td class="px-3 py-2 font-medium tabular-nums {{ $deltaTone }}">{{ $deltaFmt }} <span class="font-normal text-slate-500 dark:text-slate-400">({{ $st }})</span></td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
                             </div>
                         @endif
                     </section>

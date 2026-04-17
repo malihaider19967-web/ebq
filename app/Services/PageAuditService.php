@@ -94,7 +94,9 @@ class PageAuditService
             $benchmark = $this->buildSerperReadabilityBenchmark(
                 $pageUrl,
                 $result['keywords'],
-                is_numeric($readability['flesch'] ?? null) ? (float) $readability['flesch'] : null
+                is_numeric($readability['flesch'] ?? null) ? (float) $readability['flesch'] : null,
+                (int) ($content['word_count'] ?? 0),
+                (int) ($images['total'] ?? 0)
             );
             if ($benchmark !== null) {
                 $result['benchmark'] = $benchmark;
@@ -127,7 +129,7 @@ class PageAuditService
      * @param  array<string, mixed>  $keywordsPayload
      * @return array<string, mixed>|null null when Serper is not configured
      */
-    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch): ?array
+    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch, int $yourWordCount, int $yourImageCount): ?array
     {
         $apiKey = config('services.serper.key');
         if (! is_string($apiKey) || trim($apiKey) === '') {
@@ -222,11 +224,13 @@ class PageAuditService
                     $compContent = $compAuditor->content();
                     $compBody = $compContent['body_text'] ?? '';
                     $compRead = $compAuditor->readability($compBody);
+                    $compImages = $compAuditor->images();
                     $competitors[] = [
                         'url' => $entry['url'],
                         'title' => $entry['title'] !== '' ? $entry['title'] : '',
                         'position' => $entry['position'],
                         'word_count' => isset($compContent['word_count']) ? max(0, (int) $compContent['word_count']) : null,
+                        'image_count' => max(0, (int) ($compImages['total'] ?? 0)),
                         'flesch' => is_numeric($compRead['flesch'] ?? null) ? (float) $compRead['flesch'] : null,
                         'grade' => $compRead['grade'] ?? null,
                     ];
@@ -235,13 +239,18 @@ class PageAuditService
                 }
             }
 
+            $gapTable = $this->buildBenchmarkGapTable($yourWordCount, $yourFlesch, $yourImageCount, $competitors);
+
             return [
                 'keyword' => $keyword,
                 'source' => 'serper',
                 'your_flesch' => $yourFlesch,
+                'your_word_count' => $yourWordCount,
+                'your_image_count' => $yourImageCount,
                 'competitors' => $competitors,
                 'skipped_reason' => $competitors === [] ? 'no_competitor_pages_fetched' : null,
                 'your_serp' => $yourSerp,
+                'gap_table' => $gapTable,
             ];
         } catch (\Throwable $e) {
             Log::warning("PageAuditService: Serper benchmark failed for {$pageUrl}: {$e->getMessage()}");
@@ -254,6 +263,80 @@ class PageAuditService
                 'skipped_reason' => 'benchmark_error',
             ];
         }
+    }
+
+    /**
+     * Compare audited page to averages from fetched competitor HTML (word count, Flesch, image count).
+     *
+     * @param  list<array<string, mixed>>  $competitors
+     * @return array{rows: list<array<string, mixed>>}|null
+     */
+    private function buildBenchmarkGapTable(int $yourWords, ?float $yourFlesch, int $yourImages, array $competitors): ?array
+    {
+        if ($competitors === []) {
+            return null;
+        }
+
+        $rows = [];
+
+        $wcVals = [];
+        foreach ($competitors as $c) {
+            if (is_array($c) && isset($c['word_count']) && is_numeric($c['word_count'])) {
+                $wcVals[] = (float) $c['word_count'];
+            }
+        }
+        if ($wcVals !== []) {
+            $avg = array_sum($wcVals) / count($wcVals);
+            $delta = $yourWords - $avg;
+            $rows[] = [
+                'key' => 'word_count',
+                'metric' => 'Word count',
+                'yours' => $yourWords,
+                'market_avg' => round($avg, 1),
+                'delta' => round($delta, 1),
+                'status' => $delta < -1 ? 'Add content' : ($delta > 1 ? 'Above sample' : 'Aligned'),
+            ];
+        }
+
+        $fVals = [];
+        foreach ($competitors as $c) {
+            if (is_array($c) && isset($c['flesch']) && is_numeric($c['flesch'])) {
+                $fVals[] = (float) $c['flesch'];
+            }
+        }
+        if ($fVals !== [] && is_numeric($yourFlesch)) {
+            $avg = array_sum($fVals) / count($fVals);
+            $delta = $yourFlesch - $avg;
+            $rows[] = [
+                'key' => 'flesch',
+                'metric' => 'Readability (Flesch)',
+                'yours' => round($yourFlesch, 1),
+                'market_avg' => round($avg, 1),
+                'delta' => round($delta, 1),
+                'status' => $delta > 2 ? 'Better UX' : ($delta < -2 ? 'Tighten copy' : 'Similar'),
+            ];
+        }
+
+        $imgVals = [];
+        foreach ($competitors as $c) {
+            if (is_array($c) && array_key_exists('image_count', $c) && is_numeric($c['image_count'])) {
+                $imgVals[] = (float) $c['image_count'];
+            }
+        }
+        if ($imgVals !== []) {
+            $avg = array_sum($imgVals) / count($imgVals);
+            $delta = $yourImages - $avg;
+            $rows[] = [
+                'key' => 'images',
+                'metric' => 'Images',
+                'yours' => $yourImages,
+                'market_avg' => round($avg, 1),
+                'delta' => round($delta, 1),
+                'status' => $delta < -0.5 ? 'Add visuals' : ($delta > 0.5 ? 'Above sample' : 'Aligned'),
+            ];
+        }
+
+        return $rows === [] ? null : ['rows' => $rows];
     }
 
     /**
