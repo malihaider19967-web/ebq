@@ -9,21 +9,22 @@
     $failed = $auditReport->status === 'failed';
 @endphp
 
-<details class="group rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-    <summary class="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-800 [&::-webkit-details-marker]:hidden">
-        <div class="flex items-center gap-2">
-            <svg class="h-3.5 w-3.5 text-slate-500 transition-transform group-open:rotate-90" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
-            <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">Page Audit Report</h2>
-            <span @class([
-                'inline-flex rounded-full px-2 py-px text-[10px] font-semibold',
-                'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => ! $failed,
-                'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $failed,
-            ])>{{ ucfirst($auditReport->status) }}</span>
-        </div>
-        <p class="text-[11px] text-slate-500 dark:text-slate-400">
-            Last audited: <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $auditReport->audited_at?->format('M j, Y g:i A') ?? '—' }}</span>
-        </p>
-    </summary>
+<div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <details class="group">
+        <summary class="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-800 [&::-webkit-details-marker]:hidden">
+            <div class="flex items-center gap-2">
+                <svg class="h-3.5 w-3.5 text-slate-500 transition-transform group-open:rotate-90" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">Page Audit Report</h2>
+                <span @class([
+                    'inline-flex rounded-full px-2 py-px text-[10px] font-semibold',
+                    'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => ! $failed,
+                    'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $failed,
+                ])>{{ ucfirst($auditReport->status) }}</span>
+            </div>
+            <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                Last audited: <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $auditReport->audited_at?->format('M j, Y g:i A') ?? '—' }}</span>
+            </p>
+        </summary>
 
     @if ($failed)
         <div class="px-4 py-3 text-xs text-rose-600 dark:text-rose-400">
@@ -192,6 +193,26 @@
                     <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700"><p class="text-slate-500">Favicon</p><p class="mt-1 text-sm font-bold {{ ($advanced['has_favicon'] ?? false) ? 'text-emerald-600' : 'text-amber-600' }}">{{ ($advanced['has_favicon'] ?? false) ? 'Present' : 'Missing' }}</p></div>
                 </div>
             </section>
-        </div>
-    @endif
-</details>
+            </div>
+        @endif
+    </details>
+
+    <div class="flex flex-wrap items-center gap-2 border-t border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/30">
+        <a href="{{ route('page-audits.download', $auditReport->id) }}"
+           class="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+            <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+            Download report
+        </a>
+
+        <form wire:submit.prevent="emailAuditReport" class="flex flex-1 flex-wrap items-center gap-2 sm:flex-nowrap">
+            <input type="email" wire:model="auditEmail" placeholder="recipient@example.com"
+                   class="h-8 min-w-0 flex-1 rounded-md border border-slate-300 bg-white px-2.5 text-xs text-slate-700 placeholder-slate-400 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:placeholder-slate-500" />
+            <button type="submit" wire:loading.attr="disabled" wire:target="emailAuditReport"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md border border-indigo-500 bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
+                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
+                <span wire:loading.remove wire:target="emailAuditReport">Send via email</span>
+                <span wire:loading wire:target="emailAuditReport">Sending…</span>
+            </button>
+        </form>
+    </div>
+</div>

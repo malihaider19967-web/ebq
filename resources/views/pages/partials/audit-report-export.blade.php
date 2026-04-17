@@ -1,0 +1,186 @@
+@php
+    $result = $auditReport->result ?? [];
+    $meta = $result['metadata'] ?? [];
+    $content = $result['content'] ?? [];
+    $images = $result['images'] ?? [];
+    $links = $result['links'] ?? [];
+    $technical = $result['technical'] ?? [];
+    $advanced = $result['advanced'] ?? [];
+    $failed = $auditReport->status === 'failed';
+@endphp
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Page Audit Report — {{ $auditReport->page }}</title>
+<style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #0f172a; background: #f8fafc; margin: 0; padding: 24px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .wrap { max-width: 960px; margin: 0 auto; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin-bottom: 16px; }
+    h1 { font-size: 20px; margin: 0 0 4px; }
+    h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: #64748b; margin: 0 0 10px; }
+    h3 { font-size: 14px; margin: 0 0 8px; }
+    p { margin: 4px 0; font-size: 12px; line-height: 1.5; }
+    .muted { color: #64748b; font-size: 11px; }
+    .row { display: flex; flex-wrap: wrap; gap: 10px; }
+    .kpi { flex: 1 1 140px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px; }
+    .kpi .label { font-size: 10px; color: #64748b; text-transform: uppercase; letter-spacing: 0.06em; }
+    .kpi .value { font-size: 18px; font-weight: 700; margin-top: 4px; }
+    .ok { color: #047857; }
+    .warn { color: #b45309; }
+    .bad { color: #b91c1c; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 10px; font-weight: 700; }
+    .badge.ok { background: #d1fae5; color: #047857; }
+    .badge.bad { background: #fee2e2; color: #b91c1c; }
+    .kv { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid #f1f5f9; font-size: 12px; }
+    .kv:last-child { border-bottom: 0; }
+    .kv dt { color: #64748b; }
+    .kv dd { margin: 0; font-weight: 600; color: #0f172a; text-align: right; word-break: break-all; }
+    .list { list-style: none; padding: 0; margin: 6px 0 0; font-size: 11px; max-height: 280px; overflow: auto; }
+    .list li { padding: 3px 0; border-bottom: 1px solid #f1f5f9; word-break: break-all; }
+    .list li:last-child { border-bottom: 0; }
+    .tag { display: inline-block; background: #f1f5f9; color: #334155; padding: 2px 8px; border-radius: 999px; font-size: 10px; margin: 2px; }
+    .section { margin-top: 18px; }
+    a { color: #1d4ed8; text-decoration: none; }
+    @media print {
+        body { padding: 0; background: #fff; }
+        .card { break-inside: avoid; box-shadow: none; }
+    }
+</style>
+</head>
+<body>
+<div class="wrap">
+    <div class="card">
+        <p class="muted">Page Audit Report</p>
+        <h1 style="word-break: break-all;">{{ $auditReport->page }}</h1>
+        <p class="muted">
+            Audited: <strong>{{ $auditReport->audited_at?->format('M j, Y g:i A') ?? '—' }}</strong>
+            &nbsp;·&nbsp; Status: <span class="badge {{ $failed ? 'bad' : 'ok' }}">{{ ucfirst($auditReport->status) }}</span>
+        </p>
+    </div>
+
+    @if ($failed)
+        <div class="card">
+            <p class="bad"><strong>Audit failed:</strong> {{ $auditReport->error_message ?? 'Unknown error' }}</p>
+        </div>
+    @else
+        {{-- 1. Metadata --}}
+        <div class="card">
+            <h2>1. Metadata</h2>
+            <div class="row">
+                <div class="kpi" style="flex: 1 1 100%;">
+                    <div class="label">Title ({{ $meta['title_length'] ?? 0 }} chars)</div>
+                    <p>{{ $meta['title'] ?? '—' }}</p>
+                </div>
+                <div class="kpi" style="flex: 1 1 100%;">
+                    <div class="label">Meta description ({{ $meta['meta_description_length'] ?? 0 }} chars)</div>
+                    <p>{{ $meta['meta_description'] ?? '—' }}</p>
+                </div>
+                <div class="kpi"><div class="label">Canonical</div><p style="word-break: break-all;">{{ $meta['canonical'] ?? '—' }}</p><p class="{{ ($meta['canonical_matches'] ?? false) ? 'ok' : 'warn' }}">{{ ($meta['canonical_matches'] ?? false) ? 'Matches' : 'Does not match' }}</p></div>
+                <div class="kpi"><div class="label">OpenGraph tags</div><div class="value">{{ $meta['og_tag_count'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">Twitter tags</div><div class="value">{{ $meta['twitter_tag_count'] ?? 0 }}</div></div>
+            </div>
+        </div>
+
+        {{-- 2. Content & Structure --}}
+        <div class="card">
+            <h2>2. Content &amp; Structure</h2>
+            <div class="row">
+                <div class="kpi"><div class="label">H1 count</div><div class="value {{ ($content['h1_count'] ?? 0) === 1 ? 'ok' : 'warn' }}">{{ $content['h1_count'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">Heading order</div><div class="value {{ ($content['heading_order_ok'] ?? false) ? 'ok' : 'warn' }}" style="font-size: 14px;">{{ ($content['heading_order_ok'] ?? false) ? 'Logical' : 'Skipped levels' }}</div></div>
+                <div class="kpi"><div class="label">Word count</div><div class="value">{{ number_format($content['word_count'] ?? 0) }}</div></div>
+                <div class="kpi"><div class="label">Headings total</div><div class="value">{{ count($content['headings'] ?? []) }}</div></div>
+            </div>
+            @if (! empty($content['first_150_words']))
+                <div class="section">
+                    <h3>Answer readiness (first 150 words)</h3>
+                    <p>{{ $content['first_150_words'] }}</p>
+                </div>
+            @endif
+            @if (! empty($content['keyword_density']))
+                <div class="section">
+                    <h3>Keyword density (top 20)</h3>
+                    <div>
+                        @foreach ($content['keyword_density'] as $kw)
+                            <span class="tag"><strong>{{ $kw['term'] }}</strong> ×{{ $kw['count'] }} · {{ $kw['density'] }}%</span>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
+            @if (! empty($content['headings']))
+                <div class="section">
+                    <h3>Heading outline ({{ count($content['headings']) }})</h3>
+                    <ul class="list">
+                        @foreach ($content['headings'] as $h)
+                            <li style="padding-left: {{ ($h['level'] - 1) * 14 }}px;"><span class="muted">H{{ $h['level'] }}</span> {{ $h['text'] }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        </div>
+
+        {{-- 3. Images & Links --}}
+        <div class="card">
+            <h2>3. Image &amp; Link Analysis</h2>
+            <div class="row">
+                <div class="kpi"><div class="label">Images total</div><div class="value">{{ $images['total'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">Missing alt</div><div class="value {{ ($images['missing_alt_count'] ?? 0) > 0 ? 'bad' : 'ok' }}">{{ $images['missing_alt_count'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">Modern formats (webp/avif)</div><div class="value">{{ $images['modern_format_count'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">Broken links</div><div class="value {{ count($links['broken'] ?? []) > 0 ? 'bad' : 'ok' }}">{{ count($links['broken'] ?? []) }}</div></div>
+                <div class="kpi"><div class="label">Internal links</div><div class="value">{{ $links['internal_count'] ?? 0 }}</div></div>
+                <div class="kpi"><div class="label">External links</div><div class="value">{{ $links['external_count'] ?? 0 }}</div></div>
+            </div>
+            @if (! empty($images['missing_alt']))
+                <div class="section">
+                    <h3>Images missing alt</h3>
+                    <ul class="list">
+                        @foreach ($images['missing_alt'] as $src)
+                            <li>{{ $src }}</li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+            @if (! empty($links['broken']))
+                <div class="section">
+                    <h3 class="bad">Broken links ({{ count($links['broken']) }})</h3>
+                    <ul class="list">
+                        @foreach ($links['broken'] as $b)
+                            <li><span class="badge bad">{{ $b['status'] ?? 'ERR' }}</span> <a href="{{ $b['href'] }}">{{ $b['href'] }}</a></li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+        </div>
+
+        {{-- 4. Technical --}}
+        <div class="card">
+            <h2>4. Technical Performance</h2>
+            <div class="row">
+                <div class="kpi"><div class="label">HTTP status</div><div class="value {{ ($technical['http_status'] ?? 0) < 400 ? 'ok' : 'bad' }}">{{ $technical['http_status'] ?? '—' }}</div></div>
+                <div class="kpi"><div class="label">Response time (TTFB)</div><div class="value">{{ isset($technical['ttfb_ms']) ? $technical['ttfb_ms'].' ms' : '—' }}</div></div>
+                <div class="kpi"><div class="label">Page size</div><div class="value">{{ isset($technical['page_size_bytes']) ? number_format($technical['page_size_bytes'] / 1024, 1).' KB' : '—' }}</div></div>
+                <div class="kpi"><div class="label">Compression</div><div class="value" style="font-size: 14px;">{{ $technical['compression'] ?? 'none' }}</div></div>
+                <div class="kpi"><div class="label">HTTPS</div><div class="value {{ ($technical['is_https'] ?? false) ? 'ok' : 'warn' }}" style="font-size: 14px;">{{ ($technical['is_https'] ?? false) ? 'Yes' : 'No' }}</div></div>
+            </div>
+        </div>
+
+        {{-- 5. Advanced --}}
+        <div class="card">
+            <h2>5. Advanced Data</h2>
+            <div class="row">
+                <div class="kpi"><div class="label">Schema (JSON-LD)</div><div class="value">{{ $advanced['schema_blocks'] ?? 0 }}</div></div>
+                <div class="kpi">
+                    <div class="label">Readability (Flesch)</div>
+                    <div class="value">{{ data_get($advanced, 'readability.flesch') ?? '—' }}</div>
+                    <p class="muted">{{ data_get($advanced, 'readability.grade') ?? '' }}</p>
+                </div>
+                <div class="kpi"><div class="label">Favicon</div><div class="value {{ ($advanced['has_favicon'] ?? false) ? 'ok' : 'warn' }}" style="font-size: 14px;">{{ ($advanced['has_favicon'] ?? false) ? 'Present' : 'Missing' }}</div></div>
+            </div>
+        </div>
+    @endif
+
+    <p class="muted" style="text-align: center; margin-top: 24px;">Generated by EBQ · {{ now()->format('M j, Y g:i A') }}</p>
+</div>
+</body>
+</html>
