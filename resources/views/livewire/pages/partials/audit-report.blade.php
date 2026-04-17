@@ -32,6 +32,47 @@
         </div>
     @else
         <div class="space-y-5 px-4 py-4">
+            @php $recs = $result['recommendations'] ?? []; @endphp
+            @if (! empty($recs))
+                @php
+                    $counts = collect($recs)->groupBy('severity')->map->count();
+                    $sevMeta = [
+                        'critical' => ['label' => 'Critical', 'badge' => 'bg-rose-100 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400', 'bar' => 'border-rose-300 bg-rose-50/60 dark:border-rose-900/40 dark:bg-rose-500/5'],
+                        'warning'  => ['label' => 'Warning',  'badge' => 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400', 'bar' => 'border-amber-300 bg-amber-50/60 dark:border-amber-900/40 dark:bg-amber-500/5'],
+                        'info'     => ['label' => 'Info',     'badge' => 'bg-sky-100 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400',       'bar' => 'border-sky-300 bg-sky-50/60 dark:border-sky-900/40 dark:bg-sky-500/5'],
+                        'good'     => ['label' => 'Good',     'badge' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400', 'bar' => 'border-emerald-300 bg-emerald-50/60 dark:border-emerald-900/40 dark:bg-emerald-500/5'],
+                    ];
+                @endphp
+                <section>
+                    <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                        <h3 class="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Recommendations</h3>
+                        <div class="flex flex-wrap gap-1.5 text-[10px] font-semibold">
+                            @foreach (['critical', 'warning', 'info', 'good'] as $sev)
+                                @if (($counts[$sev] ?? 0) > 0)
+                                    <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 {{ $sevMeta[$sev]['badge'] }}">
+                                        {{ $counts[$sev] }} {{ $sevMeta[$sev]['label'] }}
+                                    </span>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+                    <div class="space-y-2">
+                        @foreach ($recs as $r)
+                            @php $meta = $sevMeta[$r['severity']] ?? $sevMeta['info']; @endphp
+                            <div class="rounded-lg border-l-4 {{ $meta['bar'] }} border-y border-r border-slate-200 px-3 py-2 text-xs dark:border-slate-700">
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <span class="inline-flex rounded-full px-2 py-px text-[10px] font-bold uppercase tracking-wider {{ $meta['badge'] }}">{{ $meta['label'] }}</span>
+                                    <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ $r['section'] }}</span>
+                                    <p class="font-bold text-slate-900 dark:text-slate-100">{{ $r['title'] }}</p>
+                                </div>
+                                <p class="mt-1.5 text-slate-600 dark:text-slate-300"><span class="font-semibold text-slate-700 dark:text-slate-200">Why it matters:</span> {{ $r['why'] }}</p>
+                                <p class="mt-1 text-slate-600 dark:text-slate-300"><span class="font-semibold text-slate-700 dark:text-slate-200">Fix:</span> {{ $r['fix'] }}</p>
+                            </div>
+                        @endforeach
+                    </div>
+                </section>
+            @endif
+
             {{-- 1. Metadata --}}
             <section>
                 <h3 class="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">1. Metadata</h3>

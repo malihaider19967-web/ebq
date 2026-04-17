@@ -65,6 +65,48 @@
             <p class="bad"><strong>Audit failed:</strong> {{ $auditReport->error_message ?? 'Unknown error' }}</p>
         </div>
     @else
+        @php $recs = $result['recommendations'] ?? []; @endphp
+        @if (! empty($recs))
+            @php $counts = collect($recs)->groupBy('severity')->map->count(); @endphp
+            <div class="card">
+                <h2>Recommendations</h2>
+                <p class="muted" style="margin-bottom: 10px;">
+                    @foreach (['critical', 'warning', 'info', 'good'] as $sev)
+                        @if (($counts[$sev] ?? 0) > 0)
+                            <span class="tag"><strong>{{ $counts[$sev] }}</strong> {{ ucfirst($sev) }}</span>
+                        @endif
+                    @endforeach
+                </p>
+                @foreach ($recs as $r)
+                    @php
+                        $sevColor = match ($r['severity']) {
+                            'critical' => '#b91c1c',
+                            'warning' => '#b45309',
+                            'info' => '#0369a1',
+                            'good' => '#047857',
+                            default => '#64748b',
+                        };
+                        $sevBg = match ($r['severity']) {
+                            'critical' => '#fee2e2',
+                            'warning' => '#fef3c7',
+                            'info' => '#e0f2fe',
+                            'good' => '#d1fae5',
+                            default => '#f1f5f9',
+                        };
+                    @endphp
+                    <div style="border-left: 4px solid {{ $sevColor }}; background: {{ $sevBg }}; padding: 10px 12px; border-radius: 6px; margin-bottom: 8px;">
+                        <p style="margin: 0;">
+                            <span class="badge" style="background: #fff; color: {{ $sevColor }}; border: 1px solid {{ $sevColor }};">{{ strtoupper($r['severity']) }}</span>
+                            <span class="muted" style="margin-left: 6px;">{{ $r['section'] }}</span>
+                            <strong style="margin-left: 6px;">{{ $r['title'] }}</strong>
+                        </p>
+                        <p style="margin-top: 6px;"><strong>Why it matters:</strong> {{ $r['why'] }}</p>
+                        <p><strong>Fix:</strong> {{ $r['fix'] }}</p>
+                    </div>
+                @endforeach
+            </div>
+        @endif
+
         {{-- 1. Metadata --}}
         <div class="card">
             <h2>1. Metadata</h2>

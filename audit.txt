@@ -1,48 +1,40 @@
-Based on the audit rules and the requirements for your tool, here is the list of simple, automated tasks the script will perform:
+Role: Expert SEO Strategist and System Architect.
 
-1. Metadata Checks
-Title Tag: Check if present and measure character count.
+Objective: Extend current audit report Create a comprehensive "Recommendation Logic Engine" for a website auditing tool. I need a set of static, rule-based mappings that link specific audit data points to actionable advice for the customer.
 
-Meta Description: Check if present and measure character count.
+Context: My system collects data on Metadata, Structure, Performance, and Technical SEO. I do not want to use AI to generate these insights on the fly. Instead, I need you to provide the "Extra Value" logic that I will hard-code into my reporting templates.
 
-Canonical URL: Verify the rel="canonical" link exists and matches the URL.
+Task: For each of the following data points found in my audit reports, provide:
 
-Social Tags: Detect OpenGraph (og:) and Twitter card tags.
+Threshold/Condition: What specific value or "Warning" status should trigger a recommendation?
 
-2. Content & Structure
-Heading Check: Find all <h1> through <h6> tags and check for logical order.
+Highlight Text: A concise explanation of why this matters (the "Extra Value").
 
-H1 Count: Ensure exactly one <h1> tag exists on the page.
+Actionable Recommendation: The specific step the user should take.
 
-Word Count: Total number of words in the <body>.
+Data Points to Map:
 
-Answer Readiness: Extract and display the first 150 words of text.
+Metadata: Title Tag length (under/over 60), Meta Description length (120-160 range), and OpenGraph/Twitter tag presence.
 
-Keyword Density: List the most frequently used words or phrases.
+Structure: Heading Order (e.g., skipped levels), Word Count (high vs. low), and Keyword Density percentages.
 
-3. Image & Link Analysis
-Alt Text: Identify any <img> tags missing an alt attribute.
+Technical: Compression status (None vs. Gzip/Brotli), Response Time (TTFB) thresholds (e.g., >500ms), and HTTPS status.
 
-Image Formats: Check for modern extensions like .webp or .avif.
+Engagement: Image count (specifically when word count is high but images are 0).
 
-Internal Links: Count and list links pointing to your own domain.
+Advanced: Schema (JSON-LD) presence and Flesch Readability scores.
 
-External Links: Count and list links pointing to outside domains.
+Output Format: Provide the logic in a table or structured list that my developers can easily translate into if/else statements for our reporting engine.
 
-Broken Links: Check HTTP status codes (e.g., 200 vs 404) for all found links.
+Why this works for your system
+Consistency: Every customer who has "Skipped Heading Levels" will get the same high-quality explanation and fix.
 
-4. Technical Performance
-Response Time: Measure the time taken to receive the first byte (TTFB).
+Speed: Since the logic is hard-coded (e.g., if (wordCount > 1000 && imageCount == 0)), the report remains instant and doesn't rely on expensive or slow AI API calls during the audit.
 
-Page Size: Calculate the total size of the HTML document in KB.
+Authority: It transforms a "Page Audit" into a "Consultancy Report" by explaining the why behind the numbers, like how a 7th-grade readability score is the "sweet spot" for gaming tools.
 
-Compression: Detect if the server is using Gzip or Brotli headers.
+Quick Tip for your System:
+You can use the Keyword Density data to provide a "Diversity Alert". If one keyword is over 3%, have your system automatically suggest 3-4 synonyms (LSI keywords) to help the user avoid "Keyword Stuffing" penalties.
 
-HTTPS Check: Verify if the connection is secure.
-
-5. Advanced Data
-Schema Detection: Locate and count any JSON-LD blocks.
-
-Readability: Calculate a basic Flesch-Kincaid ease-of-reading score.
-
-Favicon: Check for the presence of a site icon.
+Additional:
+Also update the report download and email

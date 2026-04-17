@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\PageAuditReport;
 use App\Support\Audit\HtmlAuditor;
+use App\Support\Audit\RecommendationEngine;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -67,6 +68,8 @@ class PageAuditService
                     'favicon_href' => $favicon['href'],
                 ],
             ];
+
+            $result['recommendations'] = app(RecommendationEngine::class)->analyze($result);
 
             return PageAuditReport::updateOrCreate(
                 ['website_id' => $websiteId, 'page' => $pageUrl],
