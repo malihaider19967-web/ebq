@@ -1,162 +1,214 @@
-<div class="space-y-6" wire:init="autoGenerateSnippet">
-    <div>
-        <a href="{{ route('pages.index') }}" class="inline-flex items-center gap-1 text-xs text-slate-500 transition hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400">
-            <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
-            Back to pages
-        </a>
-        <h1 class="mt-1.5 truncate text-base font-bold tracking-tight text-slate-900 dark:text-slate-100">{{ $pageUrl }}</h1>
-        <div class="mt-3 flex flex-wrap items-center gap-2">
-            <button type="button" wire:click="requestReindex" wire:loading.attr="disabled" wire:target="requestReindex" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
-                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
-                <span wire:loading.remove wire:target="requestReindex">Request Google reindex</span>
-                <span wire:loading wire:target="requestReindex">Requesting…</span>
-            </button>
-            <button type="button" wire:click="refreshGoogleIndexingStatus" wire:loading.attr="disabled" wire:target="refreshGoogleIndexingStatus" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
-                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5v5.25h5.25M19.5 19.5v-5.25h-5.25M4.5 9.75a7.5 7.5 0 0 1 13.307-4.914L19.5 6.75m0 7.5a7.5 7.5 0 0 1-13.307 4.914L4.5 17.25" /></svg>
-                <span wire:loading.remove wire:target="refreshGoogleIndexingStatus">Refresh Google status</span>
-                <span wire:loading wire:target="refreshGoogleIndexingStatus">Refreshing…</span>
-            </button>
-            <button type="button" wire:click="generateGoogleSnippet" wire:loading.attr="disabled" wire:target="generateGoogleSnippet" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
-                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h3m6-9H6a2.25 2.25 0 0 0-2.25 2.25v8.25A2.25 2.25 0 0 0 6 19.75h12a2.25 2.25 0 0 0 2.25-2.25V9.25A2.25 2.25 0 0 0 18 7Zm0 0V5.75A1.75 1.75 0 0 0 16.25 4h-8.5A1.75 1.75 0 0 0 6 5.75V7" /></svg>
-                <span wire:loading.remove wire:target="generateGoogleSnippet">Generate snippet</span>
-                <span wire:loading wire:target="generateGoogleSnippet">Generating…</span>
-            </button>
-            <button type="button" wire:click="auditPage" wire:loading.attr="disabled" wire:target="auditPage" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-indigo-500 bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
+@php
+    $messages = collect([
+        ['text' => $reindexMessage, 'kind' => $reindexMessageKind],
+        ['text' => $googleStatusMessage, 'kind' => $googleStatusMessageKind],
+        ['text' => $snippetMessage, 'kind' => $snippetMessageKind],
+        ['text' => $auditMessage, 'kind' => $auditMessageKind],
+    ])->filter(fn ($m) => ! empty($m['text']))->values();
+
+    $verdict = $indexingStatus?->google_verdict;
+    $verdictKind = match (strtoupper((string) $verdict)) {
+        'PASS' => 'success',
+        'FAIL', 'NEUTRAL', 'PARTIAL' => 'warning',
+        default => 'muted',
+    };
+@endphp
+
+<div class="space-y-5" wire:init="autoGenerateSnippet">
+    {{-- ═══ Header ═══ --}}
+    <header class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div class="px-5 pt-4">
+            <a href="{{ route('pages.index') }}" class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400">
+                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
+                Back to pages
+            </a>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+                <h1 class="min-w-0 max-w-full truncate text-base font-bold tracking-tight text-slate-900 dark:text-slate-100">{{ $pageUrl }}</h1>
+                <a href="{{ $pageUrl }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-indigo-400">
+                    Open
+                    <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
+                </a>
+            </div>
+        </div>
+
+        {{-- Actions --}}
+        <div class="flex flex-wrap items-center gap-2 px-5 pt-3">
+            <button type="button" wire:click="auditPage" wire:loading.attr="disabled" wire:target="auditPage"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
                 <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
                 <span wire:loading.remove wire:target="auditPage">Audit this page</span>
                 <span wire:loading wire:target="auditPage">Auditing…</span>
             </button>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400">Uses Google Indexing API. URL processing is not guaranteed.</p>
+
+            <div class="mx-1 hidden h-5 w-px bg-slate-200 sm:block dark:bg-slate-700"></div>
+
+            <button type="button" wire:click="requestReindex" wire:loading.attr="disabled" wire:target="requestReindex"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" /></svg>
+                <span wire:loading.remove wire:target="requestReindex">Request reindex</span>
+                <span wire:loading wire:target="requestReindex">Requesting…</span>
+            </button>
+            <button type="button" wire:click="refreshGoogleIndexingStatus" wire:loading.attr="disabled" wire:target="refreshGoogleIndexingStatus"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 4.5v5.25h5.25M19.5 19.5v-5.25h-5.25M4.5 9.75a7.5 7.5 0 0 1 13.307-4.914L19.5 6.75m0 7.5a7.5 7.5 0 0 1-13.307 4.914L4.5 17.25" /></svg>
+                <span wire:loading.remove wire:target="refreshGoogleIndexingStatus">Refresh status</span>
+                <span wire:loading wire:target="refreshGoogleIndexingStatus">Refreshing…</span>
+            </button>
+            <button type="button" wire:click="generateGoogleSnippet" wire:loading.attr="disabled" wire:target="generateGoogleSnippet"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h3m6-9H6a2.25 2.25 0 0 0-2.25 2.25v8.25A2.25 2.25 0 0 0 6 19.75h12a2.25 2.25 0 0 0 2.25-2.25V9.25A2.25 2.25 0 0 0 18 7Zm0 0V5.75A1.75 1.75 0 0 0 16.25 4h-8.5A1.75 1.75 0 0 0 6 5.75V7" /></svg>
+                <span wire:loading.remove wire:target="generateGoogleSnippet">Snippet preview</span>
+                <span wire:loading wire:target="generateGoogleSnippet">Generating…</span>
+            </button>
         </div>
-        <div class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-900/60">
-            <div class="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                <p class="text-slate-600 dark:text-slate-300">Last Google check: <span class="font-semibold text-slate-800 dark:text-slate-100">{{ $indexingStatus?->last_google_status_checked_at?->format('M j, Y g:i A') ?? 'Never' }}</span></p>
-                <p class="text-slate-600 dark:text-slate-300">Verdict: <span class="font-semibold text-slate-800 dark:text-slate-100">{{ $indexingStatus?->google_verdict ?? 'Unknown' }}</span></p>
-                <p class="text-slate-600 dark:text-slate-300">Coverage: <span class="font-semibold text-slate-800 dark:text-slate-100">{{ $indexingStatus?->google_coverage_state ?? 'Unknown' }}</span></p>
-                <p class="text-slate-600 dark:text-slate-300">Last crawl: <span class="font-semibold text-slate-800 dark:text-slate-100">{{ $indexingStatus?->google_last_crawl_at?->format('M j, Y g:i A') ?? 'Unknown' }}</span></p>
-            </div>
-            <p class="mt-2 text-slate-600 dark:text-slate-300">Last reindex request: <span class="font-semibold text-slate-800 dark:text-slate-100">{{ $indexingStatus?->last_reindex_requested_at?->format('M j, Y g:i A') ?? 'Never requested' }}</span></p>
-        </div>
-        @if ($reindexMessage)
-            <div class="mt-2 flex flex-wrap items-center gap-2">
-                <span @class([
-                    'inline-flex rounded-md px-2 py-1 text-xs font-medium',
-                    'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $reindexMessageKind === 'success',
-                    'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' => $reindexMessageKind === 'info',
-                    'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $reindexMessageKind === 'error',
-                ])>{{ $reindexMessage }}</span>
+
+        {{-- Messages --}}
+        @if ($messages->isNotEmpty() || $needsGoogleReconnect)
+            <div class="flex flex-wrap items-center gap-2 px-5 pt-3">
+                @foreach ($messages as $m)
+                    <span @class([
+                        'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-[11px] font-medium',
+                        'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $m['kind'] === 'success',
+                        'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' => $m['kind'] === 'info',
+                        'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $m['kind'] === 'error',
+                    ])>{{ $m['text'] }}</span>
+                @endforeach
                 @if ($needsGoogleReconnect)
-                    <a href="{{ route('google.redirect') }}" class="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
+                    <a href="{{ route('google.redirect') }}" class="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
                         Reconnect Google
                     </a>
                 @endif
             </div>
         @endif
-        @if ($googleStatusMessage)
-            <div class="mt-2 flex flex-wrap items-center gap-2">
-                <span @class([
-                    'inline-flex rounded-md px-2 py-1 text-xs font-medium',
-                    'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $googleStatusMessageKind === 'success',
-                    'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' => $googleStatusMessageKind === 'info',
-                    'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $googleStatusMessageKind === 'error',
-                ])>{{ $googleStatusMessage }}</span>
-                @if ($needsGoogleReconnect)
-                    <a href="{{ route('google.redirect') }}" class="inline-flex h-7 items-center rounded-md border border-slate-300 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
-                        Reconnect Google
-                    </a>
-                @endif
-            </div>
-        @endif
-        @if ($snippetTitle || $snippetDescription)
-            <div class="mt-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900/60">
-                <p class="text-xs text-emerald-700 dark:text-emerald-400">{{ $snippetDisplayUrl }}</p>
-                <p class="mt-1 text-base font-medium text-blue-700 dark:text-blue-400">{{ $snippetTitle }}</p>
-                <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{{ $snippetDescription }}</p>
-            </div>
-        @endif
-        @if ($snippetMessage)
-            <div class="mt-2">
-                <span @class([
-                    'inline-flex rounded-md px-2 py-1 text-xs font-medium',
-                    'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $snippetMessageKind === 'success',
-                    'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' => $snippetMessageKind === 'info',
-                    'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $snippetMessageKind === 'error',
-                ])>{{ $snippetMessage }}</span>
-            </div>
-        @endif
-        @if ($auditMessage)
-            <div class="mt-2">
-                <span @class([
-                    'inline-flex rounded-md px-2 py-1 text-xs font-medium',
-                    'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $auditMessageKind === 'success',
-                    'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' => $auditMessageKind === 'info',
-                    'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $auditMessageKind === 'error',
-                ])>{{ $auditMessage }}</span>
-            </div>
-        @endif
-    </div>
 
-    @if ($auditReport)
-        @include('livewire.pages.partials.audit-report', ['auditReport' => $auditReport])
-    @endif
+        {{-- Footnote --}}
+        <p class="px-5 pb-4 pt-3 text-[11px] text-slate-500 dark:text-slate-400">Audits use a Googlebot user-agent. Reindex uses the Google Indexing API — processing is not guaranteed.</p>
+    </header>
 
+    {{-- ═══ KPI row ═══ --}}
     @if ($summary)
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             @foreach ([
-                ['label' => 'Clicks', 'value' => number_format($summary->total_clicks), 'color' => 'text-blue-600 dark:text-blue-400', 'bg' => 'bg-blue-50 dark:bg-blue-500/10'],
-                ['label' => 'Impressions', 'value' => number_format($summary->total_impressions), 'color' => 'text-emerald-600 dark:text-emerald-400', 'bg' => 'bg-emerald-50 dark:bg-emerald-500/10'],
-                ['label' => 'Avg CTR', 'value' => number_format(($summary->avg_ctr ?? 0) * 100, 1).'%', 'color' => 'text-violet-600 dark:text-violet-400', 'bg' => 'bg-violet-50 dark:bg-violet-500/10'],
-                ['label' => 'Avg Position', 'value' => number_format($summary->avg_position ?? 0, 1), 'color' => 'text-amber-600 dark:text-amber-400', 'bg' => 'bg-amber-50 dark:bg-amber-500/10'],
+                ['label' => 'Clicks', 'value' => number_format($summary->total_clicks), 'color' => 'text-blue-600 dark:text-blue-400', 'icon' => 'M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007zM8.625 10.5a.375.375 0 11-.75 0 .375.375 0 01.75 0zm7.5 0a.375.375 0 11-.75 0 .375.375 0 01.75 0z'],
+                ['label' => 'Impressions', 'value' => number_format($summary->total_impressions), 'color' => 'text-emerald-600 dark:text-emerald-400', 'icon' => 'M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z M15 12a3 3 0 11-6 0 3 3 0 016 0z'],
+                ['label' => 'Avg CTR', 'value' => number_format(($summary->avg_ctr ?? 0) * 100, 1).'%', 'color' => 'text-violet-600 dark:text-violet-400', 'icon' => 'M15.042 21.672L13.684 16.6m0 0l-2.51 2.225.569-9.47 5.227 7.917-3.286-.672zm-7.518-.267A8.25 8.25 0 1120.25 10.5M8.288 14.212A5.25 5.25 0 1117.25 10.5'],
+                ['label' => 'Avg Position', 'value' => number_format($summary->avg_position ?? 0, 1), 'color' => 'text-amber-600 dark:text-amber-400', 'icon' => 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z'],
             ] as $card)
-                <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ $card['label'] }}</p>
-                    <p class="mt-1 text-xl font-bold {{ $card['color'] }}">{{ $card['value'] }}</p>
+                <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                    <div class="flex items-center justify-between">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ $card['label'] }}</p>
+                        <svg class="h-4 w-4 {{ $card['color'] }}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $card['icon'] }}" /></svg>
+                    </div>
+                    <p class="mt-2 text-2xl font-bold tabular-nums {{ $card['color'] }}">{{ $card['value'] }}</p>
                 </div>
             @endforeach
         </div>
     @endif
 
-    <div>
-        <h3 class="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Keywords ranking for this page</h3>
+    {{-- ═══ Indexing + Snippet ═══ --}}
+    <div class="grid gap-4 lg:grid-cols-5">
+        {{-- Google indexing status --}}
+        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-center justify-between">
+                <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Google Indexing</h3>
+                <span @class([
+                    'inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                    'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $verdictKind === 'success',
+                    'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' => $verdictKind === 'warning',
+                    'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' => $verdictKind === 'muted',
+                ])>{{ $verdict ?? 'Unknown' }}</span>
+            </div>
+            <dl class="mt-3 space-y-2 text-xs">
+                <div class="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 dark:border-slate-800">
+                    <dt class="text-slate-500 dark:text-slate-400">Coverage</dt>
+                    <dd class="truncate text-right font-medium text-slate-800 dark:text-slate-100">{{ $indexingStatus?->google_coverage_state ?? '—' }}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 dark:border-slate-800">
+                    <dt class="text-slate-500 dark:text-slate-400">Indexing state</dt>
+                    <dd class="truncate text-right font-medium text-slate-800 dark:text-slate-100">{{ $indexingStatus?->google_indexing_state ?? '—' }}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 dark:border-slate-800">
+                    <dt class="text-slate-500 dark:text-slate-400">Last crawl</dt>
+                    <dd class="text-right font-medium text-slate-800 dark:text-slate-100">{{ $indexingStatus?->google_last_crawl_at?->format('M j, Y g:i A') ?? '—' }}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 dark:border-slate-800">
+                    <dt class="text-slate-500 dark:text-slate-400">Last status check</dt>
+                    <dd class="text-right font-medium text-slate-800 dark:text-slate-100">{{ $indexingStatus?->last_google_status_checked_at?->format('M j, Y g:i A') ?? 'Never' }}</dd>
+                </div>
+                <div class="flex items-center justify-between gap-3">
+                    <dt class="text-slate-500 dark:text-slate-400">Last reindex request</dt>
+                    <dd class="text-right font-medium text-slate-800 dark:text-slate-100">{{ $indexingStatus?->last_reindex_requested_at?->format('M j, Y g:i A') ?? 'Never' }}</dd>
+                </div>
+            </dl>
+        </div>
+
+        {{-- Google snippet preview --}}
+        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-3 dark:border-slate-800 dark:bg-slate-900">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Google Snippet Preview</h3>
+            @if ($snippetTitle || $snippetDescription)
+                <div class="mt-3 rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
+                    <p class="text-xs text-emerald-700 dark:text-emerald-400">{{ $snippetDisplayUrl }}</p>
+                    <p class="mt-1 text-lg font-medium leading-snug text-blue-700 dark:text-blue-400">{{ $snippetTitle }}</p>
+                    <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{{ $snippetDescription }}</p>
+                </div>
+            @else
+                <div class="mt-3 flex h-32 items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50/50 text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/30 dark:text-slate-400">
+                    Click "Snippet preview" to generate.
+                </div>
+            @endif
+        </div>
+    </div>
+
+    {{-- ═══ Audit report ═══ --}}
+    @if ($auditReport)
+        @include('livewire.pages.partials.audit-report', ['auditReport' => $auditReport])
+    @endif
+
+    {{-- ═══ Keywords ═══ --}}
+    <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3 dark:border-slate-800">
+            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Keywords ranking for this page</h3>
+            @if ($keywords instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $keywords->total() > 0)
+                <span class="text-[11px] text-slate-500 dark:text-slate-400">{{ number_format($keywords->total()) }} total</span>
+            @endif
+        </div>
 
         @if ($keywords instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $keywords->isNotEmpty())
-            <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <div class="overflow-x-auto">
-                    <table class="w-full text-xs">
-                        <thead>
-                            <tr class="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
-                                <x-sort-header column="query" :sortBy="$sortBy" :sortDir="$sortDir">Keyword</x-sort-header>
-                                <x-sort-header column="total_clicks" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Clicks</x-sort-header>
-                                <x-sort-header column="total_impressions" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Impressions</x-sort-header>
-                                <x-sort-header column="avg_ctr" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Avg CTR</x-sort-header>
-                                <x-sort-header column="avg_position" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Avg Position</x-sort-header>
+            <div class="overflow-x-auto">
+                <table class="w-full text-xs">
+                    <thead>
+                        <tr class="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-800/40 dark:text-slate-400">
+                            <x-sort-header column="query" :sortBy="$sortBy" :sortDir="$sortDir">Keyword</x-sort-header>
+                            <x-sort-header column="total_clicks" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Clicks</x-sort-header>
+                            <x-sort-header column="total_impressions" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Impressions</x-sort-header>
+                            <x-sort-header column="avg_ctr" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Avg CTR</x-sort-header>
+                            <x-sort-header column="avg_position" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Avg Position</x-sort-header>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                        @foreach ($keywords as $kw)
+                            <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                                <td class="whitespace-nowrap px-4 py-2.5 font-medium text-slate-900 dark:text-slate-100">{{ $kw->query }}</td>
+                                <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($kw->total_clicks) }}</td>
+                                <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($kw->total_impressions) }}</td>
+                                <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format(($kw->avg_ctr ?? 0) * 100, 1) }}%</td>
+                                <td class="whitespace-nowrap px-4 py-2.5 text-right">
+                                    <span @class([
+                                        'inline-flex rounded-full px-1.5 py-px text-[10px] font-semibold tabular-nums',
+                                        'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => ($kw->avg_position ?? 0) <= 3,
+                                        'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400' => ($kw->avg_position ?? 0) > 3 && ($kw->avg_position ?? 0) <= 10,
+                                        'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' => ($kw->avg_position ?? 0) > 10 && ($kw->avg_position ?? 0) <= 20,
+                                        'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' => ($kw->avg_position ?? 0) > 20,
+                                    ])>{{ number_format($kw->avg_position ?? 0, 1) }}</span>
+                                </td>
                             </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                            @foreach ($keywords as $kw)
-                                <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                                    <td class="whitespace-nowrap px-4 py-2.5 font-medium text-slate-900 dark:text-slate-100">{{ $kw->query }}</td>
-                                    <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($kw->total_clicks) }}</td>
-                                    <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($kw->total_impressions) }}</td>
-                                    <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format(($kw->avg_ctr ?? 0) * 100, 1) }}%</td>
-                                    <td class="whitespace-nowrap px-4 py-2.5 text-right">
-                                        <span @class([
-                                            'inline-flex rounded-full px-1.5 py-px text-[10px] font-semibold tabular-nums',
-                                            'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => ($kw->avg_position ?? 0) <= 3,
-                                            'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400' => ($kw->avg_position ?? 0) > 3 && ($kw->avg_position ?? 0) <= 10,
-                                            'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' => ($kw->avg_position ?? 0) > 10 && ($kw->avg_position ?? 0) <= 20,
-                                            'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' => ($kw->avg_position ?? 0) > 20,
-                                        ])>{{ number_format($kw->avg_position ?? 0, 1) }}</span>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
-            <div class="mt-3">{{ $keywords->links() }}</div>
+            <div class="border-t border-slate-200 px-5 py-3 dark:border-slate-800">{{ $keywords->links() }}</div>
         @else
-            <div class="flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white px-6 py-16 dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex flex-col items-center justify-center px-6 py-16">
                 <p class="text-sm font-medium text-slate-500 dark:text-slate-400">No keyword data for this page yet</p>
             </div>
         @endif
