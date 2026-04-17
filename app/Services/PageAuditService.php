@@ -495,7 +495,7 @@ class PageAuditService
     }
 
     /**
-     * @return array{found: bool, position: int|null, on_first_page: bool|null, organic_sample_size: int, matched_listing_url: string|null, matched_listing_title: string|null}
+     * @return array{found: bool, position: int|null, on_first_page: bool|null, organic_sample_size: int, matched_listing_url: string|null, matched_listing_title: string|null, matched_listing_snippet: string|null, matched_listing_display: string|null}
      */
     private function emptyYourSerpSnapshot(): array
     {
@@ -506,6 +506,8 @@ class PageAuditService
             'organic_sample_size' => 0,
             'matched_listing_url' => null,
             'matched_listing_title' => null,
+            'matched_listing_snippet' => null,
+            'matched_listing_display' => null,
         ];
     }
 
@@ -515,7 +517,7 @@ class PageAuditService
      * Picks the best (lowest) reported position among matching rows and returns that row’s listing URL/title.
      *
      * @param  list<array<string, mixed>>  $organic
-     * @return array{found: bool, position: int|null, on_first_page: bool|null, organic_sample_size: int, matched_listing_url: string|null, matched_listing_title: string|null}
+     * @return array{found: bool, position: int|null, on_first_page: bool|null, organic_sample_size: int, matched_listing_url: string|null, matched_listing_title: string|null, matched_listing_snippet: string|null, matched_listing_display: string|null}
      */
     private function resolveYourSerpPosition(string $pageUrl, array $organic): array
     {
@@ -529,6 +531,8 @@ class PageAuditService
         $bestPos = null;
         $bestLink = null;
         $bestTitle = null;
+        $bestSnippet = null;
+        $bestDisplay = null;
         $ordinal = 0;
         foreach ($organic as $row) {
             $link = $this->organicRowHttpUrl($row);
@@ -548,6 +552,8 @@ class PageAuditService
                 $bestLink = $link;
                 $t = $row['title'] ?? '';
                 $bestTitle = is_string($t) && trim($t) !== '' ? trim($t) : null;
+                $bestSnippet = $this->organicRowSnippet($row);
+                $bestDisplay = $this->organicSerpDisplayLine($row, $link);
             }
         }
 
@@ -559,6 +565,8 @@ class PageAuditService
                 'organic_sample_size' => $totalValid,
                 'matched_listing_url' => $bestLink,
                 'matched_listing_title' => $bestTitle,
+                'matched_listing_snippet' => $bestSnippet,
+                'matched_listing_display' => $bestDisplay,
             ];
         }
 
@@ -569,6 +577,8 @@ class PageAuditService
             'organic_sample_size' => $totalValid,
             'matched_listing_url' => null,
             'matched_listing_title' => null,
+            'matched_listing_snippet' => null,
+            'matched_listing_display' => null,
         ];
     }
 
@@ -609,6 +619,56 @@ class PageAuditService
         }
 
         return $link;
+    }
+
+    /**
+     * @param  array<string, mixed>  $row
+     */
+    private function organicRowSnippet(array $row): ?string
+    {
+        foreach (['snippet', 'description'] as $key) {
+            $v = $row[$key] ?? null;
+            if (is_string($v)) {
+                $s = trim($v);
+                if ($s !== '') {
+                    return mb_substr($s, 0, 320);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Green-line style URL as shown in Google (Serper: displayLink, etc.; else breadcrumb from link).
+     *
+     * @param  array<string, mixed>  $row
+     */
+    private function organicSerpDisplayLine(array $row, string $link): string
+    {
+        foreach (['displayLink', 'displayedLink', 'displayUrl'] as $key) {
+            $v = $row[$key] ?? null;
+            if (is_string($v)) {
+                $s = trim($v);
+                if ($s !== '') {
+                    return mb_substr($s, 0, 200);
+                }
+            }
+        }
+
+        return $this->breadcrumbStyleUrlDisplay($link);
+    }
+
+    private function breadcrumbStyleUrlDisplay(string $url): string
+    {
+        $parts = parse_url($url);
+        $host = (string) ($parts['host'] ?? '');
+        $path = (string) ($parts['path'] ?? '');
+        $trimmedPath = trim($path, '/');
+
+        return $trimmedPath !== ''
+            ? $host.' › '.str_replace('/', ' › ', $trimmedPath)
+            : $host;
     }
 
     private function normalizeHostForBenchmark(string $url): ?string

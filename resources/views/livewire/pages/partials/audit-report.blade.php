@@ -461,13 +461,17 @@
                                                 <p class="mt-1.5">Your site shows at <strong class="tabular-nums">#{{ $ysPos }}</strong> in this sample — <strong>outside the first results page</strong> (positions 1–10) in this snapshot.</p>
                                             @endif
                                             @if (! empty($ys['matched_listing_url']))
-                                                <p class="mt-2 rounded-lg border border-slate-200 bg-white/80 px-3 py-2 text-[11px] leading-snug text-slate-600 dark:border-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
-                                                    <span class="font-semibold text-slate-700 dark:text-slate-200">Matched listing in sample</span>
-                                                    <a href="{{ $ys['matched_listing_url'] }}" target="_blank" rel="noopener noreferrer" class="mt-1 block break-all font-mono text-indigo-600 hover:underline dark:text-indigo-400">{{ $ys['matched_listing_url'] }}</a>
-                                                    @if (! empty($ys['matched_listing_title']))
-                                                        <span class="mt-1 block text-slate-500 dark:text-slate-400">“{{ $ys['matched_listing_title'] }}”</span>
+                                                <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50/90 p-4 shadow-inner dark:border-slate-600 dark:bg-slate-950/50">
+                                                    <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Serp listing preview</p>
+                                                    <p class="mt-2 text-xs leading-snug text-emerald-800 dark:text-emerald-400/90">{{ $ys['matched_listing_display'] ?? '' }}</p>
+                                                    <a href="{{ $ys['matched_listing_url'] }}" target="_blank" rel="noopener noreferrer" class="mt-1 block text-base font-medium leading-snug text-blue-700 hover:underline dark:text-blue-400">
+                                                        {{ $ys['matched_listing_title'] ?? \Illuminate\Support\Str::limit($ys['matched_listing_url'], 72) }}
+                                                    </a>
+                                                    @if (! empty($ys['matched_listing_snippet']))
+                                                        <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ $ys['matched_listing_snippet'] }}</p>
                                                     @endif
-                                                </p>
+                                                    <p class="mt-2 break-all font-mono text-[11px] text-slate-500 dark:text-slate-400">{{ $ys['matched_listing_url'] }}</p>
+                                                </div>
                                             @endif
                                             <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Sample: {{ $ysN }} organic listings checked.</p>
                                         </div>
