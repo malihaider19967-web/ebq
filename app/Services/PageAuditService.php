@@ -93,7 +93,7 @@ class PageAuditService
         try {
             $response = Http::timeout(20)
                 ->connectTimeout(10)
-                ->withUserAgent('Mozilla/5.0 (compatible; EbqAuditor/1.0)')
+                ->withUserAgent('Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/124.0.6367.207 Safari/537.36')
                 ->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
                 ->withOptions(['allow_redirects' => true])
                 ->get($url);
@@ -141,7 +141,7 @@ class PageAuditService
                     $calls[] = $pool->as((string) $i)
                         ->timeout(self::LINK_TIMEOUT)
                         ->connectTimeout(self::LINK_TIMEOUT)
-                        ->withUserAgent('Mozilla/5.0 (compatible; EbqAuditor/1.0)')
+                        ->withUserAgent('Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/124.0.6367.207 Safari/537.36')
                         ->withOptions(['allow_redirects' => true])
                         ->head($link['href']);
                 }
@@ -182,7 +182,7 @@ class PageAuditService
         try {
             $resp = Http::timeout(self::LINK_TIMEOUT)
                 ->connectTimeout(self::LINK_TIMEOUT)
-                ->withUserAgent('Mozilla/5.0 (compatible; EbqAuditor/1.0)')
+                ->withUserAgent('Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/124.0.6367.207 Safari/537.36')
                 ->withOptions(['allow_redirects' => true])
                 ->get($url);
 

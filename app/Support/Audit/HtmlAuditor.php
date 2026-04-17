@@ -80,8 +80,17 @@ class HtmlAuditor
 
     public function content(): array
     {
-        $bodyNode = $this->xpath->query('//body')->item(0);
-        $bodyText = $bodyNode ? trim(preg_replace('/\s+/', ' ', $bodyNode->textContent)) : '';
+        $textNodes = $this->xpath->query('//body//text()[not(ancestor::script) and not(ancestor::style) and not(ancestor::noscript) and not(ancestor::template) and not(ancestor::svg)]');
+        $parts = [];
+        if ($textNodes) {
+            foreach ($textNodes as $n) {
+                $t = trim((string) $n->nodeValue);
+                if ($t !== '') {
+                    $parts[] = $t;
+                }
+            }
+        }
+        $bodyText = trim(preg_replace('/\s+/', ' ', implode(' ', $parts)));
         $words = $bodyText === '' ? [] : preg_split('/\s+/u', $bodyText);
         $wordCount = count($words);
         $first150 = $wordCount > 0 ? implode(' ', array_slice($words, 0, 150)) : '';
