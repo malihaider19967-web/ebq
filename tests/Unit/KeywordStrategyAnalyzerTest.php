@@ -148,10 +148,21 @@ class KeywordStrategyAnalyzerTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $intent['transactional_count']);
     }
 
+    public function test_latin_american_spanish_transactional_query_matches_es_419_pack(): void
+    {
+        $analyzer = new KeywordStrategyAnalyzer;
+        $intent = $analyzer->analyze([$this->kw('envío gratis compra en línea', 1, 100)], $this->components())['intent'];
+
+        $this->assertGreaterThanOrEqual(1, $intent['transactional_count']);
+    }
+
     public function test_merged_transactional_triggers_include_non_english_phrases(): void
     {
         $merged = IntentTriggerVocabulary::mergedSorted('transactional');
         $this->assertContains('acheter en ligne', $merged);
         $this->assertContains('kaufen', $merged);
+        $this->assertContains('pix', $merged);
+        $this->assertContains('envío gratis', $merged);
+        $this->assertContains('包邮', $merged);
     }
 }

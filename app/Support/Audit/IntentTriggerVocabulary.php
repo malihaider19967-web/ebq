@@ -4,6 +4,9 @@ namespace App\Support\Audit;
 
 /**
  * Merged search-intent substring triggers: English baseline ∪ every shipped language pack (memoized).
+ *
+ * Regional coverage includes: Americas EN, ES (419), PT-BR; JP; KO; ZH + ZH-Hans; AR, HI, TR, PL, NL;
+ * Scandinavian (SV, DA, NO, FI, IS); CZ, EL, HE, TH, VI, ID, MS, TL; plus FR, DE, IT, ES (EU baseline).
  */
 class IntentTriggerVocabulary
 {
@@ -97,6 +100,16 @@ class IntentTriggerVocabulary
      */
     private static function additionalLanguagePacks(): array
     {
+        /** Americas English — colloquial / e‑commerce phrasing not always in generic EN lists */
+        $en_americas = [
+            'commercial' => ['user reviews', 'side by side comparison', 'cash back', 'rebate', 'buyers guide', 'consumer reports'],
+            'transactional' => ['add to cart', 'buy now pay later', 'free shipping', 'gift card', 'rebate offer', 'order tracking'],
+            'navigational' => ['help center', 'track my order', 'order status', 'returns center'],
+            'local' => ['store pickup', 'same-day delivery', 'sales tax', 'nearest store', 'curbside pickup'],
+            'support' => ['return label', 'warranty claim', 'chat with an agent', 'rma number'],
+            'utility' => ['free download', 'mobile app', 'browser extension'],
+            'informational' => ['how much does it cost', 'what is the difference'],
+        ];
         $fr = [
             'commercial' => ['meilleur choix', 'comparatif', 'alternative à', 'avis clients', 'note globale', 'lequel choisir', 'avantages et inconvénients', 'est-ce que ça vaut', 'arnaque ou fiable', 'meilleur', 'avis', 'comparateur'],
             'transactional' => ['acheter en ligne', 'prix promo', 'code promo', 'bon de réduction', 'commander', 'panier', 'livraison gratuite', 'abonnement', 'réservation', 'souscrire', 'tarif', 'paiement', 'promo', 'vente', 'louer', 'réserver'],
@@ -133,6 +146,17 @@ class IntentTriggerVocabulary
             'utility' => ['descargar', 'herramienta online', 'generador', 'convertidor', 'calculadora', 'gratis', 'prueba gratuita'],
             'informational' => ['cómo hacer', 'qué es', 'por qué', 'definición', 'tutorial', 'guía', 'consejos', 'estadísticas'],
         ];
+        /** Latin American Spanish (Americas) — distinct from Spain/EU phrasing where it matters */
+        $es_419 = [
+            'commercial' => ['cuál conviene', 'vale la pena comprar', 'opiniones de usuarios', 'comparar precios', 'ganga del día'],
+            'transactional' => ['envío gratis', 'cuotas sin interés', 'retiro en tienda', 'pago en efectivo', 'compra en línea', 'pedido en línea', 'descuento bancario', 'oferta del día'],
+            'navigational' => ['mi cuenta', 'atención al cliente', 'trabaja con nosotros', 'preguntas frecuentes'],
+            'local' => ['cerca de mí', 'horarios de atención', 'envío a todo el país', 'sucursal más cercana', 'delivery'],
+            'support' => ['no me funciona', 'me falló', 'cómo desinstalar', 'olvidé la clave', 'no carga', 'está lento'],
+            'utility' => ['descarga gratis', 'herramienta gratis', 'probá gratis', 'app gratis'],
+            'informational' => ['cómo se hace', 'qué significa', 'tips útiles', 'guía rápida'],
+        ];
+        /** European / general Portuguese baseline */
         $pt = [
             'commercial' => ['melhor', 'comparativo', 'alternativas', 'avaliações', 'vale a pena', 'prós e contras'],
             'transactional' => ['comprar', 'preço', 'desconto', 'cupom', 'pedido', 'carrinho', 'assinatura', 'reservar', 'alugar', 'promoção'],
@@ -141,6 +165,16 @@ class IntentTriggerVocabulary
             'support' => ['não funciona', 'erro', 'desinstalar', 'esqueci a senha', 'bug', 'lento', 'como consertar', 'como usar'],
             'utility' => ['baixar', 'ferramenta online', 'gerador', 'conversor', 'calculadora', 'grátis', 'teste grátis'],
             'informational' => ['como fazer', 'o que é', 'por que', 'definição', 'tutorial', 'guia', 'dicas', 'estatísticas'],
+        ];
+        /** Brazilian Portuguese (PT-BR) — payments, logistics, and support idioms common in BR queries */
+        $pt_br = [
+            'commercial' => ['reclamação', 'nota fiscal', 'melhor custo benefício', 'comparar preços'],
+            'transactional' => ['pix', 'boleto', 'parcelamento sem juros', 'frete grátis', 'cupom promocional', 'comprar com desconto', 'rastreamento de pedido', 'marketplace'],
+            'navigational' => ['central de ajuda', 'minha conta', 'sac', 'fale conosco', 'trabalhe conosco'],
+            'local' => ['retirada na loja', 'entrega expressa', 'prazo de entrega', 'cep', 'loja mais próxima'],
+            'support' => ['não consigo usar', 'deu erro', 'reembolso', 'defeito de fábrica', 'garantia estendida'],
+            'utility' => ['baixar grátis', 'aplicativo gratuito', 'teste grátis por 7 dias'],
+            'informational' => ['passo a passo', 'o que significa', 'dicas de uso'],
         ];
         $nl = [
             'commercial' => ['beste', 'review', 'vergelijking', 'alternatief', 'voordelen nadelen', 'de moeite waard'],
@@ -161,23 +195,24 @@ class IntentTriggerVocabulary
             'informational' => ['jak zrobić', 'co to', 'dlaczego', 'definicja', 'poradnik', 'porady', 'statystyki'],
         ];
         $ja = [
-            'commercial' => ['比較', 'レビュー', 'おすすめ', '口コミ', 'ランキング', 'どっちがいい', 'メリット デメリット'],
-            'transactional' => ['購入', '価格', '割引', 'クーポン', '注文', 'カート', '予約', 'サブスク', 'レンタル', '料金'],
-            'navigational' => ['ログイン', 'マイページ', 'アカウント', 'サポート', '採用', 'お問い合わせ', 'ホーム'],
-            'local' => ['近く', '営業時間', '住所', '配達', '店舗'],
-            'support' => ['動かない', 'エラー', 'アンインストール', 'パスワード忘れ', 'バグ', '遅い', '直し方', '使い方'],
-            'utility' => ['ダウンロード', '無料ツール', 'オンラインツール', 'ジェネレーター', '変換', '計算機', '無料'],
-            'informational' => ['とは', 'やり方', '方法', '意味', 'チュートリアル', 'ガイド', '統計', 'ヒント'],
+            'commercial' => ['比較', 'レビュー', 'おすすめ', '口コミ', 'ランキング', 'どっちがいい', 'メリット デメリット', '最安値', '人気ランキング', '徹底比較'],
+            'transactional' => ['購入', '価格', '割引', 'クーポン', '注文', 'カート', '予約', 'サブスク', 'レンタル', '料金', '送料無料', '返品', '支払い方法', 'ポイント還元'],
+            'navigational' => ['ログイン', 'マイページ', 'アカウント', 'サポート', '採用', 'お問い合わせ', 'ホーム', '問い合わせフォーム', 'ヘルプセンター'],
+            'local' => ['近く', '営業時間', '住所', '配達', '店舗', '最寄り駅', '店舗受け取り'],
+            'support' => ['動かない', 'エラー', 'アンインストール', 'パスワード忘れ', 'バグ', '遅い', '直し方', '使い方', '接続できない', '解約方法'],
+            'utility' => ['ダウンロード', '無料ツール', 'オンラインツール', 'ジェネレーター', '変換', '計算機', '無料', '無料トライアル'],
+            'informational' => ['とは', 'やり方', '方法', '意味', 'チュートリアル', 'ガイド', '統計', 'ヒント', '使い方解説'],
         ];
         $ko = [
-            'commercial' => ['비교', '리뷰', '추천', '후기', '랭킹', '장단점', '가치'],
-            'transactional' => ['구매', '가격', '할인', '쿠폰', '주문', '장바구니', '예약', '구독', '렌탈'],
-            'navigational' => ['로그인', '회원가입', '계정', '고객센터', '채용', '문의', '홈'],
-            'local' => ['근처', '영업시간', '주소', '배달', '픽업'],
-            'support' => ['작동 안 함', '오류', '삭제', '비밀번호 분실', '버그', '느림', '고치는 방법', '사용법'],
-            'utility' => ['다운로드', '무료 도구', '온라인 도구', '변환기', '계산기', '무료', '체험'],
-            'informational' => ['방법', '뭐예요', '왜', '정의', '튜토리얼', '가이드', '통계', '팁'],
+            'commercial' => ['비교', '리뷰', '추천', '후기', '랭킹', '장단점', '가치', '가성비', '인기순'],
+            'transactional' => ['구매', '가격', '할인', '쿠폰', '주문', '장바구니', '예약', '구독', '렌탈', '무료배송', '환불', '무이자할부', '결제방법'],
+            'navigational' => ['로그인', '회원가입', '계정', '고객센터', '채용', '문의', '홈', '문의하기', '고객지원'],
+            'local' => ['근처', '영업시간', '주소', '배달', '픽업', '매장픽업', '택배조회'],
+            'support' => ['작동 안 함', '오류', '삭제', '비밀번호 분실', '버그', '느림', '고치는 방법', '사용법', '앱이 안 켜져요', '환불문의'],
+            'utility' => ['다운로드', '무료 도구', '온라인 도구', '변환기', '계산기', '무료', '체험판', '무료체험'],
+            'informational' => ['방법', '뭐예요', '왜', '정의', '튜토리얼', '가이드', '통계', '팁', '사용후기'],
         ];
+        /** Simplified Chinese (general) */
         $zh = [
             'commercial' => ['对比', '评测', '推荐', '哪个好', '优缺点', '值得买', '评价', '排名'],
             'transactional' => ['购买', '价格', '折扣', '优惠券', '下单', '购物车', '订阅', '预订', '租赁', '促销'],
@@ -186,6 +221,16 @@ class IntentTriggerVocabulary
             'support' => ['无法使用', '错误', '卸载', '忘记密码', '故障', '很慢', '如何修复', '怎么用'],
             'utility' => ['下载', '在线工具', '生成器', '转换', '计算器', '免费', '试用'],
             'informational' => ['如何', '是什么', '为什么', '定义', '教程', '指南', '统计', '技巧'],
+        ];
+        /** Simplified Chinese (ZH-Hans) — mainland e‑commerce & app-store style queries */
+        $zh_hans = [
+            'commercial' => ['官方旗舰店', '对比测评', '用户差评', '好评率', '哪个牌子好', '性价比'],
+            'transactional' => ['包邮', '领券', '下单立减', '拼团', '秒杀', '花呗分期', '微信支付', '支付宝付款', '七天无理由退货'],
+            'navigational' => ['个人中心', '联系卖家', '官方客服', '常见问题'],
+            'local' => ['同城配送', '到店自提', '附近门店', '发货地'],
+            'support' => ['闪退', '无法安装', '黑屏', '卡顿', '怎么退款', '申请售后'],
+            'utility' => ['免费下载', '在线转换', '小程序', '扫码使用'],
+            'informational' => ['小白教程', '是什么意思', '新手入门', '图文教程'],
         ];
         $ar = [
             'commercial' => ['أفضل', 'مقارنة', 'بديل', 'مراجعات', 'إيجابيات سلبيات', 'هل يستحق'],
@@ -322,8 +367,49 @@ class IntentTriggerVocabulary
             'utility' => ['i-download', 'libreng tool', 'converter', 'calculator', 'libre', 'online tool'],
             'informational' => ['paano', 'ano ang', 'bakit', 'kahulugan', 'tutorial', 'guide', 'statistics', 'tips'],
         ];
+        /** Icelandic (Nordic / Scandinavian coverage) */
+        $is = [
+            'commercial' => ['besta', 'samanburður', 'umsagnir', 'kostir gallar', 'virði peninganna'],
+            'transactional' => ['kaupa', 'verð', 'afsláttur', 'kúpónn', 'panta', 'karfan', 'áskrift', 'bóka'],
+            'navigational' => ['skrá inn', 'reikningur', 'þjónusta við viðskiptavini', 'heim', 'störf', 'hafa samband'],
+            'local' => ['nálægt mér', 'opnunartími', 'heimilisfang', 'heimkeyrsla', 'sækja'],
+            'support' => ['virkar ekki', 'villa', 'fjarlægja', 'gleymdi lykilorði', 'hægt', 'hvernig á að laga'],
+            'utility' => ['sækja', 'ókeypis verkfæri', 'breytir', 'reiknivél', 'ókeypis', 'prufuáskrift'],
+            'informational' => ['hvernig', 'hvað er', 'af hverju', 'skýring', 'leiðbeiningar', 'ráð', 'tölfræði'],
+        ];
 
-        return [$fr, $de, $it, $es, $pt, $nl, $pl, $ja, $ko, $zh, $ar, $tr, $hi, $sv, $da, $no, $fi, $cs, $el, $he, $th, $vi, $id, $ms, $tl];
+        return [
+            $en_americas,
+            $fr,
+            $de,
+            $it,
+            $es,
+            $es_419,
+            $pt,
+            $pt_br,
+            $nl,
+            $pl,
+            $ja,
+            $ko,
+            $zh,
+            $zh_hans,
+            $ar,
+            $tr,
+            $hi,
+            $sv,
+            $da,
+            $no,
+            $fi,
+            $is,
+            $cs,
+            $el,
+            $he,
+            $th,
+            $vi,
+            $id,
+            $ms,
+            $tl,
+        ];
     }
 
     /**
