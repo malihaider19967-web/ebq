@@ -456,9 +456,9 @@
                                         <div class="min-w-0 flex-1 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
                                             <p class="font-bold text-slate-900 dark:text-slate-100">Search position in this snapshot</p>
                                             @if ($ysFirst === true)
-                                                <p class="mt-1.5">Your audited URL appears in the <strong>top 10</strong> organic results for the primary query below. Serper approximates Google; use Search Console for official average position.</p>
+                                                <p class="mt-1.5">Your site (same domain in this sample) appears in the <strong>top 10</strong> organic results for the primary query below — the listing URL may differ from the page you audited. Serper approximates Google; use Search Console for official average position.</p>
                                             @else
-                                                <p class="mt-1.5">Your URL shows at <strong class="tabular-nums">#{{ $ysPos }}</strong> in this sample — <strong>outside the first results page</strong> (positions 1–10) in this snapshot.</p>
+                                                <p class="mt-1.5">Your site shows at <strong class="tabular-nums">#{{ $ysPos }}</strong> in this sample — <strong>outside the first results page</strong> (positions 1–10) in this snapshot.</p>
                                             @endif
                                             <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Sample: {{ $ysN }} organic listings checked.</p>
                                         </div>
@@ -475,7 +475,7 @@
                                             <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-slate-300 bg-white/80 text-xl font-black text-slate-400 dark:border-slate-600 dark:bg-slate-900/50 dark:text-slate-500">?</div>
                                             <div class="mt-3 min-w-0 flex-1 text-sm sm:mt-0">
                                                 <p class="font-bold text-slate-900 dark:text-slate-100">Not in top {{ $ysN }} of this sample</p>
-                                                <p class="mt-1 text-slate-600 dark:text-slate-400">Your URL did not match any of the {{ $ysN }} organic URLs returned. That does not mean you are not ranking — verify in Search Console or a live SERP.</p>
+                                                <p class="mt-1 text-slate-600 dark:text-slate-400">Your site’s domain did not match any of the {{ $ysN }} organic results in this snapshot (we compare by domain, not the full audited URL path). That does not mean you are not ranking — verify in Search Console or a live SERP.</p>
                                             </div>
                                         </div>
                                     @endif

@@ -276,20 +276,13 @@ class PageAuditService
 
             $yourSerp = $this->resolveYourSerpPosition($pageUrl, $organic);
 
-            $auditedHost = $this->normalizeHostForBenchmark($pageUrl);
-            $auditedCanonical = $this->canonicalUrlForBenchmark($pageUrl);
-
             $candidates = [];
             foreach ($organic as $row) {
                 $link = $this->organicRowHttpUrl(is_array($row) ? $row : null);
                 if ($link === null) {
                     continue;
                 }
-                $host = $this->normalizeHostForBenchmark($link);
-                if ($auditedHost !== null && $host !== null && $host === $auditedHost) {
-                    continue;
-                }
-                if ($auditedCanonical !== null && $this->canonicalUrlForBenchmark($link) === $auditedCanonical) {
+                if ($this->organicHostMatchesAuditedSite($pageUrl, $link)) {
                     continue;
                 }
                 if (! $this->guard->check($link)['ok']) {
@@ -515,14 +508,15 @@ class PageAuditService
     }
 
     /**
-     * Match audited URL against Serper organic rows (host + path; ignores query string differences).
+     * Match audited site against Serper organic rows by **host** (www-normalized), not full URL path,
+     * so e.g. an audited deep URL still matches when the sample lists the homepage or another path on the same domain.
+     * Picks the best (lowest) reported position among matching rows.
      *
      * @param  list<array<string, mixed>>  $organic
      * @return array{found: bool, position: int|null, on_first_page: bool|null, organic_sample_size: int}
      */
     private function resolveYourSerpPosition(string $pageUrl, array $organic): array
     {
-        $auditedCanon = $this->canonicalUrlForBenchmark($pageUrl);
         $totalValid = 0;
         foreach ($organic as $row) {
             if ($this->organicRowHttpUrl($row) !== null) {
@@ -530,6 +524,7 @@ class PageAuditService
             }
         }
 
+        $bestPos = null;
         $ordinal = 0;
         foreach ($organic as $row) {
             $link = $this->organicRowHttpUrl($row);
@@ -537,21 +532,25 @@ class PageAuditService
                 continue;
             }
             $ordinal++;
-            $rowCanon = $this->canonicalUrlForBenchmark($link);
-            $matches = $auditedCanon !== null && $rowCanon !== null && $auditedCanon === $rowCanon;
-            if (! $matches && $auditedCanon === null) {
-                $matches = strtolower(rtrim($link, '/')) === strtolower(rtrim($pageUrl, '/'));
+            if (! $this->organicHostMatchesAuditedSite($pageUrl, $link)) {
+                continue;
             }
-            if ($matches && is_array($row)) {
-                $pos = is_numeric($row['position'] ?? null) ? (int) $row['position'] : $ordinal;
+            if (! is_array($row)) {
+                continue;
+            }
+            $pos = is_numeric($row['position'] ?? null) ? (int) $row['position'] : $ordinal;
+            if ($bestPos === null || $pos < $bestPos) {
+                $bestPos = $pos;
+            }
+        }
 
-                return [
-                    'found' => true,
-                    'position' => $pos,
-                    'on_first_page' => $pos <= 10,
-                    'organic_sample_size' => $totalValid,
-                ];
-            }
+        if ($bestPos !== null) {
+            return [
+                'found' => true,
+                'position' => $bestPos,
+                'on_first_page' => $bestPos <= 10,
+                'organic_sample_size' => $totalValid,
+            ];
         }
 
         return [
@@ -560,6 +559,25 @@ class PageAuditService
             'on_first_page' => null,
             'organic_sample_size' => $totalValid,
         ];
+    }
+
+    /**
+     * True when the organic result is on the same host or a parent/child subdomain of the audited URL’s host
+     * (e.g. audited https://blog.example.com/a and organic https://example.com/ → match).
+     */
+    private function organicHostMatchesAuditedSite(string $auditedPageUrl, string $organicUrl): bool
+    {
+        $auditedHost = $this->normalizeHostForBenchmark($auditedPageUrl);
+        $organicHost = $this->normalizeHostForBenchmark($organicUrl);
+        if ($auditedHost === null || $organicHost === null) {
+            return false;
+        }
+        if ($auditedHost === $organicHost) {
+            return true;
+        }
+
+        return str_ends_with($auditedHost, '.'.$organicHost)
+            || str_ends_with($organicHost, '.'.$auditedHost);
     }
 
     /**
@@ -591,19 +609,6 @@ class PageAuditService
         $host = strtolower($host);
 
         return preg_replace('/^www\./', '', $host) ?: null;
-    }
-
-    private function canonicalUrlForBenchmark(string $url): ?string
-    {
-        $parts = parse_url($url);
-        if (! is_array($parts) || empty($parts['host'])) {
-            return null;
-        }
-        $host = strtolower((string) $parts['host']);
-        $host = preg_replace('/^www\./', '', $host) ?? $host;
-        $path = $parts['path'] ?? '/';
-
-        return $host.rtrim((string) $path, '/');
     }
 
     private function fetchTargetKeywords(int $websiteId, string $pageUrl): array

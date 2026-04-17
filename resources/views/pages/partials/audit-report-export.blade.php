@@ -460,9 +460,9 @@
                                     <td style="vertical-align: middle; padding-left: 12px; border-left: 1px solid rgba(148,163,184,0.5); font-size: 12px; line-height: 1.55; color: #334155;">
                                         <strong style="color: #0f172a;">Search position (Serper snapshot)</strong><br>
                                         @if ($ysFirst === true)
-                                            Your URL appears in the <strong>top 10</strong> organic results for the primary query. Use Search Console for official average position.
+                                            Your site (same domain in this sample) appears in the <strong>top 10</strong> organic results — the listing URL may differ from the page you audited. Use Search Console for official average position.
                                         @else
-                                            Position <strong>#{{ $ysPos }}</strong> in this sample — <strong>outside the first page</strong> (positions 1–10).
+                                            Your site at position <strong>#{{ $ysPos }}</strong> in this sample — <strong>outside the first page</strong> (positions 1–10).
                                         @endif
                                         <br><span class="muted" style="font-size: 10px;">{{ $ysN }} organic listings in sample.</span>
                                     </td>
@@ -473,7 +473,7 @@
                             <p style="margin: 6px 0 0; font-size: 12px; color: #475569;">Rank could not be checked — no organic links in the Serper response.</p>
                         @else
                             <p style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">Not in top {{ $ysN }} of this sample</p>
-                            <p style="margin: 6px 0 0; font-size: 12px; color: #475569;">Your URL did not match the {{ $ysN }} organic URLs returned. Check Search Console for your real average position.</p>
+                            <p style="margin: 6px 0 0; font-size: 12px; color: #475569;">Your site’s domain did not match any of the {{ $ysN }} organic results in this snapshot (domain match, not full URL path). Check Search Console for your real average position.</p>
                         @endif
                     </div>
                 @endif

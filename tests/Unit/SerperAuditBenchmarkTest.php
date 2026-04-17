@@ -148,6 +148,43 @@ class SerperAuditBenchmarkTest extends TestCase
         $this->assertSame('gsc_primary', $bench['keyword_source']);
     }
 
+    public function test_your_serp_matches_organic_homepage_when_audited_path_not_in_sample(): void
+    {
+        $svc = $this->app->make(PageAuditService::class);
+        $method = new ReflectionMethod(PageAuditService::class, 'resolveYourSerpPosition');
+        $method->setAccessible(true);
+
+        $organic = [
+            ['link' => 'https://competitor.test/a', 'position' => 1],
+            ['link' => 'https://www.example.test/', 'position' => 4],
+            ['link' => 'https://other.test/b', 'position' => 5],
+        ];
+
+        $out = $method->invoke($svc, 'https://example.test/products/deep-nested-url', $organic);
+
+        $this->assertTrue($out['found']);
+        $this->assertSame(4, $out['position']);
+        $this->assertTrue($out['on_first_page']);
+        $this->assertSame(3, $out['organic_sample_size']);
+    }
+
+    public function test_your_serp_uses_best_position_when_same_domain_appears_twice(): void
+    {
+        $svc = $this->app->make(PageAuditService::class);
+        $method = new ReflectionMethod(PageAuditService::class, 'resolveYourSerpPosition');
+        $method->setAccessible(true);
+
+        $organic = [
+            ['link' => 'https://shop.example.test/old', 'position' => 8],
+            ['link' => 'https://example.test/', 'position' => 2],
+        ];
+
+        $out = $method->invoke($svc, 'https://example.test/new-page', $organic);
+
+        $this->assertTrue($out['found']);
+        $this->assertSame(2, $out['position']);
+    }
+
     public function test_build_benchmark_gap_table_computes_deltas(): void
     {
         $svc = $this->app->make(PageAuditService::class);
