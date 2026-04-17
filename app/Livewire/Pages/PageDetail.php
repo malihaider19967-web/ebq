@@ -303,7 +303,7 @@ class PageDetail extends Component
                             $q2->whereNull('page_url_hash')->where('page_url', $pageUrl);
                         });
                 })
-                ->with(['user:id,name'])
+                ->with(['user:id,name', 'pageAuditReport:id,result'])
                 ->latest()
                 ->limit(40)
                 ->get();

@@ -40,6 +40,8 @@
     $kwAvailable = (bool) ($keywordData['available'] ?? false);
     $benchmark = $result['benchmark'] ?? null;
     $benchmarkNav = is_array($benchmark);
+    $pageLocale = is_array($result['page_locale'] ?? null) ? $result['page_locale'] : null;
+    $pageLocaleLabel = \App\Support\Audit\PageLocalePresentation::shortLabel($pageLocale);
 
     $skippedReasonLabel = fn (?string $reason) => match ($reason) {
         'no_primary_keyword' => 'Benchmark unavailable: no Search Console primary keyword for this page yet.',
@@ -129,6 +131,15 @@
                             <span class="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-800 dark:bg-violet-500/20 dark:text-violet-200">Custom</span>
                         @elseif (($auditReport->primary_keyword_source ?? null) === 'gsc_primary')
                             <span class="ml-1 text-slate-400 dark:text-slate-500">· Search Console</span>
+                        @endif
+                    </p>
+                @endif
+                @if ($pageLocaleLabel)
+                    <p class="mt-1.5 text-[11px] text-slate-600 dark:text-slate-300">
+                        <span class="font-semibold text-slate-700 dark:text-slate-200">Detected market</span>
+                        <span>{{ $pageLocaleLabel }}</span>
+                        @if (! empty($pageLocale['source'] ?? null))
+                            <span class="text-slate-400 dark:text-slate-500">· {{ str_replace('_', ' ', (string) $pageLocale['source']) }}</span>
                         @endif
                     </p>
                 @endif
@@ -497,6 +508,10 @@
                         @endif
                         <p class="mb-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
                             Organic URLs from <strong class="text-slate-600 dark:text-slate-300">Serper.dev</strong>; Flesch scores computed from HTML fetched at audit time. Not identical to live Google rankings; use as a directional sample.
+                            @php $serpLocLine = \App\Support\Audit\PageLocalePresentation::serpParamsLine($benchmark['serp_locale'] ?? null); @endphp
+                            @if ($serpLocLine)
+                                <span class="mt-1 block text-slate-500 dark:text-slate-400">SERP sample region: <span class="font-mono text-slate-700 dark:text-slate-300">{{ $serpLocLine }}</span></span>
+                            @endif
                         </p>
                         @if (! empty($benchmark['keyword']))
                             <p class="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-700 dark:text-slate-200">

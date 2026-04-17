@@ -84,6 +84,7 @@
                             <tr>
                                 <th class="whitespace-nowrap px-4 py-3">When</th>
                                 <th class="min-w-[10rem] px-4 py-3">Page</th>
+                                <th class="min-w-[7rem] px-4 py-3">Market</th>
                                 <th class="min-w-[8rem] px-4 py-3">Keyword</th>
                                 <th class="whitespace-nowrap px-4 py-3">By</th>
                                 <th class="whitespace-nowrap px-4 py-3">Status</th>
@@ -98,6 +99,10 @@
                                     </td>
                                     <td class="max-w-[14rem] px-4 py-3">
                                         <span class="block truncate font-mono text-xs text-slate-800 dark:text-slate-200" title="{{ $row->page_url }}">{{ Str::limit($row->page_url, 56) }}</span>
+                                    </td>
+                                    <td class="max-w-[8rem] truncate px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                                        @php $caPl = is_array($row->pageAuditReport?->result['page_locale'] ?? null) ? $row->pageAuditReport->result['page_locale'] : null; @endphp
+                                        {{ \App\Support\Audit\PageLocalePresentation::shortLabel($caPl) ?? '—' }}
                                     </td>
                                     <td class="max-w-[12rem] px-4 py-3">
                                         <span class="line-clamp-2 text-slate-800 dark:text-slate-200" title="{{ $row->target_keyword !== '' ? $row->target_keyword : 'Default (Search Console primary)' }}">{{ $row->target_keyword !== '' ? Str::limit($row->target_keyword, 80) : '—' }}</span>

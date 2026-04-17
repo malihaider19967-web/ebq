@@ -7,6 +7,19 @@
             </a>
             <h1 class="mt-2 text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Page audit</h1>
             <p class="mt-1 break-all font-mono text-sm text-slate-600 dark:text-slate-300">{{ $pageAuditReport->page }}</p>
+            @php
+                $hdrPl = is_array($pageAuditReport->result ?? null) ? ($pageAuditReport->result['page_locale'] ?? null) : null;
+                $hdrPlLabel = \App\Support\Audit\PageLocalePresentation::shortLabel(is_array($hdrPl) ? $hdrPl : null);
+            @endphp
+            @if ($hdrPlLabel)
+                <p class="mt-2 text-xs text-slate-600 dark:text-slate-300">
+                    <span class="font-semibold text-slate-800 dark:text-slate-100">Detected market</span>
+                    {{ $hdrPlLabel }}
+                    @if (! empty($hdrPl['source'] ?? null))
+                        <span class="text-slate-400 dark:text-slate-500">· {{ str_replace('_', ' ', (string) $hdrPl['source']) }}</span>
+                    @endif
+                </p>
+            @endif
         </div>
         <div class="flex flex-wrap items-center gap-2">
             <a

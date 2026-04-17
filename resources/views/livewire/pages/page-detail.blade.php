@@ -24,6 +24,13 @@
             </a>
             <div class="mt-2 flex flex-wrap items-center gap-2">
                 <h1 class="min-w-0 max-w-full truncate text-base font-bold tracking-tight text-slate-900 dark:text-slate-100">{{ $pageUrl }}</h1>
+                @php
+                    $headerLocale = $auditReport && is_array($auditReport->result ?? null) ? ($auditReport->result['page_locale'] ?? null) : null;
+                    $headerLocaleLabel = \App\Support\Audit\PageLocalePresentation::shortLabel(is_array($headerLocale) ? $headerLocale : null);
+                @endphp
+                @if ($headerLocaleLabel)
+                    <span class="inline-flex max-w-[14rem] items-center truncate rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-800 dark:border-sky-800 dark:bg-sky-500/10 dark:text-sky-200" title="From latest audit HTML">{{ $headerLocaleLabel }}</span>
+                @endif
                 <a href="{{ $pageUrl }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-600 transition hover:border-indigo-300 hover:text-indigo-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:text-indigo-400">
                     Open
                     <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>
@@ -193,6 +200,7 @@
                             <tr>
                                 <th class="whitespace-nowrap px-3 py-2.5">When</th>
                                 <th class="px-3 py-2.5">Source</th>
+                                <th class="min-w-[6rem] px-3 py-2.5">Market</th>
                                 <th class="min-w-[8rem] px-3 py-2.5">SERP keyword</th>
                                 <th class="whitespace-nowrap px-3 py-2.5">By</th>
                                 <th class="whitespace-nowrap px-3 py-2.5">Status</th>
@@ -209,6 +217,9 @@
                                         @else
                                             <span class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-600 dark:text-slate-200">Page</span>
                                         @endif
+                                    </td>
+                                    <td class="max-w-[7rem] truncate px-3 py-2 text-[11px] text-slate-600 dark:text-slate-300" title="{{ \App\Support\Audit\PageLocalePresentation::shortLabel(is_array($run->pageAuditReport?->result['page_locale'] ?? null) ? $run->pageAuditReport->result['page_locale'] : null) ?? '' }}">
+                                        {{ \App\Support\Audit\PageLocalePresentation::shortLabel(is_array($run->pageAuditReport?->result['page_locale'] ?? null) ? $run->pageAuditReport->result['page_locale'] : null) ?? '—' }}
                                     </td>
                                     <td class="max-w-[10rem] truncate px-3 py-2 font-mono text-slate-800 dark:text-slate-100" title="{{ $run->target_keyword }}">{{ $run->target_keyword !== '' ? $run->target_keyword : '—' }}</td>
                                     <td class="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">

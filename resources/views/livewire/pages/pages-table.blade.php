@@ -14,6 +14,7 @@
                     <thead>
                         <tr class="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400">
                             <x-sort-header column="page" :sortBy="$sortBy" :sortDir="$sortDir">Page</x-sort-header>
+                            <th class="px-4 py-2.5 text-left text-[11px] font-semibold text-slate-500 dark:text-slate-400">Market</th>
                             <x-sort-header column="total_clicks" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Clicks</x-sort-header>
                             <x-sort-header column="total_impressions" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Impressions</x-sort-header>
                             <x-sort-header column="avg_ctr" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Avg CTR</x-sort-header>
@@ -28,6 +29,9 @@
                                     <a href="{{ route('pages.show', ['id' => urlencode($row->page)]) }}" class="font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300">
                                         {{ $row->page }}
                                     </a>
+                                </td>
+                                <td class="max-w-[8rem] truncate px-4 py-2.5 text-[11px] text-slate-600 dark:text-slate-300" title="{{ \App\Support\Audit\PageLocalePresentation::shortLabel($pageLocaleByHash[hash('sha256', $row->page)] ?? null) ?? '' }}">
+                                    {{ \App\Support\Audit\PageLocalePresentation::shortLabel($pageLocaleByHash[hash('sha256', $row->page)] ?? null) ?? '—' }}
                                 </td>
                                 <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->total_clicks) }}</td>
                                 <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->total_impressions) }}</td>

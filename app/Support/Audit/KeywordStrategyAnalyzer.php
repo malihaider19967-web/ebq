@@ -4,62 +4,11 @@ namespace App\Support\Audit;
 
 class KeywordStrategyAnalyzer
 {
-    /** @var list<string> */
-    private const COMMERCIAL_TRIGGERS = [
-        'difference between', 'which is better', 'pros and cons', 'worth the money', 'scam or legit',
-        'alternative to', 'best overall', 'top-rated', 'top rated', 'specifications', 'best alternative',
-        'comparison', 'competitors', 'alternatives', 'benchmark', 'benefits', 'is it good', 'is it worth',
-        'versus', 'reviews', 'review', 'rating', 'specs', 'best', 'vs',
-    ];
-
     private const COMPOUND_RUNNER_RATIO = 0.45;
 
     private const COMPOUND_RUNNER_MIN_SCORE = 2.0;
 
     private const MAX_HITS_PER_BUCKET_PER_QUERY = 8;
-
-    /** @var list<string> */
-    private const TRANSACTIONAL_TRIGGERS = [
-        'promo code', 'promocode', 'premium version', 'upgrade to pro', 'get it now', 'free trial', 'freetrial',
-        'for sale', 'subscription', 'affordable', 'clearance', 'checkout',
-        'purchase', 'discount', 'voucher', 'coupon', 'reserve', 'pricing', 'enroll', 'cheap', 'deal',
-        'order', 'shop', 'hire', 'book', 'cost', 'price', 'buy',
-    ];
-
-    /** @var list<string> */
-    private const NAVIGATIONAL_TRIGGERS = [
-        'customer service', 'support phone', 'official site', 'my account', 'home page', 'homepage', 'dashboard', 'sign-in',
-        'sign in', 'signin', 'log in', 'login', 'portal', 'account', 'contact', 'careers', 'career',
-        'jobs', 'press',
-    ];
-
-    /** @var list<string> */
-    private const LOCAL_TRIGGERS = [
-        'open today', 'open now', 'near me', 'nearby', 'around me', 'closest', 'pick up', 'pickup',
-        'delivery to', 'in my area', 'zip code', 'zipcode', 'directions', 'address', 'hours',
-        'local',
-    ];
-
-    /** @var list<string> */
-    private const SUPPORT_TRIGGERS = [
-        'not working', "doesn't work", 'doesnt work', 'reset password', 'forgotten password',
-        'forgot password', 'troubleshoot', 'how to fix', 'how to use', 'uninstalled', 'uninstall',
-        'failed', 'broken', 'stuck', 'error', 'manual', 'setup', 'install', 'cancel', 'refund', 'bug',
-        'fix', 'slow',
-    ];
-
-    /** @var list<string> */
-    private const UTILITY_TRIGGERS = [
-        'free tool', 'online tool', 'downloader', 'generator', 'converter', 'calculator', 'checker',
-        'tester', 'builder', 'scanner', 'viewer', 'editor', 'creator', 'maker', 'online', 'download',
-        'tool', 'free',
-    ];
-
-    /** @var list<string> */
-    private const INFORMATIONAL_TRIGGERS = [
-        'whitepaper', 'case study', 'statistics', 'examples of', 'meaning of', 'history of',
-        'when was', 'why does', 'what is', 'research', 'tutorial', 'stats', 'tips', 'ideas', 'how to',
-    ];
 
     /**
      * @param  array<int, array{query: string, clicks: int, impressions: int, position?: float}>  $targetKeywords
@@ -190,13 +139,13 @@ class KeywordStrategyAnalyzer
      */
     private function intentAlignment(array $keywords): array
     {
-        $commercialSorted = self::sortTriggersDesc(self::COMMERCIAL_TRIGGERS);
-        $transactionalSorted = self::sortTriggersDesc(self::TRANSACTIONAL_TRIGGERS);
-        $navigationalSorted = self::sortTriggersDesc(self::NAVIGATIONAL_TRIGGERS);
-        $localSorted = self::sortTriggersDesc(self::LOCAL_TRIGGERS);
-        $supportSorted = self::sortTriggersDesc(self::SUPPORT_TRIGGERS);
-        $utilitySorted = self::sortTriggersDesc(self::UTILITY_TRIGGERS);
-        $informationalSorted = self::sortTriggersDesc(self::INFORMATIONAL_TRIGGERS);
+        $commercialSorted = IntentTriggerVocabulary::mergedSorted('commercial');
+        $transactionalSorted = IntentTriggerVocabulary::mergedSorted('transactional');
+        $navigationalSorted = IntentTriggerVocabulary::mergedSorted('navigational');
+        $localSorted = IntentTriggerVocabulary::mergedSorted('local');
+        $supportSorted = IntentTriggerVocabulary::mergedSorted('support');
+        $utilitySorted = IntentTriggerVocabulary::mergedSorted('utility');
+        $informationalSorted = IntentTriggerVocabulary::mergedSorted('informational');
 
         $commercial = [];
         $transactional = [];
@@ -357,6 +306,15 @@ class KeywordStrategyAnalyzer
             if ($t === 'free' && (str_contains($lower, 'free trial') || str_contains($lower, 'freetrial'))) {
                 continue;
             }
+            if ($t === 'gratuit' && str_contains($lower, 'essai gratuit')) {
+                continue;
+            }
+            if ($t === 'kostenlos' && (str_contains($lower, 'kostenlose testversion') || str_contains($lower, 'kostenlos testen'))) {
+                continue;
+            }
+            if ($t === 'gratis' && (str_contains($lower, 'prueba gratis') || str_contains($lower, 'pruebagratis'))) {
+                continue;
+            }
             if (str_contains($lower, $t)) {
                 $n++;
             }
@@ -376,6 +334,9 @@ class KeywordStrategyAnalyzer
                 continue;
             }
             if ($t === 'how to' && (str_contains($lower, 'how to fix') || str_contains($lower, 'how to use'))) {
+                continue;
+            }
+            if ($t === 'comment' && (str_contains($lower, 'comment réparer') || str_contains($lower, 'comment utiliser'))) {
                 continue;
             }
             if (str_contains($lower, $t)) {
@@ -427,18 +388,6 @@ class KeywordStrategyAnalyzer
         }
 
         return $top;
-    }
-
-    /**
-     * @param  list<string>  $phrases
-     * @return list<string>
-     */
-    private static function sortTriggersDesc(array $phrases): array
-    {
-        $phrases = array_values(array_unique($phrases));
-        usort($phrases, fn (string $a, string $b) => mb_strlen($b) <=> mb_strlen($a));
-
-        return $phrases;
     }
 
     private function accidentalAuthority(array $density, array $targets, string $titleAndH1): array

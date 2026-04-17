@@ -7,6 +7,7 @@ use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Support\Audit\HtmlAuditor;
 use App\Support\Audit\KeywordStrategyAnalyzer;
+use App\Support\Audit\PageLocaleResolver;
 use App\Support\Audit\RecommendationEngine;
 use App\Support\Audit\SafeHttpGuard;
 use Illuminate\Http\Client\Pool;
@@ -87,6 +88,8 @@ class PageAuditService
             $auditor = new HtmlAuditor($html, $pageUrl);
 
             $metadata = $auditor->metadata();
+            $localeSignals = $auditor->localeSignals();
+            $pageLocaleResolved = PageLocaleResolver::resolve($localeSignals, $pageUrl);
             $headings = $auditor->headings();
             $content = $auditor->content();
             $bodyText = $content['body_text'];
@@ -114,6 +117,14 @@ class PageAuditService
 
             $result = [
                 'metadata' => $metadata,
+                'page_locale' => [
+                    'gl' => $pageLocaleResolved['gl'],
+                    'hl' => $pageLocaleResolved['hl'],
+                    'source' => $pageLocaleResolved['source'],
+                    'bcp47' => $pageLocaleResolved['bcp47'],
+                    'hreflang_matched' => $pageLocaleResolved['hreflang_matched'],
+                    'signals' => $pageLocaleResolved['signals'],
+                ],
                 'content' => $content + ['headings' => $headings['headings'], 'h1_count' => $headings['h1_count'], 'heading_order_ok' => $headings['heading_order_ok']],
                 'images' => $images,
                 'links' => $links,
@@ -151,6 +162,8 @@ class PageAuditService
                 (int) ($images['total'] ?? 0),
                 $technical['stack'] ?? null,
                 $serpKeywordArg,
+                $pageLocaleResolved['gl'],
+                $pageLocaleResolved['hl'],
             );
             if ($benchmark !== null) {
                 $result['benchmark'] = $benchmark;
@@ -204,7 +217,7 @@ class PageAuditService
      * @param  array<string, mixed>  $keywordsPayload
      * @return array<string, mixed>|null null when Serper is not configured
      */
-    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch, int $yourWordCount, int $yourImageCount, ?array $yourStack = null, ?string $serpKeywordOverride = null): ?array
+    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch, int $yourWordCount, int $yourImageCount, ?array $yourStack = null, ?string $serpKeywordOverride = null, ?string $serpGl = null, ?string $serpHl = null): ?array
     {
         $apiKey = config('services.serper.key');
         if (! is_string($apiKey) || trim($apiKey) === '') {
@@ -214,6 +227,7 @@ class PageAuditService
         $keywordContext = null;
 
         try {
+            $serpLocaleOut = $this->compactSerpLocale($serpGl, $serpHl);
             $override = $serpKeywordOverride !== null ? trim($serpKeywordOverride) : '';
             $useManualSerpKeyword = $override !== '';
             $keywordSource = null;
@@ -227,6 +241,7 @@ class PageAuditService
                         'your_flesch' => $yourFlesch,
                         'competitors' => [],
                         'skipped_reason' => 'no_primary_keyword',
+                        'serp_locale' => $serpLocaleOut,
                     ];
                 }
                 $keyword = trim((string) $keywordsPayload['primary']['query']);
@@ -245,10 +260,11 @@ class PageAuditService
                     'your_flesch' => $yourFlesch,
                     'competitors' => [],
                     'skipped_reason' => 'no_primary_keyword',
+                    'serp_locale' => $serpLocaleOut,
                 ];
             }
 
-            $payload = app(SerperSearchClient::class)->search($keyword, 20);
+            $payload = app(SerperSearchClient::class)->search($keyword, 20, $serpGl, $serpHl);
             if ($payload === null) {
                 return [
                     'keyword' => $keyword,
@@ -258,6 +274,7 @@ class PageAuditService
                     'competitors' => [],
                     'skipped_reason' => 'serper_request_failed',
                     'your_serp' => $this->emptyYourSerpSnapshot(),
+                    'serp_locale' => $serpLocaleOut,
                 ];
             }
 
@@ -271,6 +288,7 @@ class PageAuditService
                     'competitors' => [],
                     'skipped_reason' => 'no_organic_results',
                     'your_serp' => $this->emptyYourSerpSnapshot(),
+                    'serp_locale' => $serpLocaleOut,
                 ];
             }
 
@@ -340,6 +358,7 @@ class PageAuditService
                 'skipped_reason' => $competitors === [] ? 'no_competitor_pages_fetched' : null,
                 'your_serp' => $yourSerp,
                 'gap_table' => $gapTable,
+                'serp_locale' => $serpLocaleOut,
             ];
         } catch (\Throwable $e) {
             Log::warning("PageAuditService: Serper benchmark failed for {$pageUrl}: {$e->getMessage()}");
@@ -351,8 +370,27 @@ class PageAuditService
                 'your_flesch' => $yourFlesch,
                 'competitors' => [],
                 'skipped_reason' => 'benchmark_error',
+                'serp_locale' => $this->compactSerpLocale($serpGl, $serpHl),
             ];
         }
+    }
+
+    /**
+     * @return array{gl?: string, hl?: string}
+     */
+    private function compactSerpLocale(?string $gl, ?string $hl): array
+    {
+        $out = [];
+        $g = is_string($gl) ? strtolower(trim($gl)) : '';
+        if ($g !== '' && strlen($g) === 2 && ctype_alpha($g)) {
+            $out['gl'] = $g;
+        }
+        $h = is_string($hl) ? strtolower(trim($hl)) : '';
+        if ($h !== '' && preg_match('/^[a-z]{2}(-[a-z0-9]{2,8})?$/', $h) === 1) {
+            $out['hl'] = $h;
+        }
+
+        return $out;
     }
 
     /**

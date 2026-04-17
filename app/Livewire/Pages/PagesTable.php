@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Pages;
 
+use App\Models\PageAuditReport;
 use App\Models\SearchConsoleData;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -77,8 +78,25 @@ class PagesTable extends Component
                 ->groupBy('search_console_data.page')
                 ->orderBy($sortColumn, $this->sortDir)
                 ->paginate(20);
+
+            $pageLocaleByHash = [];
+            if ($rows instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $rows->isNotEmpty()) {
+                $hashes = $rows->getCollection()->map(fn ($row) => hash('sha256', $row->page))->unique()->values()->all();
+                $reports = PageAuditReport::query()
+                    ->where('website_id', $this->websiteId)
+                    ->whereIn('page_hash', $hashes)
+                    ->get(['page_hash', 'result']);
+                foreach ($reports as $report) {
+                    $pl = is_array($report->result) ? ($report->result['page_locale'] ?? null) : null;
+                    if (is_array($pl)) {
+                        $pageLocaleByHash[$report->page_hash] = $pl;
+                    }
+                }
+            }
+        } else {
+            $pageLocaleByHash = [];
         }
 
-        return view('livewire.pages.pages-table', compact('rows'));
+        return view('livewire.pages.pages-table', compact('rows', 'pageLocaleByHash'));
     }
 }

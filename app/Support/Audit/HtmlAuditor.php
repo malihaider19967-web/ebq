@@ -53,6 +53,53 @@ class HtmlAuditor
         ];
     }
 
+    /**
+     * Raw locale signals for Serper / market resolution (hreflang, og:locale, html lang).
+     *
+     * @return array{
+     *   html_lang: ?string,
+     *   og_locale: ?string,
+     *   hreflangs: list<array{hreflang: string, href: string}>
+     * }
+     */
+    public function localeSignals(): array
+    {
+        $htmlLang = trim((string) $this->xpath->evaluate('string(//html/@lang)'));
+        if ($htmlLang === '') {
+            $htmlLang = null;
+        }
+
+        $ogLocale = trim((string) $this->xpath->evaluate(
+            'string(//meta[translate(@property, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")="og:locale"]/@content)'
+        ));
+        if ($ogLocale === '') {
+            $ogLocale = null;
+        }
+
+        $hreflangs = [];
+        $nodes = $this->xpath->query('//link[translate(@rel, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")="alternate" and @hreflang and @href]');
+        if ($nodes) {
+            foreach ($nodes as $node) {
+                $hreflang = trim((string) $node->getAttribute('hreflang'));
+                $hrefRaw = trim((string) $node->getAttribute('href'));
+                if ($hreflang === '' || $hrefRaw === '') {
+                    continue;
+                }
+                $abs = $this->absoluteUrl($hrefRaw, $this->pageUrl);
+                if ($abs === null) {
+                    continue;
+                }
+                $hreflangs[] = ['hreflang' => $hreflang, 'href' => $abs];
+            }
+        }
+
+        return [
+            'html_lang' => $htmlLang,
+            'og_locale' => $ogLocale,
+            'hreflangs' => $hreflangs,
+        ];
+    }
+
     public function headings(): array
     {
         $nodes = $this->xpath->query('//h1|//h2|//h3|//h4|//h5|//h6');

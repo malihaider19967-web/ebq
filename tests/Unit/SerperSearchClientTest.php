@@ -49,7 +49,30 @@ class SerperSearchClientTest extends TestCase
             return $request->url() === 'https://serper-stub.test/search'
                 && $request->hasHeader('X-API-KEY', 'secret-key')
                 && $request['q'] === 'hello'
-                && (int) $request['num'] === 5;
+                && (int) $request['num'] === 5
+                && ! array_key_exists('gl', $request->data())
+                && ! array_key_exists('hl', $request->data());
+        });
+    }
+
+    public function test_posts_gl_and_hl_when_valid(): void
+    {
+        Config::set('services.serper.key', 'secret-key');
+        Config::set('services.serper.search_url', 'https://serper-stub.test/search');
+
+        Http::fake([
+            'https://serper-stub.test/search' => Http::response(['organic' => []], 200),
+        ]);
+
+        $out = app(SerperSearchClient::class)->search('hello', 5, 'de', 'de');
+        $this->assertIsArray($out);
+
+        Http::assertSent(function ($request) {
+            $d = $request->data();
+
+            return $d['q'] === 'hello'
+                && $d['gl'] === 'de'
+                && $d['hl'] === 'de';
         });
     }
 

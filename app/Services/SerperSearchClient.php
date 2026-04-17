@@ -10,7 +10,7 @@ class SerperSearchClient
     /**
      * @return array<string, mixed>|null Decoded JSON or null on failure / missing key
      */
-    public function search(string $query, int $num = 10): ?array
+    public function search(string $query, int $num = 10, ?string $gl = null, ?string $hl = null): ?array
     {
         $key = config('services.serper.key');
         if (! is_string($key) || trim($key) === '') {
@@ -22,6 +22,19 @@ class SerperSearchClient
             return null;
         }
 
+        $body = [
+            'q' => $query,
+            'num' => min(20, max(1, $num)),
+        ];
+        $glT = is_string($gl) ? strtolower(trim($gl)) : '';
+        if ($glT !== '' && strlen($glT) === 2 && ctype_alpha($glT)) {
+            $body['gl'] = $glT;
+        }
+        $hlT = is_string($hl) ? strtolower(trim($hl)) : '';
+        if ($hlT !== '' && preg_match('/^[a-z]{2}(-[a-z0-9]{2,8})?$/', $hlT) === 1) {
+            $body['hl'] = $hlT;
+        }
+
         try {
             $response = Http::timeout(15)
                 ->connectTimeout(8)
@@ -29,10 +42,7 @@ class SerperSearchClient
                     'X-API-KEY' => $key,
                     'Content-Type' => 'application/json',
                 ])
-                ->post($url, [
-                    'q' => $query,
-                    'num' => min(20, max(1, $num)),
-                ]);
+                ->post($url, $body);
         } catch (\Throwable $e) {
             Log::warning('SerperSearchClient: request failed: '.$e->getMessage());
 

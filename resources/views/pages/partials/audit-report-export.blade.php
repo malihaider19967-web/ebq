@@ -9,6 +9,8 @@
     $keywordData = $result['keywords'] ?? [];
     $kwAvailable = (bool) ($keywordData['available'] ?? false);
     $benchmark = $result['benchmark'] ?? null;
+    $pageLocale = is_array($result['page_locale'] ?? null) ? $result['page_locale'] : null;
+    $pageLocaleLabel = \App\Support\Audit\PageLocalePresentation::shortLabel($pageLocale);
 
     $skippedReasonLabel = fn (?string $reason) => match ($reason) {
         'no_primary_keyword' => 'Benchmark unavailable: no Search Console primary keyword for this page yet.',
@@ -71,6 +73,14 @@
             Audited: <strong>{{ $auditReport->audited_at?->format('M j, Y g:i A') ?? '—' }}</strong>
             &nbsp;·&nbsp; Status: <span class="badge {{ $failed ? 'bad' : 'ok' }}">{{ ucfirst($auditReport->status) }}</span>
         </p>
+        @if ($pageLocaleLabel)
+            <p style="margin-top: 8px; font-size: 11px; color: #475569;">
+                <strong>Detected market:</strong> {{ $pageLocaleLabel }}
+                @if (! empty($pageLocale['source'] ?? null))
+                    <span style="color: #94a3b8;"> · {{ str_replace('_', ' ', (string) $pageLocale['source']) }}</span>
+                @endif
+            </p>
+        @endif
         @if (filled($auditReport->primary_keyword))
             <p style="margin-top: 8px; font-size: 12px;">
                 <strong>Primary keyword:</strong>
@@ -495,6 +505,10 @@
                 @endif
                 <p class="muted" style="margin-bottom: 10px;">
                     Organic URLs via <strong>Serper.dev</strong>. Flesch scores are from HTML fetched at audit time; rankings are approximate and not identical to live Google.
+                    @php $exportSerpLoc = \App\Support\Audit\PageLocalePresentation::serpParamsLine($benchmark['serp_locale'] ?? null); @endphp
+                    @if ($exportSerpLoc)
+                        <br><span style="display: inline-block; margin-top: 4px;">SERP sample region: <span style="font-family: ui-monospace, monospace;">{{ $exportSerpLoc }}</span></span>
+                    @endif
                 </p>
                 @if (! empty($benchmark['keyword']))
                     <p>

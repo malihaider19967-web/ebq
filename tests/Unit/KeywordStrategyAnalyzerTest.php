@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Support\Audit\IntentTriggerVocabulary;
 use App\Support\Audit\KeywordStrategyAnalyzer;
 use PHPUnit\Framework\TestCase;
 
@@ -137,5 +138,20 @@ class KeywordStrategyAnalyzerTest extends TestCase
         $this->assertSame([], $out['target_keywords']);
         $this->assertSame('custom audit phrase', $out['primary']['query']);
         $this->assertSame(100.0, $out['coverage']['score']);
+    }
+
+    public function test_french_transactional_query_matches_merged_vocabulary(): void
+    {
+        $analyzer = new KeywordStrategyAnalyzer;
+        $intent = $analyzer->analyze([$this->kw('acheter en ligne pas cher', 1, 100)], $this->components())['intent'];
+
+        $this->assertGreaterThanOrEqual(1, $intent['transactional_count']);
+    }
+
+    public function test_merged_transactional_triggers_include_non_english_phrases(): void
+    {
+        $merged = IntentTriggerVocabulary::mergedSorted('transactional');
+        $this->assertContains('acheter en ligne', $merged);
+        $this->assertContains('kaufen', $merged);
     }
 }
