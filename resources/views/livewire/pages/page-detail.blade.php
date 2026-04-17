@@ -106,9 +106,9 @@
     @endif
 
     {{-- ═══ Indexing + Snippet ═══ --}}
-    <div class="grid gap-4 lg:grid-cols-5">
+    <div class="grid gap-4 md:grid-cols-2">
         {{-- Google indexing status --}}
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2 dark:border-slate-800 dark:bg-slate-900">
+        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
                 <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Google Indexing</h3>
                 <span @class([
@@ -143,7 +143,7 @@
         </div>
 
         {{-- Google snippet preview --}}
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-3 dark:border-slate-800 dark:bg-slate-900">
+        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Google Snippet Preview</h3>
             @if ($snippetTitle || $snippetDescription)
                 <div class="mt-3 rounded-lg bg-slate-50 p-4 dark:bg-slate-800/50">
