@@ -82,34 +82,83 @@ class SerperAuditBenchmarkTest extends TestCase
     public function test_readability_benchmark_recommendation_when_flesch_lags_median(): void
     {
         $engine = new RecommendationEngine;
-        $method = new ReflectionMethod(RecommendationEngine::class, 'readabilityBenchmark');
+        $method = new ReflectionMethod(RecommendationEngine::class, 'serpBenchmark');
         $method->setAccessible(true);
 
         $below = $method->invoke($engine, [
+            'content' => ['word_count' => 5000],
             'benchmark' => [
                 'keyword' => 'widgets',
                 'your_flesch' => 40.0,
                 'competitors' => [
-                    ['flesch' => 70.0],
-                    ['flesch' => 90.0],
+                    ['flesch' => 70.0, 'word_count' => 800],
+                    ['flesch' => 90.0, 'word_count' => 800],
                 ],
             ],
         ]);
         $ids = array_column($below, 'id');
         $this->assertContains('bench.readability.below_median', $ids);
-        $this->assertSame(RecommendationEngine::SEV_INFO, $below[0]['severity'] ?? null);
+        $belowRec = collect($below)->firstWhere('id', 'bench.readability.below_median');
+        $this->assertSame(RecommendationEngine::SEV_INFO, $belowRec['severity'] ?? null);
 
         $ok = $method->invoke($engine, [
+            'content' => ['word_count' => 5000],
             'benchmark' => [
                 'keyword' => 'widgets',
                 'your_flesch' => 72.0,
                 'competitors' => [
-                    ['flesch' => 70.0],
-                    ['flesch' => 90.0],
+                    ['flesch' => 70.0, 'word_count' => 800],
+                    ['flesch' => 90.0, 'word_count' => 800],
                 ],
             ],
         ]);
-        $this->assertSame([], $ok);
+        $this->assertNotContains('bench.readability.below_median', array_column($ok, 'id'));
+    }
+
+    public function test_serp_gap_length_when_word_count_below_competitor_average_band(): void
+    {
+        $engine = new RecommendationEngine;
+        $method = new ReflectionMethod(RecommendationEngine::class, 'serpBenchmark');
+        $method->setAccessible(true);
+
+        $recs = $method->invoke($engine, [
+            'content' => ['word_count' => 400],
+            'benchmark' => [
+                'keyword' => 'widgets guide',
+                'your_flesch' => 55.0,
+                'competitors' => [
+                    ['flesch' => 55.0, 'word_count' => 1000],
+                    ['flesch' => 55.0, 'word_count' => 1000],
+                ],
+            ],
+        ]);
+
+        $lengthRec = collect($recs)->firstWhere('id', 'bench.serp_gap.length');
+        $this->assertNotNull($lengthRec);
+        $this->assertSame(RecommendationEngine::SEV_SERP_GAP, $lengthRec['severity']);
+    }
+
+    public function test_readability_easier_than_market_emits_info_recommendation(): void
+    {
+        $engine = new RecommendationEngine;
+        $method = new ReflectionMethod(RecommendationEngine::class, 'serpBenchmark');
+        $method->setAccessible(true);
+
+        $recs = $method->invoke($engine, [
+            'content' => ['word_count' => 5000],
+            'benchmark' => [
+                'keyword' => 'widgets',
+                'your_flesch' => 85.0,
+                'competitors' => [
+                    ['flesch' => 40.0, 'word_count' => 2000],
+                    ['flesch' => 50.0, 'word_count' => 2000],
+                ],
+            ],
+        ]);
+
+        $easy = collect($recs)->firstWhere('id', 'bench.readability.easier_than_market');
+        $this->assertNotNull($easy);
+        $this->assertSame(RecommendationEngine::SEV_INFO, $easy['severity']);
     }
 
     public function test_benchmark_returns_error_payload_when_serper_client_throws(): void

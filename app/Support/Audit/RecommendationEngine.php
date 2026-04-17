@@ -12,10 +12,14 @@ class RecommendationEngine
 
     public const SEV_GOOD = 'good';
 
+    /** Consultant-style signal from SERP sample (length/readability vs. organic set). */
+    public const SEV_SERP_GAP = 'serp_gap';
+
     /**
      * Produce a prioritized list of recommendations for an audit result.
      *
      * Each entry: ['id', 'section', 'severity', 'title', 'why', 'fix']
+     * Severities include {@see self::SEV_SERP_GAP} for SERP-derived length gaps.
      */
     public function analyze(array $result): array
     {
@@ -29,12 +33,18 @@ class RecommendationEngine
         $recs = array_merge($recs, $this->links($result['links'] ?? []));
         $recs = array_merge($recs, $this->keywords($result['keywords'] ?? []));
         try {
-            $recs = array_merge($recs, $this->readabilityBenchmark($result));
+            $recs = array_merge($recs, $this->serpBenchmark($result));
         } catch (\Throwable) {
             // Benchmark recs are optional; never fail the audit recommendation pass.
         }
 
-        $order = [self::SEV_CRITICAL => 0, self::SEV_WARNING => 1, self::SEV_INFO => 2, self::SEV_GOOD => 3];
+        $order = [
+            self::SEV_CRITICAL => 0,
+            self::SEV_WARNING => 1,
+            self::SEV_SERP_GAP => 2,
+            self::SEV_INFO => 3,
+            self::SEV_GOOD => 4,
+        ];
         usort($recs, fn ($a, $b) => ($order[$a['severity']] ?? 9) <=> ($order[$b['severity']] ?? 9));
 
         return $recs;
@@ -437,9 +447,11 @@ class RecommendationEngine
     }
 
     /**
+     * SERP sample insights: readability median, length gap, and readability vs. market average.
+     *
      * @return list<array{id: string, section: string, severity: string, title: string, why: string, fix: string}>
      */
-    private function readabilityBenchmark(array $result): array
+    private function serpBenchmark(array $result): array
     {
         $bench = $result['benchmark'] ?? null;
         if (! is_array($bench)) {
@@ -451,39 +463,70 @@ class RecommendationEngine
             return [];
         }
 
-        $values = [];
+        $kw = (string) ($bench['keyword'] ?? 'this query');
+        $out = [];
+        $yours = $bench['your_flesch'] ?? null;
+
+        $fleschValues = [];
         foreach ($comps as $c) {
             if (is_array($c) && isset($c['flesch']) && is_numeric($c['flesch'])) {
-                $values[] = (float) $c['flesch'];
+                $fleschValues[] = (float) $c['flesch'];
             }
         }
-        if (count($values) < 2) {
-            return [];
+
+        if (count($fleschValues) >= 2) {
+            sort($fleschValues);
+            $n = count($fleschValues);
+            $median = ($n % 2 === 1)
+                ? $fleschValues[(int) ($n / 2)]
+                : ($fleschValues[$n / 2 - 1] + $fleschValues[$n / 2]) / 2.0;
+
+            if (is_numeric($yours)) {
+                $y = (float) $yours;
+                if ($y < $median - 10) {
+                    $medRounded = round($median, 1);
+                    $out[] = $this->rec('bench.readability.below_median', 'Keywords', self::SEV_INFO,
+                        'Readability below SERP sample median',
+                        "For primary query \"{$kw}\", your Flesch score ({$y}) is more than 10 points below the median (≈{$medRounded}) of top organic pages we could fetch. That does not mean you should match competitors blindly—search intent still rules—but large readability gaps can correlate with weaker engagement for the same intent.",
+                        'If your audience is broad, shorten sentences, simplify jargon, and add definition boxes for acronyms. If the topic is intentionally expert-level, keep difficulty but improve structure: headings, lists, and scannable summaries so users still get value quickly.',
+                    );
+                }
+            }
+
+            $avgFlesch = array_sum($fleschValues) / count($fleschValues);
+            if (is_numeric($yours) && (float) $yours > $avgFlesch + 20) {
+                $y = (float) $yours;
+                $avgRounded = round($avgFlesch, 1);
+                $out[] = $this->rec('bench.readability.easier_than_market', 'SERP benchmark', self::SEV_INFO,
+                    'Your content is significantly easier to read than the market—maintain this for UX.',
+                    "For \"{$kw}\", your Flesch score ({$y}) is more than 20 points above the average (≈{$avgRounded}) of the top organic pages we sampled. Searchers often reward clarity when intent is informational or mixed.",
+                    'Keep plain language and scannable structure. If the query is expert or regulatory, add a short "for professionals" section so advanced readers still find depth without hurting the broad UX win.',
+                );
+            }
         }
 
-        sort($values);
-        $n = count($values);
-        $median = ($n % 2 === 1)
-            ? $values[(int) ($n / 2)]
-            : ($values[$n / 2 - 1] + $values[$n / 2]) / 2.0;
-
-        $yours = $bench['your_flesch'] ?? null;
-        if (! is_numeric($yours)) {
-            return [];
+        $wordSamples = [];
+        foreach ($comps as $c) {
+            if (is_array($c) && array_key_exists('word_count', $c) && is_numeric($c['word_count']) && (int) $c['word_count'] > 0) {
+                $wordSamples[] = (float) $c['word_count'];
+            }
         }
-        $y = (float) $yours;
-        if ($y >= $median - 10) {
-            return [];
+        if (count($wordSamples) >= 2) {
+            $avgWords = array_sum($wordSamples) / count($wordSamples);
+            $yourWords = (int) ($result['content']['word_count'] ?? 0);
+            $threshold = $avgWords * 0.8;
+            if ($avgWords > 0 && $yourWords < $threshold) {
+                $avgRounded = (int) round($avgWords);
+                $thrRounded = (int) round($threshold);
+                $out[] = $this->rec('bench.serp_gap.length', 'SERP benchmark', self::SEV_SERP_GAP,
+                    'Length gap vs. top organic pages',
+                    "For \"{$kw}\", your page has about {$yourWords} words in the audited body, while the average of comparable top results we fetched is ≈{$avgRounded} words (80% of that average ≈{$thrRounded} words). Falling below that band can signal under-developed topical coverage for the same intent—not always, but it is a common pattern where pages stall on page two.",
+                    'Aim to close the gap with substance, not padding: add sections that answer adjacent questions (FAQs, comparisons, checklists), cite primary sources, and cover subtopics competitors address. Re-audit after changes to see how the SERP sample moves.',
+                );
+            }
         }
 
-        $kw = (string) ($bench['keyword'] ?? 'this query');
-        $medRounded = round($median, 1);
-
-        return [$this->rec('bench.readability.below_median', 'Keywords', self::SEV_INFO,
-            'Readability below SERP sample median',
-            "For primary query \"{$kw}\", your Flesch score ({$y}) is more than 10 points below the median (≈{$medRounded}) of top organic pages we could fetch. That does not mean you should match competitors blindly—search intent still rules—but large readability gaps can correlate with weaker engagement for the same intent.",
-            'If your audience is broad, shorten sentences, simplify jargon, and add definition boxes for acronyms. If the topic is intentionally expert-level, keep difficulty but improve structure: headings, lists, and scannable summaries so users still get value quickly.',
-        )];
+        return $out;
     }
 
     private function rec(string $id, string $section, string $severity, string $title, string $why, string $fix): array

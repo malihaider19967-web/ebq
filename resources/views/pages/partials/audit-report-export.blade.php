@@ -74,9 +74,9 @@
             <div class="card">
                 <h2>Recommendations</h2>
                 <p class="muted" style="margin-bottom: 10px;">
-                    @foreach (['critical', 'warning', 'info', 'good'] as $sev)
+                    @foreach (['critical', 'warning', 'serp_gap', 'info', 'good'] as $sev)
                         @if (($counts[$sev] ?? 0) > 0)
-                            <span class="tag"><strong>{{ $counts[$sev] }}</strong> {{ ucfirst($sev) }}</span>
+                            <span class="tag"><strong>{{ $counts[$sev] }}</strong> {{ $sev === 'serp_gap' ? 'SERP gap' : ucfirst($sev) }}</span>
                         @endif
                     @endforeach
                 </p>
@@ -85,6 +85,7 @@
                         $sevColor = match ($r['severity']) {
                             'critical' => '#b91c1c',
                             'warning' => '#b45309',
+                            'serp_gap' => '#5b21b6',
                             'info' => '#0369a1',
                             'good' => '#047857',
                             default => '#64748b',
@@ -92,6 +93,7 @@
                         $sevBg = match ($r['severity']) {
                             'critical' => '#fee2e2',
                             'warning' => '#fef3c7',
+                            'serp_gap' => '#ede9fe',
                             'info' => '#e0f2fe',
                             'good' => '#d1fae5',
                             default => '#f1f5f9',

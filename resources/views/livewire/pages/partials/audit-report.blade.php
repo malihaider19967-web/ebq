@@ -12,10 +12,11 @@
     $counts = collect($recs)->groupBy('severity')->map->count();
     $critical = (int) ($counts['critical'] ?? 0);
     $warning = (int) ($counts['warning'] ?? 0);
+    $serpGap = (int) ($counts['serp_gap'] ?? 0);
     $info = (int) ($counts['info'] ?? 0);
     $good = (int) ($counts['good'] ?? 0);
 
-    $score = $failed ? 0 : max(0, 100 - ($critical * 15) - ($warning * 6) - ($info * 2));
+    $score = $failed ? 0 : max(0, 100 - ($critical * 15) - ($warning * 6) - ($serpGap * 5) - ($info * 2));
     $scoreTone = $score >= 85 ? 'good' : ($score >= 65 ? 'warn' : 'bad');
     $scoreStrokeClass = $scoreTone === 'good' ? 'text-emerald-500' : ($scoreTone === 'warn' ? 'text-amber-500' : 'text-rose-500');
     $scoreBadgeClass = $scoreTone === 'good'
@@ -30,6 +31,7 @@
     $sevMeta = [
         'critical' => ['label' => 'Critical', 'badge' => 'bg-rose-100 text-rose-700 ring-1 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-900/40', 'bar' => 'border-l-rose-500 bg-rose-50/40 dark:bg-rose-500/5', 'icon' => 'M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z'],
         'warning'  => ['label' => 'Warning',  'badge' => 'bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-900/40', 'bar' => 'border-l-amber-500 bg-amber-50/40 dark:bg-amber-500/5', 'icon' => 'M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z'],
+        'serp_gap' => ['label' => 'SERP gap', 'badge' => 'bg-violet-100 text-violet-800 ring-1 ring-violet-200 dark:bg-violet-500/10 dark:text-violet-300 dark:ring-violet-900/40', 'bar' => 'border-l-violet-500 bg-violet-50/40 dark:bg-violet-500/5', 'icon' => 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v7.125c0 .621-.504 1.125-1.125 1.125h-2.25A1.125 1.125 0 013 20.25v-7.125zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z'],
         'info'     => ['label' => 'Info',     'badge' => 'bg-sky-100 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-500/10 dark:text-sky-400 dark:ring-sky-900/40',          'bar' => 'border-l-sky-500 bg-sky-50/40 dark:bg-sky-500/5',     'icon' => 'M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z'],
         'good'     => ['label' => 'Good',     'badge' => 'bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-900/40', 'bar' => 'border-l-emerald-500 bg-emerald-50/40 dark:bg-emerald-500/5', 'icon' => 'M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z'],
     ];
@@ -91,7 +93,7 @@
                 {{-- Severity pills --}}
                 @if (! $failed && ! empty($recs))
                     <div class="mt-2 flex flex-wrap gap-1.5">
-                        @foreach (['critical', 'warning', 'info', 'good'] as $sev)
+                        @foreach (['critical', 'warning', 'serp_gap', 'info', 'good'] as $sev)
                             @if (($counts[$sev] ?? 0) > 0)
                                 <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold {{ $sevMeta[$sev]['badge'] }}">
                                     <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $sevMeta[$sev]['icon'] }}" /></svg>
@@ -150,7 +152,7 @@
                             @foreach ($recs as $r)
                                 @php $sm = $sevMeta[$r['severity']] ?? $sevMeta['info']; @endphp
                                 <div class="flex gap-3 rounded-lg border border-slate-200 border-l-4 {{ $sm['bar'] }} p-3 transition hover:shadow-sm dark:border-slate-700">
-                                    <svg class="mt-0.5 h-4 w-4 shrink-0 {{ $r['severity'] === 'critical' ? 'text-rose-500' : ($r['severity'] === 'warning' ? 'text-amber-500' : ($r['severity'] === 'info' ? 'text-sky-500' : 'text-emerald-500')) }}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $sm['icon'] }}" /></svg>
+                                    <svg class="mt-0.5 h-4 w-4 shrink-0 {{ $r['severity'] === 'critical' ? 'text-rose-500' : ($r['severity'] === 'warning' ? 'text-amber-500' : ($r['severity'] === 'serp_gap' ? 'text-violet-600 dark:text-violet-400' : ($r['severity'] === 'info' ? 'text-sky-500' : 'text-emerald-500'))) }}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $sm['icon'] }}" /></svg>
                                     <div class="min-w-0 flex-1">
                                         <div class="flex flex-wrap items-center gap-2">
                                             <p class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $r['title'] }}</p>

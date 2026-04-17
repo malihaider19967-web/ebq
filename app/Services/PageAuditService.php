@@ -229,6 +229,7 @@ class PageAuditService
                         'url' => $entry['url'],
                         'title' => $entry['title'] !== '' ? $entry['title'] : '',
                         'position' => $entry['position'],
+                        'word_count' => isset($compContent['word_count']) ? max(0, (int) $compContent['word_count']) : null,
                         'flesch' => is_numeric($compRead['flesch'] ?? null) ? (float) $compRead['flesch'] : null,
                         'grade' => $compRead['grade'] ?? null,
                     ];
