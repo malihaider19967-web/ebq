@@ -100,7 +100,7 @@
                                         <span class="block truncate font-mono text-xs text-slate-800 dark:text-slate-200" title="{{ $row->page_url }}">{{ Str::limit($row->page_url, 56) }}</span>
                                     </td>
                                     <td class="max-w-[12rem] px-4 py-3">
-                                        <span class="line-clamp-2 text-slate-800 dark:text-slate-200" title="{{ $row->target_keyword }}">{{ Str::limit($row->target_keyword, 80) }}</span>
+                                        <span class="line-clamp-2 text-slate-800 dark:text-slate-200" title="{{ $row->target_keyword !== '' ? $row->target_keyword : 'Default (Search Console primary)' }}">{{ $row->target_keyword !== '' ? Str::limit($row->target_keyword, 80) : '—' }}</span>
                                     </td>
                                     <td class="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
                                         @if ($row->user_id === auth()->id())
@@ -117,11 +117,15 @@
                                         @endif
                                     </td>
                                     <td class="whitespace-nowrap px-4 py-3 text-right">
-                                        <a
-                                            href="{{ route('pages.show', ['id' => rawurlencode($row->page_url)]) }}"
-                                            wire:navigate
-                                            class="text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
-                                        >View</a>
+                                        @if ($row->page_audit_report_id)
+                                            <a
+                                                href="{{ route('page-audits.show', $row->page_audit_report_id) }}"
+                                                wire:navigate
+                                                class="text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+                                            >View</a>
+                                        @else
+                                            <span class="text-xs text-slate-400">—</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @endforeach

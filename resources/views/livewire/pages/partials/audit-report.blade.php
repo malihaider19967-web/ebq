@@ -61,10 +61,11 @@
         ['key' => 'technical',       'label' => 'Technical',       'count' => null,         'show' => true],
         ['key' => 'advanced',        'label' => 'Advanced',        'count' => null,         'show' => true],
     ];
+    $auditSummaryOpen = (bool) ($openAuditSummary ?? false);
 @endphp
 
 <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-    <details class="group">
+    <details class="group" @if ($auditSummaryOpen) open @endif>
         {{-- ═══ Report Header ═══ --}}
         <summary class="flex cursor-pointer list-none items-start gap-4 border-b border-slate-200 bg-gradient-to-br from-slate-50 to-white px-5 py-4 dark:border-slate-800 dark:from-slate-900 dark:to-slate-900 [&::-webkit-details-marker]:hidden">
             {{-- Score donut --}}

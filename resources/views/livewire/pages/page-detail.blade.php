@@ -159,9 +159,88 @@
         </div>
     </div>
 
-    {{-- ═══ Audit report ═══ --}}
-    @if ($auditReport)
-        @include('livewire.pages.partials.audit-report', ['auditReport' => $auditReport])
+    {{-- ═══ Page audits (history + latest snapshot) ═══ --}}
+    @if ($auditReport || $pageAuditRuns->isNotEmpty())
+        <div class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4 dark:border-slate-800">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Page audits</h3>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Runs logged for this URL. Open any row to see that report (latest run overwrites the saved snapshot for the page).</p>
+                </div>
+                @if ($auditReport)
+                    <div class="flex flex-wrap gap-2">
+                        <a
+                            href="{{ route('page-audits.show', $auditReport) }}"
+                            wire:navigate
+                            class="inline-flex h-9 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                        >
+                            Latest report
+                        </a>
+                        <a
+                            href="{{ route('page-audits.download', $auditReport->id) }}"
+                            class="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                        >
+                            Download latest
+                        </a>
+                    </div>
+                @endif
+            </div>
+
+            @if ($pageAuditRuns->isNotEmpty())
+                <div class="mt-4 overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                    <table class="min-w-full divide-y divide-slate-200 text-left text-xs dark:divide-slate-700">
+                        <thead class="bg-slate-50 font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-400">
+                            <tr>
+                                <th class="whitespace-nowrap px-3 py-2.5">When</th>
+                                <th class="px-3 py-2.5">Source</th>
+                                <th class="min-w-[8rem] px-3 py-2.5">SERP keyword</th>
+                                <th class="whitespace-nowrap px-3 py-2.5">By</th>
+                                <th class="whitespace-nowrap px-3 py-2.5">Status</th>
+                                <th class="whitespace-nowrap px-3 py-2.5 text-right">Report</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            @foreach ($pageAuditRuns as $run)
+                                <tr @class(['bg-indigo-50/40 dark:bg-indigo-500/5' => $auditReport && $run->page_audit_report_id === $auditReport->id])>
+                                    <td class="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300" title="{{ $run->created_at->toIso8601String() }}">{{ $run->created_at->diffForHumans() }}</td>
+                                    <td class="px-3 py-2">
+                                        @if ($run->source === \App\Models\CustomPageAudit::SOURCE_CUSTOM)
+                                            <span class="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase text-violet-800 dark:bg-violet-500/20 dark:text-violet-200">Custom</span>
+                                        @else
+                                            <span class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-600 dark:text-slate-200">Page</span>
+                                        @endif
+                                    </td>
+                                    <td class="max-w-[10rem] truncate px-3 py-2 font-mono text-slate-800 dark:text-slate-100" title="{{ $run->target_keyword }}">{{ $run->target_keyword !== '' ? $run->target_keyword : '—' }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2 text-slate-600 dark:text-slate-300">
+                                        @if ($run->user_id === auth()->id())
+                                            You
+                                        @else
+                                            {{ $run->user?->name ?? '—' }}
+                                        @endif
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-2">
+                                        @if ($run->status === 'completed')
+                                            <span class="text-emerald-700 dark:text-emerald-400">Done</span>
+                                        @else
+                                            <span class="text-rose-700 dark:text-rose-400">Failed</span>
+                                        @endif
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-2 text-right">
+                                        @if ($run->page_audit_report_id)
+                                            <a href="{{ route('page-audits.show', $run->page_audit_report_id) }}" wire:navigate class="font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">View</a>
+                                        @else
+                                            <span class="text-slate-400">—</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @elseif ($auditReport)
+                <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">No run history yet for this URL. After you use <strong class="text-slate-600 dark:text-slate-300">Audit this page</strong> or <strong class="text-slate-600 dark:text-slate-300">Custom audit</strong>, runs will appear here.</p>
+            @endif
+        </div>
     @endif
 
     {{-- ═══ Keywords ═══ --}}

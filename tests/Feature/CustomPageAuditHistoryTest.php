@@ -33,15 +33,14 @@ class CustomPageAuditHistoryTest extends TestCase
             'result' => ['metadata' => ['title' => 'T']],
         ]);
 
-        CustomPageAudit::query()->create([
-            'website_id' => $website->id,
-            'user_id' => $user->id,
-            'page_url' => $pageUrl,
-            'target_keyword' => 'unique serp phrase xyz',
-            'page_audit_report_id' => $report->id,
-            'status' => 'completed',
-            'error_message' => null,
-        ]);
+        CustomPageAudit::recordRun(
+            $website->id,
+            $user->id,
+            $pageUrl,
+            $report,
+            'unique serp phrase xyz',
+            CustomPageAudit::SOURCE_CUSTOM,
+        );
 
         $response = $this->actingAs($user)
             ->withSession(['current_website_id' => $website->id])
@@ -53,9 +52,10 @@ class CustomPageAuditHistoryTest extends TestCase
 
         $this->actingAs($user)
             ->withSession(['current_website_id' => $website->id])
-            ->get(route('pages.show', ['id' => rawurlencode($pageUrl)]))
+            ->get(route('page-audits.show', $report))
             ->assertOk()
             ->assertSee('unique serp phrase xyz', false)
-            ->assertSee('Primary keyword', false);
+            ->assertSee('Primary keyword', false)
+            ->assertSee('Page audit', false);
     }
 }

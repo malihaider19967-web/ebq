@@ -105,18 +105,17 @@ class CustomAudit extends Component
         }
         $this->running = false;
 
-        CustomPageAudit::query()->create([
-            'website_id' => $this->websiteId,
-            'user_id' => $user->id,
-            'page_url' => $normalizedUrl,
-            'target_keyword' => $keyword,
-            'page_audit_report_id' => $report->id,
-            'status' => $report->status,
-            'error_message' => $report->error_message,
-        ]);
+        CustomPageAudit::recordRun(
+            $this->websiteId,
+            $user->id,
+            $normalizedUrl,
+            $report,
+            $keyword,
+            CustomPageAudit::SOURCE_CUSTOM,
+        );
 
         if ($report->status === 'completed') {
-            $this->redirect(route('pages.show', ['id' => rawurlencode($normalizedUrl)]), navigate: true);
+            $this->redirect(route('page-audits.show', $report), navigate: true);
 
             return;
         }
@@ -149,6 +148,7 @@ class CustomAudit extends Component
         if ($this->websiteId > 0 && Auth::check() && Auth::user()->canViewWebsiteId($this->websiteId)) {
             $recentAudits = CustomPageAudit::query()
                 ->where('website_id', $this->websiteId)
+                ->where('source', CustomPageAudit::SOURCE_CUSTOM)
                 ->with(['user:id,name', 'pageAuditReport'])
                 ->latest()
                 ->limit(50)
