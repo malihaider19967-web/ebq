@@ -41,7 +41,9 @@
       "Bash(xargs grep *)",
       "Bash(xargs ls *)",
       "Bash(php -l app/Support/Audit/SafeHttpGuard.php app/Jobs/AuditPageJob.php app/Services/PageAuditService.php app/Livewire/Pages/PageDetail.php app/Support/Audit/HtmlAuditor.php app/Jobs/SyncPageIndexingStatus.php app/Mail/PageAuditReportMail.php)",
-      "Bash(php artisan *)"
+      "Bash(php artisan *)",
+      "Bash(php -l app/Livewire/Pages/PageDetail.php)",
+      "Bash(php -l app/Jobs/SyncPageIndexingStatus.php)"
     ]
   }
 }

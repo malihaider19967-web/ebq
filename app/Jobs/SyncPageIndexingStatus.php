@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\PageIndexingStatus;
 use App\Models\Website;
 use App\Services\Google\GoogleClientFactory;
+use App\Services\PageAuditService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;
@@ -102,7 +103,11 @@ class SyncPageIndexingStatus implements ShouldQueue
                 );
 
                 if ($status->wasRecentlyCreated) {
-                    AuditPageJob::dispatch($this->websiteId, $pageUrl);
+                    try {
+                        app(PageAuditService::class)->audit($this->websiteId, $pageUrl);
+                    } catch (\Throwable $e) {
+                        Log::warning("SyncPageIndexingStatus: Auto-audit failed for website {$this->websiteId} page {$pageUrl}: {$e->getMessage()}");
+                    }
                 }
             } catch (\Throwable $e) {
                 Log::warning("SyncPageIndexingStatus: Failed for website {$this->websiteId} page {$pageUrl}: {$e->getMessage()}");

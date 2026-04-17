@@ -2,7 +2,6 @@
 
 namespace App\Livewire\Pages;
 
-use App\Jobs\AuditPageJob;
 use App\Mail\PageAuditReportMail;
 use App\Models\GoogleAccount;
 use App\Models\PageAuditReport;
@@ -10,6 +9,7 @@ use App\Models\PageIndexingStatus;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Services\Google\GoogleClientFactory;
+use App\Services\PageAuditService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -43,7 +43,6 @@ class PageDetail extends Component
     public ?string $auditMessage = null;
     public string $auditMessageKind = 'info';
     public string $auditEmail = '';
-    public ?int $auditQueuedAt = null;
 
     public function mount(string $pageUrl): void
     {
@@ -198,7 +197,7 @@ class PageDetail extends Component
         }
     }
 
-    public function auditPage(): void
+    public function auditPage(PageAuditService $pageAuditService): void
     {
         $this->auditMessage = null;
 
@@ -219,9 +218,12 @@ class PageDetail extends Component
         RateLimiter::hit($rateKey, 60);
 
         try {
-            AuditPageJob::dispatch($this->websiteId, $this->pageUrl);
-            $this->auditQueuedAt = time();
-            $this->setAuditMessage('Audit queued. Results will appear here shortly.', 'info');
+            $report = $pageAuditService->audit($this->websiteId, $this->pageUrl);
+            if ($report->status === 'completed') {
+                $this->setAuditMessage('Audit complete.', 'success');
+            } else {
+                $this->setAuditMessage('Audit failed: ' . ($report->error_message ?? 'unknown error'), 'error');
+            }
         } catch (\Throwable $e) {
             $this->setAuditMessage('Audit failed: ' . $e->getMessage(), 'error');
         }
@@ -356,18 +358,7 @@ class PageDetail extends Component
                 ->first();
         }
 
-        $awaitingAudit = false;
-        if ($this->auditQueuedAt !== null) {
-            $ageSeconds = time() - $this->auditQueuedAt;
-            $reportTs = $auditReport?->audited_at?->getTimestamp() ?? 0;
-            // Poll for up to 3 minutes, and only while the stored report is older than our dispatch.
-            $awaitingAudit = $ageSeconds < 180 && $reportTs < $this->auditQueuedAt;
-            if (! $awaitingAudit) {
-                $this->auditQueuedAt = null;
-            }
-        }
-
-        return view('livewire.pages.page-detail', compact('summary', 'keywords', 'indexingStatus', 'auditReport', 'awaitingAudit'));
+        return view('livewire.pages.page-detail', compact('summary', 'keywords', 'indexingStatus', 'auditReport'));
     }
 
     private function setReindexMessage(string $message, string $kind = 'info'): void
