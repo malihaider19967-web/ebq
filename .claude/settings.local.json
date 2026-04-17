@@ -39,7 +39,9 @@
       "Bash(curl -s http://127.0.0.1:8001/robots.txt)",
       "Bash(curl -s -o /tmp/final.html -w \"HTTP %{http_code}  size %{size_download}B  time %{time_total}s\\\\n\" http://127.0.0.1:8001/)",
       "Bash(xargs grep *)",
-      "Bash(xargs ls *)"
+      "Bash(xargs ls *)",
+      "Bash(php -l app/Support/Audit/SafeHttpGuard.php app/Jobs/AuditPageJob.php app/Services/PageAuditService.php app/Livewire/Pages/PageDetail.php app/Support/Audit/HtmlAuditor.php app/Jobs/SyncPageIndexingStatus.php app/Mail/PageAuditReportMail.php)",
+      "Bash(php artisan *)"
     ]
   }
 }

@@ -9,6 +9,16 @@
     $keywordData = $result['keywords'] ?? [];
     $kwAvailable = (bool) ($keywordData['available'] ?? false);
     $benchmark = $result['benchmark'] ?? null;
+
+    $skippedReasonLabel = fn (?string $reason) => match ($reason) {
+        'no_primary_keyword' => 'Benchmark unavailable: no Search Console primary keyword for this page yet.',
+        'serper_request_failed' => 'Benchmark unavailable: the SERP API did not respond.',
+        'no_organic_results' => 'Benchmark unavailable: the SERP API returned no organic results for this keyword.',
+        'no_competitor_pages_fetched' => 'Benchmark unavailable: none of the top-ranking pages could be fetched.',
+        'benchmark_error' => 'Benchmark unavailable: an unexpected error occurred while benchmarking.',
+        null, '' => null,
+        default => 'Benchmark unavailable: ' . str_replace('_', ' ', $reason) . '.',
+    };
     $failed = $auditReport->status === 'failed';
 @endphp
 <!doctype html>
@@ -354,9 +364,13 @@
             <h2>5. Advanced Data</h2>
             <div class="row">
                 <div class="kpi"><div class="label">Schema (JSON-LD)</div><div class="value">{{ $advanced['schema_blocks'] ?? 0 }}</div></div>
+                @php
+                    $fleschExp = data_get($advanced, 'readability.flesch');
+                    $fleschExp = is_numeric($fleschExp) ? (float) $fleschExp : null;
+                @endphp
                 <div class="kpi">
                     <div class="label">Readability (Flesch)</div>
-                    <div class="value">{{ data_get($advanced, 'readability.flesch') ?? '—' }}</div>
+                    <div class="value">{{ $fleschExp !== null ? $fleschExp : '—' }}</div>
                     <p class="muted">{{ data_get($advanced, 'readability.grade') ?? '' }}</p>
                 </div>
                 <div class="kpi"><div class="label">Favicon</div><div class="value {{ ($advanced['has_favicon'] ?? false) ? 'ok' : 'warn' }}" style="font-size: 14px;">{{ ($advanced['has_favicon'] ?? false) ? 'Present' : 'Missing' }}</div></div>
@@ -417,8 +431,9 @@
                 @if (! empty($benchmark['keyword']))
                     <p><strong>Primary query:</strong> <span style="font-family: ui-monospace, monospace;">{{ $benchmark['keyword'] }}</span></p>
                 @endif
-                @if (! empty($benchmark['skipped_reason']) && empty($benchmark['competitors']))
-                    <p class="warn"><strong>Benchmark skipped:</strong> {{ str_replace('_', ' ', $benchmark['skipped_reason']) }}</p>
+                @php $skippedLabel = $skippedReasonLabel($benchmark['skipped_reason'] ?? null); @endphp
+                @if ($skippedLabel && empty($benchmark['competitors']))
+                    <p class="warn">{{ $skippedLabel }}</p>
                 @endif
                 @if (! empty($benchmark['competitors']))
                     <table style="width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px;">

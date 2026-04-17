@@ -22,7 +22,9 @@ class HtmlAuditor
 
         libxml_use_internal_errors(true);
         $dom = new DOMDocument();
-        $dom->loadHTML('<?xml encoding="UTF-8">' . $html);
+        // LIBXML_NONET prevents DTD / external-entity network fetches; NOWARNING + NOERROR
+        // silence malformed-HTML noise we already tolerate.
+        $dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_NOWARNING | LIBXML_NOERROR | LIBXML_NONET);
         libxml_clear_errors();
 
         $this->xpath = new DOMXPath($dom);

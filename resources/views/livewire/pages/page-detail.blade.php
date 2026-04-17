@@ -160,9 +160,16 @@
     </div>
 
     {{-- ═══ Audit report ═══ --}}
-    @if ($auditReport)
-        @include('livewire.pages.partials.audit-report', ['auditReport' => $auditReport])
-    @endif
+    <div @if ($awaitingAudit ?? false) wire:poll.6s @endif>
+        @if ($auditReport)
+            @include('livewire.pages.partials.audit-report', ['auditReport' => $auditReport])
+        @elseif ($awaitingAudit ?? false)
+            <div class="flex items-center gap-3 rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-8 dark:border-slate-700 dark:bg-slate-800/40">
+                <svg class="h-5 w-5 animate-spin text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                <p class="text-sm text-slate-700 dark:text-slate-200">Audit is running in the background. This page refreshes automatically when the report is ready.</p>
+            </div>
+        @endif
+    </div>
 
     {{-- ═══ Keywords ═══ --}}
     <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">

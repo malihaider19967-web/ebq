@@ -10,6 +10,7 @@ class PageAuditReport extends Model
     protected $fillable = [
         'website_id',
         'page',
+        'page_hash',
         'status',
         'audited_at',
         'http_status',

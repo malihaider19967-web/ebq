@@ -7,6 +7,7 @@ use App\Models\SearchConsoleData;
 use App\Support\Audit\HtmlAuditor;
 use App\Support\Audit\KeywordStrategyAnalyzer;
 use App\Support\Audit\RecommendationEngine;
+use App\Support\Audit\SafeHttpGuard;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\DB;
@@ -21,9 +22,25 @@ class PageAuditService
 
     private const LINK_POOL_CONCURRENCY = 10;
 
+    /** Cap the HTML body we parse to protect libxml / memory. */
+    private const MAX_BODY_BYTES = 5_000_000;
+
+    public function __construct(private readonly SafeHttpGuard $guard) {}
+
     public function audit(int $websiteId, string $pageUrl): PageAuditReport
     {
         $startedAt = microtime(true);
+
+        $guardCheck = $this->guard->check($pageUrl);
+        if (! $guardCheck['ok']) {
+            return $this->persistFailure(
+                $websiteId,
+                $pageUrl,
+                'Audit target rejected: ' . ($guardCheck['reason'] ?? 'unsafe_url'),
+                null,
+                null
+            );
+        }
 
         try {
             $fetch = $this->fetch($pageUrl);
@@ -105,8 +122,9 @@ class PageAuditService
             $result['recommendations'] = app(RecommendationEngine::class)->analyze($result);
 
             return PageAuditReport::updateOrCreate(
-                ['website_id' => $websiteId, 'page' => $pageUrl],
+                ['website_id' => $websiteId, 'page_hash' => hash('sha256', $pageUrl)],
                 [
+                    'page' => mb_substr($pageUrl, 0, 700),
                     'status' => 'completed',
                     'audited_at' => now(),
                     'http_status' => $fetch['http_status'],
@@ -201,6 +219,9 @@ class PageAuditService
                     continue;
                 }
                 if ($auditedCanonical !== null && $this->canonicalUrlForBenchmark($link) === $auditedCanonical) {
+                    continue;
+                }
+                if (! $this->guard->check($link)['ok']) {
                     continue;
                 }
                 $candidates[] = [
@@ -467,22 +488,52 @@ class PageAuditService
     private function fetch(string $url): array
     {
         $startedAt = microtime(true);
+
+        $guardCheck = $this->guard->check($url);
+        if (! $guardCheck['ok']) {
+            return [
+                'error' => 'blocked: ' . ($guardCheck['reason'] ?? 'unsafe_url'),
+                'http_status' => null,
+                'ttfb_ms' => 0,
+            ];
+        }
+
         try {
             $response = Http::timeout(20)
                 ->connectTimeout(10)
                 ->withUserAgent('Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/124.0.6367.207 Safari/537.36')
                 ->withHeaders(['Accept' => 'text/html,application/xhtml+xml'])
-                ->withOptions(['allow_redirects' => true])
+                ->withOptions([
+                    // Manual redirect handling: follow up to 5 hops, but re-guard each.
+                    'allow_redirects' => [
+                        'max' => 5,
+                        'strict' => true,
+                        'referer' => false,
+                        'protocols' => ['http', 'https'],
+                        'track_redirects' => true,
+                        'on_redirect' => function ($request, $response, $uri) {
+                            $check = $this->guard->check((string) $uri);
+                            if (! $check['ok']) {
+                                throw new \RuntimeException('blocked redirect: ' . ($check['reason'] ?? 'unsafe_url'));
+                            }
+                        },
+                    ],
+                ])
                 ->get($url);
             $ttfb = (int) round((microtime(true) - $startedAt) * 1000);
-            $body = (string) $response->body();
+            $fullBody = (string) $response->body();
+            $fullSize = strlen($fullBody);
+            $body = $fullSize > self::MAX_BODY_BYTES ? substr($fullBody, 0, self::MAX_BODY_BYTES) : $fullBody;
+            if ($fullSize > self::MAX_BODY_BYTES) {
+                Log::info("PageAuditService: truncated oversized response body for {$url} ({$fullSize} -> " . self::MAX_BODY_BYTES . ' bytes)');
+            }
             $encoding = strtolower((string) $response->header('Content-Encoding'));
 
             return [
                 'body' => $body,
                 'http_status' => $response->status(),
                 'ttfb_ms' => $ttfb,
-                'size' => strlen($body),
+                'size' => $fullSize,
                 'compression' => $encoding !== '' ? $encoding : null,
             ];
         } catch (\Throwable $e) {
@@ -507,10 +558,26 @@ class PageAuditService
             }
             $unique[$l['href']] = $l;
         }
-        $toCheck = array_values($unique);
-        $skipped = max(0, count($links) - count($toCheck));
+        $allCandidates = array_values($unique);
+        $skipped = max(0, count($links) - count($allCandidates));
 
         $broken = [];
+        $toCheck = [];
+        foreach ($allCandidates as $link) {
+            $check = $this->guard->check((string) ($link['href'] ?? ''));
+            if (! $check['ok']) {
+                $broken[] = [
+                    'href' => $link['href'] ?? '',
+                    'anchor' => $link['anchor'] ?? '',
+                    'status' => 'blocked',
+                    'error' => $check['reason'] ?? 'unsafe_url',
+                ];
+
+                continue;
+            }
+            $toCheck[] = $link;
+        }
+
         foreach (array_chunk($toCheck, self::LINK_POOL_CONCURRENCY) as $batch) {
             $responses = Http::pool(function (Pool $pool) use ($batch) {
                 $calls = [];
@@ -519,7 +586,20 @@ class PageAuditService
                         ->timeout(self::LINK_TIMEOUT)
                         ->connectTimeout(self::LINK_TIMEOUT)
                         ->withUserAgent('Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/124.0.6367.207 Safari/537.36')
-                        ->withOptions(['allow_redirects' => true])
+                        ->withOptions([
+                            'allow_redirects' => [
+                                'max' => 3,
+                                'strict' => true,
+                                'referer' => false,
+                                'protocols' => ['http', 'https'],
+                                'on_redirect' => function ($request, $response, $uri) {
+                                    $check = $this->guard->check((string) $uri);
+                                    if (! $check['ok']) {
+                                        throw new \RuntimeException('blocked redirect: ' . ($check['reason'] ?? 'unsafe_url'));
+                                    }
+                                },
+                            ],
+                        ])
                         ->head($link['href']);
                 }
 
@@ -556,11 +636,29 @@ class PageAuditService
 
     private function getFallback(string $url): ?int
     {
+        $check = $this->guard->check($url);
+        if (! $check['ok']) {
+            return null;
+        }
+
         try {
             $resp = Http::timeout(self::LINK_TIMEOUT)
                 ->connectTimeout(self::LINK_TIMEOUT)
                 ->withUserAgent('Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/124.0.6367.207 Safari/537.36')
-                ->withOptions(['allow_redirects' => true])
+                ->withOptions([
+                    'allow_redirects' => [
+                        'max' => 3,
+                        'strict' => true,
+                        'referer' => false,
+                        'protocols' => ['http', 'https'],
+                        'on_redirect' => function ($request, $response, $uri) {
+                            $check = $this->guard->check((string) $uri);
+                            if (! $check['ok']) {
+                                throw new \RuntimeException('blocked redirect: ' . ($check['reason'] ?? 'unsafe_url'));
+                            }
+                        },
+                    ],
+                ])
                 ->get($url);
 
             return $resp->status();
@@ -572,14 +670,15 @@ class PageAuditService
     private function persistFailure(int $websiteId, string $pageUrl, string $error, ?int $httpStatus, ?int $ttfb): PageAuditReport
     {
         return PageAuditReport::updateOrCreate(
-            ['website_id' => $websiteId, 'page' => $pageUrl],
+            ['website_id' => $websiteId, 'page_hash' => hash('sha256', $pageUrl)],
             [
+                'page' => mb_substr($pageUrl, 0, 700),
                 'status' => 'failed',
                 'audited_at' => now(),
                 'http_status' => $httpStatus,
                 'response_time_ms' => $ttfb,
                 'page_size_bytes' => null,
-                'error_message' => $error,
+                'error_message' => mb_substr($error, 0, 1000),
                 'result' => null,
             ]
         );

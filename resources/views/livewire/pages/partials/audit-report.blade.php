@@ -41,6 +41,16 @@
     $benchmark = $result['benchmark'] ?? null;
     $benchmarkNav = is_array($benchmark);
 
+    $skippedReasonLabel = fn (?string $reason) => match ($reason) {
+        'no_primary_keyword' => 'Benchmark unavailable: no Search Console primary keyword for this page yet.',
+        'serper_request_failed' => 'Benchmark unavailable: the SERP API did not respond.',
+        'no_organic_results' => 'Benchmark unavailable: the SERP API returned no organic results for this keyword.',
+        'no_competitor_pages_fetched' => 'Benchmark unavailable: none of the top-ranking pages could be fetched.',
+        'benchmark_error' => 'Benchmark unavailable: an unexpected error occurred while benchmarking.',
+        null, '' => null,
+        default => 'Benchmark unavailable: ' . str_replace('_', ' ', $reason) . '.',
+    };
+
     $sections = [
         ['key' => 'recommendations', 'label' => 'Recommendations', 'count' => count($recs), 'show' => ! empty($recs)],
         ['key' => 'keywords',        'label' => 'Keywords',        'count' => $kwAvailable ? (int) ($keywordData['coverage']['total'] ?? 0) : null, 'show' => true],
@@ -457,9 +467,10 @@
                         @if (! empty($benchmark['keyword']))
                             <p class="mb-2 text-xs font-semibold text-slate-700 dark:text-slate-200">Primary query: <span class="font-mono text-slate-900 dark:text-slate-100">{{ $benchmark['keyword'] }}</span></p>
                         @endif
-                        @if (! empty($benchmark['skipped_reason']) && empty($benchmark['competitors']))
+                        @php $skippedLabel = $skippedReasonLabel($benchmark['skipped_reason'] ?? null); @endphp
+                        @if ($skippedLabel && empty($benchmark['competitors']))
                             <div class="rounded-lg border border-dashed border-amber-200 bg-amber-50/50 px-3 py-2 text-xs text-amber-900 dark:border-amber-900/40 dark:bg-amber-500/5 dark:text-amber-200">
-                                Benchmark skipped: {{ str_replace('_', ' ', $benchmark['skipped_reason']) }}
+                                {{ $skippedLabel }}
                             </div>
                         @endif
                         @if (! empty($benchmark['competitors']))

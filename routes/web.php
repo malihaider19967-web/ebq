@@ -12,7 +12,9 @@ Route::middleware(['auth', 'onboarded'])->group(function () {
     Route::view('/backlinks', 'backlinks.index')->name('backlinks.index');
     Route::view('/pages', 'pages.index')->name('pages.index');
     Route::get('/pages/{id}', fn (string $id) => view('pages.show', ['pageUrl' => $id]))->name('pages.show')->where('id', '.*');
-    Route::get('/page-audits/{id}/download', [PageAuditController::class, 'download'])->name('page-audits.download');
+    Route::get('/page-audits/{id}/download', [PageAuditController::class, 'download'])
+        ->middleware('throttle:30,1')
+        ->name('page-audits.download');
     Route::view('/websites', 'websites.index')->name('websites.index');
     Route::view('/team', 'team.index')->name('team.index');
     Route::view('/reports', 'reports.index')->name('reports.index');

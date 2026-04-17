@@ -18,6 +18,7 @@ class PageAuditReportMail extends Mailable
     public function envelope(): Envelope
     {
         $host = parse_url($this->auditReport->page, PHP_URL_HOST) ?? $this->auditReport->page;
+        $host = mb_substr(preg_replace('/[\r\n\t]+/', '', (string) $host), 0, 100);
 
         return new Envelope(
             subject: "EBQ Page Audit — {$host}",
