@@ -88,6 +88,7 @@ class SerperAuditBenchmarkTest extends TestCase
         $this->assertNull($bench['skipped_reason']);
         $this->assertArrayHasKey('your_serp', $bench);
         $this->assertFalse($bench['your_serp']['found']);
+        $this->assertNull($bench['your_serp']['matched_listing_url'] ?? null);
         $this->assertSame(3, $bench['your_serp']['organic_sample_size']);
         $this->assertNotEmpty($bench['gap_table']['rows']);
         $gapKeys = array_column($bench['gap_table']['rows'], 'key');
@@ -145,6 +146,8 @@ class SerperAuditBenchmarkTest extends TestCase
         $this->assertSame(2, $bench['your_serp']['position']);
         $this->assertTrue($bench['your_serp']['on_first_page']);
         $this->assertSame(4, $bench['your_serp']['organic_sample_size']);
+        $this->assertSame('https://audited-site.test/article', $bench['your_serp']['matched_listing_url']);
+        $this->assertSame('You', $bench['your_serp']['matched_listing_title']);
         $this->assertSame('gsc_primary', $bench['keyword_source']);
     }
 
@@ -166,6 +169,7 @@ class SerperAuditBenchmarkTest extends TestCase
         $this->assertSame(4, $out['position']);
         $this->assertTrue($out['on_first_page']);
         $this->assertSame(3, $out['organic_sample_size']);
+        $this->assertSame('https://www.example.test/', $out['matched_listing_url']);
     }
 
     public function test_your_serp_uses_best_position_when_same_domain_appears_twice(): void
@@ -183,6 +187,7 @@ class SerperAuditBenchmarkTest extends TestCase
 
         $this->assertTrue($out['found']);
         $this->assertSame(2, $out['position']);
+        $this->assertSame('https://example.test/', $out['matched_listing_url']);
     }
 
     public function test_build_benchmark_gap_table_computes_deltas(): void
@@ -229,6 +234,7 @@ class SerperAuditBenchmarkTest extends TestCase
         $this->assertSame(11, $out['position']);
         $this->assertFalse($out['on_first_page']);
         $this->assertSame(12, $out['organic_sample_size']);
+        $this->assertSame('https://audited.test/page', $out['matched_listing_url']);
     }
 
     public function test_readability_benchmark_recommendation_when_flesch_lags_median(): void

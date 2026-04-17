@@ -495,7 +495,7 @@ class PageAuditService
     }
 
     /**
-     * @return array{found: bool, position: int|null, on_first_page: bool|null, organic_sample_size: int}
+     * @return array{found: bool, position: int|null, on_first_page: bool|null, organic_sample_size: int, matched_listing_url: string|null, matched_listing_title: string|null}
      */
     private function emptyYourSerpSnapshot(): array
     {
@@ -504,16 +504,18 @@ class PageAuditService
             'position' => null,
             'on_first_page' => null,
             'organic_sample_size' => 0,
+            'matched_listing_url' => null,
+            'matched_listing_title' => null,
         ];
     }
 
     /**
      * Match audited site against Serper organic rows by **host** (www-normalized), not full URL path,
      * so e.g. an audited deep URL still matches when the sample lists the homepage or another path on the same domain.
-     * Picks the best (lowest) reported position among matching rows.
+     * Picks the best (lowest) reported position among matching rows and returns that row’s listing URL/title.
      *
      * @param  list<array<string, mixed>>  $organic
-     * @return array{found: bool, position: int|null, on_first_page: bool|null, organic_sample_size: int}
+     * @return array{found: bool, position: int|null, on_first_page: bool|null, organic_sample_size: int, matched_listing_url: string|null, matched_listing_title: string|null}
      */
     private function resolveYourSerpPosition(string $pageUrl, array $organic): array
     {
@@ -525,6 +527,8 @@ class PageAuditService
         }
 
         $bestPos = null;
+        $bestLink = null;
+        $bestTitle = null;
         $ordinal = 0;
         foreach ($organic as $row) {
             $link = $this->organicRowHttpUrl($row);
@@ -541,15 +545,20 @@ class PageAuditService
             $pos = is_numeric($row['position'] ?? null) ? (int) $row['position'] : $ordinal;
             if ($bestPos === null || $pos < $bestPos) {
                 $bestPos = $pos;
+                $bestLink = $link;
+                $t = $row['title'] ?? '';
+                $bestTitle = is_string($t) && trim($t) !== '' ? trim($t) : null;
             }
         }
 
-        if ($bestPos !== null) {
+        if ($bestPos !== null && $bestLink !== null) {
             return [
                 'found' => true,
                 'position' => $bestPos,
                 'on_first_page' => $bestPos <= 10,
                 'organic_sample_size' => $totalValid,
+                'matched_listing_url' => $bestLink,
+                'matched_listing_title' => $bestTitle,
             ];
         }
 
@@ -558,6 +567,8 @@ class PageAuditService
             'position' => null,
             'on_first_page' => null,
             'organic_sample_size' => $totalValid,
+            'matched_listing_url' => null,
+            'matched_listing_title' => null,
         ];
     }
 

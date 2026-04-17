@@ -460,6 +460,15 @@
                                             @else
                                                 <p class="mt-1.5">Your site shows at <strong class="tabular-nums">#{{ $ysPos }}</strong> in this sample — <strong>outside the first results page</strong> (positions 1–10) in this snapshot.</p>
                                             @endif
+                                            @if (! empty($ys['matched_listing_url']))
+                                                <p class="mt-2 rounded-lg border border-slate-200 bg-white/80 px-3 py-2 text-[11px] leading-snug text-slate-600 dark:border-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
+                                                    <span class="font-semibold text-slate-700 dark:text-slate-200">Matched listing in sample</span>
+                                                    <a href="{{ $ys['matched_listing_url'] }}" target="_blank" rel="noopener noreferrer" class="mt-1 block break-all font-mono text-indigo-600 hover:underline dark:text-indigo-400">{{ $ys['matched_listing_url'] }}</a>
+                                                    @if (! empty($ys['matched_listing_title']))
+                                                        <span class="mt-1 block text-slate-500 dark:text-slate-400">“{{ $ys['matched_listing_title'] }}”</span>
+                                                    @endif
+                                                </p>
+                                            @endif
                                             <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Sample: {{ $ysN }} organic listings checked.</p>
                                         </div>
                                     @elseif ($ysN === 0)

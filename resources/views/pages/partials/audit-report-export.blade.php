@@ -464,6 +464,13 @@
                                         @else
                                             Your site at position <strong>#{{ $ysPos }}</strong> in this sample — <strong>outside the first page</strong> (positions 1–10).
                                         @endif
+                                        @if (! empty($ys['matched_listing_url']))
+                                            <br><br><strong style="color: #0f172a;">Matched listing in sample:</strong><br>
+                                            <span style="font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all;">{{ $ys['matched_listing_url'] }}</span>
+                                            @if (! empty($ys['matched_listing_title']))
+                                                <br><span class="muted" style="font-size: 11px;">“{{ $ys['matched_listing_title'] }}”</span>
+                                            @endif
+                                        @endif
                                         <br><span class="muted" style="font-size: 10px;">{{ $ysN }} organic listings in sample.</span>
                                     </td>
                                 </tr>
