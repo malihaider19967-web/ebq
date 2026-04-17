@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\PageIndexingStatus;
 use App\Models\Website;
 use App\Services\Google\GoogleClientFactory;
+use App\Services\PageAuditService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Carbon;
@@ -86,7 +87,7 @@ class SyncPageIndexingStatus implements ShouldQueue
                 $indexStatus = (array) data_get($response->json(), 'inspectionResult.indexStatusResult', []);
                 $lastCrawlAt = data_get($indexStatus, 'lastCrawlTime');
 
-                PageIndexingStatus::query()->updateOrCreate(
+                $status = PageIndexingStatus::query()->updateOrCreate(
                     [
                         'website_id' => $this->websiteId,
                         'page' => $pageUrl,
@@ -100,6 +101,14 @@ class SyncPageIndexingStatus implements ShouldQueue
                         'google_status_payload' => $indexStatus,
                     ]
                 );
+
+                if ($status->wasRecentlyCreated) {
+                    try {
+                        app(PageAuditService::class)->audit($this->websiteId, $pageUrl);
+                    } catch (\Throwable $e) {
+                        Log::warning("SyncPageIndexingStatus: Auto-audit failed for website {$this->websiteId} page {$pageUrl}: {$e->getMessage()}");
+                    }
+                }
             } catch (\Throwable $e) {
                 Log::warning("SyncPageIndexingStatus: Failed for website {$this->websiteId} page {$pageUrl}: {$e->getMessage()}");
             }

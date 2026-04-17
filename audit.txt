@@ -1,0 +1,48 @@
+Based on the audit rules and the requirements for your tool, here is the list of simple, automated tasks the script will perform:
+
+1. Metadata Checks
+Title Tag: Check if present and measure character count.
+
+Meta Description: Check if present and measure character count.
+
+Canonical URL: Verify the rel="canonical" link exists and matches the URL.
+
+Social Tags: Detect OpenGraph (og:) and Twitter card tags.
+
+2. Content & Structure
+Heading Check: Find all <h1> through <h6> tags and check for logical order.
+
+H1 Count: Ensure exactly one <h1> tag exists on the page.
+
+Word Count: Total number of words in the <body>.
+
+Answer Readiness: Extract and display the first 150 words of text.
+
+Keyword Density: List the most frequently used words or phrases.
+
+3. Image & Link Analysis
+Alt Text: Identify any <img> tags missing an alt attribute.
+
+Image Formats: Check for modern extensions like .webp or .avif.
+
+Internal Links: Count and list links pointing to your own domain.
+
+External Links: Count and list links pointing to outside domains.
+
+Broken Links: Check HTTP status codes (e.g., 200 vs 404) for all found links.
+
+4. Technical Performance
+Response Time: Measure the time taken to receive the first byte (TTFB).
+
+Page Size: Calculate the total size of the HTML document in KB.
+
+Compression: Detect if the server is using Gzip or Brotli headers.
+
+HTTPS Check: Verify if the connection is secure.
+
+5. Advanced Data
+Schema Detection: Locate and count any JSON-LD blocks.
+
+Readability: Calculate a basic Flesch-Kincaid ease-of-reading score.
+
+Favicon: Check for the presence of a site icon.

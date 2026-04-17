@@ -21,6 +21,11 @@
                 <span wire:loading.remove wire:target="generateGoogleSnippet">Generate snippet</span>
                 <span wire:loading wire:target="generateGoogleSnippet">Generating…</span>
             </button>
+            <button type="button" wire:click="auditPage" wire:loading.attr="disabled" wire:target="auditPage" class="inline-flex h-8 items-center gap-1.5 rounded-md border border-indigo-500 bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
+                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                <span wire:loading.remove wire:target="auditPage">Audit this page</span>
+                <span wire:loading wire:target="auditPage">Auditing…</span>
+            </button>
             <p class="text-[11px] text-slate-500 dark:text-slate-400">Uses Google Indexing API. URL processing is not guaranteed.</p>
         </div>
         <div class="mt-2 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs dark:border-slate-700 dark:bg-slate-900/60">
@@ -79,7 +84,21 @@
                 ])>{{ $snippetMessage }}</span>
             </div>
         @endif
+        @if ($auditMessage)
+            <div class="mt-2">
+                <span @class([
+                    'inline-flex rounded-md px-2 py-1 text-xs font-medium',
+                    'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $auditMessageKind === 'success',
+                    'bg-sky-50 text-sky-700 dark:bg-sky-500/10 dark:text-sky-400' => $auditMessageKind === 'info',
+                    'bg-rose-50 text-rose-700 dark:bg-rose-500/10 dark:text-rose-400' => $auditMessageKind === 'error',
+                ])>{{ $auditMessage }}</span>
+            </div>
+        @endif
     </div>
+
+    @if ($auditReport)
+        @include('livewire.pages.partials.audit-report', ['auditReport' => $auditReport])
+    @endif
 
     @if ($summary)
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">

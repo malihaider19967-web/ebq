@@ -37,7 +37,9 @@
       "Bash(curl -s -o /tmp/landing8001.html -w \"HTTP %{http_code}\\\\nsize: %{size_download} bytes\\\\ntime: %{time_total}s\\\\n\" http://127.0.0.1:8001/)",
       "Bash(curl -s http://127.0.0.1:8001/favicon.ico)",
       "Bash(curl -s http://127.0.0.1:8001/robots.txt)",
-      "Bash(curl -s -o /tmp/final.html -w \"HTTP %{http_code}  size %{size_download}B  time %{time_total}s\\\\n\" http://127.0.0.1:8001/)"
+      "Bash(curl -s -o /tmp/final.html -w \"HTTP %{http_code}  size %{size_download}B  time %{time_total}s\\\\n\" http://127.0.0.1:8001/)",
+      "Bash(xargs grep *)",
+      "Bash(xargs ls *)"
     ]
   }
 }
