@@ -161,6 +161,24 @@
                 <h3 style="margin-top: 14px;">Search intent</h3>
                 @php
                     $domExport = $intent['dominant'] ?? 'unclear';
+                    $intentDominantLabelsExport = [
+                        'informational' => 'Informational',
+                        'utility' => 'Tool / app',
+                        'commercial' => 'Commercial',
+                        'transactional' => 'Transactional',
+                        'navigational' => 'Navigational',
+                        'local' => 'Local',
+                        'support' => 'Support',
+                        'commercial_utility' => 'Commercial + tool / app',
+                        'commercial_informational' => 'Commercial + informational',
+                        'commercial_transactional' => 'Commercial + transactional',
+                        'informational_utility' => 'Informational + tool / app',
+                        'mixed' => 'Mixed (3+ tied top scores)',
+                        'unclear' => 'Unclear',
+                    ];
+                    $dominantLabelExport = $intentDominantLabelsExport[$domExport] ?? collect(explode('_', $domExport))->map(function (string $part) {
+                        return $part === 'utility' ? 'Tool / app' : ucfirst($part);
+                    })->implode(' + ');
                     $intentBucketsExport = [
                         'Informational' => (int) ($intent['informational_count'] ?? 0),
                         'Tool / app' => (int) ($intent['utility_count'] ?? 0),
@@ -177,22 +195,20 @@
                         }
                     }
                     $intentSummaryExport = $intentSummaryPartsExport !== [] ? implode(' · ', $intentSummaryPartsExport) : 'No trigger matches';
+                    $scorePartsExport = [];
+                    foreach ($intent['intent_scores'] ?? [] as $esk => $esv) {
+                        if ((float) $esv > 0) {
+                            $scorePartsExport[] = $esk . ': ' . $esv;
+                        }
+                    }
+                    $intentScoreLineExport = $scorePartsExport !== [] ? 'Weighted: ' . implode(' · ', $scorePartsExport) : '';
                 @endphp
                 <p>
-                    <strong>
-                        @switch($domExport)
-                            @case('informational') Informational @break
-                            @case('utility') Tool / app @break
-                            @case('commercial') Commercial @break
-                            @case('transactional') Transactional @break
-                            @case('navigational') Navigational @break
-                            @case('local') Local @break
-                            @case('support') Support @break
-                            @case('mixed') Mixed (tied top intents) @break
-                            @default Unclear
-                        @endswitch
-                    </strong>
+                    <strong>{{ $dominantLabelExport }}</strong>
                     <span class="muted"> — {{ $intentSummaryExport }}</span>
+                    @if ($intentScoreLineExport !== '')
+                        <br><span class="muted" style="font-size: 10px;">{{ $intentScoreLineExport }}</span>
+                    @endif
                 </p>
 
                 @if (! empty($accidental))

@@ -5,8 +5,11 @@ namespace App\Support\Audit;
 class RecommendationEngine
 {
     public const SEV_CRITICAL = 'critical';
+
     public const SEV_WARNING = 'warning';
+
     public const SEV_INFO = 'info';
+
     public const SEV_GOOD = 'good';
 
     /**
@@ -161,12 +164,12 @@ class RecommendationEngine
             $density = (float) ($top['density'] ?? 0);
             if ($density >= 3.0) {
                 $out[] = $this->rec('struct.density.stuffing', 'Structure', self::SEV_WARNING,
-                    'Keyword stuffing risk: "' . $top['term'] . '" at ' . $density . '%',
+                    'Keyword stuffing risk: "'.$top['term'].'" at '.$density.'%',
                     'Single-term density above 3% is a strong keyword-stuffing signal. Google has penalized pages for this pattern since the Panda update.',
-                    'Reduce repetitions of "' . $top['term'] . '". Introduce 3–4 synonyms and related LSI phrases to diversify the lexical footprint.');
+                    'Reduce repetitions of "'.$top['term'].'". Introduce 3–4 synonyms and related LSI phrases to diversify the lexical footprint.');
             } elseif ($density >= 1.5) {
                 $out[] = $this->rec('struct.density.high', 'Structure', self::SEV_INFO,
-                    'Top keyword "' . $top['term'] . '" at ' . $density . '%',
+                    'Top keyword "'.$top['term'].'" at '.$density.'%',
                     'A density of 1.5–3% is within the acceptable range but close to the stuffing threshold. Pair the term with natural synonyms.',
                     'Monitor as you add content. Introduce 2–3 synonyms to stay safely under 2%.');
             }
@@ -308,7 +311,7 @@ class RecommendationEngine
         $broken = $links['broken'] ?? [];
         if (count($broken) > 0) {
             $out[] = $this->rec('links.broken', 'Technical', self::SEV_WARNING,
-                count($broken) . ' broken outbound link(s)',
+                count($broken).' broken outbound link(s)',
                 'Broken links leak link equity, damage user trust, and are a known low-quality signal to Google.',
                 'Either update each broken URL to a working equivalent or remove the link. Re-audit after changes to confirm.');
         }
@@ -353,10 +356,10 @@ class RecommendationEngine
         $verdict = $cov['verdict'] ?? null;
         if ($verdict === 'expansion_needed') {
             $missingTerms = array_slice(array_map(fn ($m) => $m['query'], $cov['missing'] ?? []), 0, 6);
-            $list = $missingTerms ? ' (e.g. ' . implode(', ', array_map(fn ($t) => '"' . $t . '"', $missingTerms)) . ')' : '';
+            $list = $missingTerms ? ' (e.g. '.implode(', ', array_map(fn ($t) => '"'.$t.'"', $missingTerms)).')' : '';
             $out[] = $this->rec('kw.coverage.low', 'Keywords', self::SEV_WARNING,
                 "Topical coverage is low ({$score}%)",
-                "Your page ranks for " . ($cov['total'] ?? 0) . " queries in Search Console, but only " . ($cov['found_count'] ?? 0) . " of those phrases actually appear in the body. Google infers topical depth from lexical breadth — a thin overlap caps your ranking ceiling.",
+                'Your page ranks for '.($cov['total'] ?? 0).' queries in Search Console, but only '.($cov['found_count'] ?? 0).' of those phrases actually appear in the body. Google infers topical depth from lexical breadth — a thin overlap caps your ranking ceiling.',
                 "Expand the article to cover the missing queries{$list}. Weave each in naturally once or twice; don't force exact matches.");
         } elseif ($verdict === 'high_authority') {
             $out[] = $this->rec('kw.coverage.high', 'Keywords', self::SEV_GOOD,
@@ -365,10 +368,17 @@ class RecommendationEngine
                 'Maintain this breadth when editing. Audit again after substantial content changes.');
         }
 
-        // 3. Intent alignment (dominant from GSC query heuristics; threshold >= 3 matching queries)
+        // 3. Intent alignment (weighted scores + compound dominants, e.g. commercial_utility)
         $intent = $kw['intent'] ?? [];
         $dom = $intent['dominant'] ?? null;
-        if ($dom === 'informational' && ($intent['informational_count'] ?? 0) >= 3) {
+        if ($dom === 'commercial_utility'
+            && ($intent['blend_counts']['commercial_utility'] ?? 0) >= 1
+            && (($intent['commercial_count'] ?? 0) + ($intent['utility_count'] ?? 0)) >= 2) {
+            $out[] = $this->rec('kw.intent.commercial_utility', 'Keywords', self::SEV_INFO,
+                'Commercial + tool intent blended',
+                'Queries mix evaluation language (best, vs, reviews) with tool-task language (generator, calculator). Users want to pick the best option and use it immediately.',
+                'Open with a tight comparison or ranked picks, then place the interactive tool above the fold. Align the H1 with both evaluation and the outcome the tool delivers.');
+        } elseif ($dom === 'informational' && ($intent['informational_count'] ?? 0) >= 3) {
             $out[] = $this->rec('kw.intent.informational', 'Keywords', self::SEV_INFO,
                 'Informational search intent detected',
                 'Several ranking queries signal discovery and learning (how-to, explainers, research-style phrasing). Pages tuned for informational intent earn more rich-result and long-click behavior when structured for depth.',
@@ -412,7 +422,7 @@ class RecommendationEngine
             if ($term === '') {
                 continue;
             }
-            $out[] = $this->rec('kw.accidental.' . md5($term), 'Keywords', self::SEV_INFO,
+            $out[] = $this->rec('kw.accidental.'.md5($term), 'Keywords', self::SEV_INFO,
                 "Accidental authority: \"{$term}\" ({$density}% density)",
                 "You use \"{$term}\" frequently in the body, but it is not among your tracked target keywords and does not appear in the title or H1. You may be ranking for it without intent — and missing the chance to rank higher.",
                 "If \"{$term}\" is relevant to this page, add it to the title or H1 to capture the unexpected search traffic.");

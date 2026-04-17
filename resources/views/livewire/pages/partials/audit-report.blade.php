@@ -269,6 +269,24 @@
                                 <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Search intent</p>
                                 @php
                                     $dom = $intent['dominant'] ?? 'unclear';
+                                    $intentDominantLabels = [
+                                        'informational' => 'Informational',
+                                        'utility' => 'Tool / app',
+                                        'commercial' => 'Commercial',
+                                        'transactional' => 'Transactional',
+                                        'navigational' => 'Navigational',
+                                        'local' => 'Local',
+                                        'support' => 'Support',
+                                        'commercial_utility' => 'Commercial + tool / app',
+                                        'commercial_informational' => 'Commercial + informational',
+                                        'commercial_transactional' => 'Commercial + transactional',
+                                        'informational_utility' => 'Informational + tool / app',
+                                        'mixed' => 'Mixed (3+ tied top scores)',
+                                        'unclear' => 'Unclear',
+                                    ];
+                                    $dominantLabel = $intentDominantLabels[$dom] ?? collect(explode('_', $dom))->map(function (string $part) {
+                                        return $part === 'utility' ? 'Tool / app' : ucfirst($part);
+                                    })->implode(' + ');
                                     $intentBucketLabels = [
                                         'Informational' => (int) ($intent['informational_count'] ?? 0),
                                         'Tool / app' => (int) ($intent['utility_count'] ?? 0),
@@ -285,23 +303,23 @@
                                         }
                                     }
                                     $intentSummary = $intentSummaryParts !== [] ? implode(' · ', $intentSummaryParts) : 'No trigger matches';
+                                    $scoreParts = [];
+                                    foreach ($intent['intent_scores'] ?? [] as $sk => $sv) {
+                                        if ((float) $sv > 0) {
+                                            $scoreParts[] = $sk . ': ' . $sv;
+                                        }
+                                    }
+                                    $intentScoreLine = $scoreParts !== [] ? 'Weighted: ' . implode(' · ', $scoreParts) : '';
                                 @endphp
                                 <p class="mt-1 text-sm font-bold text-slate-900 dark:text-slate-100">
-                                    @switch($dom)
-                                        @case('informational') Informational @break
-                                        @case('utility') Tool / app @break
-                                        @case('commercial') Commercial @break
-                                        @case('transactional') Transactional @break
-                                        @case('navigational') Navigational @break
-                                        @case('local') Local @break
-                                        @case('support') Support @break
-                                        @case('mixed') Mixed (tied top intents) @break
-                                        @default Unclear
-                                    @endswitch
+                                    {{ $dominantLabel }}
                                 </p>
                                 <p class="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
                                     {{ $intentSummary }}
                                 </p>
+                                @if ($intentScoreLine !== '')
+                                    <p class="mt-1 text-[10px] leading-relaxed text-slate-400 dark:text-slate-500">{{ $intentScoreLine }}</p>
+                                @endif
                             </div>
                             <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                                 <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Accidental authority</p>

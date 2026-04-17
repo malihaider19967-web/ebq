@@ -60,22 +60,34 @@ class KeywordStrategyAnalyzerTest extends TestCase
         $this->assertGreaterThanOrEqual(1, $intent['utility_count']);
     }
 
-    public function test_dominant_mixed_when_top_buckets_tie(): void
+    public function test_dominant_compound_when_two_buckets_tie_top_weighted_score(): void
     {
         $analyzer = new KeywordStrategyAnalyzer;
         $keywords = [
-            $this->kw('laptop vs tablet review'),
-            $this->kw('alternative to slack'),
-            $this->kw('pros and cons of vue'),
-            $this->kw('what is dns'),
-            $this->kw('tips for marathon training'),
-            $this->kw('history of printing press'),
+            $this->kw('alpha vs beta', 1, 10),
+            $this->kw('gamma vs delta', 1, 10),
+            $this->kw('epsilon vs zeta', 1, 10),
+            $this->kw('what is dns', 1, 10),
+            $this->kw('what is smtp', 1, 10),
+            $this->kw('what is tls', 1, 10),
         ];
         $intent = $analyzer->analyze($keywords, $this->components())['intent'];
 
         $this->assertSame(3, $intent['commercial_count']);
         $this->assertSame(3, $intent['informational_count']);
-        $this->assertSame('mixed', $intent['dominant']);
+        $this->assertSame('commercial_informational', $intent['dominant']);
+        $this->assertArrayHasKey('intent_scores', $intent);
+        $this->assertGreaterThan(0, $intent['intent_scores']['commercial']);
+        $this->assertGreaterThan(0, $intent['intent_scores']['informational']);
+    }
+
+    public function test_dominant_commercial_utility_when_best_and_generator_blend(): void
+    {
+        $analyzer = new KeywordStrategyAnalyzer;
+        $intent = $analyzer->analyze([$this->kw('best password generator', 1, 50)], $this->components())['intent'];
+
+        $this->assertSame('commercial_utility', $intent['dominant']);
+        $this->assertGreaterThanOrEqual(1, $intent['blend_counts']['commercial_utility'] ?? 0);
     }
 
     public function test_dominant_single_winner_when_counts_unequal(): void

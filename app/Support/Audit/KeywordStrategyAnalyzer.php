@@ -9,8 +9,14 @@ class KeywordStrategyAnalyzer
         'difference between', 'which is better', 'pros and cons', 'worth the money', 'scam or legit',
         'alternative to', 'best overall', 'top-rated', 'top rated', 'specifications', 'best alternative',
         'comparison', 'competitors', 'alternatives', 'benchmark', 'benefits', 'is it good', 'is it worth',
-        'versus', 'reviews', 'review', 'rating', 'specs', 'vs',
+        'versus', 'reviews', 'review', 'rating', 'specs', 'best', 'vs',
     ];
+
+    private const COMPOUND_RUNNER_RATIO = 0.45;
+
+    private const COMPOUND_RUNNER_MIN_SCORE = 2.0;
+
+    private const MAX_HITS_PER_BUCKET_PER_QUERY = 8;
 
     /** @var list<string> */
     private const TRANSACTIONAL_TRIGGERS = [
@@ -56,7 +62,7 @@ class KeywordStrategyAnalyzer
     ];
 
     /**
-     * @param array<int, array{query: string, clicks: int, impressions: int}> $targetKeywords
+     * @param  array<int, array{query: string, clicks: int, impressions: int}>  $targetKeywords
      */
     public function analyze(array $targetKeywords, array $components): array
     {
@@ -85,7 +91,7 @@ class KeywordStrategyAnalyzer
             'accidental' => $this->accidentalAuthority(
                 $components['keyword_density'] ?? [],
                 $targetKeywords,
-                $titleLower . ' ' . $h1Lower
+                $titleLower.' '.$h1Lower
             ),
         ];
     }
@@ -137,7 +143,7 @@ class KeywordStrategyAnalyzer
     }
 
     /**
-     * @param array<int, array{query: string, clicks: int, impressions: int}> $keywords
+     * @param  array<int, array{query: string, clicks: int, impressions: int}>  $keywords
      */
     private function intentAlignment(array $keywords): array
     {
@@ -157,49 +163,106 @@ class KeywordStrategyAnalyzer
         $utility = [];
         $informational = [];
 
+        $scores = [
+            'informational' => 0.0,
+            'utility' => 0.0,
+            'commercial' => 0.0,
+            'transactional' => 0.0,
+            'navigational' => 0.0,
+            'local' => 0.0,
+            'support' => 0.0,
+        ];
+
+        /** @var array<string, int> */
+        $blendCounts = [];
+
         foreach ($keywords as $row) {
             $lower = mb_strtolower($row['query']);
             $q = $row['query'];
+            $w = log(1 + max(1, (int) ($row['impressions'] ?? 0)));
 
-            if ($this->matchesAnyTrigger($lower, $commercialSorted)) {
+            $hitsCommercial = $this->countStandardBucketHits($lower, $commercialSorted);
+            $hitsTransactional = $this->countStandardBucketHits($lower, $transactionalSorted);
+            $hitsNavigational = $this->countStandardBucketHits($lower, $navigationalSorted);
+            $hitsLocal = $this->countStandardBucketHits($lower, $localSorted);
+            $hitsSupport = $this->countStandardBucketHits($lower, $supportSorted);
+            $hitsUtility = $this->countUtilityHits($lower, $utilitySorted);
+            $hitsInformational = $this->countInformationalHits($lower, $informationalSorted);
+
+            $scores['commercial'] += $hitsCommercial * $w;
+            $scores['transactional'] += $hitsTransactional * $w;
+            $scores['navigational'] += $hitsNavigational * $w;
+            $scores['local'] += $hitsLocal * $w;
+            $scores['support'] += $hitsSupport * $w;
+            $scores['utility'] += $hitsUtility * $w;
+            $scores['informational'] += $hitsInformational * $w;
+
+            $hitMap = [
+                'commercial' => $hitsCommercial,
+                'transactional' => $hitsTransactional,
+                'navigational' => $hitsNavigational,
+                'local' => $hitsLocal,
+                'support' => $hitsSupport,
+                'utility' => $hitsUtility,
+                'informational' => $hitsInformational,
+            ];
+
+            if ($hitsCommercial > 0) {
                 $commercial[] = $q;
             }
-            if ($this->matchesAnyTrigger($lower, $transactionalSorted)) {
+            if ($hitsTransactional > 0) {
                 $transactional[] = $q;
             }
-            if ($this->matchesAnyTrigger($lower, $navigationalSorted)) {
+            if ($hitsNavigational > 0) {
                 $navigational[] = $q;
             }
-            if ($this->matchesAnyTrigger($lower, $localSorted)) {
+            if ($hitsLocal > 0) {
                 $local[] = $q;
             }
-            if ($this->matchesAnyTrigger($lower, $supportSorted)) {
+            if ($hitsSupport > 0) {
                 $support[] = $q;
             }
-            if ($this->matchesUtility($lower, $utilitySorted)) {
+            if ($hitsUtility > 0) {
                 $utility[] = $q;
             }
-            if ($this->matchesInformational($lower, $informationalSorted)) {
+            if ($hitsInformational > 0) {
                 $informational[] = $q;
+            }
+
+            $active = array_keys(array_filter($hitMap, fn (int $h) => $h > 0));
+            sort($active);
+            $n = count($active);
+            for ($i = 0; $i < $n; $i++) {
+                for ($j = $i + 1; $j < $n; $j++) {
+                    $pair = $active[$i].'_'.$active[$j];
+                    $blendCounts[$pair] = ($blendCounts[$pair] ?? 0) + 1;
+                }
             }
         }
 
         $counts = [
-            'informational' => count($informational),
-            'utility' => count($utility),
-            'commercial' => count($commercial),
-            'transactional' => count($transactional),
-            'navigational' => count($navigational),
-            'local' => count($local),
-            'support' => count($support),
+            'informational' => count(array_unique($informational)),
+            'utility' => count(array_unique($utility)),
+            'commercial' => count(array_unique($commercial)),
+            'transactional' => count(array_unique($transactional)),
+            'navigational' => count(array_unique($navigational)),
+            'local' => count(array_unique($local)),
+            'support' => count(array_unique($support)),
         ];
 
-        $max = max($counts);
-        if ($max === 0) {
-            $dominant = 'unclear';
-        } else {
-            $leaders = array_keys(array_filter($counts, fn (int $c) => $c === $max));
-            $dominant = count($leaders) > 1 ? 'mixed' : $leaders[0];
+        $informational = array_values(array_unique($informational));
+        $utility = array_values(array_unique($utility));
+        $commercial = array_values(array_unique($commercial));
+        $transactional = array_values(array_unique($transactional));
+        $navigational = array_values(array_unique($navigational));
+        $local = array_values(array_unique($local));
+        $support = array_values(array_unique($support));
+
+        $dominant = $this->resolveDominantFromScores($scores);
+
+        $intentScoresRounded = [];
+        foreach ($scores as $k => $v) {
+            $intentScoresRounded[$k] = round($v, 1);
         }
 
         return [
@@ -217,66 +280,110 @@ class KeywordStrategyAnalyzer
             'navigational_examples' => array_slice($navigational, 0, 5),
             'local_examples' => array_slice($local, 0, 5),
             'support_examples' => array_slice($support, 0, 5),
+            'intent_scores' => $intentScoresRounded,
+            'blend_counts' => $blendCounts,
             'dominant' => $dominant,
         ];
     }
 
     /**
-     * @param  list<string>  $triggers  longest-first recommended
+     * @param  list<string>  $triggersSorted  longest-first
      */
-    private function matchesAnyTrigger(string $lower, array $triggers): bool
+    private function countStandardBucketHits(string $lower, array $triggersSorted): int
     {
-        foreach ($triggers as $t) {
+        $n = 0;
+        foreach ($triggersSorted as $t) {
             if ($t !== '' && str_contains($lower, $t)) {
-                return true;
+                $n++;
             }
         }
 
-        return false;
+        return min($n, self::MAX_HITS_PER_BUCKET_PER_QUERY);
     }
 
     /**
      * @param  list<string>  $utilitySorted  longest-first
      */
-    private function matchesUtility(string $lower, array $utilitySorted): bool
+    private function countUtilityHits(string $lower, array $utilitySorted): int
     {
+        $n = 0;
         foreach ($utilitySorted as $t) {
             if ($t === '') {
                 continue;
             }
-            if ($t === 'free') {
-                if (str_contains($lower, 'free trial') || str_contains($lower, 'freetrial')) {
-                    continue;
-                }
+            if ($t === 'free' && (str_contains($lower, 'free trial') || str_contains($lower, 'freetrial'))) {
+                continue;
             }
             if (str_contains($lower, $t)) {
-                return true;
+                $n++;
             }
         }
 
-        return false;
+        return min($n, self::MAX_HITS_PER_BUCKET_PER_QUERY);
     }
 
     /**
      * @param  list<string>  $informationalSorted  longest-first
      */
-    private function matchesInformational(string $lower, array $informationalSorted): bool
+    private function countInformationalHits(string $lower, array $informationalSorted): int
     {
+        $n = 0;
         foreach ($informationalSorted as $t) {
             if ($t === '') {
                 continue;
             }
-            if ($t === 'how to') {
-                if (str_contains($lower, 'how to fix') || str_contains($lower, 'how to use')) {
-                    continue;
-                }
+            if ($t === 'how to' && (str_contains($lower, 'how to fix') || str_contains($lower, 'how to use'))) {
+                continue;
             }
             if (str_contains($lower, $t)) {
-                return true;
+                $n++;
             }
         }
 
-        return false;
+        return min($n, self::MAX_HITS_PER_BUCKET_PER_QUERY);
+    }
+
+    /**
+     * @param  array<string, float>  $scores
+     */
+    private function resolveDominantFromScores(array $scores): string
+    {
+        $positive = array_filter($scores, fn (float $v) => $v > 1e-9);
+        if ($positive === []) {
+            return 'unclear';
+        }
+
+        arsort($positive);
+        $values = array_values($positive);
+        $maxV = $values[0];
+        $atMax = array_keys(array_filter($positive, fn (float $v) => abs($v - $maxV) < 1e-6));
+
+        if (count($atMax) >= 3) {
+            return 'mixed';
+        }
+
+        if (count($atMax) === 2) {
+            sort($atMax);
+
+            return implode('_', $atMax);
+        }
+
+        $keys = array_keys($positive);
+        $top = $keys[0];
+        $topV = $positive[$top];
+        $secondV = $values[1] ?? 0.0;
+        $secondKey = $keys[1] ?? null;
+
+        if ($secondKey !== null
+            && $secondV >= self::COMPOUND_RUNNER_RATIO * $topV
+            && $secondV >= self::COMPOUND_RUNNER_MIN_SCORE) {
+            $pair = [$top, $secondKey];
+            sort($pair);
+
+            return implode('_', $pair);
+        }
+
+        return $top;
     }
 
     /**
