@@ -9,9 +9,10 @@
     $failed = $auditReport->status === 'failed';
 @endphp
 
-<div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+<details class="group rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900" open>
+    <summary class="flex cursor-pointer list-none flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3 dark:border-slate-800 [&::-webkit-details-marker]:hidden">
         <div class="flex items-center gap-2">
+            <svg class="h-3.5 w-3.5 text-slate-500 transition-transform group-open:rotate-90" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
             <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">Page Audit Report</h2>
             <span @class([
                 'inline-flex rounded-full px-2 py-px text-[10px] font-semibold',
@@ -22,7 +23,7 @@
         <p class="text-[11px] text-slate-500 dark:text-slate-400">
             Last audited: <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $auditReport->audited_at?->format('M j, Y g:i A') ?? '—' }}</span>
         </p>
-    </div>
+    </summary>
 
     @if ($failed)
         <div class="px-4 py-3 text-xs text-rose-600 dark:text-rose-400">
@@ -193,4 +194,4 @@
             </section>
         </div>
     @endif
-</div>
+</details>
