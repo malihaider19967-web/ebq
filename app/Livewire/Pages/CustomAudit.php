@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Pages;
 
+use App\Models\CustomPageAudit;
 use App\Models\Website;
 use App\Services\PageAuditService;
 use Illuminate\Support\Facades\Auth;
@@ -104,6 +105,16 @@ class CustomAudit extends Component
         }
         $this->running = false;
 
+        CustomPageAudit::query()->create([
+            'website_id' => $this->websiteId,
+            'user_id' => $user->id,
+            'page_url' => $normalizedUrl,
+            'target_keyword' => $keyword,
+            'page_audit_report_id' => $report->id,
+            'status' => $report->status,
+            'error_message' => $report->error_message,
+        ]);
+
         if ($report->status === 'completed') {
             $this->redirect(route('pages.show', ['id' => rawurlencode($normalizedUrl)]), navigate: true);
 
@@ -134,6 +145,18 @@ class CustomAudit extends Component
 
     public function render()
     {
-        return view('livewire.pages.custom-audit');
+        $recentAudits = collect();
+        if ($this->websiteId > 0 && Auth::check() && Auth::user()->canViewWebsiteId($this->websiteId)) {
+            $recentAudits = CustomPageAudit::query()
+                ->where('website_id', $this->websiteId)
+                ->with(['user:id,name', 'pageAuditReport'])
+                ->latest()
+                ->limit(50)
+                ->get();
+        }
+
+        return view('livewire.pages.custom-audit', [
+            'recentAudits' => $recentAudits,
+        ]);
     }
 }

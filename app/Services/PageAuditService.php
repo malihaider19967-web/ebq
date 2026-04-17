@@ -32,6 +32,11 @@ class PageAuditService
     {
         $startedAt = microtime(true);
 
+        $serpKeywordTrimmed = is_string($serpTargetKeyword) ? trim($serpTargetKeyword) : '';
+        $serpKeywordArg = $serpKeywordTrimmed !== '' ? $serpKeywordTrimmed : null;
+        $failurePrimaryKeyword = $serpKeywordArg;
+        $failurePrimarySource = $serpKeywordArg !== null ? 'custom_audit' : null;
+
         $guardCheck = $this->guard->check($pageUrl);
         if (! $guardCheck['ok']) {
             return $this->persistFailure(
@@ -39,14 +44,16 @@ class PageAuditService
                 $pageUrl,
                 'Audit target rejected: '.($guardCheck['reason'] ?? 'unsafe_url'),
                 null,
-                null
+                null,
+                $failurePrimaryKeyword,
+                $failurePrimarySource,
             );
         }
 
         if ($enforceUrlBelongsToWebsite) {
             $website = Website::query()->find($websiteId);
             if (! $website instanceof Website) {
-                return $this->persistFailure($websiteId, $pageUrl, 'Website not found.', null, null);
+                return $this->persistFailure($websiteId, $pageUrl, 'Website not found.', null, null, $failurePrimaryKeyword, $failurePrimarySource);
             }
             if (! $website->isAuditUrlForThisSite($pageUrl)) {
                 return $this->persistFailure(
@@ -54,7 +61,9 @@ class PageAuditService
                     $pageUrl,
                     'The URL must use your website domain (or a subdomain of it).',
                     null,
-                    null
+                    null,
+                    $failurePrimaryKeyword,
+                    $failurePrimarySource,
                 );
             }
         }
@@ -63,7 +72,15 @@ class PageAuditService
             $fetch = $this->fetch($pageUrl);
 
             if (! isset($fetch['body'])) {
-                return $this->persistFailure($websiteId, $pageUrl, $fetch['error'] ?? 'Failed to fetch page', $fetch['http_status'] ?? null, $fetch['ttfb_ms'] ?? null);
+                return $this->persistFailure(
+                    $websiteId,
+                    $pageUrl,
+                    $fetch['error'] ?? 'Failed to fetch page',
+                    $fetch['http_status'] ?? null,
+                    $fetch['ttfb_ms'] ?? null,
+                    $failurePrimaryKeyword,
+                    $failurePrimarySource,
+                );
             }
 
             $html = $fetch['body'];
@@ -124,9 +141,8 @@ class PageAuditService
                 'all_headings_text' => $allHeadingsText,
                 'body_text' => $bodyText,
                 'keyword_density' => $content['keyword_density'] ?? [],
-            ]);
+            ], $serpKeywordArg);
 
-            $serpKeyword = $serpTargetKeyword !== null ? trim($serpTargetKeyword) : '';
             $benchmark = $this->buildSerperReadabilityBenchmark(
                 $pageUrl,
                 $result['keywords'],
@@ -134,13 +150,23 @@ class PageAuditService
                 (int) ($content['word_count'] ?? 0),
                 (int) ($images['total'] ?? 0),
                 $technical['stack'] ?? null,
-                $serpKeyword !== '' ? $serpKeyword : null,
+                $serpKeywordArg,
             );
             if ($benchmark !== null) {
                 $result['benchmark'] = $benchmark;
             }
 
             $result['recommendations'] = app(RecommendationEngine::class)->analyze($result);
+
+            $kwBlock = $result['keywords'] ?? [];
+            $storedPrimaryKeyword = null;
+            $storedPrimarySource = null;
+            if (($kwBlock['available'] ?? false) === true) {
+                $pq = isset($kwBlock['primary']['query']) ? trim((string) $kwBlock['primary']['query']) : '';
+                $storedPrimaryKeyword = $pq !== '' ? mb_substr($pq, 0, 200) : null;
+                $src = $kwBlock['primary_source'] ?? null;
+                $storedPrimarySource = is_string($src) && $src !== '' ? mb_substr($src, 0, 32) : null;
+            }
 
             return PageAuditReport::updateOrCreate(
                 ['website_id' => $websiteId, 'page_hash' => hash('sha256', $pageUrl)],
@@ -152,13 +178,23 @@ class PageAuditService
                     'response_time_ms' => $fetch['ttfb_ms'],
                     'page_size_bytes' => $fetch['size'],
                     'error_message' => null,
+                    'primary_keyword' => $storedPrimaryKeyword,
+                    'primary_keyword_source' => $storedPrimarySource,
                     'result' => $result,
                 ]
             );
         } catch (\Throwable $e) {
             Log::warning("PageAuditService failed for website {$websiteId} page {$pageUrl}: {$e->getMessage()}");
 
-            return $this->persistFailure($websiteId, $pageUrl, $e->getMessage(), null, (int) round((microtime(true) - $startedAt) * 1000));
+            return $this->persistFailure(
+                $websiteId,
+                $pageUrl,
+                $e->getMessage(),
+                null,
+                (int) round((microtime(true) - $startedAt) * 1000),
+                $failurePrimaryKeyword,
+                $failurePrimarySource,
+            );
         }
     }
 
@@ -781,8 +817,21 @@ class PageAuditService
         }
     }
 
-    private function persistFailure(int $websiteId, string $pageUrl, string $error, ?int $httpStatus, ?int $ttfb): PageAuditReport
-    {
+    private function persistFailure(
+        int $websiteId,
+        string $pageUrl,
+        string $error,
+        ?int $httpStatus,
+        ?int $ttfb,
+        ?string $primaryKeyword = null,
+        ?string $primaryKeywordSource = null,
+    ): PageAuditReport {
+        $pk = $primaryKeyword !== null && trim($primaryKeyword) !== '' ? mb_substr(trim($primaryKeyword), 0, 200) : null;
+        $pks = $primaryKeywordSource !== null && trim($primaryKeywordSource) !== '' ? mb_substr(trim($primaryKeywordSource), 0, 32) : null;
+        if ($pk === null) {
+            $pks = null;
+        }
+
         return PageAuditReport::updateOrCreate(
             ['website_id' => $websiteId, 'page_hash' => hash('sha256', $pageUrl)],
             [
@@ -793,6 +842,8 @@ class PageAuditService
                 'response_time_ms' => $ttfb,
                 'page_size_bytes' => null,
                 'error_message' => mb_substr($error, 0, 1000),
+                'primary_keyword' => $pk,
+                'primary_keyword_source' => $pks,
                 'result' => null,
             ]
         );

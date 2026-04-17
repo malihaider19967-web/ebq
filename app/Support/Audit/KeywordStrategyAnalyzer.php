@@ -62,27 +62,56 @@ class KeywordStrategyAnalyzer
     ];
 
     /**
-     * @param  array<int, array{query: string, clicks: int, impressions: int}>  $targetKeywords
+     * @param  array<int, array{query: string, clicks: int, impressions: int, position?: float}>  $targetKeywords
+     * @param  array<string, mixed>  $components
      */
-    public function analyze(array $targetKeywords, array $components): array
+    public function analyze(array $targetKeywords, array $components, ?string $primaryQueryOverride = null): array
     {
-        if (empty($targetKeywords)) {
-            return [
-                'available' => false,
-                'reason' => 'No Search Console queries available for this page yet. Once Google starts surfacing impressions, target-keyword analysis will appear here.',
-            ];
-        }
+        $override = $primaryQueryOverride !== null ? trim($primaryQueryOverride) : '';
+        $usePrimaryOverride = $override !== '';
 
         $bodyLower = mb_strtolower($components['body_text'] ?? '');
         $titleLower = mb_strtolower($components['title'] ?? '');
         $descLower = mb_strtolower($components['meta_description'] ?? '');
         $h1Lower = mb_strtolower($components['h1_text'] ?? '');
-        $allHeadingsLower = mb_strtolower($components['all_headings_text'] ?? '');
+
+        if (empty($targetKeywords)) {
+            if (! $usePrimaryOverride) {
+                return [
+                    'available' => false,
+                    'reason' => 'No Search Console queries available for this page yet. Once Google starts surfacing impressions, target-keyword analysis will appear here.',
+                ];
+            }
+
+            $primary = [
+                'query' => $override,
+                'clicks' => 0,
+                'impressions' => 0,
+                'position' => 0.0,
+            ];
+
+            return [
+                'available' => true,
+                'primary_source' => 'custom_audit',
+                'gsc_queries_available' => false,
+                'target_keywords' => [],
+                'primary' => $primary,
+                'power_placement' => $this->powerPlacement($override, $titleLower, $descLower, $h1Lower),
+                'coverage' => $this->coverage([$primary], $bodyLower),
+                'intent' => $this->intentAlignment([$primary]),
+                'accidental' => $this->accidentalAuthority(
+                    $components['keyword_density'] ?? [],
+                    [$primary],
+                    $titleLower.' '.$h1Lower
+                ),
+            ];
+        }
 
         $primary = $targetKeywords[0];
-
-        return [
+        $out = [
             'available' => true,
+            'primary_source' => 'gsc_primary',
+            'gsc_queries_available' => true,
             'target_keywords' => $targetKeywords,
             'primary' => $primary,
             'power_placement' => $this->powerPlacement($primary['query'], $titleLower, $descLower, $h1Lower),
@@ -94,6 +123,20 @@ class KeywordStrategyAnalyzer
                 $titleLower.' '.$h1Lower
             ),
         ];
+
+        if ($usePrimaryOverride) {
+            $synPrimary = [
+                'query' => $override,
+                'clicks' => 0,
+                'impressions' => 0,
+                'position' => 0.0,
+            ];
+            $out['primary'] = $synPrimary;
+            $out['power_placement'] = $this->powerPlacement($override, $titleLower, $descLower, $h1Lower);
+            $out['primary_source'] = 'custom_audit';
+        }
+
+        return $out;
     }
 
     private function powerPlacement(string $keyword, string $title, string $desc, string $h1): array

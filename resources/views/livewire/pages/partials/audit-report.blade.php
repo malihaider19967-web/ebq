@@ -120,6 +120,17 @@
                         <span class="text-slate-400">·</span> {{ $auditReport->audited_at->format('M j, Y g:i A') }}
                     @endif
                 </p>
+                @if (filled($auditReport->primary_keyword))
+                    <p class="mt-1.5 text-[11px] text-slate-600 dark:text-slate-300">
+                        <span class="font-semibold text-slate-700 dark:text-slate-200">Primary keyword</span>
+                        <span class="font-mono text-slate-800 dark:text-slate-100">“{{ $auditReport->primary_keyword }}”</span>
+                        @if (($auditReport->primary_keyword_source ?? null) === 'custom_audit')
+                            <span class="ml-1 rounded bg-violet-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-violet-800 dark:bg-violet-500/20 dark:text-violet-200">Custom</span>
+                        @elseif (($auditReport->primary_keyword_source ?? null) === 'gsc_primary')
+                            <span class="ml-1 text-slate-400 dark:text-slate-500">· Search Console</span>
+                        @endif
+                    </p>
+                @endif
             </div>
         </summary>
 
@@ -129,6 +140,11 @@
                 <div>
                     <p class="font-semibold text-slate-900 dark:text-slate-100">Audit failed</p>
                     <p class="mt-0.5 text-slate-600 dark:text-slate-400">{{ $auditReport->error_message ?? 'Unknown error' }}</p>
+                    @if (filled($auditReport->primary_keyword))
+                        <p class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                            Intended primary keyword: <span class="font-mono font-medium text-slate-700 dark:text-slate-200">{{ $auditReport->primary_keyword }}</span>
+                        </p>
+                    @endif
                 </div>
             </div>
         @else
@@ -214,11 +230,15 @@
                                         <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Primary keyword</p>
                                         <p class="mt-0.5 truncate text-sm font-bold text-slate-900 dark:text-slate-100">{{ $primary['query'] }}</p>
                                     </div>
-                                    <div class="flex items-center gap-3 text-[11px] text-slate-500">
-                                        <span><span class="font-semibold text-slate-700 dark:text-slate-200">{{ number_format($primary['clicks'] ?? 0) }}</span> clicks</span>
-                                        <span><span class="font-semibold text-slate-700 dark:text-slate-200">{{ number_format($primary['impressions'] ?? 0) }}</span> impressions</span>
-                                        <span>Pos <span class="font-semibold text-slate-700 dark:text-slate-200">{{ number_format($primary['position'] ?? 0, 1) }}</span></span>
-                                    </div>
+                                    @if (($keywordData['primary_source'] ?? null) === 'custom_audit')
+                                        <span class="shrink-0 rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-violet-800 dark:bg-violet-500/20 dark:text-violet-200">Custom audit</span>
+                                    @else
+                                        <div class="flex items-center gap-3 text-[11px] text-slate-500">
+                                            <span><span class="font-semibold text-slate-700 dark:text-slate-200">{{ number_format($primary['clicks'] ?? 0) }}</span> clicks</span>
+                                            <span><span class="font-semibold text-slate-700 dark:text-slate-200">{{ number_format($primary['impressions'] ?? 0) }}</span> impressions</span>
+                                            <span>Pos <span class="font-semibold text-slate-700 dark:text-slate-200">{{ number_format($primary['position'] ?? 0, 1) }}</span></span>
+                                        </div>
+                                    @endif
                                 </div>
                                 <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
                                     @foreach ([['in_title', 'Title'], ['in_h1', 'H1'], ['in_meta_description', 'Meta description']] as [$key, $label])

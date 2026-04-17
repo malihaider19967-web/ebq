@@ -1,4 +1,8 @@
-<div class="mx-auto max-w-2xl space-y-6">
+@php
+    use Illuminate\Support\Str;
+@endphp
+
+<div class="mx-auto max-w-4xl space-y-8">
     <div>
         <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Custom page audit</h1>
         <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
@@ -62,5 +66,69 @@
                 <span wire:loading wire:target="runAudit" class="text-xs text-slate-500 dark:text-slate-400">This can take a minute.</span>
             </div>
         </form>
+
+        @if ($recentAudits->isNotEmpty())
+            <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div class="flex flex-wrap items-end justify-between gap-3">
+                    <div>
+                        <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">Recent custom audits</h2>
+                        <p class="mt-1 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
+                            Each row records the URL and SERP keyword you used. Opening the report shows the <strong class="text-slate-600 dark:text-slate-300">latest saved audit</strong> for that page; a later audit (custom or from Pages) can replace the same report row.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
+                    <table class="min-w-full divide-y divide-slate-200 text-left text-sm dark:divide-slate-700">
+                        <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-400">
+                            <tr>
+                                <th class="whitespace-nowrap px-4 py-3">When</th>
+                                <th class="min-w-[10rem] px-4 py-3">Page</th>
+                                <th class="min-w-[8rem] px-4 py-3">Keyword</th>
+                                <th class="whitespace-nowrap px-4 py-3">By</th>
+                                <th class="whitespace-nowrap px-4 py-3">Status</th>
+                                <th class="whitespace-nowrap px-4 py-3 text-right">Report</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                            @foreach ($recentAudits as $row)
+                                <tr class="bg-white dark:bg-slate-900">
+                                    <td class="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                                        <span title="{{ $row->created_at->toIso8601String() }}">{{ $row->created_at->diffForHumans() }}</span>
+                                    </td>
+                                    <td class="max-w-[14rem] px-4 py-3">
+                                        <span class="block truncate font-mono text-xs text-slate-800 dark:text-slate-200" title="{{ $row->page_url }}">{{ Str::limit($row->page_url, 56) }}</span>
+                                    </td>
+                                    <td class="max-w-[12rem] px-4 py-3">
+                                        <span class="line-clamp-2 text-slate-800 dark:text-slate-200" title="{{ $row->target_keyword }}">{{ Str::limit($row->target_keyword, 80) }}</span>
+                                    </td>
+                                    <td class="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                                        @if ($row->user_id === auth()->id())
+                                            You
+                                        @else
+                                            {{ $row->user?->name ?? '—' }}
+                                        @endif
+                                    </td>
+                                    <td class="whitespace-nowrap px-4 py-3">
+                                        @if ($row->status === 'completed')
+                                            <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Done</span>
+                                        @else
+                                            <span class="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800 dark:bg-rose-500/15 dark:text-rose-300">Failed</span>
+                                        @endif
+                                    </td>
+                                    <td class="whitespace-nowrap px-4 py-3 text-right">
+                                        <a
+                                            href="{{ route('pages.show', ['id' => rawurlencode($row->page_url)]) }}"
+                                            wire:navigate
+                                            class="text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+                                        >View</a>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
     @endif
 </div>

@@ -105,4 +105,37 @@ class KeywordStrategyAnalyzerTest extends TestCase
         $this->assertSame('informational', $intent['dominant']);
         $this->assertGreaterThan($intent['commercial_count'], $intent['informational_count']);
     }
+
+    public function test_primary_query_override_replaces_gsc_primary_for_display_and_placement(): void
+    {
+        $analyzer = new KeywordStrategyAnalyzer;
+        $out = $analyzer->analyze(
+            [$this->kw('gsc top query', 50, 500)],
+            $this->components(['title' => 'Widget reviews and ratings', 'h1_text' => 'Widget reviews']),
+            'widget reviews'
+        );
+
+        $this->assertSame('custom_audit', $out['primary_source']);
+        $this->assertSame('widget reviews', $out['primary']['query']);
+        $this->assertSame('gsc top query', $out['target_keywords'][0]['query']);
+        $this->assertTrue($out['power_placement']['in_title']);
+        $this->assertTrue($out['power_placement']['in_h1']);
+    }
+
+    public function test_primary_query_override_without_gsc_still_produces_keyword_section(): void
+    {
+        $analyzer = new KeywordStrategyAnalyzer;
+        $out = $analyzer->analyze(
+            [],
+            $this->components(['body_text' => 'custom audit phrase in body custom audit phrase']),
+            'custom audit phrase'
+        );
+
+        $this->assertTrue($out['available']);
+        $this->assertSame('custom_audit', $out['primary_source']);
+        $this->assertFalse($out['gsc_queries_available']);
+        $this->assertSame([], $out['target_keywords']);
+        $this->assertSame('custom audit phrase', $out['primary']['query']);
+        $this->assertSame(100.0, $out['coverage']['score']);
+    }
 }

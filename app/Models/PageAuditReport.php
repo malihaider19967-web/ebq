@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PageAuditReport extends Model
 {
@@ -11,6 +12,8 @@ class PageAuditReport extends Model
         'website_id',
         'page',
         'page_hash',
+        'primary_keyword',
+        'primary_keyword_source',
         'status',
         'audited_at',
         'http_status',
@@ -31,5 +34,13 @@ class PageAuditReport extends Model
     public function website(): BelongsTo
     {
         return $this->belongsTo(Website::class);
+    }
+
+    /**
+     * @return HasMany<CustomPageAudit, $this>
+     */
+    public function customPageAudits(): HasMany
+    {
+        return $this->hasMany(CustomPageAudit::class);
     }
 }

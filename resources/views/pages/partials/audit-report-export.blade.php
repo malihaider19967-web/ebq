@@ -71,11 +71,28 @@
             Audited: <strong>{{ $auditReport->audited_at?->format('M j, Y g:i A') ?? '—' }}</strong>
             &nbsp;·&nbsp; Status: <span class="badge {{ $failed ? 'bad' : 'ok' }}">{{ ucfirst($auditReport->status) }}</span>
         </p>
+        @if (filled($auditReport->primary_keyword))
+            <p style="margin-top: 8px; font-size: 12px;">
+                <strong>Primary keyword:</strong>
+                <span style="font-family: ui-monospace, monospace;">{{ $auditReport->primary_keyword }}</span>
+                @if (($auditReport->primary_keyword_source ?? null) === 'custom_audit')
+                    <span style="margin-left: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #5b21b6;">(custom)</span>
+                @elseif (($auditReport->primary_keyword_source ?? null) === 'gsc_primary')
+                    <span class="muted" style="margin-left: 6px; font-size: 10px;">(Search Console)</span>
+                @endif
+            </p>
+        @endif
     </div>
 
     @if ($failed)
         <div class="card">
             <p class="bad"><strong>Audit failed:</strong> {{ $auditReport->error_message ?? 'Unknown error' }}</p>
+            @if (filled($auditReport->primary_keyword))
+                <p class="muted" style="margin-top: 8px; font-size: 12px;">
+                    <strong>Intended primary keyword:</strong>
+                    <span style="font-family: ui-monospace, monospace;">{{ $auditReport->primary_keyword }}</span>
+                </p>
+            @endif
         </div>
     @else
         @php $recs = $result['recommendations'] ?? []; @endphp
@@ -138,7 +155,14 @@
                 <h2>Keyword Strategy</h2>
 
                 @if ($primary)
-                    <p><strong>Primary keyword:</strong> "{{ $primary['query'] }}" &nbsp;·&nbsp; {{ number_format($primary['clicks'] ?? 0) }} clicks · {{ number_format($primary['impressions'] ?? 0) }} impressions · position {{ number_format($primary['position'] ?? 0, 1) }}</p>
+                    <p>
+                        <strong>Primary keyword:</strong> "{{ $primary['query'] }}"
+                        @if (($keywordData['primary_source'] ?? null) === 'custom_audit')
+                            <span style="margin-left: 6px; font-size: 9px; font-weight: 800; text-transform: uppercase; color: #5b21b6;">(custom audit)</span>
+                        @else
+                            &nbsp;·&nbsp; {{ number_format($primary['clicks'] ?? 0) }} clicks · {{ number_format($primary['impressions'] ?? 0) }} impressions · position {{ number_format($primary['position'] ?? 0, 1) }}
+                        @endif
+                    </p>
                     <div class="row" style="margin-top: 8px;">
                         @foreach ([['in_title', 'Title'], ['in_h1', 'H1'], ['in_meta_description', 'Meta description']] as [$key, $label])
                             @php $present = (bool) ($pp[$key] ?? false); @endphp

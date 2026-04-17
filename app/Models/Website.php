@@ -88,6 +88,11 @@ class Website extends Model
         return $this->hasMany(PageIndexingStatus::class);
     }
 
+    public function customPageAudits(): HasMany
+    {
+        return $this->hasMany(CustomPageAudit::class);
+    }
+
     /**
      * Whether a page URL is on this website's domain or a subdomain of it (www normalized).
      */
