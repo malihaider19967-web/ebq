@@ -267,17 +267,40 @@
                         <div class="mt-3 grid gap-2 sm:grid-cols-2">
                             <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
                                 <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Search intent</p>
-                                @php $dom = $intent['dominant'] ?? 'unclear'; @endphp
+                                @php
+                                    $dom = $intent['dominant'] ?? 'unclear';
+                                    $intentBucketLabels = [
+                                        'Informational' => (int) ($intent['informational_count'] ?? 0),
+                                        'Tool / app' => (int) ($intent['utility_count'] ?? 0),
+                                        'Commercial' => (int) ($intent['commercial_count'] ?? 0),
+                                        'Transactional' => (int) ($intent['transactional_count'] ?? 0),
+                                        'Navigational' => (int) ($intent['navigational_count'] ?? 0),
+                                        'Local' => (int) ($intent['local_count'] ?? 0),
+                                        'Support' => (int) ($intent['support_count'] ?? 0),
+                                    ];
+                                    $intentSummaryParts = [];
+                                    foreach ($intentBucketLabels as $label => $n) {
+                                        if ($n > 0) {
+                                            $intentSummaryParts[] = $label . ': ' . $n;
+                                        }
+                                    }
+                                    $intentSummary = $intentSummaryParts !== [] ? implode(' · ', $intentSummaryParts) : 'No trigger matches';
+                                @endphp
                                 <p class="mt-1 text-sm font-bold text-slate-900 dark:text-slate-100">
                                     @switch($dom)
                                         @case('informational') Informational @break
-                                        @case('utility') Utility / Transactional @break
-                                        @case('mixed') Mixed (info + utility) @break
+                                        @case('utility') Tool / app @break
+                                        @case('commercial') Commercial @break
+                                        @case('transactional') Transactional @break
+                                        @case('navigational') Navigational @break
+                                        @case('local') Local @break
+                                        @case('support') Support @break
+                                        @case('mixed') Mixed (tied top intents) @break
                                         @default Unclear
                                     @endswitch
                                 </p>
-                                <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
-                                    {{ $intent['informational_count'] ?? 0 }} informational · {{ $intent['utility_count'] ?? 0 }} utility triggers
+                                <p class="mt-1 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                                    {{ $intentSummary }}
                                 </p>
                             </div>
                             <div class="rounded-lg border border-slate-200 p-3 dark:border-slate-700">

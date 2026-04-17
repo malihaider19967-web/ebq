@@ -159,16 +159,40 @@
                 @endif
 
                 <h3 style="margin-top: 14px;">Search intent</h3>
+                @php
+                    $domExport = $intent['dominant'] ?? 'unclear';
+                    $intentBucketsExport = [
+                        'Informational' => (int) ($intent['informational_count'] ?? 0),
+                        'Tool / app' => (int) ($intent['utility_count'] ?? 0),
+                        'Commercial' => (int) ($intent['commercial_count'] ?? 0),
+                        'Transactional' => (int) ($intent['transactional_count'] ?? 0),
+                        'Navigational' => (int) ($intent['navigational_count'] ?? 0),
+                        'Local' => (int) ($intent['local_count'] ?? 0),
+                        'Support' => (int) ($intent['support_count'] ?? 0),
+                    ];
+                    $intentSummaryPartsExport = [];
+                    foreach ($intentBucketsExport as $label => $n) {
+                        if ($n > 0) {
+                            $intentSummaryPartsExport[] = $label . ': ' . $n;
+                        }
+                    }
+                    $intentSummaryExport = $intentSummaryPartsExport !== [] ? implode(' · ', $intentSummaryPartsExport) : 'No trigger matches';
+                @endphp
                 <p>
                     <strong>
-                        @switch($intent['dominant'] ?? 'unclear')
+                        @switch($domExport)
                             @case('informational') Informational @break
-                            @case('utility') Utility / Transactional @break
-                            @case('mixed') Mixed @break
+                            @case('utility') Tool / app @break
+                            @case('commercial') Commercial @break
+                            @case('transactional') Transactional @break
+                            @case('navigational') Navigational @break
+                            @case('local') Local @break
+                            @case('support') Support @break
+                            @case('mixed') Mixed (tied top intents) @break
                             @default Unclear
                         @endswitch
                     </strong>
-                    <span class="muted">({{ $intent['informational_count'] ?? 0 }} informational · {{ $intent['utility_count'] ?? 0 }} utility triggers)</span>
+                    <span class="muted"> — {{ $intentSummaryExport }}</span>
                 </p>
 
                 @if (! empty($accidental))

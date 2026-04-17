@@ -365,18 +365,44 @@ class RecommendationEngine
                 'Maintain this breadth when editing. Audit again after substantial content changes.');
         }
 
-        // 3. Intent alignment
+        // 3. Intent alignment (dominant from GSC query heuristics; threshold >= 3 matching queries)
         $intent = $kw['intent'] ?? [];
-        if (($intent['dominant'] ?? null) === 'informational' && ($intent['informational_count'] ?? 0) >= 3) {
+        $dom = $intent['dominant'] ?? null;
+        if ($dom === 'informational' && ($intent['informational_count'] ?? 0) >= 3) {
             $out[] = $this->rec('kw.intent.informational', 'Keywords', self::SEV_INFO,
                 'Informational search intent detected',
-                'Several of your ranking queries use how-to / guide / tutorial phrasing. Pages serving informational intent win more rich-result real estate when structured for it.',
-                'Add FAQ schema (JSON-LD FAQPage) for answered questions, and a Table of Contents anchor list near the top — both dramatically increase SERP footprint and dwell time.');
-        } elseif (($intent['dominant'] ?? null) === 'utility' && ($intent['utility_count'] ?? 0) >= 3) {
+                'Several ranking queries signal discovery and learning (how-to, explainers, research-style phrasing). Pages tuned for informational intent earn more rich-result and long-click behavior when structured for depth.',
+                'Lead with a clear answer or overview, add a table of contents with jump links, and use FAQPage JSON-LD where you answer concrete questions in the copy.');
+        } elseif ($dom === 'utility' && ($intent['utility_count'] ?? 0) >= 3) {
             $out[] = $this->rec('kw.intent.utility', 'Keywords', self::SEV_INFO,
-                'Utility / transactional search intent detected',
-                'Queries like "generator", "tool", "maker", "online" indicate users want to *do* something, not just read. Pages that bury the tool under intro copy have far lower conversion.',
-                'Move the interactive tool above-the-fold. Keep descriptive copy below. Add clear step-by-step usage instructions for SERP feature eligibility.');
+                'Tool / app search intent detected',
+                'Many queries imply an active task (generator, calculator, checker, online tool). Users expect the interactive surface immediately; long intros increase bounce before the task starts.',
+                'Place the primary tool or action above the fold with a visible primary control. Move marketing copy and secondary links below; add short numbered steps for first-time use.');
+        } elseif ($dom === 'commercial' && ($intent['commercial_count'] ?? 0) >= 3) {
+            $out[] = $this->rec('kw.intent.commercial', 'Keywords', self::SEV_INFO,
+                'Commercial evaluation intent detected',
+                'Queries skew toward comparison, reviews, alternatives, and “worth it” evaluation. Thin opinion blocks underperform versus structured comparison and proof.',
+                'Add a comparison table (you vs alternatives or plans), cite specs and limits honestly, and surface ratings, testimonials, or third-party proof near the decision section.');
+        } elseif ($dom === 'transactional' && ($intent['transactional_count'] ?? 0) >= 3) {
+            $out[] = $this->rec('kw.intent.transactional', 'Keywords', self::SEV_INFO,
+                'Transactional intent detected',
+                'Ranking queries reference price, purchase, deals, trials, or checkout-style language. Hesitation or buried pricing hurts conversion on these clicks.',
+                'Put price or “from” pricing, primary CTA, and trust signals (guarantee, refund, security) in the first screen. Repeat the CTA after the value proof block.');
+        } elseif ($dom === 'navigational' && ($intent['navigational_count'] ?? 0) >= 3) {
+            $out[] = $this->rec('kw.intent.navigational', 'Keywords', self::SEV_INFO,
+                'Navigational intent detected',
+                'Queries suggest users already chose your brand and need a specific destination (login, account, contact, careers). Friction or ambiguous IA wastes branded demand.',
+                'Use obvious labels in navigation and footer, deep-link common destinations from the homepage, and keep login/account paths one click from global chrome.');
+        } elseif ($dom === 'local' && ($intent['local_count'] ?? 0) >= 3) {
+            $out[] = $this->rec('kw.intent.local', 'Keywords', self::SEV_INFO,
+                'Local intent detected',
+                'Queries reference geography, hours, directions, pickup, or “near me.” Missing local cues reduces relevance for map packs and local SERPs.',
+                'Publish consistent NAP (name, address, phone), valid LocalBusiness or store schema where applicable, and a block for hours, map embed, and service area or pickup options.');
+        } elseif ($dom === 'support' && ($intent['support_count'] ?? 0) >= 3) {
+            $out[] = $this->rec('kw.intent.support', 'Keywords', self::SEV_INFO,
+                'Support and troubleshooting intent detected',
+                'Queries point to errors, fixes, setup, refunds, or passwords. These visits need fast resolution paths, not marketing fluff — poor support UX also signals low quality to search.',
+                'Surface a search-first help layout: top FAQs, links to docs, version or environment notes, and a visible path to human support or status page for outages.');
         }
 
         // 4. Accidental authority
