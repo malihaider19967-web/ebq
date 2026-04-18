@@ -8,6 +8,7 @@ use App\Models\Website;
 use App\Support\Audit\HtmlAuditor;
 use App\Support\Audit\KeywordStrategyAnalyzer;
 use App\Support\Audit\PageLocaleResolver;
+use App\Services\LighthouseClient;
 use App\Support\Audit\RecommendationEngine;
 use App\Support\Audit\SafeHttpGuard;
 use App\Support\Audit\SerpGlCountryPrompt;
@@ -216,6 +217,22 @@ class PageAuditService
                     );
                 }
                 $result['benchmark'] = $benchmark;
+            }
+
+            // Core Web Vitals via the standalone ebq-intelegence Lighthouse service.
+            // Runs here (not in the Job) so the sync "Audit this page" flow on
+            // PageDetail gets CWV too. Client returns null silently if the
+            // service is down — audit still completes without CWV.
+            try {
+                $cwv = app(LighthouseClient::class)->fetchMobileAndDesktop($pageUrl);
+                if (is_array($cwv)) {
+                    $result['core_web_vitals'] = $cwv;
+                }
+            } catch (\Throwable $e) {
+                Log::warning('PageAuditService: CWV enrichment failed', [
+                    'url' => $pageUrl,
+                    'exception' => $e->getMessage(),
+                ]);
             }
 
             $result['recommendations'] = app(RecommendationEngine::class)->analyze($result);
