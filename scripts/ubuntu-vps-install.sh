@@ -60,6 +60,31 @@ ensure_repo_php() {
   apt-get update -y
 }
 
+have_pkg() {
+  dpkg -s "$1" >/dev/null 2>&1
+}
+
+mysql_like_server_installed() {
+  have_pkg mariadb-server || have_pkg mysql-server || have_pkg mysql-server-8.0
+}
+
+# Installs a MySQL-protocol server if none is present (Laravel uses DB_CONNECTION=mysql either way).
+ensure_database_server() {
+  if mysql_like_server_installed; then
+    return 0
+  fi
+  echo "No MySQL-compatible server found; installing ${DB_SERVER_PACKAGE:-mariadb-server}..." >&2
+  apt-get update -y
+  case "${DB_SERVER_PACKAGE:-mariadb-server}" in
+    mysql-server)
+      apt_install mysql-server
+      ;;
+    *)
+      apt_install mariadb-server mariadb-client
+      ;;
+  esac
+}
+
 install_base_stack() {
   apt-get update -y
   apt_install git curl unzip jq openssl acl ca-certificates
@@ -80,8 +105,6 @@ install_base_stack() {
     "php${PHP_VERSION}-intl"
     "php${PHP_VERSION}-readline"
     "php${PHP_VERSION}-sqlite3"
-    "mariadb-server"
-    "mariadb-client"
   )
 
   apt_install "${pkgs[@]}"
@@ -436,6 +459,7 @@ maybe_ssl() {
 
 main() {
   install_base_stack
+  ensure_database_server
   configure_system_misc
   configure_php_apache
   configure_apache_global
