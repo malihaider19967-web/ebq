@@ -1,0 +1,349 @@
+#!/usr/bin/env bash
+# Ubuntu VPS bootstrap: stack check/install, git deploy, Apache vhost, optional SSL + Cloudflare DNS.
+# Usage:
+#   sudo cp scripts/deploy.env.example scripts/deploy.env
+#   sudo nano scripts/deploy.env
+#   sudo bash scripts/ubuntu-vps-install.sh
+#
+# Re-runs are safe: packages are idempotent; git pull updates the app dir.
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DEFAULT_ENV_FILE="${SCRIPT_DIR}/deploy.env"
+: "${DEPLOY_ENV_FILE:=${DEFAULT_ENV_FILE}}"
+
+if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+  echo "Run as root: sudo $0" >&2
+  exit 1
+fi
+
+if [[ -f "${DEPLOY_ENV_FILE}" ]]; then
+  # shellcheck source=/dev/null
+  set -a && source "${DEPLOY_ENV_FILE}" && set +a
+else
+  echo "Missing ${DEPLOY_ENV_FILE}" >&2
+  echo "Copy deploy.env.example to deploy.env and edit values." >&2
+  exit 1
+fi
+
+: "${GIT_REPO:?Set GIT_REPO in deploy.env}"
+: "${GIT_BRANCH:=main}"
+: "${APP_DIR:=/var/www/ebq}"
+: "${PRIMARY_DOMAIN:?Set PRIMARY_DOMAIN in deploy.env}"
+: "${EXTRA_DOMAINS:=}"
+: "${ENABLE_SSL:=0}"
+: "${ADMIN_EMAIL:=}"
+
+PHP_VERSION="${PHP_VERSION:-8.3}"
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+apt_install() {
+  DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends "$@"
+}
+
+ensure_repo_php() {
+  if apt-cache show "php${PHP_VERSION}-cli" >/dev/null 2>&1; then
+    return 0
+  fi
+  apt_install software-properties-common ca-certificates lsb-release gnupg
+  add-apt-repository -y ppa:ondrej/php
+  apt-get update -y
+}
+
+have_pkg() {
+  dpkg -s "$1" >/dev/null 2>&1
+}
+
+install_base_stack() {
+  apt-get update -y
+  apt_install git curl unzip jq openssl acl
+
+  ensure_repo_php
+
+  local pkgs=(
+    "apache2"
+    "libapache2-mod-php${PHP_VERSION}"
+    "php${PHP_VERSION}-cli"
+    "php${PHP_VERSION}-common"
+    "php${PHP_VERSION}-curl"
+    "php${PHP_VERSION}-mbstring"
+    "php${PHP_VERSION}-xml"
+    "php${PHP_VERSION}-zip"
+    "php${PHP_VERSION}-mysql"
+    "php${PHP_VERSION}-bcmath"
+    "php${PHP_VERSION}-intl"
+    "php${PHP_VERSION}-readline"
+    "php${PHP_VERSION}-sqlite3"
+    "mariadb-server"
+    "mariadb-client"
+  )
+
+  local p
+  for p in "${pkgs[@]}"; do
+    if ! have_pkg "$p"; then
+      apt_install "$p"
+    fi
+  done
+
+  a2enmod rewrite headers ssl >/dev/null
+  a2dissite 000-default.conf >/dev/null 2>&1 || true
+
+  if ! require_cmd composer; then
+    curl -fsSL https://getcomposer.org/installer -o /tmp/composer-setup.php
+    php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+    rm -f /tmp/composer-setup.php
+  fi
+
+  if ! require_cmd node; then
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    apt_install nodejs
+  fi
+
+  if ! require_cmd certbot; then
+    apt_install certbot python3-certbot-apache
+  fi
+}
+
+server_all_names() {
+  local names=("${PRIMARY_DOMAIN}")
+  IFS=',' read -r -a extra <<< "${EXTRA_DOMAINS// /}"
+  local x
+  for x in "${extra[@]}"; do
+    [[ -n "$x" ]] && names+=("$x")
+  done
+  printf '%s\n' "${names[@]}" | awk 'NF' | sort -u
+}
+
+apache_vhost_path() {
+  echo "/etc/apache2/sites-available/${PRIMARY_DOMAIN}.conf"
+}
+
+extra_server_aliases() {
+  server_all_names | grep -vxF "${PRIMARY_DOMAIN}" || true
+}
+
+write_apache_vhost() {
+  local conf
+  conf="$(apache_vhost_path)"
+  local alias_line=""
+  if extra_server_aliases | grep -q .; then
+    alias_line="    ServerAlias $(extra_server_aliases | paste -sd' ' -)"
+  fi
+
+  cat >"${conf}" <<EOF
+<VirtualHost *:80>
+    ServerName ${PRIMARY_DOMAIN}
+${alias_line}
+    DocumentRoot ${APP_DIR}/public
+
+    <Directory ${APP_DIR}/public>
+        Options FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog \${APACHE_LOG_DIR}/${PRIMARY_DOMAIN}-error.log
+    CustomLog \${APACHE_LOG_DIR}/${PRIMARY_DOMAIN}-access.log combined
+</VirtualHost>
+EOF
+
+  a2ensite "$(basename "${conf}")" >/dev/null
+  systemctl reload apache2
+}
+
+mysql_ensure_db_user() {
+  systemctl enable --now mariadb >/dev/null 2>&1 || systemctl enable --now mysql >/dev/null 2>&1 || true
+
+  : "${DB_DATABASE:=ebq}"
+  : "${DB_USERNAME:=ebq}"
+  : "${DB_PASSWORD:?Set DB_PASSWORD in deploy.env}"
+
+  mysql --protocol=socket -uroot <<SQL
+CREATE DATABASE IF NOT EXISTS \`${DB_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
+GRANT ALL PRIVILEGES ON \`${DB_DATABASE}\`.* TO '${DB_USERNAME}'@'localhost';
+FLUSH PRIVILEGES;
+SQL
+}
+
+git_deploy() {
+  mkdir -p "$(dirname "${APP_DIR}")"
+  local owner="${SUDO_USER:-root}"
+
+  if [[ -d "${APP_DIR}/.git" ]]; then
+    git -C "${APP_DIR}" fetch origin
+    git -C "${APP_DIR}" checkout "${GIT_BRANCH}"
+    git -C "${APP_DIR}" pull --ff-only origin "${GIT_BRANCH}"
+  elif [[ -e "${APP_DIR}" ]]; then
+    echo "${APP_DIR} exists but is not a git clone; remove it or set APP_DIR to an empty path." >&2
+    exit 1
+  else
+    git clone --branch "${GIT_BRANCH}" --single-branch "${GIT_REPO}" "${APP_DIR}"
+  fi
+
+  chown -R "${owner}:www-data" "${APP_DIR}"
+  find "${APP_DIR}" -type d -exec chmod 775 {} \;
+  find "${APP_DIR}" -type f -exec chmod 664 {} \;
+  [[ -f "${APP_DIR}/artisan" ]] && chmod 775 "${APP_DIR}/artisan"
+  chmod -R g+w "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache" 2>/dev/null || true
+}
+
+laravel_env_and_build() {
+  local env_file="${APP_DIR}/.env"
+  if [[ ! -f "${env_file}" ]]; then
+    if [[ -f "${APP_DIR}/.env.example" ]]; then
+      cp "${APP_DIR}/.env.example" "${env_file}"
+    else
+      echo "No .env.example in ${APP_DIR}; create .env manually." >&2
+      exit 1
+    fi
+  fi
+
+  local app_key_value=""
+  local raw_key
+  raw_key="$(grep -E '^APP_KEY=' "${env_file}" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '\r' || true)"
+  raw_key="${raw_key#"${raw_key%%[![:space:]]*}"}"
+  raw_key="${raw_key%"${raw_key##*[![:space:]]}"}"
+  if [[ -z "${raw_key}" ]]; then
+    app_key_value="$(cd "${APP_DIR}" && php -r "echo 'base64:'.base64_encode(random_bytes(32));")"
+  fi
+
+  ENV_FILE="${env_file}" \
+    APP_URL="${APP_URL:-https://${PRIMARY_DOMAIN}}" \
+    APP_KEY_VALUE="${app_key_value}" \
+    DB_CONNECTION="${DB_CONNECTION:-mysql}" \
+    DB_HOST="${DB_HOST:-127.0.0.1}" \
+    DB_PORT="${DB_PORT:-3306}" \
+    DB_DATABASE="${DB_DATABASE:-ebq}" \
+    DB_USERNAME="${DB_USERNAME:-ebq}" \
+    DB_PASSWORD="${DB_PASSWORD:-}" \
+    php -r '
+    $path = getenv("ENV_FILE");
+    $pairs = [
+      "APP_ENV" => "production",
+      "APP_DEBUG" => "false",
+      "APP_URL" => getenv("APP_URL") ?: "",
+      "DB_CONNECTION" => getenv("DB_CONNECTION") ?: "mysql",
+      "DB_HOST" => getenv("DB_HOST") ?: "127.0.0.1",
+      "DB_PORT" => getenv("DB_PORT") ?: "3306",
+      "DB_DATABASE" => getenv("DB_DATABASE") ?: "",
+      "DB_USERNAME" => getenv("DB_USERNAME") ?: "",
+      "DB_PASSWORD" => getenv("DB_PASSWORD") ?: "",
+    ];
+    $k = getenv("APP_KEY_VALUE");
+    if ($k !== false && $k !== "") {
+      $pairs["APP_KEY"] = $k;
+    }
+    $lines = file_exists($path) ? file($path, FILE_IGNORE_NEW_LINES) : [];
+    $out = [];
+    foreach ($lines as $line) {
+      if (preg_match("/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=/", $line, $m)) {
+        $key = $m[1];
+        if (array_key_exists($key, $pairs)) {
+          continue;
+        }
+      }
+      $out[] = $line;
+    }
+    foreach ($pairs as $key => $v) {
+      if ($v === "") {
+        continue;
+      }
+      $out[] = $key . "=" . $v;
+    }
+    file_put_contents($path, implode(PHP_EOL, $out) . PHP_EOL);
+  '
+
+  local owner="${SUDO_USER:-root}"
+  sudo -u "${owner}" bash -c "cd '${APP_DIR}' && composer install --no-dev --optimize-autoloader --no-interaction"
+  sudo -u "${owner}" bash -c "cd '${APP_DIR}' && npm ci && npm run build"
+
+  sudo -u "${owner}" bash -c "cd '${APP_DIR}' && php artisan migrate --force"
+  sudo -u "${owner}" bash -c "cd '${APP_DIR}' && php artisan config:cache && php artisan route:cache && php artisan view:cache"
+}
+
+public_ipv4() {
+  curl -fsS https://api.ipify.org || curl -fsS https://ifconfig.me
+}
+
+cloudflare_upsert_a() {
+  local token="${CLOUDFLARE_API_TOKEN:-}"
+  local zone_name="${CLOUDFLARE_ZONE_NAME:-}"
+  if [[ -z "$token" && -z "$zone_name" ]]; then
+    return 0
+  fi
+  if [[ -z "$token" || -z "$zone_name" ]]; then
+    echo "Set both CLOUDFLARE_API_TOKEN and CLOUDFLARE_ZONE_NAME, or leave both unset." >&2
+    return 1
+  fi
+
+  local zone_id
+  zone_id="$(curl -fsS -H "Authorization: Bearer ${token}" \
+    "https://api.cloudflare.com/client/v4/zones?name=${zone_name}" | jq -r '.result[0].id // empty')"
+  if [[ -z "${zone_id}" || "${zone_id}" == "null" ]]; then
+    echo "Cloudflare: could not resolve zone for ${zone_name}. Check CLOUDFLARE_ZONE_NAME and token." >&2
+    return 1
+  fi
+
+  local ip
+  ip="$(public_ipv4)"
+  local name
+  while IFS= read -r name; do
+    [[ -z "$name" ]] && continue
+    local existing
+    existing="$(curl -fsS -H "Authorization: Bearer ${token}" \
+      "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records?type=A&name=${name}")"
+    local rid
+    rid="$(echo "${existing}" | jq -r '.result[0].id // empty')"
+
+    local payload
+    payload="$(jq -nc --arg name "$name" --arg ip "$ip" \
+      '{type:"A",name:$name,content:$ip,ttl:300,proxied:false}')"
+
+    if [[ -n "$rid" && "$rid" != "null" ]]; then
+      curl -fsS -X PUT -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \
+        "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records/${rid}" \
+        -d "${payload}" >/dev/null
+      echo "Cloudflare: updated A ${name} -> ${ip}"
+    else
+      curl -fsS -X POST -H "Authorization: Bearer ${token}" -H "Content-Type: application/json" \
+        "https://api.cloudflare.com/client/v4/zones/${zone_id}/dns_records" \
+        -d "${payload}" >/dev/null
+      echo "Cloudflare: created A ${name} -> ${ip}"
+    fi
+  done < <(server_all_names)
+}
+
+maybe_ssl() {
+  if [[ "${ENABLE_SSL}" != "1" ]]; then
+    return 0
+  fi
+  : "${ADMIN_EMAIL:?Set ADMIN_EMAIL when ENABLE_SSL=1}"
+  local cert_args=()
+  local d
+  while IFS= read -r d; do
+    [[ -z "$d" ]] && continue
+    cert_args+=(-d "$d")
+  done < <(server_all_names)
+  certbot --apache --non-interactive --agree-tos -m "${ADMIN_EMAIL}" "${cert_args[@]}"
+}
+
+main() {
+  install_base_stack
+  mysql_ensure_db_user
+  git_deploy
+  laravel_env_and_build
+  write_apache_vhost
+  cloudflare_upsert_a
+  systemctl restart apache2
+  maybe_ssl
+  systemctl reload apache2
+
+  echo "Done. Site: http://${PRIMARY_DOMAIN} (or HTTPS if certbot succeeded)."
+}
+
+main "$@"
