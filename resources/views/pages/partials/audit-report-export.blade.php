@@ -558,17 +558,26 @@
                             @foreach ($benchmark['gap_table']['rows'] as $g)
                                 @php
                                     $gk = $g['key'] ?? '';
-                                    $yoursFmt = $gk === 'word_count'
-                                        ? number_format((int) ($g['yours'] ?? 0))
-                                        : (($gk === 'flesch') ? number_format((float) ($g['yours'] ?? 0), 1) : number_format((int) ($g['yours'] ?? 0)));
-                                    $avgFmt = $gk === 'word_count'
-                                        ? number_format((int) round((float) ($g['market_avg'] ?? 0)))
-                                        : (($gk === 'flesch') ? number_format((float) ($g['market_avg'] ?? 0), 1) : number_format((float) ($g['market_avg'] ?? 0), 1));
-                                    $d = (float) ($g['delta'] ?? 0);
+                                    $hasYours = isset($g['yours']) && $g['yours'] !== null;
+                                    $hasAvg = isset($g['market_avg']) && $g['market_avg'] !== null;
+                                    $hasDelta = isset($g['delta']) && is_numeric($g['delta']);
+                                    $yoursFmt = $hasYours
+                                        ? ($gk === 'word_count'
+                                            ? number_format((int) $g['yours'])
+                                            : (($gk === 'flesch') ? number_format((float) $g['yours'], 1) : (is_numeric($g['yours']) ? number_format((int) $g['yours']) : (string) $g['yours'])))
+                                        : '—';
+                                    $avgFmt = $hasAvg
+                                        ? ($gk === 'word_count'
+                                            ? number_format((int) round((float) $g['market_avg']))
+                                            : (($gk === 'flesch') ? number_format((float) $g['market_avg'], 1) : (is_numeric($g['market_avg']) ? number_format((float) $g['market_avg'], 1) : (string) $g['market_avg'])))
+                                        : '—';
+                                    $d = $hasDelta ? (float) $g['delta'] : 0.0;
                                     $sign = $d > 0 ? '+' : '';
-                                    $deltaFmt = $gk === 'word_count'
-                                        ? $sign.number_format((int) round($d), 0, '.', ',')
-                                        : $sign.number_format($d, 1);
+                                    $deltaFmt = $hasDelta
+                                        ? ($gk === 'word_count'
+                                            ? $sign.number_format((int) round($d), 0, '.', ',')
+                                            : $sign.number_format($d, 1))
+                                        : '—';
                                 @endphp
                                 <tr style="border-top: 1px solid #e2e8f0;">
                                     <td style="padding: 6px 8px; font-weight: 600;">{{ $g['metric'] ?? '' }}</td>
@@ -579,6 +588,17 @@
                             @endforeach
                         </tbody>
                     </table>
+                    @php
+                        $gapHasFleschOutOfRangeExp = false;
+                        foreach ($benchmark['gap_table']['rows'] as $gRowExp) {
+                            if (($gRowExp['sample_note'] ?? null) === 'flesch_out_of_range') { $gapHasFleschOutOfRangeExp = true; break; }
+                        }
+                    @endphp
+                    @if ($gapHasFleschOutOfRangeExp)
+                        <p class="muted" style="margin-top: 8px; font-size: 11px; font-style: italic;">
+                            Some competitor pages in the SERP sample were not long-form articles (Flesch outside the 10–95 prose range) and were excluded from the readability average.
+                        </p>
+                    @endif
                 @endif
             </div>
         @endif

@@ -522,23 +522,48 @@ class PageAuditService
             ];
         }
 
-        $fVals = [];
-        foreach ($competitors as $c) {
-            if (is_array($c) && isset($c['flesch']) && is_numeric($c['flesch'])) {
-                $fVals[] = (float) $c['flesch'];
+        if (is_numeric($yourFlesch)) {
+            $fRawCount = 0;
+            $fVals = [];
+            foreach ($competitors as $c) {
+                if (is_array($c) && isset($c['flesch']) && is_numeric($c['flesch'])) {
+                    $fRawCount++;
+                    $v = (float) $c['flesch'];
+                    // Flesch is only meaningful for real prose. <10 or >95 almost always
+                    // comes from non-article competitor pages (product shells, SPA chrome,
+                    // heavy-JS categories) and would skew the market average wildly.
+                    if ($v >= 10.0 && $v <= 95.0) {
+                        $fVals[] = $v;
+                    }
+                }
             }
-        }
-        if ($fVals !== [] && is_numeric($yourFlesch)) {
-            $avg = array_sum($fVals) / count($fVals);
-            $delta = $yourFlesch - $avg;
-            $rows[] = [
-                'key' => 'flesch',
-                'metric' => 'Readability (Flesch)',
-                'yours' => round($yourFlesch, 1),
-                'market_avg' => round($avg, 1),
-                'delta' => round($delta, 1),
-                'status' => $delta > 2 ? 'Better UX' : ($delta < -2 ? 'Tighten copy' : 'Similar'),
-            ];
+
+            if ($fVals !== []) {
+                $avg = array_sum($fVals) / count($fVals);
+                $delta = $yourFlesch - $avg;
+                $row = [
+                    'key' => 'flesch',
+                    'metric' => 'Readability (Flesch)',
+                    'yours' => round($yourFlesch, 1),
+                    'market_avg' => round($avg, 1),
+                    'delta' => round($delta, 1),
+                    'status' => $this->fleschStatus($yourFlesch, $delta),
+                ];
+                if ($fRawCount > count($fVals)) {
+                    $row['sample_note'] = 'flesch_out_of_range';
+                }
+                $rows[] = $row;
+            } elseif ($fRawCount > 0) {
+                $rows[] = [
+                    'key' => 'flesch',
+                    'metric' => 'Readability (Flesch)',
+                    'yours' => round($yourFlesch, 1),
+                    'market_avg' => null,
+                    'delta' => null,
+                    'status' => 'No comparable sample',
+                    'sample_note' => 'flesch_out_of_range',
+                ];
+            }
         }
 
         $imgVals = [];
@@ -573,6 +598,34 @@ class PageAuditService
      * @param  list<array<string, mixed>>  $competitors
      * @return array<string, mixed>|null
      */
+    /**
+     * Zone-aware label for the Flesch gap-table row. A page already in the "accessible"
+     * band (≥60) should never be flagged "tighten copy" just because a competitor
+     * sample happens to skew lower; conversely, a page in the "hard-to-read" band (<30)
+     * should be flagged regardless of the delta.
+     */
+    private function fleschStatus(float $yours, ?float $delta): string
+    {
+        if ($yours >= 60.0) {
+            if ($delta !== null && $delta > 5.0) {
+                return 'Accessible · above sample';
+            }
+
+            return 'Accessible';
+        }
+        if ($yours < 30.0) {
+            return 'Tighten copy';
+        }
+        if ($delta !== null && $delta > 5.0) {
+            return 'Better UX';
+        }
+        if ($delta !== null && $delta < -5.0) {
+            return 'Tighten copy';
+        }
+
+        return 'Similar';
+    }
+
     private function buildStackGapRow(?array $yourStack, array $competitors): ?array
     {
         $yourType = is_array($yourStack) ? (string) ($yourStack['type'] ?? 'unknown') : 'unknown';

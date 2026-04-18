@@ -581,20 +581,48 @@ class RecommendationEngine
             }
         }
 
-        // Readability deltas
-        if (isset($byKey['flesch'])) {
+        // Readability deltas — zone-aware. A page already in the accessible band
+        // (≥60) must never get the "too complex" warning just because the sanitized
+        // market average happens to sit higher. Equally, a page that is in the sweet
+        // spot deserves a positive call-out even when its delta is small.
+        $absFlesch = is_numeric(data_get($result, 'content.readability.flesch'))
+            ? (float) data_get($result, 'content.readability.flesch')
+            : null;
+        if (isset($byKey['flesch']) && $absFlesch !== null) {
             $fl = $byKey['flesch'];
             $delta = is_numeric($fl['delta'] ?? null) ? (float) $fl['delta'] : null;
-            if ($delta !== null && $delta > 15) {
+            $sampleNote = $fl['sample_note'] ?? null;
+            $fired = false;
+
+            // Positive: explicit "more accessible than competitors" call-out.
+            if ($absFlesch >= 60.0 && (
+                ($delta !== null && $delta > 15.0)
+                || ($absFlesch >= 70.0 && $delta !== null && $delta > 5.0)
+            )) {
                 $out[] = $this->rec('market.readability.accessible', 'SERP benchmark', self::SEV_GOOD,
                     'Much more accessible than competitors',
                     'Your content is much more accessible than competitors. This is a strong retention signal; do not increase complexity even if you add length.',
                     'Keep plain sentences, short paragraphs, and scannable structure. If you expand coverage, preserve the reading level that is winning engagement for you today.');
-            } elseif ($delta !== null && $delta < -15) {
+                $fired = true;
+            }
+
+            // Warning: only when your absolute score is actually weak AND the
+            // sanitized market average isn't poisoned by outliers.
+            if (! $fired && $absFlesch < 50.0 && $delta !== null && $delta < -15.0 && $sampleNote !== 'flesch_out_of_range') {
                 $out[] = $this->rec('market.readability.complex', 'SERP benchmark', self::SEV_WARNING,
                     'Significantly harder to read than the Top 3',
-                    "Your Flesch score is " . round($delta, 1) . ' points below the Top 3 average. Pages with a readability gap of this size typically have lower dwell time and weaker engagement on the same intent.',
+                    'Your Flesch score is ' . round($delta, 1) . ' points below the Top 3 average, and your absolute score (' . round($absFlesch, 1) . ') sits in the "difficult" band. Pages with a readability gap of this size typically have lower dwell time and weaker engagement on the same intent.',
                     'Shorten sentences (≤20 words), replace jargon with plain language, and break paragraphs. Keep depth but improve delivery.');
+                $fired = true;
+            }
+
+            // Positive fallback: always give credit when the absolute score is in
+            // the broad-audience sweet spot (60–80), even if no other rule triggered.
+            if (! $fired && $absFlesch >= 60.0 && $absFlesch <= 80.0) {
+                $out[] = $this->rec('market.readability.sweet_spot', 'SERP benchmark', self::SEV_GOOD,
+                    'Readability is in the broad-audience sweet spot',
+                    'Your Flesch score (' . round($absFlesch, 1) . ') sits in the 60–80 range that reads at a 7th–9th grade level — the highest-engagement band for most web audiences.',
+                    'No change needed. Preserve this reading level as you add content; avoid dense paragraphs and jargon creep.');
             }
         }
 
