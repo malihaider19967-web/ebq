@@ -53,6 +53,22 @@
                 />
             </div>
 
+            @if ($awaitingEnglishSerpCountry)
+                <div class="rounded-xl border border-sky-200 bg-sky-50/80 p-4 dark:border-sky-900/50 dark:bg-sky-500/10">
+                    <label for="custom-audit-serp-gl" class="block text-sm font-semibold text-slate-800 dark:text-slate-200">Google SERP country</label>
+                    <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Required for this English page (no region in HTML). Used for the Serper organic snapshot.</p>
+                    <select
+                        id="custom-audit-serp-gl"
+                        wire:model="serpCountryGl"
+                        class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                    >
+                        @foreach (\App\Support\Audit\SerpEnglishGlSelector::selectOptions() as $code => $label)
+                            <option value="{{ $code }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+
             <div class="flex items-center gap-3">
                 <button
                     type="submit"

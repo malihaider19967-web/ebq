@@ -40,11 +40,11 @@
 
         {{-- Actions --}}
         <div class="flex flex-wrap items-center gap-2 px-5 pt-3">
-            <button type="button" wire:click="auditPage" wire:loading.attr="disabled" wire:target="auditPage"
+            <button type="button" wire:click="preparePageAudit" wire:loading.attr="disabled" wire:target="preparePageAudit,confirmPageAuditWithSerpCountry"
                     class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
                 <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
-                <span wire:loading.remove wire:target="auditPage">Audit this page</span>
-                <span wire:loading wire:target="auditPage">Auditing…</span>
+                <span wire:loading.remove wire:target="preparePageAudit,confirmPageAuditWithSerpCountry">Audit this page</span>
+                <span wire:loading wire:target="preparePageAudit,confirmPageAuditWithSerpCountry">Auditing…</span>
             </button>
 
             <div class="mx-1 hidden h-5 w-px bg-slate-200 sm:block dark:bg-slate-700"></div>
@@ -91,6 +91,29 @@
         {{-- Footnote --}}
         <p class="px-5 pb-4 pt-3 text-[11px] text-slate-500 dark:text-slate-400">Audits use a Googlebot user-agent. Reindex uses the Google Indexing API — processing is not guaranteed.</p>
     </header>
+
+    @if ($serpCountryModalOpen)
+        <div class="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="serp-country-modal-title">
+            <div class="absolute inset-0 bg-slate-900/60" wire:click="cancelPageAuditSerpCountryModal" role="presentation"></div>
+            <div class="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                <h3 id="serp-country-modal-title" class="text-sm font-bold text-slate-900 dark:text-slate-100">Choose Google SERP country</h3>
+                <p class="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">This page is in English and does not specify a region in its HTML. Pick the market used for the Serper organic snapshot (competitor sample and rank-in-top-10 check).</p>
+                <label for="serp-country-gl" class="mt-4 block text-xs font-semibold text-slate-700 dark:text-slate-300">Country</label>
+                <select id="serp-country-gl" wire:model="serpCountryGl" class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100">
+                    @foreach (\App\Support\Audit\SerpEnglishGlSelector::selectOptions() as $code => $label)
+                        <option value="{{ $code }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+                <div class="mt-5 flex flex-wrap justify-end gap-2">
+                    <button type="button" wire:click="cancelPageAuditSerpCountryModal" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">Cancel</button>
+                    <button type="button" wire:click="confirmPageAuditWithSerpCountry" wire:loading.attr="disabled" wire:target="confirmPageAuditWithSerpCountry" class="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400">
+                        <span wire:loading.remove wire:target="confirmPageAuditWithSerpCountry">Run audit</span>
+                        <span wire:loading wire:target="confirmPageAuditWithSerpCountry">Auditing…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- ═══ KPI row ═══ --}}
     @if ($summary)

@@ -5,6 +5,7 @@ namespace App\Livewire\Pages;
 use App\Models\CustomPageAudit;
 use App\Models\Website;
 use App\Services\PageAuditService;
+use App\Support\Audit\SerpEnglishGlSelector;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
@@ -25,6 +26,10 @@ class CustomAudit extends Component
 
     public bool $running = false;
 
+    public bool $awaitingEnglishSerpCountry = false;
+
+    public string $serpCountryGl = 'us';
+
     public function mount(): void
     {
         $this->websiteId = (int) session('current_website_id', 0);
@@ -34,6 +39,17 @@ class CustomAudit extends Component
     public function switchWebsite(int $websiteId): void
     {
         $this->websiteId = $websiteId;
+        $this->awaitingEnglishSerpCountry = false;
+    }
+
+    public function updatedPageUrl(): void
+    {
+        $this->awaitingEnglishSerpCountry = false;
+    }
+
+    public function updatedTargetKeyword(): void
+    {
+        $this->awaitingEnglishSerpCountry = false;
     }
 
     public function runAudit(PageAuditService $pageAuditService): void
@@ -85,6 +101,33 @@ class CustomAudit extends Component
             return;
         }
 
+        $serpGlOverride = null;
+        if ($this->awaitingEnglishSerpCountry) {
+            if (! SerpEnglishGlSelector::isAllowedGl($this->serpCountryGl)) {
+                $this->setMessage('Pick a valid country for the SERP sample.', 'error');
+
+                return;
+            }
+            $serpGlOverride = strtolower(trim($this->serpCountryGl));
+            $this->awaitingEnglishSerpCountry = false;
+        } else {
+            $peek = $pageAuditService->peekSerpCountryChoiceNeeded($this->websiteId, $normalizedUrl, true);
+            if (! ($peek['ok'] ?? false)) {
+                $this->setMessage($peek['error'] ?? 'Could not read the page to detect locale.', 'error');
+
+                return;
+            }
+            if ($peek['needs_serp_country_choice'] ?? false) {
+                if (! SerpEnglishGlSelector::isAllowedGl($this->serpCountryGl)) {
+                    $this->serpCountryGl = 'us';
+                }
+                $this->awaitingEnglishSerpCountry = true;
+                $this->setMessage('This page is in English without a region in its HTML. Choose the Google SERP country below, then click “Run audit” again.', 'info');
+
+                return;
+            }
+        }
+
         $rateKey = 'custom-audit:'.$user->id;
         if (RateLimiter::tooManyAttempts($rateKey, 8)) {
             $seconds = RateLimiter::availableIn($rateKey);
@@ -96,7 +139,7 @@ class CustomAudit extends Component
 
         $this->running = true;
         try {
-            $report = $pageAuditService->audit($this->websiteId, $normalizedUrl, $keyword, true);
+            $report = $pageAuditService->audit($this->websiteId, $normalizedUrl, $keyword, true, $serpGlOverride);
         } catch (\Throwable $e) {
             $this->running = false;
             $this->setMessage('Audit failed: '.$e->getMessage(), 'error');

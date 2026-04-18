@@ -10,6 +10,7 @@ use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Services\Google\GoogleClientFactory;
 use App\Services\PageAuditService;
+use App\Support\Audit\SerpEnglishGlSelector;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -56,6 +57,10 @@ class PageDetail extends Component
     public ?string $auditMessage = null;
 
     public string $auditMessageKind = 'info';
+
+    public bool $serpCountryModalOpen = false;
+
+    public string $serpCountryGl = 'us';
 
     public function mount(string $pageUrl): void
     {
@@ -210,7 +215,59 @@ class PageDetail extends Component
         }
     }
 
-    public function auditPage(PageAuditService $pageAuditService): void
+    public function preparePageAudit(PageAuditService $pageAuditService): void
+    {
+        $this->auditMessage = null;
+        $this->serpCountryModalOpen = false;
+
+        $user = Auth::user();
+        if (! $user || ! $user->canViewWebsiteId($this->websiteId) || $this->pageUrl === '') {
+            $this->setAuditMessage('You do not have permission to audit this page.', 'error');
+
+            return;
+        }
+
+        $peek = $pageAuditService->peekSerpCountryChoiceNeeded($this->websiteId, $this->pageUrl, false);
+        if (! ($peek['ok'] ?? false)) {
+            $this->setAuditMessage($peek['error'] ?? 'Could not read the page to detect locale.', 'error');
+
+            return;
+        }
+
+        if ($peek['needs_serp_country_choice'] ?? false) {
+            if (! SerpEnglishGlSelector::isAllowedGl($this->serpCountryGl)) {
+                $this->serpCountryGl = 'us';
+            }
+            $this->serpCountryModalOpen = true;
+
+            return;
+        }
+
+        $this->finalizePageAudit($pageAuditService, null);
+    }
+
+    public function confirmPageAuditWithSerpCountry(PageAuditService $pageAuditService): void
+    {
+        if (! $this->serpCountryModalOpen) {
+            return;
+        }
+
+        if (! SerpEnglishGlSelector::isAllowedGl($this->serpCountryGl)) {
+            $this->setAuditMessage('Pick a valid country for the SERP sample.', 'error');
+
+            return;
+        }
+
+        $this->serpCountryModalOpen = false;
+        $this->finalizePageAudit($pageAuditService, strtolower(trim($this->serpCountryGl)));
+    }
+
+    public function cancelPageAuditSerpCountryModal(): void
+    {
+        $this->serpCountryModalOpen = false;
+    }
+
+    private function finalizePageAudit(PageAuditService $pageAuditService, ?string $serpGlUserOverride): void
     {
         $this->auditMessage = null;
 
@@ -231,7 +288,7 @@ class PageDetail extends Component
         RateLimiter::hit($rateKey, 60);
 
         try {
-            $report = $pageAuditService->audit($this->websiteId, $this->pageUrl);
+            $report = $pageAuditService->audit($this->websiteId, $this->pageUrl, null, false, $serpGlUserOverride);
             CustomPageAudit::recordRun(
                 $this->websiteId,
                 $user->id,

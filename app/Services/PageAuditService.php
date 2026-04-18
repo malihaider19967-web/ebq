@@ -10,6 +10,7 @@ use App\Support\Audit\KeywordStrategyAnalyzer;
 use App\Support\Audit\PageLocaleResolver;
 use App\Support\Audit\RecommendationEngine;
 use App\Support\Audit\SafeHttpGuard;
+use App\Support\Audit\SerpEnglishGlSelector;
 use App\Support\Audit\SerpLocaleDefaults;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
@@ -104,6 +105,13 @@ class PageAuditService
             $metadata = $auditor->metadata();
             $localeSignals = $auditor->localeSignals();
             $pageLocaleResolved = PageLocaleResolver::resolve($localeSignals, $pageUrl);
+
+            $userSerpGl = null;
+            if ($serpGlUserOverride !== null && SerpLocaleDefaults::isValidSerperGl($serpGlUserOverride)) {
+                $userSerpGl = strtolower(trim($serpGlUserOverride));
+            }
+            $serpGlForBenchmark = $userSerpGl ?? $pageLocaleResolved['gl'];
+
             $headings = $auditor->headings();
             $content = $auditor->content();
             $bodyText = $content['body_text'];
@@ -129,16 +137,21 @@ class PageAuditService
                 'stack' => $auditor->technology($fetch['headers'] ?? []),
             ];
 
+            $pageLocaleBlock = [
+                'gl' => $pageLocaleResolved['gl'],
+                'hl' => $pageLocaleResolved['hl'],
+                'source' => $pageLocaleResolved['source'],
+                'bcp47' => $pageLocaleResolved['bcp47'],
+                'hreflang_matched' => $pageLocaleResolved['hreflang_matched'],
+                'signals' => $pageLocaleResolved['signals'],
+            ];
+            if ($userSerpGl !== null) {
+                $pageLocaleBlock['serp_gl_user_chosen'] = $userSerpGl;
+            }
+
             $result = [
                 'metadata' => $metadata,
-                'page_locale' => [
-                    'gl' => $pageLocaleResolved['gl'],
-                    'hl' => $pageLocaleResolved['hl'],
-                    'source' => $pageLocaleResolved['source'],
-                    'bcp47' => $pageLocaleResolved['bcp47'],
-                    'hreflang_matched' => $pageLocaleResolved['hreflang_matched'],
-                    'signals' => $pageLocaleResolved['signals'],
-                ],
+                'page_locale' => $pageLocaleBlock,
                 'content' => $content + ['headings' => $headings['headings'], 'h1_count' => $headings['h1_count'], 'heading_order_ok' => $headings['heading_order_ok']],
                 'images' => $images,
                 'links' => $links,
@@ -180,7 +193,7 @@ class PageAuditService
                 (int) ($images['total'] ?? 0),
                 $technical['stack'] ?? null,
                 $serpKeywordArg,
-                $pageLocaleResolved['gl'],
+                $serpGlForBenchmark,
                 $pageLocaleResolved['hl'],
                 $pageLocaleResolved['bcp47'],
             );
@@ -228,6 +241,45 @@ class PageAuditService
                 $failurePrimarySource,
             );
         }
+    }
+
+    /**
+     * One HTTP fetch to detect whether the audited page needs an explicit English SERP country before running a full audit.
+     *
+     * @return array{ok: bool, needs_serp_country_choice?: bool, error?: string}
+     */
+    public function peekSerpCountryChoiceNeeded(int $websiteId, string $pageUrl, bool $enforceUrlBelongsToWebsite = false): array
+    {
+        $guardCheck = $this->guard->check($pageUrl);
+        if (! $guardCheck['ok']) {
+            return ['ok' => false, 'error' => 'Audit target rejected: '.($guardCheck['reason'] ?? 'unsafe_url')];
+        }
+
+        if ($enforceUrlBelongsToWebsite) {
+            $websiteForDomain = Website::query()->find($websiteId);
+            if (! $websiteForDomain instanceof Website) {
+                return ['ok' => false, 'error' => 'Website not found.'];
+            }
+            if (! $websiteForDomain->isAuditUrlForThisSite($pageUrl)) {
+                return ['ok' => false, 'error' => 'The URL must use your website domain (or a subdomain of it).'];
+            }
+        }
+
+        $fetch = $this->fetch($pageUrl);
+        if (! isset($fetch['body'])) {
+            return ['ok' => false, 'error' => (string) ($fetch['error'] ?? 'Failed to fetch page')];
+        }
+
+        $signals = (new HtmlAuditor($fetch['body'], $pageUrl))->localeSignals();
+        $resolved = PageLocaleResolver::resolve($signals, $pageUrl);
+
+        return [
+            'ok' => true,
+            'needs_serp_country_choice' => SerpEnglishGlSelector::needsEnglishSerpCountryChoice(
+                $resolved['hl'] ?? null,
+                $resolved['gl'] ?? null,
+            ),
+        ];
     }
 
     /**
