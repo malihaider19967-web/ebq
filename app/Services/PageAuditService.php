@@ -10,7 +10,7 @@ use App\Support\Audit\KeywordStrategyAnalyzer;
 use App\Support\Audit\PageLocaleResolver;
 use App\Support\Audit\RecommendationEngine;
 use App\Support\Audit\SafeHttpGuard;
-use App\Support\Audit\SerpEnglishGlSelector;
+use App\Support\Audit\SerpGlCountryPrompt;
 use App\Support\Audit\SerpLocaleDefaults;
 use Illuminate\Http\Client\Pool;
 use Illuminate\Http\Client\Response;
@@ -31,7 +31,7 @@ class PageAuditService
 
     public function __construct(private readonly SafeHttpGuard $guard) {}
 
-    public function audit(int $websiteId, string $pageUrl, ?string $serpTargetKeyword = null, bool $enforceUrlBelongsToWebsite = false): PageAuditReport
+    public function audit(int $websiteId, string $pageUrl, ?string $serpTargetKeyword = null, bool $enforceUrlBelongsToWebsite = false, ?string $serpGlUserOverride = null): PageAuditReport
     {
         $startedAt = microtime(true);
 
@@ -149,6 +149,16 @@ class PageAuditService
                 $pageLocaleBlock['serp_gl_user_chosen'] = $userSerpGl;
             }
 
+            $serpEffectivePreview = SerpLocaleDefaults::forSerperRequest(
+                $serpGlForBenchmark,
+                $pageLocaleResolved['hl'],
+                $pageLocaleResolved['bcp47'],
+            );
+            $serpEffGl = $serpEffectivePreview['gl'] ?? null;
+            if (SerpLocaleDefaults::isValidSerperGl($serpEffGl)) {
+                $pageLocaleBlock['serp_gl_effective'] = strtolower((string) $serpEffGl);
+            }
+
             $result = [
                 'metadata' => $metadata,
                 'page_locale' => $pageLocaleBlock,
@@ -244,9 +254,9 @@ class PageAuditService
     }
 
     /**
-     * One HTTP fetch to detect whether the audited page needs an explicit English SERP country before running a full audit.
+     * One HTTP fetch to resolve page locale and recommend a Serper {@code gl} before the interactive audit flow.
      *
-     * @return array{ok: bool, needs_serp_country_choice?: bool, error?: string}
+     * @return array{ok: bool, recommended_gl?: string, recommendation_hint?: string, detected_hl?: ?string, detected_html_gl?: ?string, error?: string}
      */
     public function peekSerpCountryChoiceNeeded(int $websiteId, string $pageUrl, bool $enforceUrlBelongsToWebsite = false): array
     {
@@ -272,13 +282,17 @@ class PageAuditService
 
         $signals = (new HtmlAuditor($fetch['body'], $pageUrl))->localeSignals();
         $resolved = PageLocaleResolver::resolve($signals, $pageUrl);
+        $hl = $resolved['hl'] ?? null;
+        $htmlGl = $resolved['gl'] ?? null;
+        $bcp47 = $resolved['bcp47'] ?? null;
+        $recommended = SerpGlCountryPrompt::recommendedGl($htmlGl, $hl, $bcp47);
 
         return [
             'ok' => true,
-            'needs_serp_country_choice' => SerpEnglishGlSelector::needsEnglishSerpCountryChoice(
-                $resolved['hl'] ?? null,
-                $resolved['gl'] ?? null,
-            ),
+            'recommended_gl' => $recommended,
+            'recommendation_hint' => SerpGlCountryPrompt::recommendationHint($recommended, $htmlGl, $hl, $bcp47),
+            'detected_hl' => $hl,
+            'detected_html_gl' => $htmlGl,
         ];
     }
 

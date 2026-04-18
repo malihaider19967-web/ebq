@@ -17,11 +17,11 @@ class PageAuditSerpCountryPeekTest extends TestCase
         parent::tearDown();
     }
 
-    public function test_peek_requests_country_for_lang_en_without_region(): void
+    public function test_peek_recommends_jp_for_lang_ja_without_region(): void
     {
         Http::fake([
             'https://example.test/page' => Http::response(
-                '<!DOCTYPE html><html lang="en"><head><title>t</title></head><body><p>Hi</p></body></html>',
+                '<!DOCTYPE html><html lang="ja"><head><title>t</title></head><body><p>Hi</p></body></html>',
                 200,
                 ['Content-Type' => 'text/html']
             ),
@@ -34,10 +34,12 @@ class PageAuditSerpCountryPeekTest extends TestCase
         $peek = $this->app->make(PageAuditService::class)->peekSerpCountryChoiceNeeded(1, 'https://example.test/page');
 
         $this->assertTrue($peek['ok']);
-        $this->assertTrue($peek['needs_serp_country_choice']);
+        $this->assertSame('jp', $peek['recommended_gl']);
+        $this->assertArrayHasKey('recommendation_hint', $peek);
+        $this->assertStringContainsString('gl=jp', (string) $peek['recommendation_hint']);
     }
 
-    public function test_peek_skips_choice_for_french_without_gl(): void
+    public function test_peek_recommends_fr_for_french_without_gl(): void
     {
         Http::fake([
             'https://example.test/fr' => Http::response(
@@ -54,6 +56,27 @@ class PageAuditSerpCountryPeekTest extends TestCase
         $peek = $this->app->make(PageAuditService::class)->peekSerpCountryChoiceNeeded(1, 'https://example.test/fr');
 
         $this->assertTrue($peek['ok']);
-        $this->assertFalse($peek['needs_serp_country_choice']);
+        $this->assertSame('fr', $peek['recommended_gl']);
+        $this->assertStringContainsString('gl=fr', (string) $peek['recommendation_hint']);
+    }
+
+    public function test_peek_recommends_us_for_lang_en_without_region(): void
+    {
+        Http::fake([
+            'https://example.test/page' => Http::response(
+                '<!DOCTYPE html><html lang="en"><head><title>t</title></head><body><p>Hi</p></body></html>',
+                200,
+                ['Content-Type' => 'text/html']
+            ),
+        ]);
+
+        $guard = Mockery::mock(SafeHttpGuard::class);
+        $guard->shouldReceive('check')->andReturn(['ok' => true]);
+        $this->app->instance(SafeHttpGuard::class, $guard);
+
+        $peek = $this->app->make(PageAuditService::class)->peekSerpCountryChoiceNeeded(1, 'https://example.test/page');
+
+        $this->assertTrue($peek['ok']);
+        $this->assertSame('us', $peek['recommended_gl']);
     }
 }

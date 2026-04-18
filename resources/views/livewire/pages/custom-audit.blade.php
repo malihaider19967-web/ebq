@@ -53,16 +53,20 @@
                 />
             </div>
 
-            @if ($awaitingEnglishSerpCountry)
+            @if ($awaitingSerpCountryChoice)
                 <div class="rounded-xl border border-sky-200 bg-sky-50/80 p-4 dark:border-sky-900/50 dark:bg-sky-500/10">
                     <label for="custom-audit-serp-gl" class="block text-sm font-semibold text-slate-800 dark:text-slate-200">Google SERP country</label>
-                    <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Required for this English page (no region in HTML). Used for the Serper organic snapshot.</p>
+                    @if ($serpCountryRecommendationHint)
+                        <p class="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-400">{{ $serpCountryRecommendationHint }}</p>
+                    @else
+                        <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Used for the Serper organic snapshot. The best match for your page is pre-selected.</p>
+                    @endif
                     <select
                         id="custom-audit-serp-gl"
                         wire:model="serpCountryGl"
                         class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
                     >
-                        @foreach (\App\Support\Audit\SerpEnglishGlSelector::selectOptions() as $code => $label)
+                        @foreach (\App\Support\Audit\SerpGlCatalog::selectOptions() as $code => $label)
                             <option value="{{ $code }}">{{ $label }}</option>
                         @endforeach
                     </select>
@@ -116,9 +120,15 @@
                                     <td class="max-w-[14rem] px-4 py-3">
                                         <span class="block truncate font-mono text-xs text-slate-800 dark:text-slate-200" title="{{ $row->page_url }}">{{ Str::limit($row->page_url, 56) }}</span>
                                     </td>
-                                    <td class="max-w-[8rem] truncate px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
-                                        @php $caPl = is_array($row->pageAuditReport?->result['page_locale'] ?? null) ? $row->pageAuditReport->result['page_locale'] : null; @endphp
-                                        {{ \App\Support\Audit\PageLocalePresentation::shortLabel($caPl) ?? '—' }}
+                                    <td class="max-w-[10rem] truncate px-4 py-3 text-xs text-slate-600 dark:text-slate-300" title="{{ $row->serp_sample_gl ? 'Serper gl='.$row->serp_sample_gl : '' }}">
+                                        @php
+                                            $caPl = is_array($row->pageAuditReport?->result['page_locale'] ?? null) ? $row->pageAuditReport->result['page_locale'] : null;
+                                            $mkt = \App\Support\Audit\PageLocalePresentation::shortLabel($caPl);
+                                            if ($mkt === null && filled($row->serp_sample_gl)) {
+                                                $mkt = 'SERP: '.\App\Support\Audit\SerpGlCatalog::labelFor($row->serp_sample_gl).' ('.$row->serp_sample_gl.')';
+                                            }
+                                        @endphp
+                                        {{ $mkt ?? '—' }}
                                     </td>
                                     <td class="max-w-[12rem] px-4 py-3">
                                         <span class="line-clamp-2 text-slate-800 dark:text-slate-200" title="{{ $row->target_keyword !== '' ? $row->target_keyword : 'Default (Search Console primary)' }}">{{ $row->target_keyword !== '' ? Str::limit($row->target_keyword, 80) : '—' }}</span>

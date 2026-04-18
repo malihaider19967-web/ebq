@@ -10,7 +10,7 @@ use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Services\Google\GoogleClientFactory;
 use App\Services\PageAuditService;
-use App\Support\Audit\SerpEnglishGlSelector;
+use App\Support\Audit\SerpGlCatalog;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -61,6 +61,8 @@ class PageDetail extends Component
     public bool $serpCountryModalOpen = false;
 
     public string $serpCountryGl = 'us';
+
+    public ?string $serpCountryRecommendationHint = null;
 
     public function mount(string $pageUrl): void
     {
@@ -234,16 +236,12 @@ class PageDetail extends Component
             return;
         }
 
-        if ($peek['needs_serp_country_choice'] ?? false) {
-            if (! SerpEnglishGlSelector::isAllowedGl($this->serpCountryGl)) {
-                $this->serpCountryGl = 'us';
-            }
-            $this->serpCountryModalOpen = true;
-
-            return;
+        $this->serpCountryRecommendationHint = (string) ($peek['recommendation_hint'] ?? '');
+        $this->serpCountryGl = (string) ($peek['recommended_gl'] ?? 'us');
+        if (! SerpGlCatalog::isAllowedGl($this->serpCountryGl)) {
+            $this->serpCountryGl = 'us';
         }
-
-        $this->finalizePageAudit($pageAuditService, null);
+        $this->serpCountryModalOpen = true;
     }
 
     public function confirmPageAuditWithSerpCountry(PageAuditService $pageAuditService): void
@@ -252,7 +250,7 @@ class PageDetail extends Component
             return;
         }
 
-        if (! SerpEnglishGlSelector::isAllowedGl($this->serpCountryGl)) {
+        if (! SerpGlCatalog::isAllowedGl($this->serpCountryGl)) {
             $this->setAuditMessage('Pick a valid country for the SERP sample.', 'error');
 
             return;
@@ -265,6 +263,7 @@ class PageDetail extends Component
     public function cancelPageAuditSerpCountryModal(): void
     {
         $this->serpCountryModalOpen = false;
+        $this->serpCountryRecommendationHint = null;
     }
 
     private function finalizePageAudit(PageAuditService $pageAuditService, ?string $serpGlUserOverride): void

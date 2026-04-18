@@ -24,4 +24,28 @@ class PageLocalePresentationTest extends TestCase
         $this->assertFalse(PageLocalePresentation::shouldShowSerpLocationNote(null));
         $this->assertFalse(PageLocalePresentation::shouldShowSerpLocationNote([]));
     }
+
+    public function test_short_label_appends_user_chosen_serp_country(): void
+    {
+        $label = PageLocalePresentation::shortLabel([
+            'hl' => 'en',
+            'gl' => null,
+            'serp_gl_user_chosen' => 'gb',
+            'serp_gl_effective' => 'gb',
+        ]);
+        $this->assertNotNull($label);
+        $this->assertStringContainsString('SERP:', $label);
+        $this->assertStringContainsString('(gb)', $label);
+    }
+
+    public function test_short_label_suppresses_redundant_serp_when_matches_html_gl(): void
+    {
+        $label = PageLocalePresentation::shortLabel([
+            'hl' => 'fr',
+            'gl' => 'fr',
+            'serp_gl_effective' => 'fr',
+        ]);
+        $this->assertNotNull($label);
+        $this->assertStringNotContainsString('SERP:', $label);
+    }
 }
