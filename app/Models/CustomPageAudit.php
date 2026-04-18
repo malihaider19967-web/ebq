@@ -78,6 +78,42 @@ class CustomPageAudit extends Model
     }
 
     /**
+     * Log a *synchronously-completed* audit run. Used by the legacy "Audit this page"
+     * flow on PageDetail that still runs PageAuditService inline. The queued flow
+     * uses queue() + markCompleted() instead — do not call both.
+     */
+    public static function recordRun(
+        int $websiteId,
+        int $userId,
+        string $pageUrlAsAudited,
+        PageAuditReport $report,
+        ?string $targetKeyword,
+        string $source,
+    ): self {
+        $kw = $targetKeyword !== null ? trim($targetKeyword) : '';
+        $status = $report->status === 'completed' ? self::STATUS_COMPLETED : self::STATUS_FAILED;
+
+        return self::query()->create([
+            'website_id' => $websiteId,
+            'user_id' => $userId,
+            'source' => in_array($source, [self::SOURCE_CUSTOM, self::SOURCE_PAGE_DETAIL], true)
+                ? $source
+                : self::SOURCE_CUSTOM,
+            'page_url' => $pageUrlAsAudited,
+            'page_url_hash' => hash('sha256', $pageUrlAsAudited),
+            'target_keyword' => $kw !== '' ? mb_substr($kw, 0, 200) : '',
+            'serp_sample_gl' => self::serpSampleGlFromReportResult($report),
+            'page_audit_report_id' => $report->id,
+            'status' => $status,
+            'error_message' => $report->error_message,
+            'queued_at' => now(),
+            'started_at' => now(),
+            'finished_at' => now(),
+            'attempts' => 1,
+        ]);
+    }
+
+    /**
      * Look for an already-queued-or-running audit for the same (website, url, user).
      * Returning a row means we should *not* queue a duplicate and paid-API-spend twice.
      */
