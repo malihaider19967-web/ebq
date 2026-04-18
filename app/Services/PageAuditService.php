@@ -208,6 +208,13 @@ class PageAuditService
                 $pageLocaleResolved['bcp47'],
             );
             if ($benchmark !== null) {
+                if (isset($benchmark['your_serp']) && is_array($benchmark['your_serp'])) {
+                    $benchmark['your_serp'] = $this->mergeAuditedPageSerpPreviewIntoYourSerp(
+                        $benchmark['your_serp'],
+                        $pageUrl,
+                        $metadata,
+                    );
+                }
                 $result['benchmark'] = $benchmark;
             }
 
@@ -619,6 +626,26 @@ class PageAuditService
                 default => 'Parity',
             },
         ];
+    }
+
+    /**
+     * Adds title / meta description / URL line from the audited page HTML so the report can compare with the Serper organic row.
+     *
+     * @param  array<string, mixed>  $yourSerp
+     * @param  array<string, mixed>  $metadata
+     * @return array<string, mixed>
+     */
+    private function mergeAuditedPageSerpPreviewIntoYourSerp(array $yourSerp, string $pageUrl, array $metadata): array
+    {
+        $title = isset($metadata['title']) && is_string($metadata['title']) ? trim($metadata['title']) : '';
+        $desc = isset($metadata['meta_description']) && is_string($metadata['meta_description']) ? trim($metadata['meta_description']) : '';
+
+        $yourSerp['audited_page_url'] = $pageUrl;
+        $yourSerp['audited_page_title'] = $title !== '' ? mb_substr($title, 0, 200) : null;
+        $yourSerp['audited_page_snippet'] = $desc !== '' ? mb_substr($desc, 0, 500) : null;
+        $yourSerp['audited_page_display'] = $this->breadcrumbStyleUrlDisplay($pageUrl);
+
+        return $yourSerp;
     }
 
     /**

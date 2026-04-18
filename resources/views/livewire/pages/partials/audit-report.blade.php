@@ -476,19 +476,6 @@
                                             @else
                                                 <p class="mt-1.5">Your site shows at <strong class="tabular-nums">#{{ $ysPos }}</strong> in this sample — <strong>outside the first results page</strong> (positions 1–10) in this snapshot.</p>
                                             @endif
-                                            @if (! empty($ys['matched_listing_url']))
-                                                <div class="mt-3 rounded-xl border border-slate-200 bg-slate-50/90 p-4 shadow-inner dark:border-slate-600 dark:bg-slate-950/50">
-                                                    <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Serp listing preview</p>
-                                                    <p class="mt-2 text-xs leading-snug text-emerald-800 dark:text-emerald-400/90">{{ $ys['matched_listing_display'] ?? '' }}</p>
-                                                    <a href="{{ $ys['matched_listing_url'] }}" target="_blank" rel="noopener noreferrer" class="mt-1 block text-base font-medium leading-snug text-blue-700 hover:underline dark:text-blue-400">
-                                                        {{ $ys['matched_listing_title'] ?? \Illuminate\Support\Str::limit($ys['matched_listing_url'], 72) }}
-                                                    </a>
-                                                    @if (! empty($ys['matched_listing_snippet']))
-                                                        <p class="mt-2 text-sm leading-relaxed text-slate-600 dark:text-slate-300">{{ $ys['matched_listing_snippet'] }}</p>
-                                                    @endif
-                                                    <p class="mt-2 break-all font-mono text-[11px] text-slate-500 dark:text-slate-400">{{ $ys['matched_listing_url'] }}</p>
-                                                </div>
-                                            @endif
                                             <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Sample: {{ $ysN }} organic listings checked.</p>
                                         </div>
                                     @elseif ($ysN === 0)
@@ -509,6 +496,7 @@
                                         </div>
                                     @endif
                                 </div>
+                                @include('partials.serp-vs-audited-snippet', ['ys' => $ys])
                             </div>
                         @endif
                         <p class="mb-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">

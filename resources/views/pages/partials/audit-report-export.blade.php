@@ -474,22 +474,6 @@
                                         @else
                                             Your site at position <strong>#{{ $ysPos }}</strong> in this sample — <strong>outside the first page</strong> (positions 1–10).
                                         @endif
-                                        @if (! empty($ys['matched_listing_url']))
-                                            <br><br>
-                                            <div style="margin-top: 8px; padding: 12px 14px; border-radius: 10px; border: 1px solid #e2e8f0; background: #f8fafc;">
-                                                <p style="margin: 0; font-size: 9px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">Serp listing preview</p>
-                                                @if (! empty($ys['matched_listing_display']))
-                                                    <p style="margin: 8px 0 0; font-size: 12px; line-height: 1.4; color: #065f46;">{{ $ys['matched_listing_display'] }}</p>
-                                                @endif
-                                                <p style="margin: 6px 0 0;">
-                                                    <a href="{{ $ys['matched_listing_url'] }}" style="font-size: 15px; font-weight: 600; color: #1d4ed8; text-decoration: none;">{{ $ys['matched_listing_title'] ?? \Illuminate\Support\Str::limit($ys['matched_listing_url'], 72) }}</a>
-                                                </p>
-                                                @if (! empty($ys['matched_listing_snippet']))
-                                                    <p style="margin: 8px 0 0; font-size: 13px; line-height: 1.5; color: #475569;">{{ $ys['matched_listing_snippet'] }}</p>
-                                                @endif
-                                                <p style="margin: 10px 0 0; font-family: ui-monospace, monospace; font-size: 11px; word-break: break-all; color: #64748b;">{{ $ys['matched_listing_url'] }}</p>
-                                            </div>
-                                        @endif
                                         <br><span class="muted" style="font-size: 10px;">{{ $ysN }} organic listings in sample.</span>
                                     </td>
                                 </tr>
@@ -501,6 +485,7 @@
                             <p style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">Not in top {{ $ysN }} of this sample</p>
                             <p style="margin: 6px 0 0; font-size: 12px; color: #475569;">Your site’s domain did not match any of the {{ $ysN }} organic results in this snapshot (domain match, not full URL path). Check Search Console for your real average position.</p>
                         @endif
+                        @include('partials.serp-vs-audited-snippet-export', ['ys' => $ys])
                     </div>
                 @endif
                 <p class="muted" style="margin-bottom: 10px;">
