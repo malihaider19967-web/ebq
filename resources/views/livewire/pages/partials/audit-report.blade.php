@@ -61,6 +61,7 @@
         ['key' => 'content',         'label' => 'Content',         'count' => null,         'show' => true],
         ['key' => 'links',           'label' => 'Images & Links',  'count' => null,         'show' => true],
         ['key' => 'technical',       'label' => 'Technical',       'count' => null,         'show' => true],
+        ['key' => 'core-web-vitals', 'label' => 'Core Web Vitals', 'count' => null,         'show' => is_array($result['core_web_vitals'] ?? null)],
         ['key' => 'advanced',        'label' => 'Advanced',        'count' => null,         'show' => true],
     ];
     $auditSummaryOpen = (bool) ($openAuditSummary ?? false);
@@ -900,6 +901,93 @@
                         </div>
                     </div>
                 </section>
+
+                {{-- ══════ Core Web Vitals ══════ --}}
+                @php $cwv = $result['core_web_vitals'] ?? null; @endphp
+                @if (is_array($cwv))
+                    <section id="audit-core-web-vitals" class="scroll-mt-16">
+                        <div class="mb-3 flex items-center gap-2">
+                            <div class="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                                <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v18M8.25 19.5V9m4.5 10.5V13.5M17.25 19.5V6" /></svg>
+                            </div>
+                            <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Core Web Vitals</h3>
+                            @if (! empty($cwv['fetched_at']))
+                                <span class="text-[10px] text-slate-400 dark:text-slate-500">measured {{ \Carbon\Carbon::parse($cwv['fetched_at'])->diffForHumans() }}</span>
+                            @endif
+                        </div>
+
+                        @php
+                            // Google's published thresholds (web.dev/vitals).
+                            $lcpTone = fn (?int $ms) => $ms === null ? 'neutral' : ($ms <= 2500 ? 'good' : ($ms <= 4000 ? 'warn' : 'bad'));
+                            $clsTone = fn (?float $v) => $v === null ? 'neutral' : ($v <= 0.1 ? 'good' : ($v <= 0.25 ? 'warn' : 'bad'));
+                            $tbtTone = fn (?int $ms) => $ms === null ? 'neutral' : ($ms <= 200 ? 'good' : ($ms <= 600 ? 'warn' : 'bad'));
+                            $fcpTone = fn (?int $ms) => $ms === null ? 'neutral' : ($ms <= 1800 ? 'good' : ($ms <= 3000 ? 'warn' : 'bad'));
+                            $ttfbTone = fn (?int $ms) => $ms === null ? 'neutral' : ($ms <= 800 ? 'good' : ($ms <= 1800 ? 'warn' : 'bad'));
+                            $scoreTone = fn (?int $s) => $s === null ? 'neutral' : ($s >= 90 ? 'good' : ($s >= 50 ? 'warn' : 'bad'));
+                            $fmt = fn ($v, $suffix = '') => $v === null ? '—' : (is_float($v) ? number_format($v, 2) : ($v.$suffix));
+
+                            $strategies = [
+                                'mobile' => ['label' => 'Mobile', 'data' => is_array($cwv['mobile'] ?? null) ? $cwv['mobile'] : null],
+                                'desktop' => ['label' => 'Desktop', 'data' => is_array($cwv['desktop'] ?? null) ? $cwv['desktop'] : null],
+                            ];
+                        @endphp
+
+                        <div class="grid gap-4 md:grid-cols-2">
+                            @foreach ($strategies as $key => $strategy)
+                                <div class="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900">
+                                    <div class="flex items-center justify-between border-b border-slate-100 pb-2 dark:border-slate-800">
+                                        <div class="flex items-center gap-1.5">
+                                            @if ($key === 'mobile')
+                                                <svg class="h-3.5 w-3.5 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3" /></svg>
+                                            @else
+                                                <svg class="h-3.5 w-3.5 text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12v6.75a2.25 2.25 0 01-2.25 2.25H5.25a2.25 2.25 0 01-2.25-2.25V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25" /></svg>
+                                            @endif
+                                            <h4 class="text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-300">{{ $strategy['label'] }}</h4>
+                                        </div>
+                                        @if ($strategy['data'])
+                                            @php
+                                                $sc = $strategy['data']['performance_score'] ?? null;
+                                                $scTone = $scoreTone($sc);
+                                                $scCls = match ($scTone) {
+                                                    'good' => 'bg-emerald-100 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-400 dark:ring-emerald-900/40',
+                                                    'warn' => 'bg-amber-100 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-900/40',
+                                                    'bad' => 'bg-rose-100 text-rose-700 ring-rose-200 dark:bg-rose-500/10 dark:text-rose-400 dark:ring-rose-900/40',
+                                                    default => 'bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700',
+                                                };
+                                            @endphp
+                                            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ring-1 {{ $scCls }}">
+                                                Score {{ $sc ?? '—' }}
+                                            </span>
+                                        @else
+                                            <span class="text-[10px] text-slate-400">unavailable</span>
+                                        @endif
+                                    </div>
+
+                                    @if ($strategy['data'] !== null)
+                                        @php $d = $strategy['data']; @endphp
+                                        <div class="mt-3 grid grid-cols-3 gap-2">
+                                            <x-audit.stat label="LCP" :value="$fmt($d['lcp_ms'] ?? null, ' ms')" :tone="$lcpTone($d['lcp_ms'] ?? null)" />
+                                            <x-audit.stat label="CLS" :value="$fmt($d['cls'] ?? null)" :tone="$clsTone($d['cls'] ?? null)" />
+                                            <x-audit.stat label="TBT" :value="$fmt($d['tbt_ms'] ?? null, ' ms')" :tone="$tbtTone($d['tbt_ms'] ?? null)" />
+                                            <x-audit.stat label="FCP" :value="$fmt($d['fcp_ms'] ?? null, ' ms')" :tone="$fcpTone($d['fcp_ms'] ?? null)" />
+                                            <x-audit.stat label="TTFB" :value="$fmt($d['ttfb_ms'] ?? null, ' ms')" :tone="$ttfbTone($d['ttfb_ms'] ?? null)" />
+                                            <x-audit.stat label="Speed Index" :value="$fmt($d['speed_index_ms'] ?? null, ' ms')" tone="neutral" />
+                                        </div>
+                                        @if (! empty($d['runtime_error']))
+                                            <p class="mt-2 text-[10px] text-rose-600 dark:text-rose-400">Lighthouse runtime note: {{ $d['runtime_error'] }}</p>
+                                        @endif
+                                    @else
+                                        <p class="mt-3 text-[11px] text-slate-500 dark:text-slate-400">This strategy failed on Lighthouse. Re-run the audit to retry.</p>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+
+                        <p class="mt-3 text-[10px] leading-relaxed text-slate-500 dark:text-slate-500">
+                            Lab data from a single Lighthouse run. TBT is the lab-side proxy for INP — field INP requires CrUX and is not available here. Thresholds follow <span class="font-mono">web.dev/vitals</span> (good / needs-improvement / poor).
+                        </p>
+                    </section>
+                @endif
 
                 {{-- ══════ Advanced ══════ --}}
                 <section id="audit-advanced" class="scroll-mt-16">

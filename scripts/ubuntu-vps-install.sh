@@ -519,6 +519,9 @@ laravel_env_and_build() {
   DB_USERNAME="${DB_USERNAME:-ebq}" \
   DB_PASSWORD="${DB_PASSWORD:-}" \
   ENABLE_REDIS="${ENABLE_REDIS}" \
+  LIGHTHOUSE_API_URL="${LIGHTHOUSE_API_URL:-}" \
+  LIGHTHOUSE_API_KEY="${LIGHTHOUSE_API_KEY:-}" \
+  LIGHTHOUSE_TIMEOUT_S="${LIGHTHOUSE_TIMEOUT_S:-}" \
   php -r '
     $path = getenv("ENV_FILE");
     $pairs = [
@@ -536,6 +539,15 @@ laravel_env_and_build() {
       $pairs["REDIS_HOST"]   = "127.0.0.1";
       $pairs["REDIS_PORT"]   = "6379";
       $pairs["REDIS_CLIENT"] = "phpredis";
+    }
+    // Lighthouse CWV enrichment — seed only if caller supplied both URL + key.
+    $lhUrl = getenv("LIGHTHOUSE_API_URL") ?: "";
+    $lhKey = getenv("LIGHTHOUSE_API_KEY") ?: "";
+    if ($lhUrl !== "" && $lhKey !== "") {
+      $pairs["LIGHTHOUSE_API_URL"] = $lhUrl;
+      $pairs["LIGHTHOUSE_API_KEY"] = $lhKey;
+      $to = getenv("LIGHTHOUSE_TIMEOUT_S") ?: "";
+      if ($to !== "") $pairs["LIGHTHOUSE_TIMEOUT_S"] = $to;
     }
     $lines = file_exists($path) ? file($path, FILE_IGNORE_NEW_LINES) : [];
     $out = [];

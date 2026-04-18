@@ -46,4 +46,10 @@ return [
         'search_url' => env('SERPER_SEARCH_URL', 'https://google.serper.dev/search'),
     ],
 
+    'lighthouse' => [
+        'url' => env('LIGHTHOUSE_API_URL'),
+        'key' => env('LIGHTHOUSE_API_KEY'),
+        'timeout' => (int) env('LIGHTHOUSE_TIMEOUT_S', 90),
+    ],
+
 ];

@@ -51,7 +51,13 @@
       "Bash(php -l app/Models/CustomPageAudit.php)",
       "Bash(php -l app/Jobs/RunCustomPageAudit.php)",
       "Bash(php -l app/Livewire/Pages/CustomAudit.php)",
-      "Bash(php -l database/migrations/2026_04_19_130000_add_queue_columns_to_custom_page_audits.php)"
+      "Bash(php -l database/migrations/2026_04_19_130000_add_queue_columns_to_custom_page_audits.php)",
+      "Bash(mkdir -p \"/c/Users/malih/Desktop/ebq-intelegence/lib\" \"/c/Users/malih/Desktop/ebq-intelegence/test\" \"/c/Users/malih/Desktop/ebq-intelegence/systemd\" \"/c/Users/malih/Desktop/ebq-intelegence/scripts\")",
+      "Read(//c/Users/malih/Desktop/**)",
+      "Bash(bash -n \"/c/Users/malih/Desktop/ebq-intelegence/scripts/install.sh\")",
+      "Bash(php -l app/Services/LighthouseClient.php)",
+      "Bash(php -l config/services.php)",
+      "Bash(bash -n scripts/ubuntu-vps-install.sh)"
     ]
   }
 }

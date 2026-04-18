@@ -32,6 +32,7 @@ class RecommendationEngine
         $recs = array_merge($recs, $this->advanced($result['advanced'] ?? []));
         $recs = array_merge($recs, $this->links($result['links'] ?? []));
         $recs = array_merge($recs, $this->keywords($result['keywords'] ?? []));
+        $recs = array_merge($recs, $this->coreWebVitals($result['core_web_vitals'] ?? []));
         try {
             $recs = array_merge($recs, $this->serpBenchmark($result));
         } catch (\Throwable) {
@@ -532,6 +533,105 @@ class RecommendationEngine
         }
 
         return $out;
+    }
+
+    /**
+     * Core Web Vitals rules. Thresholds follow Google's official good / needs-
+     * improvement / poor bands (web.dev/vitals). Mobile is the SEO-weighted
+     * strategy; desktop is referenced for comparison.
+     *
+     * Expected input shape:
+     *   ['mobile' => ['lcp_ms','cls','tbt_ms',...], 'desktop' => [...], 'source' => ...]
+     */
+    private function coreWebVitals(array $cwv): array
+    {
+        $out = [];
+        $mobile = is_array($cwv['mobile'] ?? null) ? $cwv['mobile'] : null;
+        $desktop = is_array($cwv['desktop'] ?? null) ? $cwv['desktop'] : null;
+
+        if ($mobile === null && $desktop === null) {
+            return $out; // No CWV data — Lighthouse unreachable or mis-configured; don't fabricate recs.
+        }
+
+        $mLcp = $this->intOrNull($mobile['lcp_ms'] ?? null);
+        $mCls = $this->floatOrNull($mobile['cls'] ?? null);
+        $mTbt = $this->intOrNull($mobile['tbt_ms'] ?? null);
+        $dLcp = $this->intOrNull($desktop['lcp_ms'] ?? null);
+
+        // ── LCP (mobile) ─────────────────────────────────────────────────────
+        if ($mLcp !== null) {
+            if ($mLcp > 4000) {
+                $out[] = $this->rec('cwv.lcp.poor', 'Core Web Vitals', self::SEV_CRITICAL,
+                    "Mobile LCP is poor ({$mLcp} ms)",
+                    'Largest Contentful Paint measures how quickly the main content of the page becomes visible. Google uses the mobile 75th-percentile LCP as a ranking signal; a value above 4,000 ms means most visitors perceive the page as broken.',
+                    'Identify the LCP element (usually a hero image or H1 block) in Chrome DevTools → Performance. Preload it with <link rel="preload">, serve it from a CDN, compress to WebP/AVIF, and remove render-blocking scripts before it.');
+            } elseif ($mLcp > 2500) {
+                $out[] = $this->rec('cwv.lcp.needs_improvement', 'Core Web Vitals', self::SEV_WARNING,
+                    "Mobile LCP needs improvement ({$mLcp} ms)",
+                    'LCP between 2.5s and 4s is outside Google\'s "good" threshold and caps your Core Web Vitals score.',
+                    'Target <2,500 ms. Preload the hero image, defer non-critical JS, and enable HTTP/2 or HTTP/3 push for critical CSS.');
+            } else {
+                $out[] = $this->rec('cwv.lcp.good', 'Core Web Vitals', self::SEV_GOOD,
+                    "Mobile LCP is good ({$mLcp} ms)",
+                    'LCP ≤ 2,500 ms meets Google\'s "good" threshold for all users.',
+                    'No change needed. Re-check monthly; LCP regresses easily when hero assets change.');
+            }
+        }
+
+        // ── CLS (mobile) ─────────────────────────────────────────────────────
+        if ($mCls !== null) {
+            if ($mCls > 0.25) {
+                $out[] = $this->rec('cwv.cls.poor', 'Core Web Vitals', self::SEV_CRITICAL,
+                    'Mobile Cumulative Layout Shift is poor ('.number_format($mCls, 2).')',
+                    'CLS above 0.25 means elements visibly jump while the page loads — users mis-click, and Google treats it as a poor-experience signal.',
+                    'Set explicit width/height on every image, iframe, and video. Reserve space for ads and embeds. Avoid injecting content above existing DOM after first paint.');
+            } elseif ($mCls > 0.1) {
+                $out[] = $this->rec('cwv.cls.needs_improvement', 'Core Web Vitals', self::SEV_WARNING,
+                    'Mobile CLS needs improvement ('.number_format($mCls, 2).')',
+                    'CLS between 0.1 and 0.25 is outside Google\'s "good" band. Perceived stability suffers on slow connections.',
+                    'Audit the DOM for late-inserted banners, late-loading fonts (use font-display: optional), and un-sized media.');
+            } else {
+                $out[] = $this->rec('cwv.cls.good', 'Core Web Vitals', self::SEV_GOOD,
+                    'Mobile CLS is good ('.number_format($mCls, 2).')',
+                    'CLS ≤ 0.1 meets Google\'s "good" threshold.',
+                    'No change needed.');
+            }
+        }
+
+        // ── TBT (lab proxy for INP) ──────────────────────────────────────────
+        if ($mTbt !== null) {
+            if ($mTbt > 600) {
+                $out[] = $this->rec('cwv.tbt.poor', 'Core Web Vitals', self::SEV_WARNING,
+                    "Mobile Total Blocking Time is high ({$mTbt} ms)",
+                    'TBT is the lab-side proxy for INP (Interaction to Next Paint). Values above 600 ms mean the main thread is blocked by long tasks and taps will feel laggy for real users.',
+                    'Break up any single task >50 ms in DevTools → Performance. Remove or defer third-party scripts, and split large JS bundles by route.');
+            } elseif ($mTbt > 200) {
+                $out[] = $this->rec('cwv.tbt.needs_improvement', 'Core Web Vitals', self::SEV_INFO,
+                    "Mobile TBT is moderate ({$mTbt} ms)",
+                    'TBT between 200 and 600 ms predicts borderline INP in the field, especially on low-end Android devices.',
+                    'Defer analytics and chat widgets; shift heavy JS to a Web Worker where possible.');
+            }
+        }
+
+        // ── Mobile vs desktop parity ─────────────────────────────────────────
+        if ($mLcp !== null && $dLcp !== null && $dLcp > 0 && $mLcp >= 2 * $dLcp) {
+            $out[] = $this->rec('cwv.parity.mobile_much_slower', 'Core Web Vitals', self::SEV_WARNING,
+                "Mobile is much slower than desktop (LCP {$mLcp} ms vs {$dLcp} ms)",
+                'When mobile LCP is ≥ 2× desktop, the site is optimized for large screens but not for the devices most of your users actually use. Google\'s CWV ranking signal is mobile-first.',
+                'Audit mobile-specific culprits: unresized hero images, blocking third-party scripts enabled only on mobile, and server-side device detection that serves heavier responses.');
+        }
+
+        return $out;
+    }
+
+    private function intOrNull(mixed $v): ?int
+    {
+        return is_numeric($v) ? (int) round((float) $v) : null;
+    }
+
+    private function floatOrNull(mixed $v): ?float
+    {
+        return is_numeric($v) ? (float) $v : null;
     }
 
     private function rec(string $id, string $section, string $severity, string $title, string $why, string $fix): array
