@@ -25,7 +25,7 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique(['website_id', 'page']);
-            $table->index(['website_id', 'last_google_status_checked_at']);
+            $table->index(['website_id', 'last_google_status_checked_at'], 'pis_website_last_checked_idx');
         });
     }
 
