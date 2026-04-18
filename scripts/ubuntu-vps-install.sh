@@ -248,6 +248,16 @@ git_deploy() {
   mkdir -p "$(dirname "${APP_DIR}")"
   local owner="${SUDO_USER:-root}"
 
+  if [[ -n "${GIT_SSH_IDENTITY_FILE:-}" ]]; then
+    if [[ ! -r "${GIT_SSH_IDENTITY_FILE}" ]]; then
+      echo "GIT_SSH_IDENTITY_FILE is not readable: ${GIT_SSH_IDENTITY_FILE}" >&2
+      exit 1
+    fi
+    local keyq
+    keyq="$(printf '%q' "${GIT_SSH_IDENTITY_FILE}")"
+    export GIT_SSH_COMMAND="ssh -i ${keyq} -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+  fi
+
   if [[ -d "${APP_DIR}/.git" ]]; then
     git -C "${APP_DIR}" fetch origin
     git -C "${APP_DIR}" checkout "${GIT_BRANCH}"
