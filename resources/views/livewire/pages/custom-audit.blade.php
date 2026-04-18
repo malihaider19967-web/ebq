@@ -2,7 +2,7 @@
     use Illuminate\Support\Str;
 @endphp
 
-<div class="mx-auto max-w-4xl space-y-6">
+<div class="mx-auto max-w-4xl space-y-6" @if ($hasPending) wire:poll.3s @endif>
     {{-- Page header --}}
     <header class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
         <div class="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
@@ -62,7 +62,7 @@
                 <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">URLs must stay on the current site’s domain. <code class="rounded bg-slate-100 px-1 py-px font-mono text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">https://</code> is added when omitted.</p>
             </div>
 
-            <form wire:submit="runAudit" class="space-y-5 p-5" novalidate aria-busy="{{ $running ? 'true' : 'false' }}">
+            <form wire:submit="queueAudit" class="space-y-5 p-5" novalidate>
                 <div class="space-y-5">
                     <div>
                         <label for="custom-audit-url" class="block text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Page URL</label>
@@ -72,7 +72,6 @@
                             inputmode="url"
                             autocomplete="url"
                             wire:model.blur="pageUrl"
-                            @disabled($running)
                             placeholder="https://example.com/your-page"
                             @class([
                                 'mt-1.5 block w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500',
@@ -95,7 +94,6 @@
                             type="text"
                             autocomplete="off"
                             wire:model.blur="targetKeyword"
-                            @disabled($running)
                             placeholder="e.g. best project management software"
                             @class([
                                 'mt-1.5 block w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500',
@@ -126,7 +124,6 @@
                         <select
                             id="custom-audit-serp-gl"
                             wire:model="serpCountryGl"
-                            @disabled($running)
                             class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
                         >
                             @foreach (\App\Support\Audit\SerpGlCatalog::selectOptions() as $code => $label)
@@ -141,14 +138,13 @@
                         <button
                             type="submit"
                             wire:loading.attr="disabled"
-                            wire:target="runAudit"
-                            @disabled($running)
+                            wire:target="queueAudit"
                             class="inline-flex h-9 items-center justify-center rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
                         >
-                            <span wire:loading.remove wire:target="runAudit">{{ $awaitingSerpCountryChoice ? 'Confirm and run audit' : 'Run audit' }}</span>
-                            <span wire:loading wire:target="runAudit" class="inline-flex items-center gap-2">
+                            <span wire:loading.remove wire:target="queueAudit">{{ $awaitingSerpCountryChoice ? 'Confirm and queue audit' : 'Run audit' }}</span>
+                            <span wire:loading wire:target="queueAudit" class="inline-flex items-center gap-2">
                                 <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                Running…
+                                Queuing…
                             </span>
                         </button>
                         @if ($awaitingSerpCountryChoice)
@@ -156,18 +152,28 @@
                                 type="button"
                                 wire:click="cancelSerpCountryStep"
                                 wire:loading.attr="disabled"
-                                wire:target="runAudit"
+                                wire:target="queueAudit"
                                 class="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
                             >
                                 Edit URL &amp; keyword
                             </button>
                         @endif
                     </div>
-                    <p wire:loading.remove wire:target="runAudit" class="text-[11px] text-slate-500 dark:text-slate-400">First submit checks the page and may ask for SERP region. Second submit runs the audit.</p>
-                    <p wire:loading wire:target="runAudit" class="text-[11px] font-medium text-indigo-600 dark:text-indigo-400">Please keep this tab open…</p>
+                    <p wire:loading.remove wire:target="queueAudit" class="text-[11px] text-slate-500 dark:text-slate-400">First submit checks the page and may ask for SERP region. Second submit queues the audit — it runs in the background.</p>
+                    <p wire:loading wire:target="queueAudit" class="text-[11px] font-medium text-indigo-600 dark:text-indigo-400">Queuing…</p>
                 </div>
             </form>
         </div>
+
+        @if ($hasPending)
+            <div class="flex items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50/70 px-4 py-3 text-sm shadow-sm dark:border-indigo-900/50 dark:bg-indigo-500/10" role="status" aria-live="polite">
+                <svg class="mt-0.5 h-4 w-4 shrink-0 animate-spin text-indigo-600 dark:text-indigo-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <div class="min-w-0 text-xs leading-relaxed text-indigo-900 dark:text-indigo-200">
+                    <p class="font-semibold">Audits are running in the background.</p>
+                    <p class="mt-0.5 text-indigo-800/90 dark:text-indigo-200/80">The list updates itself every few seconds. You can close this tab and come back — rows stay here with their final status.</p>
+                </div>
+            </div>
+        @endif
 
         <section class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-labelledby="custom-audit-history-heading">
             <div class="flex flex-col gap-1 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
@@ -226,19 +232,50 @@
                                         @endif
                                     </td>
                                     <td class="whitespace-nowrap px-4 py-3">
-                                        @if ($row->status === 'completed')
-                                            <span class="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Done</span>
-                                        @else
-                                            <span class="inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-800 dark:bg-rose-500/15 dark:text-rose-300">Failed</span>
-                                        @endif
+                                        @switch($row->status)
+                                            @case(\App\Models\CustomPageAudit::STATUS_QUEUED)
+                                                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-300">
+                                                    <span class="relative flex h-1.5 w-1.5">
+                                                        <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-500 opacity-75"></span>
+                                                        <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-amber-500"></span>
+                                                    </span>
+                                                    Queued
+                                                </span>
+                                                @break
+                                            @case(\App\Models\CustomPageAudit::STATUS_RUNNING)
+                                                <span class="inline-flex items-center gap-1.5 rounded-full bg-sky-100 px-2 py-0.5 text-[10px] font-semibold text-sky-800 dark:bg-sky-500/15 dark:text-sky-300">
+                                                    <svg class="h-3 w-3 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                                    Running
+                                                </span>
+                                                @break
+                                            @case(\App\Models\CustomPageAudit::STATUS_COMPLETED)
+                                                <span class="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Done</span>
+                                                @break
+                                            @case(\App\Models\CustomPageAudit::STATUS_FAILED)
+                                                <span
+                                                    class="inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-800 dark:bg-rose-500/15 dark:text-rose-300"
+                                                    @if ($row->error_message) title="{{ $row->error_message }}" @endif
+                                                >Failed</span>
+                                                @break
+                                            @default
+                                                <span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-200">{{ ucfirst((string) $row->status) }}</span>
+                                        @endswitch
                                     </td>
                                     <td class="whitespace-nowrap px-4 py-3 text-right">
-                                        @if ($row->page_audit_report_id)
+                                        @if ($row->isCompleted() && $row->page_audit_report_id)
                                             <a
                                                 href="{{ route('page-audits.show', $row->page_audit_report_id) }}"
                                                 wire:navigate
                                                 class="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-indigo-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 dark:border-slate-600 dark:bg-slate-900 dark:text-indigo-300 dark:hover:border-indigo-900 dark:hover:bg-indigo-500/10"
                                             >View</a>
+                                        @elseif ($row->isFailed())
+                                            <button
+                                                type="button"
+                                                wire:click="retryAudit({{ $row->id }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="retryAudit({{ $row->id }})"
+                                                class="inline-flex h-7 items-center rounded-md border border-rose-200 bg-white px-2.5 text-[11px] font-semibold text-rose-700 shadow-sm transition hover:bg-rose-50 disabled:opacity-60 dark:border-rose-900/60 dark:bg-slate-900 dark:text-rose-300 dark:hover:bg-rose-500/10"
+                                            >Retry</button>
                                         @else
                                             <span class="text-slate-400">—</span>
                                         @endif

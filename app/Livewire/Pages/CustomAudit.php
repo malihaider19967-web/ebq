@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Pages;
 
+use App\Jobs\RunCustomPageAudit;
 use App\Models\CustomPageAudit;
 use App\Models\Website;
 use App\Services\PageAuditService;
@@ -23,8 +24,6 @@ class CustomAudit extends Component
     public ?string $message = null;
 
     public string $messageKind = 'info';
-
-    public bool $running = false;
 
     public bool $awaitingSerpCountryChoice = false;
 
@@ -64,7 +63,11 @@ class CustomAudit extends Component
         $this->message = null;
     }
 
-    public function runAudit(PageAuditService $pageAuditService): void
+    /**
+     * Queue a background audit. Returns immediately — the user sees a new row
+     * in "Recent custom audits" with status=Queued that polls itself to completion.
+     */
+    public function queueAudit(PageAuditService $pageAuditService): void
     {
         $this->message = null;
         $this->messageKind = 'info';
@@ -115,6 +118,15 @@ class CustomAudit extends Component
             return;
         }
 
+        // Dedupe: don't let paid APIs run twice for the same URL if one is already queued/running.
+        $active = CustomPageAudit::findActiveFor($this->websiteId, $normalizedUrl, $user->id);
+        if ($active instanceof CustomPageAudit) {
+            $this->setMessage('Already queued — see the row at the top of the list. It will update itself.', 'info');
+            $this->resetForm();
+
+            return;
+        }
+
         $serpGlOverride = null;
         if ($this->awaitingSerpCountryChoice) {
             if (! SerpGlCatalog::isAllowedGl($this->serpCountryGl)) {
@@ -126,6 +138,8 @@ class CustomAudit extends Component
             $this->awaitingSerpCountryChoice = false;
             $this->serpCountryRecommendationHint = null;
         } else {
+            // Lightweight metadata-only fetch to suggest the SERP country — stays synchronous
+            // because it's fast (single HEAD/GET for <head>) and the user needs to pick before we queue.
             $peek = $pageAuditService->peekSerpCountryChoiceNeeded($this->websiteId, $normalizedUrl, true);
             if (! ($peek['ok'] ?? false)) {
                 $this->setMessage($peek['error'] ?? 'Could not read the page to detect locale.', 'error');
@@ -152,33 +166,81 @@ class CustomAudit extends Component
         }
         RateLimiter::hit($rateKey, 120);
 
-        $this->running = true;
-        try {
-            $report = $pageAuditService->audit($this->websiteId, $normalizedUrl, $keyword, true, $serpGlOverride);
-        } catch (\Throwable $e) {
-            $this->running = false;
-            $this->setMessage('Audit failed: '.$e->getMessage(), 'error');
-
-            return;
-        }
-        $this->running = false;
-
-        CustomPageAudit::recordRun(
-            $this->websiteId,
-            $user->id,
-            $normalizedUrl,
-            $report,
-            $keyword,
-            CustomPageAudit::SOURCE_CUSTOM,
+        $audit = CustomPageAudit::queue(
+            websiteId: $this->websiteId,
+            userId: $user->id,
+            pageUrl: $normalizedUrl,
+            targetKeyword: $keyword,
+            serpSampleGl: $serpGlOverride,
+            source: CustomPageAudit::SOURCE_CUSTOM,
         );
 
-        if ($report->status === 'completed') {
-            $this->redirect(route('page-audits.show', $report), navigate: true);
+        RunCustomPageAudit::dispatch($audit->id);
+
+        $this->resetForm();
+        $this->setMessage(
+            'Audit queued — it will update automatically in the list below. You can close this tab and come back.',
+            'success'
+        );
+    }
+
+    /**
+     * Re-queue a failed audit. Resets status + drops the previous error message.
+     */
+    public function retryAudit(int $auditId): void
+    {
+        $user = Auth::user();
+        if (! $user) {
+            return;
+        }
+
+        $audit = CustomPageAudit::query()->find($auditId);
+        if (! $audit instanceof CustomPageAudit) {
+            return;
+        }
+        if ($audit->user_id !== $user->id && ! $user->canViewWebsiteId($audit->website_id)) {
+            return;
+        }
+        if (! $audit->canRetry()) {
+            return;
+        }
+
+        $active = CustomPageAudit::findActiveFor($audit->website_id, $audit->page_url, $user->id);
+        if ($active instanceof CustomPageAudit) {
+            $this->setMessage('An audit for that URL is already queued.', 'info');
 
             return;
         }
 
-        $this->setMessage('Audit failed: '.($report->error_message ?? 'Unknown error'), 'error');
+        $rateKey = 'custom-audit:'.$user->id;
+        if (RateLimiter::tooManyAttempts($rateKey, 8)) {
+            $seconds = RateLimiter::availableIn($rateKey);
+            $this->setMessage("Too many audits. Try again in {$seconds}s.", 'error');
+
+            return;
+        }
+        RateLimiter::hit($rateKey, 120);
+
+        $audit->forceFill([
+            'status' => CustomPageAudit::STATUS_QUEUED,
+            'queued_at' => now(),
+            'started_at' => null,
+            'finished_at' => null,
+            'error_message' => null,
+        ])->save();
+
+        RunCustomPageAudit::dispatch($audit->id);
+
+        $this->setMessage('Audit re-queued.', 'info');
+    }
+
+    private function resetForm(): void
+    {
+        $this->pageUrl = '';
+        $this->targetKeyword = '';
+        $this->awaitingSerpCountryChoice = false;
+        $this->serpCountryRecommendationHint = null;
+        $this->resetValidation();
     }
 
     private function normalizePageUrl(string $raw): string
@@ -204,6 +266,7 @@ class CustomAudit extends Component
     {
         $recentAudits = collect();
         $website = null;
+        $hasPending = false;
 
         if ($this->websiteId > 0 && Auth::check() && Auth::user()->canViewWebsiteId($this->websiteId)) {
             $website = Website::query()->find($this->websiteId);
@@ -214,11 +277,13 @@ class CustomAudit extends Component
                 ->latest()
                 ->limit(50)
                 ->get();
+            $hasPending = $recentAudits->contains(fn (CustomPageAudit $a) => $a->isPending());
         }
 
         return view('livewire.pages.custom-audit', [
             'recentAudits' => $recentAudits,
             'website' => $website,
+            'hasPending' => $hasPending,
         ]);
     }
 }

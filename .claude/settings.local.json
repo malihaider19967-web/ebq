@@ -47,7 +47,11 @@
       "Bash(php -l app/Support/Audit/HtmlAuditor.php)",
       "Bash(php -l app/Services/PageAuditService.php)",
       "Bash(php -l app/Support/Audit/RecommendationEngine.php)",
-      "Bash(bash -n c:/Users/malih/Desktop/ebq/scripts/ubuntu-vps-install.sh)"
+      "Bash(bash -n c:/Users/malih/Desktop/ebq/scripts/ubuntu-vps-install.sh)",
+      "Bash(php -l app/Models/CustomPageAudit.php)",
+      "Bash(php -l app/Jobs/RunCustomPageAudit.php)",
+      "Bash(php -l app/Livewire/Pages/CustomAudit.php)",
+      "Bash(php -l database/migrations/2026_04_19_130000_add_queue_columns_to_custom_page_audits.php)"
     ]
   }
 }
