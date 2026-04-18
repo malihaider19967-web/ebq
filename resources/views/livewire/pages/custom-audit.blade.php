@@ -2,125 +2,210 @@
     use Illuminate\Support\Str;
 @endphp
 
-<div class="mx-auto max-w-4xl space-y-8">
-    <div>
-        <h1 class="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Custom page audit</h1>
-        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
-            Audit any URL on the selected website and set the <strong class="text-slate-700 dark:text-slate-300">SERP benchmark keyword</strong> manually (Search Console primary query is not used for Serper on this run).
+<div class="mx-auto max-w-4xl space-y-6">
+    {{-- Page header --}}
+    <header class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <div class="border-b border-slate-100 px-5 py-4 dark:border-slate-800">
+            <a href="{{ route('pages.index') }}" wire:navigate class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-500 transition hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400">
+                <svg class="h-3.5 w-3.5 shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
+                Back to pages
+            </a>
+            <div class="mt-3 flex flex-wrap items-start justify-between gap-3">
+                <div class="min-w-0">
+                    <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">Custom page audit</h1>
+                    <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
+                        Run an audit for any URL on the selected site and set the <span class="font-medium text-slate-700 dark:text-slate-300">SERP benchmark keyword</span> yourself. Search Console’s primary query is not used for the Serper snapshot on this flow.
+                    </p>
+                </div>
+                @if ($website)
+                    <span class="inline-flex shrink-0 items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200" title="Current website">
+                        {{ $website->domain }}
+                    </span>
+                @endif
+            </div>
+        </div>
+        <p class="px-5 py-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+            Audits fetch the live page, run checks, and may take up to a minute. You will confirm the Google SERP country before the run starts when we can infer locale from the page.
         </p>
-    </div>
+    </header>
 
     @if ($message)
-        <div @class([
-            'rounded-lg border px-4 py-3 text-sm',
-            'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-200' => $messageKind === 'success',
-            'border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-500/10 dark:text-rose-200' => $messageKind === 'error',
-            'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900/40 dark:bg-sky-500/10 dark:text-sky-200' => $messageKind === 'info',
-        ]) role="status">
+        <div
+            @class([
+                'rounded-xl border px-4 py-3 text-sm shadow-sm',
+                'border-emerald-200 bg-emerald-50 text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-500/10 dark:text-emerald-200' => $messageKind === 'success',
+                'border-rose-200 bg-rose-50 text-rose-900 dark:border-rose-900/40 dark:bg-rose-500/10 dark:text-rose-200' => $messageKind === 'error',
+                'border-sky-200 bg-sky-50 text-sky-900 dark:border-sky-900/40 dark:bg-sky-500/10 dark:text-sky-200' => $messageKind === 'info',
+            ])
+            role="status"
+            aria-live="polite"
+        >
             {{ $message }}
         </div>
     @endif
 
     @if ($websiteId === 0)
-        <p class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/40 dark:bg-amber-500/10 dark:text-amber-200">
-            Add or select a website in the header before running a custom audit.
-        </p>
-    @else
-        <form wire:submit="runAudit" class="space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div>
-                <label for="custom-audit-url" class="block text-sm font-semibold text-slate-800 dark:text-slate-200">Page URL</label>
-                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Must be on the current website’s domain (https:// is added if you omit it).</p>
-                <input
-                    id="custom-audit-url"
-                    type="url"
-                    wire:model="pageUrl"
-                    placeholder="https://example.com/your-page"
-                    class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
-                    autocomplete="off"
-                />
-            </div>
-
-            <div>
-                <label for="custom-audit-keyword" class="block text-sm font-semibold text-slate-800 dark:text-slate-200">Target keyword (SERP)</label>
-                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Used for Serper organic results, rank-in-sample, and competitor readability / gap averages.</p>
-                <input
-                    id="custom-audit-keyword"
-                    type="text"
-                    wire:model="targetKeyword"
-                    placeholder="e.g. best project management software"
-                    class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500"
-                    autocomplete="off"
-                />
-            </div>
-
-            @if ($awaitingSerpCountryChoice)
-                <div class="rounded-xl border border-sky-200 bg-sky-50/80 p-4 dark:border-sky-900/50 dark:bg-sky-500/10">
-                    <label for="custom-audit-serp-gl" class="block text-sm font-semibold text-slate-800 dark:text-slate-200">Google SERP country</label>
-                    @if ($serpCountryRecommendationHint)
-                        <p class="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-400">{{ $serpCountryRecommendationHint }}</p>
-                    @else
-                        <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Used for the Serper organic snapshot. The best match for your page is pre-selected.</p>
-                    @endif
-                    <select
-                        id="custom-audit-serp-gl"
-                        wire:model="serpCountryGl"
-                        class="mt-2 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
-                    >
-                        @foreach (\App\Support\Audit\SerpGlCatalog::selectOptions() as $code => $label)
-                            <option value="{{ $code }}">{{ $label }}</option>
-                        @endforeach
-                    </select>
+        <div class="rounded-2xl border border-amber-200 bg-amber-50/90 px-5 py-4 shadow-sm dark:border-amber-900/50 dark:bg-amber-500/10">
+            <div class="flex gap-3">
+                <svg class="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                <div>
+                    <p class="text-sm font-semibold text-amber-900 dark:text-amber-200">Select a website first</p>
+                    <p class="mt-1 text-xs leading-relaxed text-amber-800/90 dark:text-amber-200/80">Choose a site from the header, then return here to run a custom audit.</p>
+                    <a href="{{ route('websites.index') }}" wire:navigate class="mt-3 inline-flex text-xs font-semibold text-amber-900 underline decoration-amber-700/40 underline-offset-2 hover:decoration-amber-900 dark:text-amber-100 dark:hover:text-white">Manage websites</a>
                 </div>
-            @endif
-
-            <div class="flex items-center gap-3">
-                <button
-                    type="submit"
-                    wire:loading.attr="disabled"
-                    wire:target="runAudit"
-                    class="inline-flex items-center justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
-                >
-                    <span wire:loading.remove wire:target="runAudit">Run audit</span>
-                    <span wire:loading wire:target="runAudit">Running…</span>
-                </button>
-                <span wire:loading wire:target="runAudit" class="text-xs text-slate-500 dark:text-slate-400">This can take a minute.</span>
             </div>
-        </form>
+        </div>
+    @else
+        <div class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="border-b border-slate-100 px-5 py-3 dark:border-slate-800">
+                <h2 class="text-sm font-bold text-slate-900 dark:text-slate-100">Run audit</h2>
+                <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">URLs must stay on the current site’s domain. <code class="rounded bg-slate-100 px-1 py-px font-mono text-[10px] text-slate-700 dark:bg-slate-800 dark:text-slate-300">https://</code> is added when omitted.</p>
+            </div>
 
-        @if ($recentAudits->isNotEmpty())
-            <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-                <div class="flex flex-wrap items-end justify-between gap-3">
+            <form wire:submit="runAudit" class="space-y-5 p-5" novalidate aria-busy="{{ $running ? 'true' : 'false' }}">
+                <div class="space-y-5">
                     <div>
-                        <h2 class="text-lg font-bold text-slate-900 dark:text-slate-100">Recent custom audits</h2>
-                        <p class="mt-1 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
-                            Each row records the URL and SERP keyword you used. Opening the report shows the <strong class="text-slate-600 dark:text-slate-300">latest saved audit</strong> for that page; a later audit (custom or from Pages) can replace the same report row.
-                        </p>
+                        <label for="custom-audit-url" class="block text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Page URL</label>
+                        <input
+                            id="custom-audit-url"
+                            type="url"
+                            inputmode="url"
+                            autocomplete="url"
+                            wire:model.blur="pageUrl"
+                            @disabled($running)
+                            placeholder="https://example.com/your-page"
+                            @class([
+                                'mt-1.5 block w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500',
+                                'border-rose-400 focus:border-rose-500 focus:ring-rose-500/25 dark:border-rose-500/60' => $errors->has('pageUrl'),
+                                'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/20 dark:border-slate-600' => ! $errors->has('pageUrl'),
+                            ])
+                            aria-invalid="{{ $errors->has('pageUrl') ? 'true' : 'false' }}"
+                            @if ($errors->has('pageUrl')) aria-describedby="custom-audit-url-error" @endif
+                        />
+                        @if ($errors->has('pageUrl'))
+                            <p id="custom-audit-url-error" class="mt-1.5 text-xs font-medium text-rose-600 dark:text-rose-400">{{ $errors->first('pageUrl') }}</p>
+                        @endif
+                    </div>
+
+                    <div>
+                        <label for="custom-audit-keyword" class="block text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Target keyword (SERP)</label>
+                        <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Drives Serper organic results, in-sample rank checks, and competitor readability averages.</p>
+                        <input
+                            id="custom-audit-keyword"
+                            type="text"
+                            autocomplete="off"
+                            wire:model.blur="targetKeyword"
+                            @disabled($running)
+                            placeholder="e.g. best project management software"
+                            @class([
+                                'mt-1.5 block w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500',
+                                'border-rose-400 focus:border-rose-500 focus:ring-rose-500/25 dark:border-rose-500/60' => $errors->has('targetKeyword'),
+                                'border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/20 dark:border-slate-600' => ! $errors->has('targetKeyword'),
+                            ])
+                            aria-invalid="{{ $errors->has('targetKeyword') ? 'true' : 'false' }}"
+                            @if ($errors->has('targetKeyword')) aria-describedby="custom-audit-keyword-error" @endif
+                        />
+                        @if ($errors->has('targetKeyword'))
+                            <p id="custom-audit-keyword-error" class="mt-1.5 text-xs font-medium text-rose-600 dark:text-rose-400">{{ $errors->first('targetKeyword') }}</p>
+                        @endif
                     </div>
                 </div>
 
-                <div class="mt-4 overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-700">
-                    <table class="min-w-full divide-y divide-slate-200 text-left text-sm dark:divide-slate-700">
-                        <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-400">
+                @if ($awaitingSerpCountryChoice)
+                    <div class="rounded-xl border border-indigo-200 bg-indigo-50/60 p-4 dark:border-indigo-900/50 dark:bg-indigo-500/10" role="region" aria-labelledby="custom-audit-serp-heading">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <h3 id="custom-audit-serp-heading" class="text-sm font-bold text-slate-900 dark:text-slate-100">Confirm SERP country</h3>
+                            <span class="rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-indigo-700 ring-1 ring-indigo-200 dark:bg-slate-900/80 dark:text-indigo-300 dark:ring-indigo-800">Step 2 of 2</span>
+                        </div>
+                        @if ($serpCountryRecommendationHint)
+                            <p class="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">{{ $serpCountryRecommendationHint }}</p>
+                        @else
+                            <p class="mt-2 text-xs leading-relaxed text-slate-600 dark:text-slate-400">Choose the regional Google index used for the organic snapshot. A best guess is pre-selected from your page.</p>
+                        @endif
+                        <label for="custom-audit-serp-gl" class="mt-3 block text-[11px] font-semibold text-slate-700 dark:text-slate-300">Country</label>
+                        <select
+                            id="custom-audit-serp-gl"
+                            wire:model="serpCountryGl"
+                            @disabled($running)
+                            class="mt-1.5 block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                        >
+                            @foreach (\App\Support\Audit\SerpGlCatalog::selectOptions() as $code => $label)
+                                <option value="{{ $code }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
+
+                <div class="flex flex-col gap-3 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between dark:border-slate-800">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button
+                            type="submit"
+                            wire:loading.attr="disabled"
+                            wire:target="runAudit"
+                            @disabled($running)
+                            class="inline-flex h-9 items-center justify-center rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-indigo-500 dark:hover:bg-indigo-400"
+                        >
+                            <span wire:loading.remove wire:target="runAudit">{{ $awaitingSerpCountryChoice ? 'Confirm and run audit' : 'Run audit' }}</span>
+                            <span wire:loading wire:target="runAudit" class="inline-flex items-center gap-2">
+                                <svg class="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                Running…
+                            </span>
+                        </button>
+                        @if ($awaitingSerpCountryChoice)
+                            <button
+                                type="button"
+                                wire:click="cancelSerpCountryStep"
+                                wire:loading.attr="disabled"
+                                wire:target="runAudit"
+                                class="inline-flex h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                            >
+                                Edit URL &amp; keyword
+                            </button>
+                        @endif
+                    </div>
+                    <p wire:loading.remove wire:target="runAudit" class="text-[11px] text-slate-500 dark:text-slate-400">First submit checks the page and may ask for SERP region. Second submit runs the audit.</p>
+                    <p wire:loading wire:target="runAudit" class="text-[11px] font-medium text-indigo-600 dark:text-indigo-400">Please keep this tab open…</p>
+                </div>
+            </form>
+        </div>
+
+        <section class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-labelledby="custom-audit-history-heading">
+            <div class="flex flex-col gap-1 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <h2 id="custom-audit-history-heading" class="text-sm font-bold text-slate-900 dark:text-slate-100">Recent custom audits</h2>
+                    <p class="mt-1 max-w-2xl text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
+                        Each row is a run you started from this page. Opening the report shows the <span class="font-medium text-slate-600 dark:text-slate-300">latest saved audit</span> for that URL; a newer run (here or from Pages) can replace the same report row.
+                    </p>
+                </div>
+                @if ($recentAudits->isNotEmpty())
+                    <span class="text-[11px] font-medium text-slate-400 dark:text-slate-500">Last {{ $recentAudits->count() }} on this site</span>
+                @endif
+            </div>
+
+            @if ($recentAudits->isNotEmpty())
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-slate-200 text-left text-xs dark:divide-slate-700">
+                        <thead class="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-400">
                             <tr>
-                                <th class="whitespace-nowrap px-4 py-3">When</th>
-                                <th class="min-w-[10rem] px-4 py-3">Page</th>
-                                <th class="min-w-[7rem] px-4 py-3">Market</th>
-                                <th class="min-w-[8rem] px-4 py-3">Keyword</th>
-                                <th class="whitespace-nowrap px-4 py-3">By</th>
-                                <th class="whitespace-nowrap px-4 py-3">Status</th>
-                                <th class="whitespace-nowrap px-4 py-3 text-right">Report</th>
+                                <th scope="col" class="whitespace-nowrap px-4 py-3">When</th>
+                                <th scope="col" class="min-w-[10rem] px-4 py-3">Page</th>
+                                <th scope="col" class="min-w-[7rem] px-4 py-3">Market</th>
+                                <th scope="col" class="min-w-[8rem] px-4 py-3">Keyword</th>
+                                <th scope="col" class="whitespace-nowrap px-4 py-3">By</th>
+                                <th scope="col" class="whitespace-nowrap px-4 py-3">Status</th>
+                                <th scope="col" class="whitespace-nowrap px-4 py-3 text-right">Report</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                             @foreach ($recentAudits as $row)
-                                <tr class="bg-white dark:bg-slate-900">
-                                    <td class="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
-                                        <span title="{{ $row->created_at->toIso8601String() }}">{{ $row->created_at->diffForHumans() }}</span>
+                                <tr class="bg-white transition hover:bg-slate-50/80 dark:bg-slate-900 dark:hover:bg-slate-800/40">
+                                    <td class="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
+                                        <time datetime="{{ $row->created_at->toIso8601String() }}" title="{{ $row->created_at->toIso8601String() }}">{{ $row->created_at->diffForHumans() }}</time>
                                     </td>
                                     <td class="max-w-[14rem] px-4 py-3">
-                                        <span class="block truncate font-mono text-xs text-slate-800 dark:text-slate-200" title="{{ $row->page_url }}">{{ Str::limit($row->page_url, 56) }}</span>
+                                        <span class="block truncate font-mono text-[11px] text-slate-800 dark:text-slate-200" title="{{ $row->page_url }}">{{ Str::limit($row->page_url, 56) }}</span>
                                     </td>
-                                    <td class="max-w-[10rem] truncate px-4 py-3 text-xs text-slate-600 dark:text-slate-300" title="{{ $row->serp_sample_gl ? 'Serper gl='.$row->serp_sample_gl : '' }}">
+                                    <td class="max-w-[10rem] truncate px-4 py-3 text-slate-600 dark:text-slate-300" title="{{ $row->serp_sample_gl ? 'Serper gl='.$row->serp_sample_gl : '' }}">
                                         @php
                                             $caPl = is_array($row->pageAuditReport?->result['page_locale'] ?? null) ? $row->pageAuditReport->result['page_locale'] : null;
                                             $mkt = \App\Support\Audit\PageLocalePresentation::shortLabel($caPl);
@@ -131,9 +216,9 @@
                                         {{ $mkt ?? '—' }}
                                     </td>
                                     <td class="max-w-[12rem] px-4 py-3">
-                                        <span class="line-clamp-2 text-slate-800 dark:text-slate-200" title="{{ $row->target_keyword !== '' ? $row->target_keyword : 'Default (Search Console primary)' }}">{{ $row->target_keyword !== '' ? Str::limit($row->target_keyword, 80) : '—' }}</span>
+                                        <span class="line-clamp-2 text-slate-800 dark:text-slate-200" title="{{ $row->target_keyword !== '' ? $row->target_keyword : '—' }}">{{ $row->target_keyword !== '' ? Str::limit($row->target_keyword, 80) : '—' }}</span>
                                     </td>
-                                    <td class="whitespace-nowrap px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
+                                    <td class="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
                                         @if ($row->user_id === auth()->id())
                                             You
                                         @else
@@ -142,9 +227,9 @@
                                     </td>
                                     <td class="whitespace-nowrap px-4 py-3">
                                         @if ($row->status === 'completed')
-                                            <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Done</span>
+                                            <span class="inline-flex rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">Done</span>
                                         @else
-                                            <span class="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-800 dark:bg-rose-500/15 dark:text-rose-300">Failed</span>
+                                            <span class="inline-flex rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-semibold text-rose-800 dark:bg-rose-500/15 dark:text-rose-300">Failed</span>
                                         @endif
                                     </td>
                                     <td class="whitespace-nowrap px-4 py-3 text-right">
@@ -152,10 +237,10 @@
                                             <a
                                                 href="{{ route('page-audits.show', $row->page_audit_report_id) }}"
                                                 wire:navigate
-                                                class="text-xs font-semibold text-indigo-600 hover:text-indigo-500 dark:text-indigo-400 dark:hover:text-indigo-300"
+                                                class="inline-flex h-7 items-center rounded-md border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-indigo-700 shadow-sm transition hover:border-indigo-200 hover:bg-indigo-50 dark:border-slate-600 dark:bg-slate-900 dark:text-indigo-300 dark:hover:border-indigo-900 dark:hover:bg-indigo-500/10"
                                             >View</a>
                                         @else
-                                            <span class="text-xs text-slate-400">—</span>
+                                            <span class="text-slate-400">—</span>
                                         @endif
                                     </td>
                                 </tr>
@@ -163,7 +248,15 @@
                         </tbody>
                     </table>
                 </div>
-            </div>
-        @endif
+            @else
+                <div class="flex flex-col items-center justify-center px-6 py-14 text-center">
+                    <div class="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                        <svg class="h-6 w-6 text-slate-400 dark:text-slate-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.25" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>
+                    </div>
+                    <p class="mt-4 text-sm font-medium text-slate-600 dark:text-slate-300">No custom audits yet</p>
+                    <p class="mt-1 max-w-sm text-xs text-slate-500 dark:text-slate-400">Submit the form above to log runs here. Completed audits open in a full report.</p>
+                </div>
+            @endif
+        </section>
     @endif
 </div>

@@ -57,6 +57,13 @@ class CustomAudit extends Component
         $this->serpCountryRecommendationHint = null;
     }
 
+    public function cancelSerpCountryStep(): void
+    {
+        $this->awaitingSerpCountryChoice = false;
+        $this->serpCountryRecommendationHint = null;
+        $this->message = null;
+    }
+
     public function runAudit(PageAuditService $pageAuditService): void
     {
         $this->message = null;
@@ -72,7 +79,7 @@ class CustomAudit extends Component
         $normalizedUrl = $this->normalizePageUrl($this->pageUrl);
         $keyword = trim($this->targetKeyword);
 
-        $validator = Validator::make(
+        Validator::make(
             [
                 'pageUrl' => $normalizedUrl,
                 'targetKeyword' => $keyword,
@@ -84,14 +91,13 @@ class CustomAudit extends Component
             [
                 'pageUrl.required' => 'Enter a page URL.',
                 'targetKeyword.required' => 'Enter the keyword to use for the SERP benchmark.',
+            ],
+            [],
+            [
+                'pageUrl' => 'page URL',
+                'targetKeyword' => 'target keyword',
             ]
-        );
-
-        if ($validator->fails()) {
-            $this->setMessage($validator->errors()->first(), 'error');
-
-            return;
-        }
+        )->validate();
 
         $website = Website::query()->find($this->websiteId);
         if (! $website instanceof Website) {
@@ -101,7 +107,10 @@ class CustomAudit extends Component
         }
 
         if (! $website->isAuditUrlForThisSite($normalizedUrl)) {
-            $this->setMessage('The URL must use your website domain ('.$website->domain.') or a subdomain of it.', 'error');
+            $this->addError(
+                'pageUrl',
+                'The URL must use your website domain ('.$website->domain.') or a subdomain of it.'
+            );
 
             return;
         }
@@ -194,7 +203,10 @@ class CustomAudit extends Component
     public function render()
     {
         $recentAudits = collect();
+        $website = null;
+
         if ($this->websiteId > 0 && Auth::check() && Auth::user()->canViewWebsiteId($this->websiteId)) {
+            $website = Website::query()->find($this->websiteId);
             $recentAudits = CustomPageAudit::query()
                 ->where('website_id', $this->websiteId)
                 ->where('source', CustomPageAudit::SOURCE_CUSTOM)
@@ -206,6 +218,7 @@ class CustomAudit extends Component
 
         return view('livewire.pages.custom-audit', [
             'recentAudits' => $recentAudits,
+            'website' => $website,
         ]);
     }
 }
