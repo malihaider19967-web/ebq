@@ -73,7 +73,7 @@ class Website extends Model
      */
     public function gscKeywordWindowStartDate(?Carbon $today = null): string
     {
-        $today ??= Carbon::today();
+        $today ??= Carbon::today((string) config('app.timezone'));
 
         return $today->copy()->subDays($this->effectiveGscKeywordLookbackDays())->toDateString();
     }

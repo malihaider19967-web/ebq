@@ -4,6 +4,7 @@ namespace App\Livewire\Pages;
 
 use App\Models\PageAuditReport;
 use App\Models\SearchConsoleData;
+use App\Models\Website;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
@@ -51,12 +52,19 @@ class PagesTable extends Component
     public function render()
     {
         $rows = collect();
+        $gscKeywordLookbackDays = null;
 
         $allowed = ['page', 'total_clicks', 'total_impressions', 'avg_ctr', 'avg_position', 'last_google_status_checked_at'];
         $sortBy = in_array($this->sortBy, $allowed) ? $this->sortBy : 'total_clicks';
         $sortColumn = $sortBy === 'page' ? 'search_console_data.page' : $sortBy;
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
+            $websiteRow = Website::query()->find($this->websiteId);
+            $gscKeywordWindowFrom = $websiteRow?->gscKeywordWindowStartDate();
+            if ($websiteRow) {
+                $gscKeywordLookbackDays = $websiteRow->effectiveGscKeywordLookbackDays();
+            }
+
             $rows = SearchConsoleData::query()
                 ->select(
                     DB::raw('search_console_data.page as page'),
@@ -74,6 +82,7 @@ class PagesTable extends Component
                         ->on('page_indexing_statuses.page', '=', 'search_console_data.page');
                 })
                 ->where('search_console_data.website_id', $this->websiteId)
+                ->when($gscKeywordWindowFrom, fn ($q) => $q->whereDate('search_console_data.date', '>=', $gscKeywordWindowFrom))
                 ->when($this->search, fn ($q) => $q->where('search_console_data.page', 'like', "%{$this->search}%"))
                 ->groupBy('search_console_data.page')
                 ->orderBy($sortColumn, $this->sortDir)
@@ -97,6 +106,6 @@ class PagesTable extends Component
             $pageLocaleByHash = [];
         }
 
-        return view('livewire.pages.pages-table', compact('rows', 'pageLocaleByHash'));
+        return view('livewire.pages.pages-table', compact('rows', 'pageLocaleByHash', 'gscKeywordLookbackDays'));
     }
 }

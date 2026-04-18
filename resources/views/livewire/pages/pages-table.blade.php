@@ -5,6 +5,9 @@
             <input wire:model.live.debounce.300ms="search" type="text" placeholder="Search pages…"
                 class="h-8 w-full rounded-md border border-slate-200 bg-white pl-8 pr-2.5 text-xs placeholder-slate-400 shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800 dark:placeholder-slate-500" />
         </div>
+        @if (! empty($gscKeywordLookbackDays))
+            <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Clicks, impressions, and averages use Search Console data from the last <span class="font-semibold text-slate-700 dark:text-slate-300">{{ (int) $gscKeywordLookbackDays }}</span> days (same window as page detail and Settings → Reports).</p>
+        @endif
     </div>
 
     @if ($rows instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $rows->isNotEmpty())
