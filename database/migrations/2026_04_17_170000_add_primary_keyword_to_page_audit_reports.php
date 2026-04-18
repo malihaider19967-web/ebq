@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('page_audit_reports', function (Blueprint $table) {
-            $table->string('primary_keyword', 200)->nullable()->after('page_hash');
-            $table->string('primary_keyword_source', 32)->nullable()->after('primary_keyword');
+            $table->string('primary_keyword', 200)->nullable();
+            $table->string('primary_keyword_source', 32)->nullable();
         });
     }
 
