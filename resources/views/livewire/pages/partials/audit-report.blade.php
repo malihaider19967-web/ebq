@@ -53,15 +53,21 @@
         default => 'Benchmark unavailable: ' . str_replace('_', ' ', $reason) . '.',
     };
 
+    // Order optimized for how a reader actually uses the report:
+    //   1. Action items first (Recommendations)
+    //   2. Performance block (Core Web Vitals → Technical) — user experience & foundation
+    //   3. Competitive block (SERP benchmark → Keywords) — context for the audit
+    //   4. On-page block (Metadata → Content → Images & Links) — drill-down
+    //   5. Extras (Advanced)
     $sections = [
         ['key' => 'recommendations', 'label' => 'Recommendations', 'count' => count($recs), 'show' => ! empty($recs)],
-        ['key' => 'keywords',        'label' => 'Keywords',        'count' => $kwAvailable ? (int) ($keywordData['coverage']['total'] ?? 0) : null, 'show' => true],
+        ['key' => 'core-web-vitals', 'label' => 'Core Web Vitals', 'count' => null,         'show' => is_array($result['core_web_vitals'] ?? null)],
+        ['key' => 'technical',       'label' => 'Technical',       'count' => null,         'show' => true],
         ['key' => 'benchmark',       'label' => 'SERP benchmark',  'count' => is_array($benchmark) ? count($benchmark['competitors'] ?? []) : null, 'show' => $benchmarkNav],
+        ['key' => 'keywords',        'label' => 'Keywords',        'count' => $kwAvailable ? (int) ($keywordData['coverage']['total'] ?? 0) : null, 'show' => true],
         ['key' => 'metadata',        'label' => 'Metadata',        'count' => null,         'show' => true],
         ['key' => 'content',         'label' => 'Content',         'count' => null,         'show' => true],
         ['key' => 'links',           'label' => 'Images & Links',  'count' => null,         'show' => true],
-        ['key' => 'technical',       'label' => 'Technical',       'count' => null,         'show' => true],
-        ['key' => 'core-web-vitals', 'label' => 'Core Web Vitals', 'count' => null,         'show' => is_array($result['core_web_vitals'] ?? null)],
         ['key' => 'advanced',        'label' => 'Advanced',        'count' => null,         'show' => true],
     ];
     $auditSummaryOpen = (bool) ($openAuditSummary ?? false);
@@ -176,7 +182,12 @@
             </nav>
 
             <div class="space-y-6 px-5 py-5">
+                {{-- Each section renders into a named buffer; a single loop
+                     below emits them in the order defined by $sections. This
+                     lets us reorder sections without moving any markup. --}}
+                @php $sectionHtml = []; @endphp
 
+                @php ob_start(); @endphp
                 {{-- ══════ Recommendations ══════ --}}
                 @if (! empty($recs))
                     <section id="audit-recommendations" class="scroll-mt-16">
@@ -205,7 +216,9 @@
                         </div>
                     </section>
                 @endif
+                @php $sectionHtml['recommendations'] = ob_get_clean(); @endphp
 
+                @php ob_start(); @endphp
                 {{-- ══════ Keywords ══════ --}}
                 <section id="audit-keywords" class="scroll-mt-16">
                     <div class="mb-3 flex items-center gap-2">
@@ -435,7 +448,9 @@
                         @endif
                     @endif
                 </section>
+                @php $sectionHtml['keywords'] = ob_get_clean(); @endphp
 
+                @php ob_start(); @endphp
                 @if ($benchmarkNav)
                     {{-- ══════ SERP readability benchmark (Serper) ══════ --}}
                     <section id="audit-benchmark" class="scroll-mt-16">
@@ -625,7 +640,9 @@
                         @endif
                     </section>
                 @endif
+                @php $sectionHtml['benchmark'] = ob_get_clean(); @endphp
 
+                @php ob_start(); @endphp
                 {{-- ══════ Metadata ══════ --}}
                 <section id="audit-metadata" class="scroll-mt-16">
                     <div class="mb-3 flex items-center gap-2">
@@ -686,7 +703,9 @@
                         </div>
                     </div>
                 </section>
+                @php $sectionHtml['metadata'] = ob_get_clean(); @endphp
 
+                @php ob_start(); @endphp
                 {{-- ══════ Content ══════ --}}
                 <section id="audit-content" class="scroll-mt-16">
                     <div class="mb-3 flex items-center gap-2">
@@ -748,7 +767,9 @@
                         </details>
                     @endif
                 </section>
+                @php $sectionHtml['content'] = ob_get_clean(); @endphp
 
+                @php ob_start(); @endphp
                 {{-- ══════ Images & Links ══════ --}}
                 <section id="audit-links" class="scroll-mt-16">
                     <div class="mb-3 flex items-center gap-2">
@@ -831,7 +852,9 @@
                         </details>
                     @endif
                 </section>
+                @php $sectionHtml['links'] = ob_get_clean(); @endphp
 
+                @php ob_start(); @endphp
                 {{-- ══════ Technical ══════ --}}
                 <section id="audit-technical" class="scroll-mt-16">
                     <div class="mb-3 flex items-center gap-2">
@@ -901,7 +924,9 @@
                         </div>
                     </div>
                 </section>
+                @php $sectionHtml['technical'] = ob_get_clean(); @endphp
 
+                @php ob_start(); @endphp
                 {{-- ══════ Core Web Vitals ══════ --}}
                 @php $cwv = $result['core_web_vitals'] ?? null; @endphp
                 @if (is_array($cwv))
@@ -988,7 +1013,9 @@
                         </p>
                     </section>
                 @endif
+                @php $sectionHtml['core-web-vitals'] = ob_get_clean(); @endphp
 
+                @php ob_start(); @endphp
                 {{-- ══════ Advanced ══════ --}}
                 <section id="audit-advanced" class="scroll-mt-16">
                     <div class="mb-3 flex items-center gap-2">
@@ -1008,7 +1035,14 @@
                         <x-audit.stat label="Favicon" :value="($advanced['has_favicon'] ?? false) ? 'Present' : 'Missing'" :tone="($advanced['has_favicon'] ?? false) ? 'good' : 'warn'" />
                     </div>
                 </section>
+                @php $sectionHtml['advanced'] = ob_get_clean(); @endphp
 
+                {{-- Emit captured sections in the order defined by $sections. --}}
+                @foreach ($sections as $s)
+                    @if ($s['show'] && ! empty($sectionHtml[$s['key']]))
+                        {!! $sectionHtml[$s['key']] !!}
+                    @endif
+                @endforeach
             </div>
         @endif
     </details>
