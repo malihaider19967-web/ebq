@@ -5,7 +5,8 @@
 #   sudo nano scripts/deploy.env
 #   sudo bash scripts/ubuntu-vps-install.sh
 #
-# Re-runs are safe: packages are idempotent; git pull updates the app dir.
+# Re-runs are safe: apt/composer/node checks are idempotent; config snippets are rewritten;
+# DB user password is synced; git pull updates the app dir.
 
 set -euo pipefail
 
@@ -34,6 +35,11 @@ fi
 : "${EXTRA_DOMAINS:=}"
 : "${ENABLE_SSL:=0}"
 : "${ADMIN_EMAIL:=}"
+: "${ENABLE_UFW:=0}"
+: "${TIMEZONE:=}"
+: "${PHP_MEMORY_LIMIT:=512M}"
+: "${UPLOAD_MAX_FILESIZE:=64M}"
+: "${POST_MAX_SIZE:=64M}"
 
 PHP_VERSION="${PHP_VERSION:-8.3}"
 
@@ -54,13 +60,9 @@ ensure_repo_php() {
   apt-get update -y
 }
 
-have_pkg() {
-  dpkg -s "$1" >/dev/null 2>&1
-}
-
 install_base_stack() {
   apt-get update -y
-  apt_install git curl unzip jq openssl acl
+  apt_install git curl unzip jq openssl acl ca-certificates
 
   ensure_repo_php
 
@@ -82,30 +84,88 @@ install_base_stack() {
     "mariadb-client"
   )
 
-  local p
-  for p in "${pkgs[@]}"; do
-    if ! have_pkg "$p"; then
-      apt_install "$p"
-    fi
-  done
+  apt_install "${pkgs[@]}"
 
-  a2enmod rewrite headers ssl >/dev/null
+  a2enmod rewrite headers ssl >/dev/null 2>&1 || true
   a2dissite 000-default.conf >/dev/null 2>&1 || true
 
-  if ! require_cmd composer; then
+  if ! require_cmd composer || ! composer --version >/dev/null 2>&1; then
     curl -fsSL https://getcomposer.org/installer -o /tmp/composer-setup.php
     php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
     rm -f /tmp/composer-setup.php
   fi
 
-  if ! require_cmd node; then
-    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-    apt_install nodejs
-  fi
+  ensure_node_lts
 
   if ! require_cmd certbot; then
     apt_install certbot python3-certbot-apache
   fi
+}
+
+ensure_node_lts() {
+  local need=0
+  local major=0
+  if require_cmd node; then
+    major="$(node -p "Number(process.versions.node.split('.')[0])" 2>/dev/null || echo 0)"
+    major="${major:-0}"
+  else
+    need=1
+  fi
+  if [[ "${need}" -eq 0 && "${major}" -lt 20 ]]; then
+    need=1
+  fi
+  if [[ "${need}" -eq 1 ]]; then
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    apt_install nodejs
+  fi
+}
+
+configure_system_misc() {
+  if [[ -n "${TIMEZONE}" ]]; then
+    timedatectl set-timezone "${TIMEZONE}" >/dev/null
+  fi
+
+  if [[ "${ENABLE_UFW}" == "1" ]]; then
+    apt_install ufw
+    ufw allow OpenSSH >/dev/null 2>&1 || ufw allow 22/tcp >/dev/null 2>&1 || true
+    ufw allow 80/tcp >/dev/null 2>&1 || true
+    ufw allow 443/tcp >/dev/null 2>&1 || true
+    ufw --force enable >/dev/null
+  fi
+}
+
+configure_php_apache() {
+  local body
+  body="$(cat <<INI
+; Managed by ubuntu-vps-install.sh — Laravel-friendly defaults
+memory_limit = ${PHP_MEMORY_LIMIT}
+upload_max_filesize = ${UPLOAD_MAX_FILESIZE}
+post_max_size = ${POST_MAX_SIZE}
+max_execution_time = 120
+expose_php = Off
+INI
+)"
+  printf '%s\n' "${body}" >"/etc/php/${PHP_VERSION}/apache2/conf.d/99-ebq-laravel.ini"
+  printf '%s\n' "${body}" >"/etc/php/${PHP_VERSION}/cli/conf.d/99-ebq-laravel.ini"
+}
+
+configure_apache_global() {
+  local sn="/etc/apache2/conf-available/ebq-servername.conf"
+  cat >"${sn}" <<EOF
+# Managed by ubuntu-vps-install.sh
+ServerName ${PRIMARY_DOMAIN}
+EOF
+  a2enconf ebq-servername >/dev/null 2>&1 || true
+}
+
+ensure_service() {
+  local svc="$1"
+  systemctl enable "${svc}" >/dev/null 2>&1 || true
+  systemctl start "${svc}" >/dev/null 2>&1 || true
+  systemctl is-active --quiet "${svc}" || {
+    echo "Service ${svc} is not active; check: journalctl -u ${svc} -n 50" >&2
+    return 1
+  }
 }
 
 server_all_names() {
@@ -155,17 +215,31 @@ EOF
   systemctl reload apache2
 }
 
-mysql_ensure_db_user() {
-  systemctl enable --now mariadb >/dev/null 2>&1 || systemctl enable --now mysql >/dev/null 2>&1 || true
+mysql_escape_single() {
+  printf '%s' "$1" | sed "s/'/''/g"
+}
 
+mysql_escape_ident() {
+  printf '%s' "$1" | sed 's/`/``/g'
+}
+
+mysql_ensure_db_user() {
   : "${DB_DATABASE:=ebq}"
   : "${DB_USERNAME:=ebq}"
   : "${DB_PASSWORD:?Set DB_PASSWORD in deploy.env}"
 
+  local epw
+  epw="$(mysql_escape_single "${DB_PASSWORD}")"
+  local eu
+  eu="$(mysql_escape_single "${DB_USERNAME}")"
+  local edb
+  edb="$(mysql_escape_ident "${DB_DATABASE}")"
+
   mysql --protocol=socket -uroot <<SQL
-CREATE DATABASE IF NOT EXISTS \`${DB_DATABASE}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS '${DB_USERNAME}'@'localhost' IDENTIFIED BY '${DB_PASSWORD}';
-GRANT ALL PRIVILEGES ON \`${DB_DATABASE}\`.* TO '${DB_USERNAME}'@'localhost';
+CREATE DATABASE IF NOT EXISTS \`${edb}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS '${eu}'@'localhost' IDENTIFIED BY '${epw}';
+ALTER USER '${eu}'@'localhost' IDENTIFIED BY '${epw}';
+GRANT ALL PRIVILEGES ON \`${edb}\`.* TO '${eu}'@'localhost';
 FLUSH PRIVILEGES;
 SQL
 }
@@ -190,6 +264,24 @@ git_deploy() {
   find "${APP_DIR}" -type f -exec chmod 664 {} \;
   [[ -f "${APP_DIR}/artisan" ]] && chmod 775 "${APP_DIR}/artisan"
   chmod -R g+w "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache" 2>/dev/null || true
+}
+
+configure_git_safe_directory() {
+  local owner="${SUDO_USER:-root}"
+  git_safe_add() {
+    local u="$1"
+    if [[ "${u}" == "root" ]]; then
+      git config --global --get-all safe.directory 2>/dev/null | grep -qxF "${APP_DIR}" && return 0
+      git config --global --add safe.directory "${APP_DIR}" 2>/dev/null || true
+    else
+      sudo -u "${u}" git config --global --get-all safe.directory 2>/dev/null | grep -qxF "${APP_DIR}" && return 0
+      sudo -u "${u}" git config --global --add safe.directory "${APP_DIR}" 2>/dev/null || true
+    fi
+  }
+  git_safe_add root
+  if [[ "${owner}" != "root" ]]; then
+    git_safe_add "${owner}"
+  fi
 }
 
 laravel_env_and_build() {
@@ -334,11 +426,17 @@ maybe_ssl() {
 
 main() {
   install_base_stack
+  configure_system_misc
+  configure_php_apache
+  configure_apache_global
+  ensure_service mariadb || ensure_service mysql
   mysql_ensure_db_user
   git_deploy
+  configure_git_safe_directory
   laravel_env_and_build
   write_apache_vhost
   cloudflare_upsert_a
+  ensure_service apache2
   systemctl restart apache2
   maybe_ssl
   systemctl reload apache2
