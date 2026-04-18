@@ -471,9 +471,10 @@ git_deploy() {
 
   # Deploy user owns files, www-data group can read + write to storage/cache.
   usermod -aG www-data "${DEPLOY_USER}" 2>/dev/null || true
+  # Single-pass chown/chmod — the old `find -exec \;` loop spawned one process
+  # per file and took forever on trees with vendor/ + node_modules/.
   chown -R "${DEPLOY_USER}:www-data" "${APP_DIR}"
-  find "${APP_DIR}" -type d -exec chmod 755 {} \;
-  find "${APP_DIR}" -type f -exec chmod 644 {} \;
+  chmod -R u=rwX,g=rX,o=rX "${APP_DIR}"
   [[ -f "${APP_DIR}/artisan" ]] && chmod 755 "${APP_DIR}/artisan"
   chmod -R ug+rwX "${APP_DIR}/storage" "${APP_DIR}/bootstrap/cache" 2>/dev/null || true
   # ACL so php-fpm (www-data) can create/rotate logs + caches regardless of umask.
