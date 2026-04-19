@@ -127,7 +127,7 @@
                 <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
                     Audited <span class="font-medium text-slate-700 dark:text-slate-300">{{ $auditReport->audited_at?->diffForHumans() ?? '—' }}</span>
                     @if ($auditReport->audited_at)
-                        <span class="text-slate-400">·</span> {{ $auditReport->audited_at->format('M j, Y g:i A') }}
+                        <span class="text-slate-400">·</span> {{ format_user_datetime($auditReport->audited_at, 'M j, Y g:i A') }}
                     @endif
                 </p>
                 @if (filled($auditReport->primary_keyword))

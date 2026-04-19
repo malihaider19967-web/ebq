@@ -5,6 +5,7 @@ namespace App\Livewire\Dashboard;
 use App\Models\AnalyticsData;
 use App\Models\SearchConsoleData;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\On;
@@ -33,17 +34,21 @@ class TrafficChart extends Component
         $latestUsersPair = null;
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
-            $today = Carbon::today(config('app.timezone'));
+            $user = Auth::user();
+            $tz = display_timezone($user);
+            $today = Carbon::today($tz);
             $end = $today->copy()->subDay();
             $start = $end->copy()->subDays(29);
             $cacheKey = sprintf(
-                'traffic_chart:v2:%d:%s:%s',
+                'traffic_chart:v3:%d:%d:%s:%s:%s',
                 $this->websiteId,
+                (int) $user->id,
+                str_replace('/', '_', $tz),
                 $start->toDateString(),
                 $end->toDateString()
             );
 
-            $cached = Cache::remember($cacheKey, 600, function () use ($start, $end) {
+            $cached = Cache::remember($cacheKey, 600, function () use ($start, $end, $user) {
                 $clicks = SearchConsoleData::where('website_id', $this->websiteId)
                     ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
                     ->selectRaw('date, SUM(clicks) as clicks')
@@ -62,7 +67,7 @@ class TrafficChart extends Component
 
                 return [
                     'days' => $allDates->map(fn ($d) => [
-                        'date' => $d instanceof \DateTimeInterface ? $d->format('M d') : $d,
+                        'date' => format_user_date(is_string($d) ? $d : (string) $d, 'M d', $user),
                         'clicks' => (int) ($clicks[$d] ?? 0),
                         'users' => (int) ($users[$d] ?? 0),
                     ]),
@@ -73,7 +78,7 @@ class TrafficChart extends Component
             });
 
             // Backward compatibility in case an older cache payload is present.
-            if ($cached instanceof \Illuminate\Support\Collection) {
+            if ($cached instanceof Collection) {
                 $days = $cached;
             } else {
                 $days = collect($cached['days'] ?? []);

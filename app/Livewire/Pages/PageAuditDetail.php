@@ -54,7 +54,7 @@ class PageAuditDetail extends Component
 
         try {
             RateLimiter::hit($rateKey, 300);
-            Mail::to($this->auditEmail)->send(new PageAuditReportMail($this->pageAuditReport));
+            Mail::to($this->auditEmail)->send(new PageAuditReportMail($this->pageAuditReport, $user));
             $this->setAuditMessage("Audit report emailed to {$this->auditEmail}.", 'success');
             $this->auditEmail = '';
         } catch (\Throwable $e) {

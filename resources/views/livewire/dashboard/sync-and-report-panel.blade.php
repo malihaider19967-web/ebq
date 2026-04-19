@@ -27,7 +27,7 @@
                 'border-slate-200 dark:border-slate-700' => ! (is_null($gaAge) || $gaAge > 24),
             ])>
                 <span class="font-medium text-slate-500 dark:text-slate-400">GA</span>
-                {{ $website->last_analytics_sync_at?->timezone(config('app.timezone'))->format('M j, g:i A') ?? '—' }}
+                {{ $website->last_analytics_sync_at ? format_user_datetime($website->last_analytics_sync_at, 'M j, g:i A') : '—' }}
                 @if (is_null($gaAge) || $gaAge > 24)
                     <span class="font-semibold">stale</span>
                 @endif
@@ -38,14 +38,14 @@
                 'border-slate-200 dark:border-slate-700' => ! (is_null($gscAge) || $gscAge > 24),
             ])>
                 <span class="font-medium text-slate-500 dark:text-slate-400">GSC</span>
-                {{ $website->last_search_console_sync_at?->timezone(config('app.timezone'))->format('M j, g:i A') ?? '—' }}
+                {{ $website->last_search_console_sync_at ? format_user_datetime($website->last_search_console_sync_at, 'M j, g:i A') : '—' }}
                 @if (is_null($gscAge) || $gscAge > 24)
                     <span class="font-semibold">stale</span>
                 @endif
             </span>
             <span class="inline-flex items-center gap-1 rounded border border-slate-200 px-2 py-0.5 dark:border-slate-700">
                 <span class="font-medium text-slate-500 dark:text-slate-400">Report</span>
-                {{ $user?->last_growth_report_sent_at?->timezone(config('app.timezone'))->format('M j, g:i A') ?? '—' }}
+                {{ $user?->last_growth_report_sent_at ? format_user_datetime($user->last_growth_report_sent_at, 'M j, g:i A', $user) : '—' }}
             </span>
         </div>
     @endif

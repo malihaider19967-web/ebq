@@ -57,7 +57,7 @@
                         @foreach ($rows as $row)
                             <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                 @if ($view === 'daily')
-                                    <td class="whitespace-nowrap px-4 py-2.5 text-slate-500 dark:text-slate-400">{{ $row->date instanceof \Carbon\Carbon ? $row->date->format('M d, Y') : $row->date }}</td>
+                                    <td class="whitespace-nowrap px-4 py-2.5 text-slate-500 dark:text-slate-400">{{ format_user_date($row->date instanceof \Carbon\CarbonInterface ? $row->date->toDateString() : (is_string($row->date) ? $row->date : ''), 'M d, Y') ?: $row->date }}</td>
                                 @endif
                                 <td class="whitespace-nowrap px-4 py-2.5 font-medium text-slate-900 dark:text-slate-100">{{ $row->query }}</td>
                                 <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ number_format($row->clicks) }}</td>

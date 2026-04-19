@@ -32,7 +32,7 @@ class GrowthReportMail extends Mailable
         ?string $endDate = null,
         ?string $reportType = null,
     ) {
-        $tz = config('app.timezone');
+        $tz = $user->timezoneForDisplay();
 
         $this->endDate = $endDate ?? Carbon::yesterday($tz)->toDateString();
         $this->startDate = $startDate ?? $this->endDate;
@@ -48,8 +48,9 @@ class GrowthReportMail extends Mailable
     public function envelope(): Envelope
     {
         $typeLabel = ucfirst($this->reportType);
-        $start = Carbon::parse($this->startDate);
-        $end = Carbon::parse($this->endDate);
+        $tz = $this->user->timezoneForDisplay();
+        $start = Carbon::parse($this->startDate, $tz);
+        $end = Carbon::parse($this->endDate, $tz);
 
         $dateStr = $start->eq($end)
             ? $start->format('M j, Y')

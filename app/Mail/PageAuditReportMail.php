@@ -3,6 +3,7 @@
 namespace App\Mail;
 
 use App\Models\PageAuditReport;
+use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Mail\Mailable;
 use Illuminate\Mail\Mailables\Content;
@@ -13,7 +14,10 @@ class PageAuditReportMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public PageAuditReport $auditReport) {}
+    public function __construct(
+        public PageAuditReport $auditReport,
+        public ?User $timezoneContextUser = null,
+    ) {}
 
     public function envelope(): Envelope
     {
@@ -29,7 +33,10 @@ class PageAuditReportMail extends Mailable
     {
         return new Content(
             view: 'pages.partials.audit-report-export',
-            with: ['auditReport' => $this->auditReport],
+            with: [
+                'auditReport' => $this->auditReport,
+                'timezoneContextUser' => $this->timezoneContextUser,
+            ],
         );
     }
 }

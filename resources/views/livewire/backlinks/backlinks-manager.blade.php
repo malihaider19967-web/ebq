@@ -304,7 +304,7 @@
                                         'bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/30 dark:hover:bg-emerald-900/40' => $b->audit_status === 'matched',
                                         'hover:bg-slate-50 dark:hover:bg-slate-800/50' => ! in_array($b->audit_status, ['missing', 'unreachable', 'mismatched', 'matched'], true),
                                     ])>
-                                        <td class="whitespace-nowrap px-2 py-2 text-slate-700 dark:text-slate-200">{{ $b->tracked_date->format('M j, Y') }}</td>
+                                        <td class="whitespace-nowrap px-2 py-2 text-slate-700 dark:text-slate-200">{{ format_user_date($b->tracked_date->toDateString(), 'M j, Y') }}</td>
                                         <td class="max-w-[14rem] truncate px-2 py-2">
                                             <a href="{{ $b->referring_page_url }}" target="_blank" rel="noopener noreferrer" title="{{ $b->referring_page_url }}" class="font-medium text-indigo-600 hover:underline dark:text-indigo-400">{{ $b->referring_page_url }}</a>
                                         </td>
@@ -367,7 +367,7 @@
                                                             <span><span class="font-semibold">HTTP:</span> {{ $auditResult['http_status'] }}</span>
                                                         @endif
                                                         @if ($b->audit_checked_at)
-                                                            <span><span class="font-semibold">Checked:</span> {{ $b->audit_checked_at->format('M j, Y g:i a') }}</span>
+                                                            <span><span class="font-semibold">Checked:</span> {{ format_user_datetime($b->audit_checked_at, 'M j, Y g:i a') }}</span>
                                                         @endif
                                                     </div>
                                                     @if (! empty($auditResult['message']))

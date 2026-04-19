@@ -69,14 +69,14 @@
         <p class="meta">
             <strong>{{ $website->domain }}</strong> &mdash;
             @if ($startDate === $endDate)
-                {{ \Illuminate\Support\Carbon::parse($startDate)->format('l, F j, Y') }}
+                {{ format_user_date($startDate, 'l, F j, Y', $user) }}
             @else
-                {{ \Illuminate\Support\Carbon::parse($startDate)->format('M j') }} &ndash; {{ \Illuminate\Support\Carbon::parse($endDate)->format('M j, Y') }}
+                {{ format_user_date($startDate, 'M j', $user) }} &ndash; {{ format_user_date($endDate, 'M j, Y', $user) }}
             @endif
         </p>
         <p class="compare-line">
             Compared to {{ $report['period']['previous_label'] }}
-            ({{ \Illuminate\Support\Carbon::parse($report['period']['prev_start'])->format('M j') }} &ndash; {{ \Illuminate\Support\Carbon::parse($report['period']['prev_end'])->format('M j, Y') }})
+            ({{ format_user_date($report['period']['prev_start'], 'M j', $user) }} &ndash; {{ format_user_date($report['period']['prev_end'], 'M j, Y', $user) }})
         </p>
         <p class="greeting">Hello {{ $user->name }}, here is the performance summary for your website.</p>
 
@@ -448,7 +448,7 @@
         <p class="meta" style="margin-top:-6px; margin-bottom:12px;">
             Last checked:
             <strong>
-                {{ !empty($report['indexing']['summary']['last_checked_at']) ? \Illuminate\Support\Carbon::parse($report['indexing']['summary']['last_checked_at'])->format('M j, Y g:i A') : 'Never' }}
+                {{ !empty($report['indexing']['summary']['last_checked_at']) ? format_user_datetime($report['indexing']['summary']['last_checked_at'], 'M j, Y g:i A', $user) : 'Never' }}
             </strong>
         </p>
 
@@ -473,8 +473,8 @@
                                 </span>
                             </td>
                             <td>{{ $row['coverage_state'] }}</td>
-                            <td class="right">{{ $row['last_crawl_at'] ? \Illuminate\Support\Carbon::parse($row['last_crawl_at'])->format('M j, Y') : '—' }}</td>
-                            <td class="right">{{ $row['checked_at'] ? \Illuminate\Support\Carbon::parse($row['checked_at'])->format('M j, Y g:i A') : '—' }}</td>
+                            <td class="right">{{ $row['last_crawl_at'] ? format_user_datetime($row['last_crawl_at'], 'M j, Y', $user) : '—' }}</td>
+                            <td class="right">{{ $row['checked_at'] ? format_user_datetime($row['checked_at'], 'M j, Y g:i A', $user) : '—' }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -489,7 +489,7 @@
             <a href="{{ route('reports.index') }}" class="btn">View Full Report in Dashboard</a>
         </div>
     </div>
-    <p class="footer">Sent by EBQ &mdash; {{ now()->format('M d, Y') }}</p>
+    <p class="footer">Sent by EBQ &mdash; {{ format_user_now('M d, Y', $user) }}</p>
 </div>
 </body>
 </html>

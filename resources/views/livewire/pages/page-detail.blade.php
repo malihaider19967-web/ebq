@@ -166,15 +166,15 @@
                 </div>
                 <div class="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 dark:border-slate-800">
                     <dt class="text-slate-500 dark:text-slate-400">Last crawl</dt>
-                    <dd class="text-right font-medium text-slate-800 dark:text-slate-100">{{ $indexingStatus?->google_last_crawl_at?->format('M j, Y g:i A') ?? '—' }}</dd>
+                    <dd class="text-right font-medium text-slate-800 dark:text-slate-100">{{ $indexingStatus?->google_last_crawl_at ? format_user_datetime($indexingStatus->google_last_crawl_at, 'M j, Y g:i A') : '—' }}</dd>
                 </div>
                 <div class="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 dark:border-slate-800">
                     <dt class="text-slate-500 dark:text-slate-400">Last status check</dt>
-                    <dd class="text-right font-medium text-slate-800 dark:text-slate-100">{{ $indexingStatus?->last_google_status_checked_at?->format('M j, Y g:i A') ?? 'Never' }}</dd>
+                    <dd class="text-right font-medium text-slate-800 dark:text-slate-100">{{ $indexingStatus?->last_google_status_checked_at ? format_user_datetime($indexingStatus->last_google_status_checked_at, 'M j, Y g:i A') : 'Never' }}</dd>
                 </div>
                 <div class="flex items-center justify-between gap-3">
                     <dt class="text-slate-500 dark:text-slate-400">Last reindex request</dt>
-                    <dd class="text-right font-medium text-slate-800 dark:text-slate-100">{{ $indexingStatus?->last_reindex_requested_at?->format('M j, Y g:i A') ?? 'Never' }}</dd>
+                    <dd class="text-right font-medium text-slate-800 dark:text-slate-100">{{ $indexingStatus?->last_reindex_requested_at ? format_user_datetime($indexingStatus->last_reindex_requested_at, 'M j, Y g:i A') : 'Never' }}</dd>
                 </div>
             </dl>
         </div>

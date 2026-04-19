@@ -12,7 +12,7 @@
                     </div>
                     <div>
                         <p class="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Connected</p>
-                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Expires {{ $googleAccount->expires_at?->diffForHumans() ?? 'unknown' }}</p>
+                        <p class="text-[11px] text-slate-500 dark:text-slate-400" title="{{ $googleAccount->expires_at ? format_user_datetime($googleAccount->expires_at) : '' }}">Expires {{ $googleAccount->expires_at?->diffForHumans() ?? 'unknown' }}</p>
                     </div>
                 </div>
                 <a href="{{ route('google.redirect') }}" class="inline-flex h-8 items-center rounded-md border border-slate-200 px-3 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">Reconnect</a>

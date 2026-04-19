@@ -8,15 +8,15 @@
                     <span class="font-medium text-slate-700 dark:text-slate-200">{{ $website?->domain ?? 'Unknown' }}</span>
                     &mdash;
                     @if ($startDate === $endDate)
-                        {{ \Illuminate\Support\Carbon::parse($startDate)->format('l, F j, Y') }}
+                        {{ format_user_date($startDate, 'l, F j, Y') }}
                     @else
-                        {{ \Illuminate\Support\Carbon::parse($startDate)->format('M j') }} &ndash; {{ \Illuminate\Support\Carbon::parse($endDate)->format('M j, Y') }}
+                        {{ format_user_date($startDate, 'M j') }} &ndash; {{ format_user_date($endDate, 'M j, Y') }}
                     @endif
                 </p>
             </div>
             <p class="text-[11px] italic text-slate-400 dark:text-slate-500">
                 vs {{ $report['period']['previous_label'] }}
-                ({{ \Illuminate\Support\Carbon::parse($report['period']['prev_start'])->format('M j') }} &ndash; {{ \Illuminate\Support\Carbon::parse($report['period']['prev_end'])->format('M j') }})
+                ({{ format_user_date($report['period']['prev_start'], 'M j') }} &ndash; {{ format_user_date($report['period']['prev_end'], 'M j') }})
             </p>
         </div>
     </div>
@@ -407,7 +407,7 @@
             <p class="mb-2 text-xs text-slate-500 dark:text-slate-400">
                 Last checked:
                 <span class="font-medium text-slate-700 dark:text-slate-200">
-                    {{ !empty($report['indexing']['summary']['last_checked_at']) ? \Illuminate\Support\Carbon::parse($report['indexing']['summary']['last_checked_at'])->format('M j, Y g:i A') : 'Never' }}
+                    {{ !empty($report['indexing']['summary']['last_checked_at']) ? format_user_datetime($report['indexing']['summary']['last_checked_at'], 'M j, Y g:i A') : 'Never' }}
                 </span>
             </p>
 
@@ -437,10 +437,10 @@
                                     </td>
                                     <td class="px-3 py-2 text-slate-700 dark:text-slate-300">{{ $row['coverage_state'] }}</td>
                                     <td class="whitespace-nowrap px-3 py-2 text-right text-slate-600 dark:text-slate-300">
-                                        {{ $row['last_crawl_at'] ? \Illuminate\Support\Carbon::parse($row['last_crawl_at'])->format('M j, Y') : '—' }}
+                                        {{ $row['last_crawl_at'] ? format_user_datetime($row['last_crawl_at'], 'M j, Y') : '—' }}
                                     </td>
                                     <td class="whitespace-nowrap px-3 py-2 text-right text-slate-600 dark:text-slate-300">
-                                        {{ $row['checked_at'] ? \Illuminate\Support\Carbon::parse($row['checked_at'])->format('M j, Y g:i A') : '—' }}
+                                        {{ $row['checked_at'] ? format_user_datetime($row['checked_at'], 'M j, Y g:i A') : '—' }}
                                     </td>
                                 </tr>
                             @endforeach

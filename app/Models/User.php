@@ -23,6 +23,7 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
+        'timezone',
         'password',
     ];
 
@@ -68,6 +69,16 @@ class User extends Authenticatable
     public function sharedWebsites(): BelongsToMany
     {
         return $this->belongsToMany(Website::class, 'website_user')->withTimestamps();
+    }
+
+    public function timezoneForDisplay(): string
+    {
+        $tz = $this->timezone;
+        if (is_string($tz) && $tz !== '' && in_array($tz, timezone_identifiers_list(), true)) {
+            return $tz;
+        }
+
+        return (string) config('app.timezone');
     }
 
     /**

@@ -51,10 +51,10 @@
                                 <td class="whitespace-nowrap px-4 py-2.5 text-right text-slate-700 dark:text-slate-300">
                                     <div class="text-xs font-semibold text-slate-800 dark:text-slate-100">{{ $row->google_verdict ?? 'Not checked' }}</div>
                                     <div class="text-[11px] text-slate-500 dark:text-slate-400">
-                                        {{ $row->last_google_status_checked_at ? \Illuminate\Support\Carbon::parse($row->last_google_status_checked_at)->format('M j, Y g:i A') : 'Never checked' }}
+                                        {{ $row->last_google_status_checked_at ? format_user_datetime($row->last_google_status_checked_at, 'M j, Y g:i A') : 'Never checked' }}
                                     </div>
                                     @if ($row->google_last_crawl_at)
-                                        <div class="text-[10px] text-slate-500 dark:text-slate-400">crawl: {{ \Illuminate\Support\Carbon::parse($row->google_last_crawl_at)->format('M j, Y') }}</div>
+                                        <div class="text-[10px] text-slate-500 dark:text-slate-400">crawl: {{ format_user_datetime($row->google_last_crawl_at, 'M j, Y') }}</div>
                                     @endif
                                 </td>
                             </tr>
