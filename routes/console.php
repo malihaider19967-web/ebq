@@ -10,3 +10,4 @@ Artisan::command('inspire', function () {
 
 Schedule::command('ebq:sync-daily-data')->daily();
 Schedule::command('ebq:send-reports')->dailyAt('08:00');
+Schedule::command('ebq:track-rankings')->hourly();

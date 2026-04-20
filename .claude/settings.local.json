@@ -57,7 +57,12 @@
       "Bash(bash -n \"/c/Users/malih/Desktop/ebq-intelegence/scripts/install.sh\")",
       "Bash(php -l app/Services/LighthouseClient.php)",
       "Bash(php -l config/services.php)",
-      "Bash(bash -n scripts/ubuntu-vps-install.sh)"
+      "Bash(bash -n scripts/ubuntu-vps-install.sh)",
+      "Bash(php -l app/Services/SerperSearchClient.php)",
+      "Bash(php -l app/Services/RankTrackingService.php)",
+      "Bash(php -l app/Jobs/TrackKeywordRankJob.php)",
+      "Bash(php -l app/Console/Commands/TrackRankings.php)",
+      "Bash(php -l app/Livewire/RankTracking/RankTrackingManager.php)"
     ]
   }
 }

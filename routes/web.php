@@ -9,6 +9,7 @@ Route::view('/', 'landing')->name('landing');
 Route::middleware(['auth', 'onboarded'])->group(function () {
     Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::view('/keywords', 'keywords.index')->name('keywords.index');
+    Route::view('/rank-tracking', 'rank-tracking.index')->name('rank-tracking.index');
     Route::view('/backlinks', 'backlinks.index')->name('backlinks.index');
     Route::view('/pages', 'pages.index')->name('pages.index');
     Route::view('/custom-audit', 'pages.custom-audit')->name('custom-audit.index');
