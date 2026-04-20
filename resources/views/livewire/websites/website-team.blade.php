@@ -88,18 +88,64 @@
                 </ul>
             </div>
 
+            @if (session('team_status'))
+                <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 5000)"
+                    class="mt-4 flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+                    <span>{{ session('team_status') }}</span>
+                    <button @click="show = false" class="text-emerald-700/60">×</button>
+                </div>
+            @endif
+            @if (session('team_error'))
+                <div x-data="{ show: true }" x-show="show" x-init="setTimeout(() => show = false, 6000)"
+                    class="mt-4 flex items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                    <span>{{ session('team_error') }}</span>
+                    <button @click="show = false" class="text-amber-800/60">×</button>
+                </div>
+            @endif
+
             @if ($website->invitations->isNotEmpty())
                 <div class="mt-8">
                     <h3 class="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">Pending invitations</h3>
                     <ul class="mt-3 space-y-2">
                         @foreach ($website->invitations as $inv)
-                            <li class="flex items-center justify-between rounded-lg border border-dashed border-slate-200 px-3 py-2.5 text-sm dark:border-slate-700">
-                                <span class="text-slate-700 dark:text-slate-300">{{ $inv->email }}</span>
+                            @php
+                                $expired = $inv->expires_at && $inv->expires_at->isPast();
+                                $sentAt = $inv->updated_at ?? $inv->created_at;
+                            @endphp
+                            <li class="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed border-slate-200 px-3 py-2.5 text-sm dark:border-slate-700">
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2">
+                                        <span class="font-medium text-slate-800 dark:text-slate-200">{{ $inv->email }}</span>
+                                        @if ($expired)
+                                            <span class="rounded-full bg-red-50 px-2 py-px text-[10px] font-semibold uppercase text-red-600 dark:bg-red-500/10 dark:text-red-400">Expired</span>
+                                        @else
+                                            <span class="rounded-full bg-amber-50 px-2 py-px text-[10px] font-semibold uppercase text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">Pending</span>
+                                        @endif
+                                    </div>
+                                    <div class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                        @if ($sentAt)Sent {{ $sentAt->diffForHumans() }}@endif
+                                        @if ($inv->expires_at)
+                                            · {{ $expired ? 'Expired' : 'Expires' }} {{ $inv->expires_at->diffForHumans() }}
+                                        @endif
+                                    </div>
+                                </div>
                                 @if (! $readonly)
-                                    <button type="button" wire:click="cancelInvitation({{ $inv->id }})"
-                                        class="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">
-                                        Cancel
-                                    </button>
+                                    <div class="flex shrink-0 items-center gap-1">
+                                        <button type="button"
+                                            wire:click="resendInvitation({{ $inv->id }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="resendInvitation({{ $inv->id }})"
+                                            class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:opacity-60">
+                                            <svg wire:loading.remove wire:target="resendInvitation({{ $inv->id }})" class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 9v.906a2.25 2.25 0 0 1-1.183 1.981l-6.478 3.488M2.25 9v.906a2.25 2.25 0 0 0 1.183 1.981l6.478 3.488m8.839 2.51-4.66-2.51m0 0-1.023-.55a2.25 2.25 0 0 0-2.134 0l-1.022.55m0 0-4.661 2.51m16.5 1.615a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V8.844a2.25 2.25 0 0 1 1.183-1.98l7.5-4.04a2.25 2.25 0 0 1 2.134 0l7.5 4.04a2.25 2.25 0 0 1 1.183 1.98V19.5Z" /></svg>
+                                            <svg wire:loading wire:target="resendInvitation({{ $inv->id }})" class="h-3 w-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" class="opacity-75" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z"></path></svg>
+                                            <span wire:loading.remove wire:target="resendInvitation({{ $inv->id }})">Resend</span>
+                                            <span wire:loading wire:target="resendInvitation({{ $inv->id }})">Sending…</span>
+                                        </button>
+                                        <button type="button" wire:click="cancelInvitation({{ $inv->id }})" wire:confirm="Cancel this invitation?"
+                                            class="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800">
+                                            Cancel
+                                        </button>
+                                    </div>
                                 @endif
                             </li>
                         @endforeach

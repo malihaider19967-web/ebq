@@ -10,6 +10,7 @@ use App\Models\WebsiteInvitation;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
 use Livewire\Attributes\On;
 use Livewire\Component;
@@ -115,6 +116,44 @@ class WebsiteTeam extends Component
         }
 
         $website->members()->detach($userId);
+        $this->dispatch('website-team-updated');
+    }
+
+    public function resendInvitation(int $invitationId): void
+    {
+        if ($this->readonly || $this->websiteId <= 0) {
+            return;
+        }
+
+        $invitation = WebsiteInvitation::findOrFail($invitationId);
+        Gate::authorize('update', $invitation->website);
+
+        if ((int) $invitation->website_id !== $this->websiteId) {
+            return;
+        }
+
+        $limiterKey = 'invite-resend:'.$invitation->id;
+        if (RateLimiter::tooManyAttempts($limiterKey, 3)) {
+            $seconds = RateLimiter::availableIn($limiterKey);
+            session()->flash(
+                'team_error',
+                'Please wait '.$seconds.' seconds before resending this invitation again.'
+            );
+
+            return;
+        }
+        RateLimiter::hit($limiterKey, 300);
+
+        $plain = Str::random(64);
+        $invitation->forceFill([
+            'token' => hash('sha256', $plain),
+            'expires_at' => now()->addDays(14),
+            'invited_by_user_id' => (int) (Auth::id() ?? $invitation->invited_by_user_id),
+        ])->save();
+
+        Mail::to($invitation->email)->send(new WebsiteTeamInvitationMail($invitation, $plain));
+
+        session()->flash('team_status', 'Invitation resent to '.$invitation->email.'.');
         $this->dispatch('website-team-updated');
     }
 
