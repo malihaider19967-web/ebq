@@ -63,7 +63,8 @@
       "Bash(php -l app/Jobs/TrackKeywordRankJob.php)",
       "Bash(php -l app/Console/Commands/TrackRankings.php)",
       "Bash(php -l app/Livewire/RankTracking/RankTrackingManager.php)",
-      "Bash(php -l app/Livewire/RankTracking/RankTrackingDetail.php)"
+      "Bash(php -l app/Livewire/RankTracking/RankTrackingDetail.php)",
+      "Bash(php -l app/Models/RankTrackingKeyword.php)"
     ]
   }
 }

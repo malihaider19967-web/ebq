@@ -78,4 +78,26 @@ class RankTrackingKeyword extends Model
     {
         return hash('sha256', mb_strtolower(trim($keyword)));
     }
+
+    /**
+     * Builder for Google Search Console rows that match this tracked keyword
+     * (same website + case-insensitive query text). Optional device filter.
+     */
+    public function gscQuery(?string $device = null): \Illuminate\Database\Eloquent\Builder
+    {
+        $q = SearchConsoleData::query()
+            ->where('website_id', $this->website_id)
+            ->whereRaw('LOWER(`query`) = ?', [mb_strtolower(trim($this->keyword))]);
+
+        if ($device !== null && $device !== '') {
+            $q->where('device', strtoupper($device));
+        }
+
+        return $q;
+    }
+
+    public function hasGscMatch(): bool
+    {
+        return $this->gscQuery()->limit(1)->exists();
+    }
 }

@@ -4,9 +4,11 @@ namespace App\Livewire\RankTracking;
 
 use App\Jobs\TrackKeywordRankJob;
 use App\Models\RankTrackingKeyword;
+use App\Models\SearchConsoleData;
 use App\Models\Website;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
 use Livewire\Component;
 use Livewire\WithPagination;
@@ -21,6 +23,10 @@ class RankTrackingManager extends Component
     public string $search = '';
     public string $sortBy = 'current_position';
     public string $sortDir = 'asc';
+    public string $filterDevice = '';
+    public string $filterCountry = '';
+    public string $filterType = '';
+    public string $filterStatus = '';
 
     public string $newKeyword = '';
     public string $newTargetDomain = '';
@@ -83,6 +89,17 @@ class RankTrackingManager extends Component
 
     public function updatedSearch(): void
     {
+        $this->resetPage();
+    }
+
+    public function updatedFilterDevice(): void { $this->resetPage(); }
+    public function updatedFilterCountry(): void { $this->resetPage(); }
+    public function updatedFilterType(): void { $this->resetPage(); }
+    public function updatedFilterStatus(): void { $this->resetPage(); }
+
+    public function clearFilters(): void
+    {
+        $this->reset(['search', 'filterDevice', 'filterCountry', 'filterType', 'filterStatus']);
         $this->resetPage();
     }
 
@@ -214,24 +231,79 @@ class RankTrackingManager extends Component
     public function render()
     {
         $rows = collect();
+        $stats = [
+            'total' => 0,
+            'top3' => 0,
+            'top10' => 0,
+            'top100' => 0,
+            'avg' => null,
+            'unranked' => 0,
+            'active' => 0,
+        ];
 
         $allowed = ['keyword', 'current_position', 'best_position', 'position_change', 'last_checked_at', 'country', 'device'];
         $sortBy = in_array($this->sortBy, $allowed, true) ? $this->sortBy : 'current_position';
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
-            $rows = RankTrackingKeyword::query()
-                ->where('website_id', $this->websiteId)
-                ->when(
-                    $this->search,
-                    fn ($q) => $q->where('keyword', 'like', '%'.$this->search.'%')
-                )
+            $base = RankTrackingKeyword::query()
+                ->where('website_id', $this->websiteId);
+
+            $stats['total'] = (clone $base)->count();
+            $stats['active'] = (clone $base)->where('is_active', true)->count();
+            $stats['top3'] = (clone $base)->whereBetween('current_position', [1, 3])->count();
+            $stats['top10'] = (clone $base)->whereBetween('current_position', [1, 10])->count();
+            $stats['top100'] = (clone $base)->whereNotNull('current_position')->count();
+            $stats['unranked'] = (clone $base)->whereNull('current_position')->count();
+            $avgVal = (clone $base)->whereNotNull('current_position')->avg('current_position');
+            $stats['avg'] = $avgVal !== null ? round((float) $avgVal, 1) : null;
+
+            $filtered = (clone $base)
+                ->when($this->search, fn ($q) => $q->where('keyword', 'like', '%'.$this->search.'%'))
+                ->when($this->filterDevice, fn ($q) => $q->where('device', $this->filterDevice))
+                ->when($this->filterCountry, fn ($q) => $q->where('country', $this->filterCountry))
+                ->when($this->filterType, fn ($q) => $q->where('search_type', $this->filterType))
+                ->when($this->filterStatus === 'top3', fn ($q) => $q->whereBetween('current_position', [1, 3]))
+                ->when($this->filterStatus === 'top10', fn ($q) => $q->whereBetween('current_position', [1, 10]))
+                ->when($this->filterStatus === 'top100', fn ($q) => $q->whereNotNull('current_position'))
+                ->when($this->filterStatus === 'unranked', fn ($q) => $q->whereNull('current_position'))
+                ->when($this->filterStatus === 'active', fn ($q) => $q->where('is_active', true))
+                ->when($this->filterStatus === 'paused', fn ($q) => $q->where('is_active', false))
+                ->when($this->filterStatus === 'failed', fn ($q) => $q->where('last_status', 'failed'));
+
+            $rows = $filtered
                 ->orderByRaw("CASE WHEN {$sortBy} IS NULL THEN 1 ELSE 0 END")
                 ->orderBy($sortBy, $this->sortDir)
                 ->paginate(25);
         }
 
+        $gscByKeyword = [];
+        if ($rows instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $rows->isNotEmpty()) {
+            $keywords = $rows->getCollection()->pluck('keyword')->map(fn ($k) => mb_strtolower(trim((string) $k)))->unique()->values()->all();
+            $since = Carbon::now()->subDays(30)->toDateString();
+
+            if (! empty($keywords) && $this->websiteId) {
+                $gscRows = SearchConsoleData::query()
+                    ->where('website_id', $this->websiteId)
+                    ->whereDate('date', '>=', $since)
+                    ->whereIn(DB::raw('LOWER(`query`)'), $keywords)
+                    ->selectRaw('LOWER(`query`) as q, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position')
+                    ->groupBy('q')
+                    ->get();
+
+                foreach ($gscRows as $g) {
+                    $gscByKeyword[(string) $g->q] = [
+                        'clicks' => (int) $g->clicks,
+                        'impressions' => (int) $g->impressions,
+                        'position' => $g->position !== null ? round((float) $g->position, 1) : null,
+                    ];
+                }
+            }
+        }
+
         return view('livewire.rank-tracking.rank-tracking-manager', [
             'rows' => $rows,
+            'stats' => $stats,
+            'gscByKeyword' => $gscByKeyword,
             'countries' => $this->countries(),
             'languages' => $this->languages(),
         ]);
