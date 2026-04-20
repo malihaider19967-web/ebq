@@ -192,7 +192,7 @@
                         @foreach ($rows as $kw)
                             <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/50">
                                 <td class="px-4 py-2.5">
-                                    <div class="font-medium text-slate-900 dark:text-slate-100">{{ $kw->keyword }}</div>
+                                    <a href="{{ route('rank-tracking.show', $kw->id) }}" class="font-medium text-slate-900 hover:text-indigo-600 dark:text-slate-100 dark:hover:text-indigo-400">{{ $kw->keyword }}</a>
                                     <div class="text-[10px] uppercase tracking-wide text-slate-400">{{ $kw->search_type }}</div>
                                     @if ($kw->tags)
                                         <div class="mt-1 flex flex-wrap gap-1">

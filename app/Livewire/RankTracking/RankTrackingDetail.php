@@ -1,0 +1,113 @@
+<?php
+
+namespace App\Livewire\RankTracking;
+
+use App\Jobs\TrackKeywordRankJob;
+use App\Models\RankTrackingKeyword;
+use App\Models\RankTrackingSnapshot;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Auth;
+use Livewire\Component;
+use Livewire\WithPagination;
+
+class RankTrackingDetail extends Component
+{
+    use WithPagination;
+
+    public int $keywordId = 0;
+    public ?int $selectedSnapshotId = null;
+
+    public function mount(int $keywordId): void
+    {
+        $this->keywordId = $keywordId;
+    }
+
+    public function recheck(): void
+    {
+        $keyword = $this->keyword();
+        if (! $keyword) {
+            return;
+        }
+
+        TrackKeywordRankJob::dispatch($keyword->id, true);
+
+        $keyword->forceFill([
+            'last_status' => 'queued',
+            'next_check_at' => Carbon::now(),
+        ])->save();
+
+        session()->flash('rank_tracking_status', 'Re-check queued.');
+    }
+
+    public function selectSnapshot(int $id): void
+    {
+        $snapshot = RankTrackingSnapshot::where('rank_tracking_keyword_id', $this->keywordId)
+            ->find($id);
+        $this->selectedSnapshotId = $snapshot?->id;
+    }
+
+    private function keyword(): ?RankTrackingKeyword
+    {
+        $keyword = RankTrackingKeyword::find($this->keywordId);
+        if (! $keyword) {
+            return null;
+        }
+        $user = Auth::user();
+        if (! $user || ! $user->canViewWebsiteId((int) $keyword->website_id)) {
+            return null;
+        }
+
+        return $keyword;
+    }
+
+    public function render()
+    {
+        $keyword = $this->keyword();
+
+        if (! $keyword) {
+            return view('livewire.rank-tracking.rank-tracking-detail', [
+                'keyword' => null,
+                'snapshots' => collect(),
+                'selected' => null,
+                'chartPoints' => [],
+            ]);
+        }
+
+        $snapshots = RankTrackingSnapshot::query()
+            ->where('rank_tracking_keyword_id', $keyword->id)
+            ->orderByDesc('checked_at')
+            ->paginate(20);
+
+        $selected = null;
+        if ($this->selectedSnapshotId) {
+            $selected = RankTrackingSnapshot::where('rank_tracking_keyword_id', $keyword->id)
+                ->find($this->selectedSnapshotId);
+        }
+        if (! $selected) {
+            $selected = RankTrackingSnapshot::where('rank_tracking_keyword_id', $keyword->id)
+                ->orderByDesc('checked_at')
+                ->first();
+            $this->selectedSnapshotId = $selected?->id;
+        }
+
+        $chartPoints = RankTrackingSnapshot::query()
+            ->where('rank_tracking_keyword_id', $keyword->id)
+            ->where('status', 'ok')
+            ->orderBy('checked_at')
+            ->limit(60)
+            ->get(['checked_at', 'position'])
+            ->map(fn ($s) => [
+                'x' => $s->checked_at->toIso8601String(),
+                'y' => $s->position,
+            ])
+            ->values()
+            ->all();
+
+        return view('livewire.rank-tracking.rank-tracking-detail', [
+            'keyword' => $keyword,
+            'snapshots' => $snapshots,
+            'selected' => $selected,
+            'chartPoints' => $chartPoints,
+        ]);
+    }
+}
