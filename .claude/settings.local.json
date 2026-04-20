@@ -70,7 +70,11 @@
       "Bash(php -l app/Models/User.php)",
       "Bash(php -l app/Models/Website.php)",
       "Bash(php -l app/Models/WebsiteInvitation.php)",
-      "Bash(php -l app/Livewire/Pages/PageAuditDetail.php)"
+      "Bash(php -l app/Livewire/Pages/PageAuditDetail.php)",
+      "Bash(xargs cat *)",
+      "Bash(xargs head *)",
+      "Bash(xargs wc *)",
+      "Bash(xargs tail *)"
     ]
   }
 }

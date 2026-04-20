@@ -138,6 +138,23 @@ class User extends Authenticatable
         return TeamPermissions::allows($role, $this->permissionsForWebsite($websiteId), $feature);
     }
 
+    /**
+     * Route name of the first feature this user can access on the given website.
+     * Falls back to websites.index (accessible to anyone with ≥1 website).
+     */
+    public function firstAccessibleRoute(int $websiteId): string
+    {
+        if ($websiteId > 0) {
+            foreach (TeamPermissions::FEATURES as $key => $meta) {
+                if ($this->hasFeatureAccess($key, $websiteId)) {
+                    return $meta['route'];
+                }
+            }
+        }
+
+        return 'websites.index';
+    }
+
     public function canManageTeamFor(int $websiteId): bool
     {
         $role = $this->roleForWebsite($websiteId);

@@ -22,7 +22,18 @@ class AuthenticatedSessionController extends Controller
 
         $request->session()->regenerate();
 
-        return redirect()->intended(route('dashboard', absolute: false));
+        $user = Auth::user();
+        $websiteId = (int) session('current_website_id', 0);
+        if ($user && $websiteId <= 0) {
+            $first = $user->accessibleWebsitesQuery()->select('id')->orderBy('domain')->first();
+            if ($first) {
+                $websiteId = (int) $first->id;
+                session(['current_website_id' => $websiteId]);
+            }
+        }
+        $fallback = $user ? $user->firstAccessibleRoute($websiteId) : 'dashboard';
+
+        return redirect()->intended(route($fallback, absolute: false));
     }
 
     public function destroy(Request $request): RedirectResponse
