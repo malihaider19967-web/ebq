@@ -7,7 +7,9 @@ use App\Mail\WebsiteTeamInvitationMail;
 use App\Models\User;
 use App\Models\Website;
 use App\Models\WebsiteInvitation;
+use App\Support\TeamPermissions;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -23,7 +25,18 @@ class WebsiteTeam extends Component
 
     public bool $readonly = false;
 
+    // Invite form
     public string $inviteEmail = '';
+    public string $inviteRole = TeamPermissions::ROLE_MEMBER;
+    /** @var array<string, bool> */
+    public array $invitePermissions = [];
+
+    // Edit access modal (works for both members and pending invitations)
+    public ?string $editTargetType = null; // 'member' | 'invitation'
+    public ?int $editTargetId = null;
+    public string $editRole = TeamPermissions::ROLE_MEMBER;
+    /** @var array<string, bool> */
+    public array $editPermissions = [];
 
     public function mount(int $websiteId = 0, bool $useSessionWebsite = false): void
     {
@@ -37,6 +50,19 @@ class WebsiteTeam extends Component
             Gate::authorize('update', Website::findOrFail($this->websiteId));
             $this->readonly = false;
         }
+
+        $this->invitePermissions = $this->defaultPermissionMap();
+    }
+
+    /** @return array<string, bool> */
+    private function defaultPermissionMap(): array
+    {
+        $out = [];
+        foreach (TeamPermissions::featureKeys() as $key) {
+            $out[$key] = true;
+        }
+
+        return $out;
     }
 
     #[On('website-changed')]
@@ -48,6 +74,21 @@ class WebsiteTeam extends Component
 
         $this->websiteId = $websiteId;
         $this->applySessionModeFlags();
+        $this->cancelEdit();
+    }
+
+    public function updatedInviteRole(string $value): void
+    {
+        if ($value === TeamPermissions::ROLE_ADMIN) {
+            $this->invitePermissions = $this->defaultPermissionMap();
+        }
+    }
+
+    public function updatedEditRole(string $value): void
+    {
+        if ($value === TeamPermissions::ROLE_ADMIN) {
+            $this->editPermissions = $this->defaultPermissionMap();
+        }
     }
 
     public function inviteMember(): void
@@ -61,6 +102,7 @@ class WebsiteTeam extends Component
 
         $this->validate([
             'inviteEmail' => ['required', 'string', 'lowercase', 'email', 'max:255'],
+            'inviteRole' => ['required', 'in:admin,member'],
         ]);
 
         $email = Str::lower(trim($this->inviteEmail));
@@ -70,6 +112,10 @@ class WebsiteTeam extends Component
 
             return;
         }
+
+        $permissions = $this->inviteRole === TeamPermissions::ROLE_ADMIN
+            ? null
+            : TeamPermissions::normalize(array_keys(array_filter($this->invitePermissions)));
 
         $target = User::query()->whereRaw('LOWER(email) = ?', [$email])->first();
 
@@ -85,7 +131,12 @@ class WebsiteTeam extends Component
                 ->where('email', $email)
                 ->delete();
 
-            $website->members()->syncWithoutDetaching([$target->id]);
+            $website->members()->syncWithoutDetaching([
+                $target->id => [
+                    'role' => $this->inviteRole,
+                    'permissions' => $permissions !== null ? json_encode(array_values($permissions)) : null,
+                ],
+            ]);
 
             Mail::to($target)->send(new WebsiteAccessGrantedMail($website, $target));
         } else {
@@ -94,11 +145,21 @@ class WebsiteTeam extends Component
                 ->where('email', $email)
                 ->delete();
 
-            [$invitation, $plain] = WebsiteInvitation::issue($website, $email, (int) Auth::id());
+            [$invitation, $plain] = WebsiteInvitation::issue(
+                $website,
+                $email,
+                (int) Auth::id(),
+                14,
+                $this->inviteRole,
+                $permissions,
+            );
             Mail::to($email)->send(new WebsiteTeamInvitationMail($invitation, $plain));
         }
 
         $this->reset('inviteEmail');
+        $this->inviteRole = TeamPermissions::ROLE_MEMBER;
+        $this->invitePermissions = $this->defaultPermissionMap();
+        session()->flash('team_status', 'Invitation sent.');
         $this->dispatch('website-team-updated');
     }
 
@@ -116,6 +177,7 @@ class WebsiteTeam extends Component
         }
 
         $website->members()->detach($userId);
+        $this->cancelEdit();
         $this->dispatch('website-team-updated');
     }
 
@@ -171,7 +233,129 @@ class WebsiteTeam extends Component
         }
 
         $invitation->delete();
+        $this->cancelEdit();
         $this->dispatch('website-team-updated');
+    }
+
+    public function startEditMember(int $userId): void
+    {
+        if ($this->readonly || $this->websiteId <= 0) {
+            return;
+        }
+
+        $website = Website::findOrFail($this->websiteId);
+        Gate::authorize('update', $website);
+
+        if ($userId === (int) $website->user_id) {
+            return; // owner can't be edited
+        }
+
+        $row = DB::table('website_user')
+            ->where('website_id', $this->websiteId)
+            ->where('user_id', $userId)
+            ->first();
+
+        if (! $row) {
+            return;
+        }
+
+        $this->editTargetType = 'member';
+        $this->editTargetId = $userId;
+        $this->editRole = (string) ($row->role ?: TeamPermissions::ROLE_MEMBER);
+
+        $decoded = $row->permissions ? json_decode((string) $row->permissions, true) : null;
+        $this->editPermissions = $this->permissionsToMap(is_array($decoded) ? $decoded : null);
+    }
+
+    public function startEditInvitation(int $invitationId): void
+    {
+        if ($this->readonly || $this->websiteId <= 0) {
+            return;
+        }
+
+        $invitation = WebsiteInvitation::findOrFail($invitationId);
+        Gate::authorize('update', $invitation->website);
+
+        if ((int) $invitation->website_id !== $this->websiteId) {
+            return;
+        }
+
+        $this->editTargetType = 'invitation';
+        $this->editTargetId = $invitation->id;
+        $this->editRole = (string) ($invitation->role ?: TeamPermissions::ROLE_MEMBER);
+        $this->editPermissions = $this->permissionsToMap($invitation->permissions);
+    }
+
+    public function cancelEdit(): void
+    {
+        $this->editTargetType = null;
+        $this->editTargetId = null;
+        $this->editRole = TeamPermissions::ROLE_MEMBER;
+        $this->editPermissions = $this->defaultPermissionMap();
+    }
+
+    public function saveEdit(): void
+    {
+        if ($this->readonly || $this->websiteId <= 0 || $this->editTargetId === null) {
+            return;
+        }
+
+        $this->validate([
+            'editRole' => ['required', 'in:admin,member'],
+        ]);
+
+        $website = Website::findOrFail($this->websiteId);
+        Gate::authorize('update', $website);
+
+        $permissions = $this->editRole === TeamPermissions::ROLE_ADMIN
+            ? null
+            : TeamPermissions::normalize(array_keys(array_filter($this->editPermissions)));
+
+        if ($this->editTargetType === 'member') {
+            if ((int) $this->editTargetId === (int) $website->user_id) {
+                return;
+            }
+
+            DB::table('website_user')
+                ->where('website_id', $this->websiteId)
+                ->where('user_id', $this->editTargetId)
+                ->update([
+                    'role' => $this->editRole,
+                    'permissions' => $permissions !== null ? json_encode(array_values($permissions)) : null,
+                    'updated_at' => now(),
+                ]);
+
+            session()->flash('team_status', 'Member access updated.');
+        } elseif ($this->editTargetType === 'invitation') {
+            $invitation = WebsiteInvitation::find($this->editTargetId);
+            if ($invitation && (int) $invitation->website_id === $this->websiteId) {
+                $invitation->forceFill([
+                    'role' => $this->editRole,
+                    'permissions' => $permissions,
+                ])->save();
+                session()->flash('team_status', 'Invitation access updated.');
+            }
+        }
+
+        $this->cancelEdit();
+        $this->dispatch('website-team-updated');
+    }
+
+    /**
+     * @param  list<string>|null  $permissions
+     * @return array<string, bool>
+     */
+    private function permissionsToMap(?array $permissions): array
+    {
+        $map = $this->defaultPermissionMap();
+        if ($permissions === null) {
+            return $map;
+        }
+        foreach ($map as $k => $_) {
+            $map[$k] = in_array($k, $permissions, true);
+        }
+
+        return $map;
     }
 
     public function render()
@@ -202,6 +386,7 @@ class WebsiteTeam extends Component
         return view('livewire.websites.website-team', [
             'website' => $website,
             'emptyReason' => $emptyReason,
+            'features' => TeamPermissions::FEATURES,
         ]);
     }
 

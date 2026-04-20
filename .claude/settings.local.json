@@ -65,7 +65,11 @@
       "Bash(php -l app/Livewire/RankTracking/RankTrackingManager.php)",
       "Bash(php -l app/Livewire/RankTracking/RankTrackingDetail.php)",
       "Bash(php -l app/Models/RankTrackingKeyword.php)",
-      "Bash(php -l app/Livewire/Websites/WebsiteTeam.php)"
+      "Bash(php -l app/Livewire/Websites/WebsiteTeam.php)",
+      "Bash(php -l app/Support/TeamPermissions.php)",
+      "Bash(php -l app/Models/User.php)",
+      "Bash(php -l app/Models/Website.php)",
+      "Bash(php -l app/Models/WebsiteInvitation.php)"
     ]
   }
 }

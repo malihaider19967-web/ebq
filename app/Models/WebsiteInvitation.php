@@ -11,6 +11,8 @@ class WebsiteInvitation extends Model
     protected $fillable = [
         'website_id',
         'email',
+        'role',
+        'permissions',
         'token',
         'invited_by_user_id',
         'expires_at',
@@ -20,6 +22,7 @@ class WebsiteInvitation extends Model
     {
         return [
             'expires_at' => 'datetime',
+            'permissions' => 'array',
         ];
     }
 
@@ -63,12 +66,16 @@ class WebsiteInvitation extends Model
         string $email,
         int $invitedByUserId,
         int $expiresInDays = 14,
+        string $role = 'member',
+        ?array $permissions = null,
     ): array {
         $plain = Str::random(64);
 
         $invitation = self::query()->create([
             'website_id' => $website->id,
             'email' => Str::lower($email),
+            'role' => $role,
+            'permissions' => $permissions,
             'token' => hash('sha256', $plain),
             'invited_by_user_id' => $invitedByUserId,
             'expires_at' => now()->addDays($expiresInDays),
@@ -89,7 +96,13 @@ class WebsiteInvitation extends Model
             return;
         }
 
-        $this->website->members()->syncWithoutDetaching([$user->id]);
+        $permissions = $this->permissions;
+        $this->website->members()->syncWithoutDetaching([
+            $user->id => [
+                'role' => $this->role ?: 'member',
+                'permissions' => $permissions !== null ? json_encode(array_values($permissions)) : null,
+            ],
+        ]);
         $this->delete();
     }
 }

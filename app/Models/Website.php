@@ -90,7 +90,9 @@ class Website extends Model
 
     public function members(): BelongsToMany
     {
-        return $this->belongsToMany(User::class, 'website_user')->withTimestamps();
+        return $this->belongsToMany(User::class, 'website_user')
+            ->withPivot(['role', 'permissions'])
+            ->withTimestamps();
     }
 
     public function invitations(): HasMany

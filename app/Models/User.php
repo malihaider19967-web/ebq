@@ -7,8 +7,10 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Support\TeamPermissions;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
+use Illuminate\Support\Facades\DB;
 
 class User extends Authenticatable
 {
@@ -68,7 +70,79 @@ class User extends Authenticatable
 
     public function sharedWebsites(): BelongsToMany
     {
-        return $this->belongsToMany(Website::class, 'website_user')->withTimestamps();
+        return $this->belongsToMany(Website::class, 'website_user')
+            ->withPivot(['role', 'permissions'])
+            ->withTimestamps();
+    }
+
+    /**
+     * Role for this user on the given website ('owner', 'admin', 'member') or null.
+     */
+    public function roleForWebsite(int $websiteId): ?string
+    {
+        if ($websiteId <= 0) {
+            return null;
+        }
+
+        $ownerCount = Website::query()->whereKey($websiteId)->where('user_id', $this->id)->count();
+        if ($ownerCount > 0) {
+            return TeamPermissions::ROLE_OWNER;
+        }
+
+        $row = DB::table('website_user')
+            ->where('website_id', $websiteId)
+            ->where('user_id', $this->id)
+            ->first();
+
+        if (! $row) {
+            return null;
+        }
+
+        return (string) ($row->role ?: TeamPermissions::ROLE_MEMBER);
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    public function permissionsForWebsite(int $websiteId): ?array
+    {
+        $role = $this->roleForWebsite($websiteId);
+        if ($role === null) {
+            return null;
+        }
+        if ($role === TeamPermissions::ROLE_OWNER || $role === TeamPermissions::ROLE_ADMIN) {
+            return null;
+        }
+
+        $row = DB::table('website_user')
+            ->where('website_id', $websiteId)
+            ->where('user_id', $this->id)
+            ->first();
+
+        if (! $row || $row->permissions === null) {
+            return null;
+        }
+
+        $decoded = json_decode((string) $row->permissions, true);
+
+        return is_array($decoded) ? array_values(array_filter($decoded, 'is_string')) : null;
+    }
+
+    public function hasFeatureAccess(string $feature, int $websiteId): bool
+    {
+        $role = $this->roleForWebsite($websiteId);
+        if ($role === null) {
+            return false;
+        }
+
+        return TeamPermissions::allows($role, $this->permissionsForWebsite($websiteId), $feature);
+    }
+
+    public function canManageTeamFor(int $websiteId): bool
+    {
+        $role = $this->roleForWebsite($websiteId);
+
+        return $role === TeamPermissions::ROLE_OWNER || $role === TeamPermissions::ROLE_ADMIN;
     }
 
     public function timezoneForDisplay(): string
