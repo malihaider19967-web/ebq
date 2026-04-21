@@ -69,6 +69,36 @@ class PluginInsightsController extends Controller
     }
 
     /**
+     * Ranked focus-keyword candidates for the given post URL.
+     *   GET /api/v1/posts/{externalPostId}/focus-keyword-suggestions?url=...
+     */
+    public function focusKeywordSuggestions(Request $request, string $externalPostId): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        $url = (string) $request->query('url', '');
+
+        return response()->json([
+            'external_post_id' => $externalPostId,
+            'url' => $url,
+            'suggestions' => $this->resolver->focusKeywordSuggestions($website, $url),
+        ]);
+    }
+
+    /**
+     * Live competitor SERP (top 5) for a chosen query on this site's market.
+     *   GET /api/v1/posts/{externalPostId}/serp-preview?query=...
+     */
+    public function serpPreview(Request $request, string $externalPostId): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        $query = (string) $request->query('query', '');
+
+        return response()->json([
+            'external_post_id' => $externalPostId,
+        ] + $this->resolver->serpPreview($website, $query));
+    }
+
+    /**
      * Signed short-lived redirect into the EBQ /reports page.
      *   GET /api/v1/reports/iframe-url?insight=cannibalization
      */

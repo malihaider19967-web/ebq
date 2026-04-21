@@ -32,6 +32,25 @@ final class EBQ_Rest_Proxy
             'permission_callback' => [$this, 'can_edit'],
             'callback' => [$this, 'dashboard'],
         ]);
+
+        register_rest_route('ebq/v1', '/focus-keyword-suggestions/(?P<id>\d+)', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'focus_keyword_suggestions'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+            ],
+        ]);
+
+        register_rest_route('ebq/v1', '/serp-preview/(?P<id>\d+)', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'serp_preview'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+                'query' => ['required' => true],
+            ],
+        ]);
     }
 
     public function can_edit(): bool
@@ -56,5 +75,33 @@ final class EBQ_Rest_Proxy
     public function dashboard(): WP_REST_Response
     {
         return new WP_REST_Response(EBQ_Plugin::api_client()->get_dashboard(), 200);
+    }
+
+    public function focus_keyword_suggestions(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $url = get_permalink($post_id);
+        if (! $url) {
+            return new WP_REST_Response(['ok' => false, 'error' => 'post_not_found'], 404);
+        }
+
+        return new WP_REST_Response(
+            EBQ_Plugin::api_client()->get_focus_keyword_suggestions((string) $post_id, $url),
+            200
+        );
+    }
+
+    public function serp_preview(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $query = (string) $request->get_param('query');
+        if ($query === '') {
+            return new WP_REST_Response(['ok' => false, 'error' => 'missing_query'], 400);
+        }
+
+        return new WP_REST_Response(
+            EBQ_Plugin::api_client()->get_serp_preview((string) $post_id, $query),
+            200
+        );
     }
 }

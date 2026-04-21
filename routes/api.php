@@ -9,6 +9,12 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/posts/{externalPostId}/insights', [PluginInsightsController::class, 'showPost'])
             ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
             ->name('api.v1.posts.show');
+        Route::get('/posts/{externalPostId}/focus-keyword-suggestions', [PluginInsightsController::class, 'focusKeywordSuggestions'])
+            ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
+            ->name('api.v1.posts.focus-keyword-suggestions');
+        Route::get('/posts/{externalPostId}/serp-preview', [PluginInsightsController::class, 'serpPreview'])
+            ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
+            ->name('api.v1.posts.serp-preview');
         Route::get('/posts', [PluginInsightsController::class, 'indexPosts'])
             ->name('api.v1.posts.index');
         Route::get('/dashboard', [PluginInsightsController::class, 'dashboard'])

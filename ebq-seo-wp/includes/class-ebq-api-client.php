@@ -62,6 +62,22 @@ final class EBQ_Api_Client
         return $this->get('/api/v1/reports/iframe-url', ['insight' => $insight]);
     }
 
+    public function get_focus_keyword_suggestions(string $post_id, string $canonical_url): array
+    {
+        return $this->get(
+            sprintf('/api/v1/posts/%s/focus-keyword-suggestions', rawurlencode($post_id)),
+            ['url' => $canonical_url]
+        );
+    }
+
+    public function get_serp_preview(string $post_id, string $query): array
+    {
+        return $this->get(
+            sprintf('/api/v1/posts/%s/serp-preview', rawurlencode($post_id)),
+            ['query' => $query]
+        );
+    }
+
     private function get(string $path, array $query = []): array
     {
         if ($this->token === '') {

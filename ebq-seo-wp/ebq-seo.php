@@ -2,8 +2,8 @@
 /**
  * Plugin Name:       EBQ SEO
  * Plugin URI:        https://ebq.io/features
- * Description:       Shows EBQ's cross-signal SEO insights (cannibalization, striking distance, rank, audits) inside the Gutenberg editor, the post list, and the WordPress dashboard. One-click connect — no credentials to paste.
- * Version:           1.0.9
+ * Description:       The only SEO plugin your WordPress site needs. Real-data focus keyword, live competitor SERP, cannibalization-aware canonical, CWV-gated publish, plus Yoast-parity on-page surface (meta/social/schema/sitemap/canonical/robots). One-click connect to your EBQ workspace.
+ * Version:           2.0.0
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            EBQ
@@ -16,7 +16,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('EBQ_SEO_VERSION', '1.0.9');
+define('EBQ_SEO_VERSION', '2.0.0');
 define('EBQ_SEO_FILE', __FILE__);
 define('EBQ_SEO_PATH', plugin_dir_path(__FILE__));
 define('EBQ_SEO_URL', plugin_dir_url(__FILE__));
@@ -31,6 +31,14 @@ require_once EBQ_SEO_PATH . 'includes/class-ebq-rest-proxy.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-gutenberg-sidebar.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-meta-box.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-updater.php';
+// v2 — Yoast-replacement surface
+require_once EBQ_SEO_PATH . 'includes/class-ebq-meta-fields.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-meta-output.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-social-output.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-schema-output.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-sitemap.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-seo-panel.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-seo-fields-meta-box.php';
 
 register_activation_hook(__FILE__, static function (): void {
     add_option('ebq_site_token', '');
@@ -38,12 +46,24 @@ register_activation_hook(__FILE__, static function (): void {
     add_option('ebq_website_domain', '');
     add_option('ebq_connect_state', '');
     add_option('ebq_last_connect_error', '');
+
+    // Sitemap rewrite rules need registering before flush; the Sitemap class
+    // adds them on init, so we schedule a flush on next request.
+    update_option('ebq_flush_rewrites_pending', '1');
 });
 
 register_deactivation_hook(__FILE__, static function (): void {
     delete_option('ebq_connect_state');
     delete_option('ebq_last_connect_error');
+    flush_rewrite_rules();
 });
+
+add_action('wp_loaded', static function (): void {
+    if (get_option('ebq_flush_rewrites_pending') === '1') {
+        flush_rewrite_rules();
+        delete_option('ebq_flush_rewrites_pending');
+    }
+}, 20);
 
 add_action('plugins_loaded', static function (): void {
     EBQ_Plugin::instance()->boot();

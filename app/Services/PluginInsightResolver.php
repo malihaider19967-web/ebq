@@ -257,4 +257,122 @@ class PluginInsightResolver
             ->whereRaw('LOWER(keyword) = ?', [mb_strtolower(trim($keyword))])
             ->first();
     }
+
+    /**
+     * Ranked focus-keyword candidates for a URL, ordered by opportunity score
+     * (same formula as the striking-distance report). The plugin uses this to
+     * fill a dropdown in the editor rather than asking the user to type one.
+     *
+     * @return list<array{query: string, impressions: int, clicks: int, position: float|null, ctr: float|null, opportunity_score: float, tracked: bool}>
+     */
+    public function focusKeywordSuggestions(Website $website, string $canonicalUrl, int $limit = 10): array
+    {
+        $normalized = trim($canonicalUrl);
+        if ($normalized === '' || ! $website->isAuditUrlForThisSite($normalized)) {
+            return [];
+        }
+
+        $tz = config('app.timezone');
+        $end = Carbon::yesterday($tz)->endOfDay();
+        $start = $end->copy()->subDays(89)->startOfDay();
+
+        $rows = SearchConsoleData::query()
+            ->where('website_id', $website->id)
+            ->where('page', $normalized)
+            ->whereDate('date', '>=', $start->toDateString())
+            ->whereDate('date', '<=', $end->toDateString())
+            ->where('query', '!=', '')
+            ->selectRaw('query, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position, AVG(ctr) as ctr')
+            ->groupBy('query')
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $trackedQueries = RankTrackingKeyword::query()
+            ->where('website_id', $website->id)
+            ->pluck('keyword')
+            ->map(fn ($k) => mb_strtolower(trim((string) $k)))
+            ->flip();
+
+        $out = $rows->map(function ($r) use ($trackedQueries) {
+            $impressions = (int) $r->impressions;
+            $clicks = (int) $r->clicks;
+            $pos = $r->position !== null ? round((float) $r->position, 1) : null;
+            $ctr = $r->ctr !== null ? round((float) $r->ctr * 100, 2) : null;
+            $score = ($impressions / 100) + ($pos !== null ? max(0, 20 - $pos) : 0) - (($ctr ?? 0) * 0.6);
+
+            return [
+                'query' => (string) $r->query,
+                'impressions' => $impressions,
+                'clicks' => $clicks,
+                'position' => $pos,
+                'ctr' => $ctr,
+                'opportunity_score' => round($score, 1),
+                'tracked' => isset($trackedQueries[mb_strtolower((string) $r->query)]),
+            ];
+        })
+            ->sortByDesc('opportunity_score')
+            ->take($limit)
+            ->values()
+            ->all();
+
+        return $out;
+    }
+
+    /**
+     * Actual competitor SERP for a query on this website's market — pulled
+     * from the latest RankTrackingSnapshot.top_results for a matching tracked
+     * keyword. Used by the editor to render a real-competitor SERP panel.
+     *
+     * @return array{matched: bool, query: string, checked_at: ?string, results: list<array<string, mixed>>}
+     */
+    public function serpPreview(Website $website, string $query, int $limit = 5): array
+    {
+        $q = trim($query);
+        if ($q === '') {
+            return ['matched' => false, 'query' => $q, 'checked_at' => null, 'results' => []];
+        }
+
+        $keyword = RankTrackingKeyword::query()
+            ->where('website_id', $website->id)
+            ->whereRaw('LOWER(keyword) = ?', [mb_strtolower($q)])
+            ->first();
+
+        if (! $keyword) {
+            return ['matched' => false, 'query' => $q, 'checked_at' => null, 'results' => []];
+        }
+
+        $snapshot = \App\Models\RankTrackingSnapshot::query()
+            ->where('rank_tracking_keyword_id', $keyword->id)
+            ->where('status', 'ok')
+            ->orderByDesc('checked_at')
+            ->first();
+
+        if (! $snapshot) {
+            return ['matched' => true, 'query' => $q, 'checked_at' => null, 'results' => []];
+        }
+
+        $top = is_array($snapshot->top_results) ? $snapshot->top_results : [];
+        $results = [];
+        foreach (array_slice($top, 0, $limit) as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $results[] = [
+                'position' => isset($row['position']) ? (int) $row['position'] : null,
+                'title' => isset($row['title']) ? (string) $row['title'] : '',
+                'url' => isset($row['link']) ? (string) $row['link'] : (isset($row['url']) ? (string) $row['url'] : ''),
+                'snippet' => isset($row['snippet']) ? (string) $row['snippet'] : '',
+            ];
+        }
+
+        return [
+            'matched' => true,
+            'query' => $q,
+            'checked_at' => $snapshot->checked_at?->toIso8601String(),
+            'results' => $results,
+        ];
+    }
 }

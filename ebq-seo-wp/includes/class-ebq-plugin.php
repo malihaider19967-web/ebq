@@ -26,6 +26,15 @@ final class EBQ_Plugin
         (new EBQ_Dashboard_Widget())->register();
         (new EBQ_Gutenberg_Sidebar())->register();
         (new EBQ_Meta_Box())->register();
+
+        // v2 Yoast-replacement surface
+        (new EBQ_Meta_Fields())->register();
+        (new EBQ_Meta_Output())->register();
+        (new EBQ_Social_Output())->register();
+        (new EBQ_Schema_Output())->register();
+        (new EBQ_Sitemap())->register();
+        (new EBQ_Seo_Panel())->register();
+        (new EBQ_Seo_Fields_Meta_Box())->register();
     }
 
     public static function api_client(): EBQ_Api_Client
