@@ -202,6 +202,13 @@
         );
     }
 
+    // Document-settings panel lives inline in the right-hand editor column
+    // (always visible, no hunting in the three-dot menu).
+    var PluginDocumentSettingPanel =
+        ( wp.editor && wp.editor.PluginDocumentSettingPanel ) ||
+        ( wp.editPost && wp.editPost.PluginDocumentSettingPanel ) ||
+        null;
+
     registerPlugin( 'ebq-seo-sidebar', {
         render: function () {
             return el( wp.element.Fragment, null,
@@ -210,7 +217,12 @@
                     : null,
                 el( PluginSidebar, { name: 'ebq-seo-sidebar', icon: ICON, title: __( 'EBQ SEO', 'ebq-seo' ) },
                     el( Panel, null )
-                )
+                ),
+                PluginDocumentSettingPanel
+                    ? el( PluginDocumentSettingPanel, { name: 'ebq-seo-doc-panel', title: __( 'EBQ SEO', 'ebq-seo' ) },
+                        el( Panel, null )
+                    )
+                    : null
             );
         },
     } );
