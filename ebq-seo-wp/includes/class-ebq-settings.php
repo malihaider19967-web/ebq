@@ -35,7 +35,7 @@ final class EBQ_Settings
         // dropped the hook, caching layer swallowed the redirect, etc.), close
         // the loop here on the settings page itself.
         $inline_result = null;
-        if (! empty($_GET['ebq_cb']) && ! empty($_GET['ebq_token'])) {
+        if (! empty($_GET['ebq_token'])) {
             $inline_result = EBQ_Connect::process_callback_inline();
         }
 
@@ -193,7 +193,7 @@ final class EBQ_Settings
                             'is_multisite' => is_multisite(),
                             'ebq_api_base' => EBQ_Api_Client::base_url(),
                             'home_url' => home_url('/'),
-                            'admin_url' => admin_url('options-general.php?page=ebq-seo&ebq_cb=1'),
+                            'admin_url' => admin_url('options-general.php?page=ebq-seo'),
                             'current_user_id' => get_current_user_id(),
                             'can_manage_options' => current_user_can('manage_options'),
                             'option.ebq_site_token' => $token_opt === '' ? 'empty' : 'set ('.strlen($token_opt).' chars)',

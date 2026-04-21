@@ -7,7 +7,7 @@
  *   2. start_connect() mints a fresh state, stores it, and 302s to
  *      https://ebq.io/wordpress/connect with site_url + redirect + state.
  *   3. User authenticates in EBQ and picks a website.
- *   4. EBQ bounces back to /wp-admin/options-general.php?page=ebq-seo&ebq_cb=1
+ *   4. EBQ bounces back to /wp-admin/options-general.php?page=ebq-seo
  *      &ebq_token=...&website_id=...&state=...&ebq_domain=...
  *   5. maybe_catch_callback() validates state on admin_init, persists the
  *      token, and redirects to a clean settings URL.
@@ -15,6 +15,9 @@
  * State is only generated at click time (not on every settings page render),
  * so reloading the settings page before the callback returns cannot invalidate
  * an in-flight connection.
+ *
+ * Callback presence is detected by `ebq_token` alone, not by a flag parameter
+ * like `ebq_cb=1` — some WAFs/CDNs strip unknown bare flags from admin URLs.
  */
 
 if (! defined('ABSPATH')) {
@@ -44,7 +47,7 @@ final class EBQ_Connect
         if (! current_user_can('manage_options')) {
             return null;
         }
-        if (empty($_GET['ebq_cb']) || empty($_GET['ebq_token']) || empty($_GET['state'])) {
+        if (empty($_GET['ebq_token']) || empty($_GET['state'])) {
             return null;
         }
 
@@ -112,7 +115,7 @@ final class EBQ_Connect
         $state = wp_generate_password(32, false, false);
         update_option('ebq_connect_state', $state);
 
-        $redirect = admin_url('options-general.php?page=ebq-seo&ebq_cb=1');
+        $redirect = admin_url('options-general.php?page=ebq-seo');
         $site_url = home_url('/');
 
         $target = add_query_arg(
@@ -144,11 +147,17 @@ final class EBQ_Connect
             exit;
         }
 
-        if (empty($_GET['ebq_cb'])) {
+        // Callback detection: rely on ebq_token presence, not on a flag param
+        // (bare flags like ebq_cb=1 are commonly stripped by WAF/CDN rules).
+        if (empty($_GET['ebq_token'])) {
+            return;
+        }
+        // Only engage on our own settings page, so other admin pages aren't affected.
+        if (! isset($_GET['page']) || sanitize_key((string) wp_unslash($_GET['page'])) !== 'ebq-seo') {
             return;
         }
 
-        $token = isset($_GET['ebq_token']) ? sanitize_text_field((string) wp_unslash($_GET['ebq_token'])) : '';
+        $token = sanitize_text_field((string) wp_unslash($_GET['ebq_token']));
         $received_state = isset($_GET['state']) ? (string) wp_unslash($_GET['state']) : '';
         $website_id = isset($_GET['website_id']) ? (int) $_GET['website_id'] : 0;
         $domain = isset($_GET['ebq_domain']) ? sanitize_text_field((string) wp_unslash($_GET['ebq_domain'])) : '';
