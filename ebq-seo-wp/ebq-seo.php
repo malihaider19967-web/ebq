@@ -3,7 +3,7 @@
  * Plugin Name:       EBQ SEO
  * Plugin URI:        https://ebq.io/features
  * Description:       Shows EBQ's cross-signal SEO insights (cannibalization, striking distance, rank, audits) inside the Gutenberg editor, the post list, and the WordPress dashboard. One-click connect — no credentials to paste.
- * Version:           1.0.2
+ * Version:           1.0.3
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            EBQ
@@ -16,7 +16,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('EBQ_SEO_VERSION', '1.0.2');
+define('EBQ_SEO_VERSION', '1.0.3');
 define('EBQ_SEO_FILE', __FILE__);
 define('EBQ_SEO_PATH', plugin_dir_path(__FILE__));
 define('EBQ_SEO_URL', plugin_dir_url(__FILE__));

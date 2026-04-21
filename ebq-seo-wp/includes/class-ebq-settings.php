@@ -31,6 +31,14 @@ final class EBQ_Settings
             return;
         }
 
+        // Fallback: if admin_init didn't process the callback (security plugin
+        // dropped the hook, caching layer swallowed the redirect, etc.), close
+        // the loop here on the settings page itself.
+        $inline_result = null;
+        if (! empty($_GET['ebq_cb']) && ! empty($_GET['ebq_token'])) {
+            $inline_result = EBQ_Connect::process_callback_inline();
+        }
+
         $status = isset($_GET['ebq_status']) ? sanitize_key((string) wp_unslash($_GET['ebq_status'])) : '';
         $update_status = isset($_GET['ebq_update']) ? sanitize_key((string) wp_unslash($_GET['ebq_update'])) : '';
         $latest_from_query = isset($_GET['latest']) ? sanitize_text_field((string) wp_unslash($_GET['latest'])) : '';
@@ -57,6 +65,24 @@ final class EBQ_Settings
             <?php endif; ?>
 
             <?php $this->render_notice($status); ?>
+
+            <?php if ($inline_result): ?>
+                <?php $level = $inline_result['outcome'] === 'connected' ? 'success' : 'error'; ?>
+                <div class="notice notice-<?php echo esc_attr($level); ?>" style="padding:12px;">
+                    <p style="margin:0 0 6px;font-weight:600;">
+                        <?php echo esc_html($inline_result['message']); ?>
+                        <?php if ($inline_result['outcome'] === 'connected'): ?>
+                            — <?php esc_html_e('Reload this page to see the connected view.', 'ebq-seo'); ?>
+                        <?php endif; ?>
+                    </p>
+                    <details style="margin-top:6px;">
+                        <summary style="cursor:pointer;font-size:11px;color:#64748b;"><?php esc_html_e('Diagnostics', 'ebq-seo'); ?></summary>
+                        <code style="display:block;margin-top:6px;padding:8px;background:#f1f5f9;border-radius:4px;font-size:11px;white-space:pre-wrap;word-break:break-all;">
+<?php echo esc_html(wp_json_encode($inline_result['debug'], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?>
+                        </code>
+                    </details>
+                </div>
+            <?php endif; ?>
 
             <?php if (! $connected && $last_error !== ''): ?>
                 <div class="notice notice-error" style="padding:12px;">

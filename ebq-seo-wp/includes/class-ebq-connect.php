@@ -32,6 +32,55 @@ final class EBQ_Connect
     }
 
     /**
+     * Same logic as maybe_catch_callback() but WITHOUT the redirect + exit —
+     * intended to be called from the settings render as a fallback when
+     * admin_init did not process the callback for some reason (caching plugin,
+     * security filter, etc.). Returns the result so the view can show it.
+     *
+     * @return array{outcome: string, message: string, debug: array<string, mixed>}|null
+     */
+    public static function process_callback_inline(): ?array
+    {
+        if (! current_user_can('manage_options')) {
+            return null;
+        }
+        if (empty($_GET['ebq_cb']) || empty($_GET['ebq_token']) || empty($_GET['state'])) {
+            return null;
+        }
+
+        $token = sanitize_text_field((string) wp_unslash($_GET['ebq_token']));
+        $received_state = (string) wp_unslash($_GET['state']);
+        $website_id = isset($_GET['website_id']) ? (int) $_GET['website_id'] : 0;
+        $domain = isset($_GET['ebq_domain']) ? sanitize_text_field((string) wp_unslash($_GET['ebq_domain'])) : '';
+        $expected_state = (string) get_option('ebq_connect_state', '');
+
+        $debug = [
+            'state_expected_len' => strlen($expected_state),
+            'state_got_len' => strlen($received_state),
+            'state_match' => ($expected_state !== '' && $received_state !== '' && hash_equals($expected_state, $received_state)),
+            'token_len' => strlen($token),
+            'website_id' => $website_id,
+            'domain' => $domain,
+        ];
+
+        if ($expected_state === '' || $received_state === '' || ! hash_equals($expected_state, $received_state)) {
+            return ['outcome' => 'state_mismatch', 'message' => __('State did not match. Click Connect to EBQ again.', 'ebq-seo'), 'debug' => $debug];
+        }
+
+        if ($token === '' || $website_id <= 0) {
+            return ['outcome' => 'bad_token', 'message' => __('EBQ did not send a valid token.', 'ebq-seo'), 'debug' => $debug];
+        }
+
+        update_option('ebq_site_token', $token);
+        update_option('ebq_website_id', $website_id);
+        update_option('ebq_website_domain', $domain);
+        delete_option('ebq_connect_state');
+        delete_option('ebq_last_connect_error');
+
+        return ['outcome' => 'connected', 'message' => __('Connected successfully.', 'ebq-seo'), 'debug' => $debug];
+    }
+
+    /**
      * Link the settings page puts behind the "Connect to EBQ" button.
      */
     public static function start_url(): string
