@@ -10,20 +10,17 @@
     $activeLabel = collect($tabs)->firstWhere('key', $tab)['label'] ?? '';
 @endphp
 <div class="space-y-4" wire:key="insights-{{ $websiteId }}">
-    {{-- Tabs --}}
+    {{-- Category tiles --}}
     <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-        <div class="flex items-start justify-between gap-3">
-            <div class="min-w-0">
-                <h2 class="text-base font-semibold tracking-tight">Insights</h2>
-                <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Action-list views over the last 28 days of Search Console + indexing data.</p>
-            </div>
+        <div class="mb-3 flex items-center justify-between gap-3">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Action lists · last 28 days</p>
             <div wire:loading.flex wire:target="setTab" class="items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400" role="status" aria-live="polite">
                 <svg class="h-3 w-3 animate-spin text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" class="opacity-75"></path></svg>
                 Loading…
             </div>
         </div>
 
-        <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" role="tablist" aria-label="Insight categories">
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" role="tablist" aria-label="Insight categories">
             @foreach ($tabs as $t)
                 @php($active = $tab === $t['key'])
                 <button type="button" wire:click="setTab('{{ $t['key'] }}')"
