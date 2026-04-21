@@ -363,7 +363,7 @@
                                     </td>
                                     <td class="px-4 py-3 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ $kw->best_position ? '#'.$kw->best_position : '—' }}</td>
                                     <td class="px-4 py-3">
-                                        @php $gsc = $gscByKeyword[mb_strtolower(trim($kw->keyword))] ?? null; @endphp
+                                        @php($gsc = ($gscByKeyword ?? [])[mb_strtolower(trim($kw->keyword))] ?? null)
                                         @if ($gsc)
                                             <div class="text-[11px] text-slate-600 dark:text-slate-400">
                                                 <div class="flex items-center gap-1.5">
