@@ -57,3 +57,18 @@ if (! function_exists('format_user_now')) {
         return Carbon::now(display_timezone($user))->format($format);
     }
 }
+
+if (! function_exists('plugin_download_url')) {
+    /**
+     * Public URL to the packaged WordPress plugin ZIP, cache-busted by filemtime
+     * so repackaging always invalidates downstream caches.
+     */
+    function plugin_download_url(): string
+    {
+        $relative = 'downloads/ebq-seo.zip';
+        $absolute = public_path($relative);
+        $version = is_file($absolute) ? (string) filemtime($absolute) : '0';
+
+        return asset($relative).'?v='.$version;
+    }
+}

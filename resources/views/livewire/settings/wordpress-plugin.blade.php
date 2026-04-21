@@ -6,7 +6,7 @@
                 Install the EBQ SEO plugin on your WordPress site and click <span class="font-semibold">Connect to EBQ</span> — you'll be bounced here to approve. No codes or tokens to copy.
             </p>
         </div>
-        <a href="{{ asset('downloads/ebq-seo.zip') }}" download
+        <a href="{{ plugin_download_url() }}" download
             class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
             <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
             Download plugin
