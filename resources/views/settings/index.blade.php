@@ -41,7 +41,7 @@
 
             <div x-show="tab === 'integrations'" x-cloak class="space-y-6">
                 <livewire:settings.integrations-panel />
-                <livewire:settings.wordpress-plugin />
+                <livewire:settings.word-press-plugin />
             </div>
 
             <div x-show="tab === 'reports'" x-cloak class="space-y-6">
