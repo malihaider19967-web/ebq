@@ -1,25 +1,39 @@
-<div class="space-y-4" wire:key="insights-{{ $websiteId }}-{{ $tab }}">
+@php
+    $tabs = [
+        ['key' => 'cannibalization',  'label' => 'Cannibalizations',        'count' => $counts['cannibalizations'],             'tone' => 'amber',   'hint' => 'Queries split across pages'],
+        ['key' => 'striking_distance','label' => 'Striking distance',       'count' => $counts['striking_distance'],            'tone' => 'indigo',  'hint' => 'Pos 5–20, low CTR'],
+        ['key' => 'indexing_fails',   'label' => 'Index fails w/ traffic',  'count' => $counts['indexing_fails_with_traffic'],  'tone' => 'red',     'hint' => 'Non-PASS, still earning impressions'],
+        ['key' => 'content_decay',    'label' => 'Content decay',           'count' => $counts['content_decay'],                'tone' => 'slate',   'hint' => 'Losing clicks 28d/28d'],
+        ['key' => 'audit_performance','label' => 'Audit vs traffic',        'count' => null,                                     'tone' => 'rose',    'hint' => 'Poor CWV, high impressions'],
+        ['key' => 'backlink_impact',  'label' => 'Backlink impact',         'count' => null,                                     'tone' => 'emerald', 'hint' => 'Click Δ before/after link'],
+    ];
+    $activeLabel = collect($tabs)->firstWhere('key', $tab)['label'] ?? '';
+@endphp
+<div class="space-y-4" wire:key="insights-{{ $websiteId }}">
+    {{-- Tabs --}}
     <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
         <div class="flex items-start justify-between gap-3">
-            <div>
+            <div class="min-w-0">
                 <h2 class="text-base font-semibold tracking-tight">Insights</h2>
                 <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Action-list views over the last 28 days of Search Console + indexing data.</p>
             </div>
+            <div wire:loading.flex wire:target="setTab" class="items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400" role="status" aria-live="polite">
+                <svg class="h-3 w-3 animate-spin text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"></circle><path fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" class="opacity-75"></path></svg>
+                Loading…
+            </div>
         </div>
 
-        <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-            @foreach ([
-                ['key' => 'cannibalization', 'label' => 'Cannibalizations', 'count' => $counts['cannibalizations'], 'tone' => 'amber'],
-                ['key' => 'striking_distance', 'label' => 'Striking distance', 'count' => $counts['striking_distance'], 'tone' => 'indigo'],
-                ['key' => 'indexing_fails', 'label' => 'Indexing fails w/ traffic', 'count' => $counts['indexing_fails_with_traffic'], 'tone' => 'red'],
-                ['key' => 'content_decay', 'label' => 'Content decay', 'count' => $counts['content_decay'], 'tone' => 'slate'],
-                ['key' => 'audit_performance', 'label' => 'Audit vs traffic', 'count' => null, 'tone' => 'rose'],
-                ['key' => 'backlink_impact', 'label' => 'Backlink impact', 'count' => null, 'tone' => 'emerald'],
-            ] as $t)
+        <div class="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" role="tablist" aria-label="Insight categories">
+            @foreach ($tabs as $t)
                 @php($active = $tab === $t['key'])
                 <button type="button" wire:click="setTab('{{ $t['key'] }}')"
+                    role="tab"
+                    aria-selected="{{ $active ? 'true' : 'false' }}"
+                    aria-controls="insights-panel-content"
+                    id="insights-tab-{{ $t['key'] }}"
+                    tabindex="{{ $active ? 0 : -1 }}"
                     @class([
-                        'flex flex-col items-start rounded-lg border px-3 py-2.5 text-left transition',
+                        'flex flex-col items-start rounded-lg border px-3 py-2.5 text-left transition focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus-visible:ring-2',
                         'border-indigo-300 bg-indigo-50 dark:border-indigo-500/40 dark:bg-indigo-500/10' => $active,
                         'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800/50 dark:hover:bg-slate-800' => ! $active,
                     ])>
@@ -33,270 +47,280 @@
                         'text-rose-600 dark:text-rose-400' => $t['tone'] === 'rose',
                         'text-emerald-600 dark:text-emerald-400' => $t['tone'] === 'emerald',
                     ])>{{ $t['count'] === null ? 'View' : number_format($t['count']) }}</span>
+                    <span class="mt-0.5 truncate text-[10px] text-slate-400 dark:text-slate-500">{{ $t['hint'] }}</span>
                 </button>
             @endforeach
         </div>
     </div>
 
-    @if (! $hasAccess)
-        <div class="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-400">
-            Select a website to view insights.
+    {{-- Content --}}
+    <div id="insights-panel-content" role="tabpanel" aria-labelledby="insights-tab-{{ $tab }}" aria-label="{{ $activeLabel }} details">
+        {{-- Skeleton while switching tabs --}}
+        <div wire:loading.flex wire:target="setTab" class="flex-col gap-3 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900">
+            <div class="h-4 w-1/3 animate-pulse rounded bg-slate-200 dark:bg-slate-700"></div>
+            <div class="h-3 w-2/3 animate-pulse rounded bg-slate-200 dark:bg-slate-700"></div>
+            <div class="mt-2 space-y-2">
+                @for ($i = 0; $i < 4; $i++)
+                    <div class="flex gap-3">
+                        <div class="h-3 flex-1 animate-pulse rounded bg-slate-100 dark:bg-slate-800"></div>
+                        <div class="h-3 w-16 animate-pulse rounded bg-slate-100 dark:bg-slate-800"></div>
+                        <div class="h-3 w-16 animate-pulse rounded bg-slate-100 dark:bg-slate-800"></div>
+                    </div>
+                @endfor
+            </div>
         </div>
-    @elseif ($tab === 'cannibalization')
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-            <h3 class="text-sm font-semibold">Keyword cannibalization</h3>
-            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Queries where two or more of your pages split clicks — consolidate content or re-target the weaker URLs.</p>
-            @if (empty($data['cannibalization']))
-                <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">No cannibalization detected in the last 28 days.</p>
-            @else
-                <div class="mt-4 overflow-x-auto">
-                    <table class="min-w-full text-left text-xs">
-                        <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                            <tr>
-                                <th class="py-2 pr-3 font-semibold">Query</th>
-                                <th class="py-2 pr-3 font-semibold">Primary page</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Pages</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Clicks</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Impressions</th>
-                                <th class="py-2 font-semibold">Competing pages (share %)</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                            @foreach ($data['cannibalization'] as $row)
-                                <tr>
-                                    <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['query'] }}</td>
-                                    <td class="py-2 pr-3 max-w-[280px] truncate text-slate-600 dark:text-slate-300" title="{{ $row['primary_page'] }}">{{ $row['primary_page'] }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ $row['page_count'] }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['total_clicks']) }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['total_impressions']) }}</td>
-                                    <td class="py-2">
-                                        <ul class="space-y-0.5">
-                                            @foreach ($row['competing_pages'] as $p)
-                                                <li class="max-w-[360px] truncate text-slate-500 dark:text-slate-400" title="{{ $p['page'] }}">
-                                                    <span class="tabular-nums text-amber-600 dark:text-amber-400">{{ $p['share'] }}%</span>
-                                                    <span class="ml-2">{{ $p['page'] }}</span>
-                                                </li>
-                                            @endforeach
-                                        </ul>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
+
+        <div wire:loading.remove wire:target="setTab">
+            @if (! $hasAccess)
+                <x-insights.empty-state title="Select a website to view insights" body="Use the website picker at the top of the app to choose a site. Insights update as its Search Console and indexing data syncs." />
+            @elseif ($tab === 'cannibalization')
+                <x-insights.card title="Keyword cannibalization" description="Queries where two or more of your pages split clicks — consolidate content or re-target the weaker URLs.">
+                    @if (empty($data['cannibalization']))
+                        <x-insights.empty-state title="No cannibalization detected" body="No queries in the last 28 days are splitting clicks across multiple pages. Either your information architecture is clean or there's not yet enough GSC data — re-check after a full sync." />
+                    @else
+                        <x-insights.scroll-area>
+                            <table class="min-w-full text-left text-xs">
+                                <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                                    <tr>
+                                        <th scope="col" class="py-2 pr-3 font-semibold">Query</th>
+                                        <th scope="col" class="py-2 pr-3 font-semibold">Primary page</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Pages</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Clicks</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Impr.</th>
+                                        <th scope="col" class="py-2 font-semibold">Competing pages (share %)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                    @foreach ($data['cannibalization'] as $row)
+                                        <tr>
+                                            <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['query'] }}</td>
+                                            <td class="py-2 pr-3 max-w-[280px] truncate text-slate-600 dark:text-slate-300" title="{{ $row['primary_page'] }}">{{ $row['primary_page'] }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ $row['page_count'] }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['total_clicks']) }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['total_impressions']) }}</td>
+                                            <td class="py-2">
+                                                <ul class="space-y-0.5">
+                                                    @foreach ($row['competing_pages'] as $p)
+                                                        <li class="max-w-[360px] truncate text-slate-500 dark:text-slate-400" title="{{ $p['page'] }}">
+                                                            <span class="tabular-nums font-semibold text-amber-600 dark:text-amber-400">{{ $p['share'] }}%</span>
+                                                            <span class="ml-2">{{ $p['page'] }}</span>
+                                                        </li>
+                                                    @endforeach
+                                                </ul>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </x-insights.scroll-area>
+                    @endif
+                </x-insights.card>
+            @elseif ($tab === 'striking_distance')
+                <x-insights.card title="Striking-distance keywords" description="Queries at positions 5–20 with strong impressions and below-curve CTR — the fastest wins on your content calendar.">
+                    @if (empty($data['striking_distance']))
+                        <x-insights.empty-state title="No striking-distance opportunities yet" body="We look for queries with at least 200 impressions ranking between #5 and #20. As your GSC history grows, qualifying keywords will appear here with a priority score." />
+                    @else
+                        <x-insights.scroll-area>
+                            <table class="min-w-full text-left text-xs">
+                                <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                                    <tr>
+                                        <th scope="col" class="py-2 pr-3 font-semibold">Query</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Position</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Impressions</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Clicks</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">CTR</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Score</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                    @foreach ($data['striking_distance'] as $row)
+                                        <tr>
+                                            <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['query'] }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ $row['position'] }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['impressions']) }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['clicks']) }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ $row['ctr'] }}%</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums font-semibold text-indigo-600 dark:text-indigo-400">{{ $row['score'] }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </x-insights.scroll-area>
+                    @endif
+                </x-insights.card>
+            @elseif ($tab === 'indexing_fails')
+                <x-insights.card title="Indexing failures with live traffic" description="Pages with a non-PASS Google verdict that still received impressions in the last 14 days — urgent action required.">
+                    @if (empty($data['indexing_fails']))
+                        <x-insights.empty-state title="No failing pages with recent traffic" body="Either every indexed page is healthy, or no indexing checks have been run. Trigger a page audit on any top URL to populate indexing status automatically." />
+                    @else
+                        <x-insights.scroll-area>
+                            <table class="min-w-full text-left text-xs">
+                                <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                                    <tr>
+                                        <th scope="col" class="py-2 pr-3 font-semibold">Page</th>
+                                        <th scope="col" class="py-2 pr-3 font-semibold">Verdict</th>
+                                        <th scope="col" class="py-2 pr-3 font-semibold hidden md:table-cell">Coverage</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Clicks (14d)</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Impr. (14d)</th>
+                                        <th scope="col" class="py-2 pr-3 font-semibold hidden lg:table-cell">Last crawl</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                    @foreach ($data['indexing_fails'] as $row)
+                                        <tr>
+                                            <td class="py-2 pr-3 max-w-[320px] truncate text-slate-800 dark:text-slate-200" title="{{ $row['page'] }}">{{ $row['page'] }}</td>
+                                            <td class="py-2 pr-3"><span class="rounded bg-red-50 px-1.5 py-0.5 font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-400">{{ $row['verdict'] }}</span></td>
+                                            <td class="py-2 pr-3 text-slate-600 dark:text-slate-300 hidden md:table-cell">{{ $row['coverage_state'] }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['recent_clicks']) }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['recent_impressions']) }}</td>
+                                            <td class="py-2 pr-3 text-slate-500 dark:text-slate-400 hidden lg:table-cell">{{ $row['last_crawl_at'] ?? '—' }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </x-insights.scroll-area>
+                    @endif
+                </x-insights.card>
+            @elseif ($tab === 'audit_performance')
+                <x-insights.card title="Audit vs. performance" description="Pages with poor Lighthouse performance scores (under 70) that still attract real search impressions — technical debt measurably costing traffic.">
+                    @if (empty($data['audit_performance']))
+                        <x-insights.empty-state title="No underperforming audited pages" body="Every audited page is scoring 70+ on Lighthouse, or you haven't audited many pages yet. Run a page audit from the Audits tab to populate this list." />
+                    @else
+                        <x-insights.scroll-area>
+                            <table class="min-w-full text-left text-xs">
+                                <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                                    <tr>
+                                        <th scope="col" class="py-2 pr-3 font-semibold">Page</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Mobile</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold hidden md:table-cell">Desktop</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold hidden md:table-cell">LCP (mob)</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold hidden lg:table-cell">CLS (mob)</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Impr. (28d)</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold hidden sm:table-cell">Clicks (28d)</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                    @foreach ($data['audit_performance'] as $row)
+                                        <tr>
+                                            <td class="py-2 pr-3 max-w-[320px] truncate text-slate-800 dark:text-slate-200" title="{{ $row['page'] }}">{{ $row['page'] }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">
+                                                @if ($row['performance_score_mobile'] === null)
+                                                    <span class="text-slate-400">—</span>
+                                                @else
+                                                    <span @class(['font-semibold', 'text-red-600 dark:text-red-400' => $row['performance_score_mobile'] < 50, 'text-amber-600 dark:text-amber-400' => $row['performance_score_mobile'] >= 50])>{{ $row['performance_score_mobile'] }}</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2 pr-3 text-right tabular-nums hidden md:table-cell">{{ $row['performance_score_desktop'] ?? '—' }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums hidden md:table-cell">{{ $row['lcp_ms_mobile'] !== null ? number_format($row['lcp_ms_mobile']).'ms' : '—' }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums hidden lg:table-cell">{{ $row['cls_mobile'] !== null ? number_format($row['cls_mobile'], 3) : '—' }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['impressions']) }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums hidden sm:table-cell">{{ number_format($row['clicks']) }}</td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </x-insights.scroll-area>
+                    @endif
+                </x-insights.card>
+            @elseif ($tab === 'backlink_impact')
+                <x-insights.card title="Backlink impact" description="Per target page, clicks in the 28 days after the latest tracked backlink vs the 28 days before — sorted by biggest lift.">
+                    @if (empty($data['backlink_impact']))
+                        <x-insights.empty-state title="No backlinks with pre/post traffic data" body="Add backlinks via the Backlinks tab with a tracked_date. Once the target page has GSC data around that date, correlations will appear here." />
+                    @else
+                        <x-insights.scroll-area>
+                            <table class="min-w-full text-left text-xs">
+                                <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                                    <tr>
+                                        <th scope="col" class="py-2 pr-3 font-semibold">Target page</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Links</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold hidden md:table-cell">Avg DA</th>
+                                        <th scope="col" class="py-2 pr-3 font-semibold hidden lg:table-cell">Latest link</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold hidden sm:table-cell">Pre clicks</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold hidden sm:table-cell">Post clicks</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Δ</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                    @foreach ($data['backlink_impact'] as $row)
+                                        <tr>
+                                            <td class="py-2 pr-3 max-w-[320px] truncate text-slate-800 dark:text-slate-200" title="{{ $row['target_page_url'] }}">{{ $row['target_page_url'] }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ $row['backlink_count'] }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums hidden md:table-cell">{{ $row['avg_da'] ?? '—' }}</td>
+                                            <td class="py-2 pr-3 text-slate-500 dark:text-slate-400 hidden lg:table-cell">{{ $row['latest_tracked_date'] }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums hidden sm:table-cell">{{ number_format($row['pre_clicks']) }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums hidden sm:table-cell">{{ number_format($row['post_clicks']) }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">
+                                                <span @class([
+                                                    'font-semibold',
+                                                    'text-emerald-600 dark:text-emerald-400' => $row['clicks_change'] > 0,
+                                                    'text-red-600 dark:text-red-400' => $row['clicks_change'] < 0,
+                                                    'text-slate-400' => $row['clicks_change'] === 0,
+                                                ])>{{ $row['clicks_change'] >= 0 ? '+' : '' }}{{ $row['clicks_change'] }}{{ $row['clicks_change_percent'] !== null ? ' ('.$row['clicks_change_percent'].'%)' : '' }}</span>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </x-insights.scroll-area>
+                    @endif
+                </x-insights.card>
+            @elseif ($tab === 'content_decay')
+                <x-insights.card title="Content decay" description="Pages losing clicks 28d-over-28d while still attracting impressions. The indexing verdict tells you whether it's ranking decay or de-indexing.">
+                    @if (empty($data['content_decay']['pages']))
+                        <x-insights.empty-state title="No decay detected" body="Either every high-impression page is holding steady, or we don't have two full 28-day windows of GSC history yet. Once the baseline fills in, declining pages will appear here." />
+                    @else
+                        <x-insights.scroll-area>
+                            <table class="min-w-full text-left text-xs">
+                                <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                                    <tr>
+                                        <th scope="col" class="py-2 pr-3 font-semibold">Page</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Clicks (28d)</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold hidden md:table-cell">Prev 28d</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Δ 28d</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold hidden lg:table-cell">YoY</th>
+                                        <th scope="col" class="py-2 pr-3 font-semibold">Verdict</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                    @foreach ($data['content_decay']['pages'] as $row)
+                                        <tr>
+                                            <td class="py-2 pr-3 max-w-[320px] truncate text-slate-800 dark:text-slate-200" title="{{ $row['page'] }}">{{ $row['page'] }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['current_clicks']) }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums hidden md:table-cell">{{ number_format($row['previous_clicks']) }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums font-semibold text-red-600 dark:text-red-400">{{ $row['clicks_change_percent'] }}%</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums hidden lg:table-cell">
+                                                @if (! $data['content_decay']['has_yoy_history'])
+                                                    <span class="text-slate-400 dark:text-slate-500">—</span>
+                                                @elseif ($row['yoy_change_percent'] === null)
+                                                    <span class="text-slate-400 dark:text-slate-500">—</span>
+                                                @else
+                                                    <span @class([
+                                                        'font-semibold',
+                                                        'text-red-600 dark:text-red-400' => $row['yoy_change_percent'] < 0,
+                                                        'text-emerald-600 dark:text-emerald-400' => $row['yoy_change_percent'] >= 0,
+                                                    ])>{{ $row['yoy_change_percent'] }}%</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2 pr-3">
+                                                @if ($row['verdict'] === 'PASS')
+                                                    <span class="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">PASS</span>
+                                                @elseif ($row['verdict'])
+                                                    <span class="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-400">{{ $row['verdict'] }}</span>
+                                                @else
+                                                    <span class="text-slate-400 dark:text-slate-500">—</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </x-insights.scroll-area>
+                        @if (! $data['content_decay']['has_yoy_history'])
+                            <p class="mt-3 text-[11px] text-slate-400 dark:text-slate-500">YoY column will populate once you have 13+ months of Search Console history.</p>
+                        @endif
+                    @endif
+                </x-insights.card>
             @endif
         </div>
-    @elseif ($tab === 'striking_distance')
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-            <h3 class="text-sm font-semibold">Striking-distance keywords</h3>
-            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Queries at positions 5–20 with strong impressions and below-curve CTR — the fastest wins on your content calendar.</p>
-            @if (empty($data['striking_distance']))
-                <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">No striking-distance opportunities detected.</p>
-            @else
-                <div class="mt-4 overflow-x-auto">
-                    <table class="min-w-full text-left text-xs">
-                        <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                            <tr>
-                                <th class="py-2 pr-3 font-semibold">Query</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Position</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Impressions</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Clicks</th>
-                                <th class="py-2 pr-3 text-right font-semibold">CTR</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Score</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                            @foreach ($data['striking_distance'] as $row)
-                                <tr>
-                                    <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['query'] }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ $row['position'] }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['impressions']) }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['clicks']) }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ $row['ctr'] }}%</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums font-semibold text-indigo-600 dark:text-indigo-400">{{ $row['score'] }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
-        </div>
-    @elseif ($tab === 'indexing_fails')
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-            <h3 class="text-sm font-semibold">Indexing failures with live traffic</h3>
-            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Pages with a non-PASS Google verdict that still received impressions in the last 14 days — urgent action required.</p>
-            @if (empty($data['indexing_fails']))
-                <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">No failing pages with recent traffic.</p>
-            @else
-                <div class="mt-4 overflow-x-auto">
-                    <table class="min-w-full text-left text-xs">
-                        <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                            <tr>
-                                <th class="py-2 pr-3 font-semibold">Page</th>
-                                <th class="py-2 pr-3 font-semibold">Verdict</th>
-                                <th class="py-2 pr-3 font-semibold">Coverage</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Clicks (14d)</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Impressions (14d)</th>
-                                <th class="py-2 pr-3 font-semibold">Last crawl</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                            @foreach ($data['indexing_fails'] as $row)
-                                <tr>
-                                    <td class="py-2 pr-3 max-w-[320px] truncate text-slate-800 dark:text-slate-200" title="{{ $row['page'] }}">{{ $row['page'] }}</td>
-                                    <td class="py-2 pr-3"><span class="rounded bg-red-50 px-1.5 py-0.5 font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-400">{{ $row['verdict'] }}</span></td>
-                                    <td class="py-2 pr-3 text-slate-600 dark:text-slate-300">{{ $row['coverage_state'] }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['recent_clicks']) }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['recent_impressions']) }}</td>
-                                    <td class="py-2 pr-3 text-slate-500 dark:text-slate-400">{{ $row['last_crawl_at'] ?? '—' }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
-        </div>
-    @elseif ($tab === 'audit_performance')
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-            <h3 class="text-sm font-semibold">Audit vs. performance</h3>
-            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Pages with poor Lighthouse performance scores (under 70) that still attract real search impressions — technical debt measurably costing traffic.</p>
-            @if (empty($data['audit_performance']))
-                <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">No underperforming audited pages detected.</p>
-            @else
-                <div class="mt-4 overflow-x-auto">
-                    <table class="min-w-full text-left text-xs">
-                        <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                            <tr>
-                                <th class="py-2 pr-3 font-semibold">Page</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Mobile score</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Desktop score</th>
-                                <th class="py-2 pr-3 text-right font-semibold">LCP (mob)</th>
-                                <th class="py-2 pr-3 text-right font-semibold">CLS (mob)</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Impressions (28d)</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Clicks (28d)</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                            @foreach ($data['audit_performance'] as $row)
-                                <tr>
-                                    <td class="py-2 pr-3 max-w-[320px] truncate text-slate-800 dark:text-slate-200" title="{{ $row['page'] }}">{{ $row['page'] }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">
-                                        @if ($row['performance_score_mobile'] === null)
-                                            <span class="text-slate-400">—</span>
-                                        @else
-                                            <span @class(['font-semibold', 'text-red-600 dark:text-red-400' => $row['performance_score_mobile'] < 50, 'text-amber-600 dark:text-amber-400' => $row['performance_score_mobile'] >= 50])>{{ $row['performance_score_mobile'] }}</span>
-                                        @endif
-                                    </td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ $row['performance_score_desktop'] ?? '—' }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ $row['lcp_ms_mobile'] !== null ? number_format($row['lcp_ms_mobile']).'ms' : '—' }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ $row['cls_mobile'] !== null ? number_format($row['cls_mobile'], 3) : '—' }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['impressions']) }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['clicks']) }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
-        </div>
-    @elseif ($tab === 'backlink_impact')
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-            <h3 class="text-sm font-semibold">Backlink impact</h3>
-            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Per target page, clicks in the 28 days <em>after</em> the latest tracked backlink vs the 28 days before — sorted by biggest lift.</p>
-            @if (empty($data['backlink_impact']))
-                <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">No backlinks with measurable pre/post traffic data yet.</p>
-            @else
-                <div class="mt-4 overflow-x-auto">
-                    <table class="min-w-full text-left text-xs">
-                        <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                            <tr>
-                                <th class="py-2 pr-3 font-semibold">Target page</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Links</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Avg DA</th>
-                                <th class="py-2 pr-3 font-semibold">Latest link</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Pre clicks</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Post clicks</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Δ</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                            @foreach ($data['backlink_impact'] as $row)
-                                <tr>
-                                    <td class="py-2 pr-3 max-w-[320px] truncate text-slate-800 dark:text-slate-200" title="{{ $row['target_page_url'] }}">{{ $row['target_page_url'] }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ $row['backlink_count'] }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ $row['avg_da'] ?? '—' }}</td>
-                                    <td class="py-2 pr-3 text-slate-500 dark:text-slate-400">{{ $row['latest_tracked_date'] }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['pre_clicks']) }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['post_clicks']) }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">
-                                        <span @class([
-                                            'font-semibold',
-                                            'text-emerald-600 dark:text-emerald-400' => $row['clicks_change'] > 0,
-                                            'text-red-600 dark:text-red-400' => $row['clicks_change'] < 0,
-                                            'text-slate-400' => $row['clicks_change'] === 0,
-                                        ])>{{ $row['clicks_change'] >= 0 ? '+' : '' }}{{ $row['clicks_change'] }}{{ $row['clicks_change_percent'] !== null ? ' ('.$row['clicks_change_percent'].'%)' : '' }}</span>
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
-        </div>
-    @elseif ($tab === 'content_decay')
-        <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-5">
-            <h3 class="text-sm font-semibold">Content decay</h3>
-            <p class="mt-0.5 text-xs text-slate-500 dark:text-slate-400">Pages losing clicks 28d-over-28d while still attracting impressions. Indexing verdict is shown so you can distinguish ranking decay from de-indexing.</p>
-            @if (empty($data['content_decay']['pages']))
-                <p class="mt-4 text-xs text-slate-500 dark:text-slate-400">No decay detected — or no 28-day comparison data yet.</p>
-            @else
-                <div class="mt-4 overflow-x-auto">
-                    <table class="min-w-full text-left text-xs">
-                        <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
-                            <tr>
-                                <th class="py-2 pr-3 font-semibold">Page</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Clicks (28d)</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Prev 28d</th>
-                                <th class="py-2 pr-3 text-right font-semibold">Δ 28d</th>
-                                <th class="py-2 pr-3 text-right font-semibold">YoY</th>
-                                <th class="py-2 pr-3 font-semibold">Verdict</th>
-                            </tr>
-                        </thead>
-                        <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
-                            @foreach ($data['content_decay']['pages'] as $row)
-                                <tr>
-                                    <td class="py-2 pr-3 max-w-[320px] truncate text-slate-800 dark:text-slate-200" title="{{ $row['page'] }}">{{ $row['page'] }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['current_clicks']) }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['previous_clicks']) }}</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums font-semibold text-red-600 dark:text-red-400">{{ $row['clicks_change_percent'] }}%</td>
-                                    <td class="py-2 pr-3 text-right tabular-nums">
-                                        @if (! $data['content_decay']['has_yoy_history'])
-                                            <span class="text-slate-400 dark:text-slate-500">insufficient history</span>
-                                        @elseif ($row['yoy_change_percent'] === null)
-                                            <span class="text-slate-400 dark:text-slate-500">—</span>
-                                        @else
-                                            <span @class([
-                                                'font-semibold',
-                                                'text-red-600 dark:text-red-400' => $row['yoy_change_percent'] < 0,
-                                                'text-emerald-600 dark:text-emerald-400' => $row['yoy_change_percent'] >= 0,
-                                            ])>{{ $row['yoy_change_percent'] }}%</span>
-                                        @endif
-                                    </td>
-                                    <td class="py-2 pr-3">
-                                        @if ($row['verdict'] === 'PASS')
-                                            <span class="rounded bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400">PASS</span>
-                                        @elseif ($row['verdict'])
-                                            <span class="rounded bg-red-50 px-1.5 py-0.5 text-[10px] font-semibold text-red-700 dark:bg-red-500/15 dark:text-red-400">{{ $row['verdict'] }}</span>
-                                        @else
-                                            <span class="text-slate-400 dark:text-slate-500">—</span>
-                                        @endif
-                                    </td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            @endif
-        </div>
-    @endif
+    </div>
 </div>
