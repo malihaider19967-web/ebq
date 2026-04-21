@@ -47,13 +47,11 @@ class RegisteredUserController extends Controller
             'password' => $validated['password'],
         ]);
 
-        $inviteToken = $request->input('invite');
-        if (is_string($inviteToken) && $inviteToken !== '') {
-            $invitation = WebsiteInvitation::findValidByPlainToken($inviteToken);
-            if ($invitation && Str::lower($invitation->email) === Str::lower($validated['email'])) {
-                $invitation->acceptFor($user);
-            }
-        }
+        WebsiteInvitation::query()
+            ->where('email', Str::lower($validated['email']))
+            ->where('expires_at', '>', now())
+            ->get()
+            ->each(fn (WebsiteInvitation $invitation) => $invitation->acceptFor($user));
 
         event(new Registered($user));
 
