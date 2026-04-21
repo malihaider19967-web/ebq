@@ -51,6 +51,30 @@ final class EBQ_Rest_Proxy
                 'query' => ['required' => true],
             ],
         ]);
+
+        register_rest_route('ebq/v1', '/post-insights-html/(?P<id>\d+)', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'post_insights_html'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+            ],
+        ]);
+
+        register_rest_route('ebq/v1', '/dashboard-html', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'dashboard_html'],
+        ]);
+
+        register_rest_route('ebq/v1', '/bulk-post-insights', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'bulk_post_insights'],
+            'args' => [
+                'post_ids' => ['required' => true],
+            ],
+        ]);
     }
 
     public function can_edit(): bool
@@ -103,5 +127,71 @@ final class EBQ_Rest_Proxy
             EBQ_Plugin::api_client()->get_serp_preview((string) $post_id, $query),
             200
         );
+    }
+
+    public function post_insights_html(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $url = get_permalink($post_id);
+        if (! $url) {
+            return new WP_REST_Response(['ok' => false, 'error' => 'post_not_found'], 404);
+        }
+
+        $data = EBQ_Plugin::api_client()->get_post_insights((string) $post_id, $url);
+        if (empty($data) || ! is_array($data) || ($data['ok'] ?? null) === false) {
+            $reason = is_array($data) ? (string) ($data['error'] ?? 'unknown') : 'no_response';
+
+            return new WP_REST_Response(['ok' => false, 'error' => $reason], 200);
+        }
+
+        return new WP_REST_Response([
+            'ok' => true,
+            'html' => EBQ_Meta_Box::render_content($data),
+        ], 200);
+    }
+
+    public function dashboard_html(): WP_REST_Response
+    {
+        $data = EBQ_Plugin::api_client()->get_dashboard();
+        if (empty($data) || ! is_array($data) || ($data['ok'] ?? null) === false) {
+            $reason = is_array($data) ? (string) ($data['error'] ?? 'unknown') : 'no_response';
+
+            return new WP_REST_Response(['ok' => false, 'error' => $reason], 200);
+        }
+
+        return new WP_REST_Response([
+            'ok' => true,
+            'html' => EBQ_Dashboard_Widget::render_content($data),
+        ], 200);
+    }
+
+    public function bulk_post_insights(WP_REST_Request $request): WP_REST_Response
+    {
+        $ids = (array) $request->get_param('post_ids');
+        $urls = [];
+        foreach ($ids as $id) {
+            $id = (int) $id;
+            if ($id <= 0) {
+                continue;
+            }
+            $permalink = get_permalink($id);
+            if ($permalink) {
+                $urls[$id] = $permalink;
+            }
+        }
+
+        if (empty($urls)) {
+            return new WP_REST_Response(['ok' => true, 'rows' => []], 200);
+        }
+
+        $response = EBQ_Plugin::api_client()->get_posts_bulk(array_values($urls));
+        $results = is_array($response['results'] ?? null) ? $response['results'] : [];
+
+        $rows = [];
+        foreach ($urls as $post_id => $url) {
+            $rows[(string) $post_id] = isset($results[$url]) ? $results[$url] : null;
+        }
+
+        return new WP_REST_Response(['ok' => true, 'rows' => $rows], 200);
     }
 }
