@@ -177,6 +177,41 @@ final class EBQ_Settings
                 <?php endif; ?>
             </div>
 
+            <?php // Always-on diagnostics panel ?>
+            <div style="max-width:560px;background:#fff;border:1px solid #c3c4c7;border-radius:8px;padding:16px 20px;margin-top:16px;">
+                <details <?php echo $connected ? '' : 'open'; ?>>
+                    <summary style="cursor:pointer;font-size:12px;font-weight:600;color:#64748b;">
+                        <?php esc_html_e('Diagnostics (share when reporting issues)', 'ebq-seo'); ?>
+                    </summary>
+                    <?php
+                        $token_opt = (string) get_option('ebq_site_token', '');
+                        $state_opt = (string) get_option('ebq_connect_state', '');
+                        $diag = [
+                            'plugin_version' => EBQ_SEO_VERSION,
+                            'wp_version' => get_bloginfo('version'),
+                            'php_version' => PHP_VERSION,
+                            'is_multisite' => is_multisite(),
+                            'ebq_api_base' => EBQ_Api_Client::base_url(),
+                            'home_url' => home_url('/'),
+                            'admin_url' => admin_url('options-general.php?page=ebq-seo&ebq_cb=1'),
+                            'current_user_id' => get_current_user_id(),
+                            'can_manage_options' => current_user_can('manage_options'),
+                            'option.ebq_site_token' => $token_opt === '' ? 'empty' : 'set ('.strlen($token_opt).' chars)',
+                            'option.ebq_website_id' => (int) get_option('ebq_website_id', 0),
+                            'option.ebq_website_domain' => (string) get_option('ebq_website_domain', ''),
+                            'option.ebq_connect_state' => $state_opt === '' ? 'empty' : 'set ('.strlen($state_opt).' chars, prefix '.substr($state_opt, 0, 6).'…)',
+                            'option.ebq_last_connect_error' => (string) get_option('ebq_last_connect_error', ''),
+                            'is_configured()' => EBQ_Plugin::is_configured(),
+                            'get_query_vars' => array_keys($_GET),
+                            'object_cache_active' => wp_using_ext_object_cache(),
+                        ];
+                    ?>
+                    <code style="display:block;margin-top:8px;padding:10px;background:#f1f5f9;border-radius:4px;font-size:11px;white-space:pre-wrap;word-break:break-all;">
+<?php echo esc_html(wp_json_encode($diag, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)); ?>
+                    </code>
+                </details>
+            </div>
+
             <?php if (defined('EBQ_API_BASE')): ?>
                 <p style="margin-top:16px;color:#94a3b8;font-size:11px;">
                     <?php echo esc_html(sprintf(__('Advanced: EBQ_API_BASE is defined in wp-config.php as %s.', 'ebq-seo'), (string) EBQ_API_BASE)); ?>
