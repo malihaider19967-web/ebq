@@ -60,15 +60,15 @@ if (! function_exists('format_user_now')) {
 
 if (! function_exists('plugin_download_url')) {
     /**
-     * Public URL to the packaged WordPress plugin ZIP, cache-busted by filemtime
-     * so repackaging always invalidates downstream caches.
+     * URL to the packaged WordPress plugin ZIP. Routed through Laravel so the
+     * controller can emit no-cache headers and a filemtime-stamped filename —
+     * guarantees every repackage is immediately the version users download.
      */
     function plugin_download_url(): string
     {
-        $relative = 'downloads/ebq-seo.zip';
-        $absolute = public_path($relative);
+        $absolute = public_path('downloads/ebq-seo.zip');
         $version = is_file($absolute) ? (string) filemtime($absolute) : '0';
 
-        return asset($relative).'?v='.$version;
+        return route('wordpress.plugin.download').'?v='.$version;
     }
 }
