@@ -25,6 +25,7 @@ final class EBQ_Plugin
         (new EBQ_Post_Column())->register();
         (new EBQ_Dashboard_Widget())->register();
         (new EBQ_Gutenberg_Sidebar())->register();
+        (new EBQ_Meta_Box())->register();
     }
 
     public static function api_client(): EBQ_Api_Client
