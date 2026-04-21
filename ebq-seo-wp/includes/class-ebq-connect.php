@@ -106,7 +106,7 @@ final class EBQ_Connect
         $expected_state = (string) get_option('ebq_connect_state', '');
 
         $fail = static function (string $status) use ($received_state, $expected_state, $token, $website_id): void {
-            update_option('ebq_last_connect_error', sprintf(
+            $summary = sprintf(
                 '[%s] state_expected=%s state_got=%s token_len=%d website_id=%d ts=%s',
                 $status,
                 $expected_state !== '' ? substr($expected_state, 0, 6).'…' : 'empty',
@@ -114,7 +114,9 @@ final class EBQ_Connect
                 strlen($token),
                 $website_id,
                 current_time('mysql')
-            ));
+            );
+            update_option('ebq_last_connect_error', $summary);
+            error_log('EBQ SEO connect failure: '.$summary);
             wp_safe_redirect(admin_url('options-general.php?page=ebq-seo&ebq_status='.$status));
             exit;
         };

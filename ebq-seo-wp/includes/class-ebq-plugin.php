@@ -19,6 +19,7 @@ final class EBQ_Plugin
     public function boot(): void
     {
         (new EBQ_Connect())->register();
+        (new EBQ_Updater())->register();
         (new EBQ_Settings())->register();
         (new EBQ_Rest_Proxy())->register();
         (new EBQ_Post_Column())->register();

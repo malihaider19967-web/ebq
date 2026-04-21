@@ -4,6 +4,7 @@ use App\Http\Controllers\GoogleOAuthController;
 use App\Http\Controllers\PageAuditController;
 use App\Http\Controllers\WordPressConnectController;
 use App\Http\Controllers\WordPressPluginDownloadController;
+use App\Http\Controllers\WordPressPluginVersionController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'landing')->name('landing');
@@ -11,6 +12,7 @@ Route::view('/features', 'features')->name('features');
 
 // Always-fresh download of the latest packaged WP plugin — bypasses public/ caching.
 Route::get('/wordpress/plugin.zip', WordPressPluginDownloadController::class)->name('wordpress.plugin.download');
+Route::get('/wordpress/plugin/version', WordPressPluginVersionController::class)->name('wordpress.plugin.version');
 
 // OAuth-style one-click link from the WordPress plugin.
 Route::middleware(['web', 'auth'])->group(function (): void {

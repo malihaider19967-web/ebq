@@ -51,6 +51,26 @@ class FeaturesPageTest extends TestCase
         $this->assertGreaterThan(5_000, filesize($path), 'Plugin zip looks empty.');
     }
 
+    public function test_plugin_version_endpoint_reflects_source_header(): void
+    {
+        $response = $this->getJson(route('wordpress.plugin.version'));
+
+        $response->assertOk()
+            ->assertJsonStructure([
+                'slug',
+                'name',
+                'version',
+                'download_url',
+                'requires' => ['wp', 'php'],
+                'tested',
+                'homepage',
+            ]);
+
+        $this->assertSame('ebq-seo', $response->json('slug'));
+        $this->assertMatchesRegularExpression('/^\d+\.\d+\.\d+$/', (string) $response->json('version'));
+        $this->assertStringContainsString('/wordpress/plugin.zip', (string) $response->json('download_url'));
+    }
+
     public function test_plugin_download_route_serves_fresh_zip_with_no_cache_headers(): void
     {
         $response = $this->get(route('wordpress.plugin.download'));
