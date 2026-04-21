@@ -5,6 +5,7 @@ use App\Http\Controllers\PageAuditController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'landing')->name('landing');
+Route::view('/features', 'features')->name('features');
 
 Route::middleware(['auth', 'onboarded'])->group(function () {
     Route::view('/dashboard', 'dashboard')->middleware('feature:dashboard')->name('dashboard');

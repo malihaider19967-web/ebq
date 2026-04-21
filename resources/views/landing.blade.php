@@ -42,7 +42,7 @@
                 </a>
 
                 <nav aria-label="Primary" class="hidden items-center gap-8 text-sm font-medium text-slate-100 md:flex">
-                    <a href="#features" class="transition hover:text-indigo-200">Features</a>
+                    <a href="{{ route('features') }}" class="transition hover:text-indigo-200">Features</a>
                     <a href="#workflow" class="transition hover:text-indigo-200">Workflow</a>
                     <a href="#results" class="transition hover:text-indigo-200">Results</a>
                     <a href="#faq" class="transition hover:text-indigo-200">FAQ</a>
