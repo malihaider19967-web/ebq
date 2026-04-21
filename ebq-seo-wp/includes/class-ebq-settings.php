@@ -66,7 +66,7 @@ final class EBQ_Settings
                         <?php esc_html_e('One click. You\'ll log in to EBQ, pick which website to link, and come back — the token is exchanged for you.', 'ebq-seo'); ?>
                     </p>
                     <p>
-                        <a href="<?php echo esc_url(EBQ_Connect::build_connect_url()); ?>" class="button button-primary button-hero">
+                        <a href="<?php echo esc_url(EBQ_Connect::start_url()); ?>" class="button button-primary button-hero">
                             <?php esc_html_e('Connect to EBQ →', 'ebq-seo'); ?>
                         </a>
                     </p>
@@ -76,6 +76,13 @@ final class EBQ_Settings
                             esc_url(EBQ_Api_Client::base_url() . '/register')
                         )); ?>
                     </p>
+                    <?php $last_error = (string) get_option('ebq_last_connect_error', ''); ?>
+                    <?php if ($last_error !== ''): ?>
+                        <details style="margin-top:14px;color:#64748b;font-size:11px;">
+                            <summary style="cursor:pointer;"><?php esc_html_e('Last connection attempt diagnostics', 'ebq-seo'); ?></summary>
+                            <code style="display:block;margin-top:6px;padding:8px;background:#f1f5f9;border-radius:4px;word-break:break-all;"><?php echo esc_html($last_error); ?></code>
+                        </details>
+                    <?php endif; ?>
                 <?php endif; ?>
             </div>
 

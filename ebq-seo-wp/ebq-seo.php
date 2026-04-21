@@ -35,10 +35,12 @@ register_activation_hook(__FILE__, static function (): void {
     add_option('ebq_website_id', 0);
     add_option('ebq_website_domain', '');
     add_option('ebq_connect_state', '');
+    add_option('ebq_last_connect_error', '');
 });
 
 register_deactivation_hook(__FILE__, static function (): void {
     delete_option('ebq_connect_state');
+    delete_option('ebq_last_connect_error');
 });
 
 add_action('plugins_loaded', static function (): void {
