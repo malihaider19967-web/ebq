@@ -8,6 +8,7 @@
             <livewire:dashboard.sync-and-report-panel />
         </div>
         <livewire:dashboard.kpi-cards />
+        <livewire:dashboard.insight-cards />
         <livewire:dashboard.traffic-chart />
     </div>
 </x-layouts.app>

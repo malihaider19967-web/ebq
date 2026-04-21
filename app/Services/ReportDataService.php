@@ -531,8 +531,95 @@ class ReportDataService
 
     private function buildOpportunities(int $websiteId, Carbon $start, Carbon $end): array
     {
-        return SearchConsoleData::where('website_id', $websiteId)
+        return $this->strikingDistance($websiteId, $start->toDateString(), $end->toDateString(), 8);
+    }
+
+    /**
+     * Queries where multiple pages from this site split clicks/impressions —
+     * Google has to pick one; two competing URLs dilute each other's authority.
+     *
+     * @return array<int, array{query: string, primary_page: string, total_clicks: int, total_impressions: int, competing_pages: list<array{page: string, clicks: int, impressions: int, share: float, position: float}>}>
+     */
+    public function cannibalizationReport(int $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50): array
+    {
+        [$start, $end] = $this->resolveRange($startDate, $endDate, 28);
+
+        $rows = SearchConsoleData::query()
+            ->where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->where('query', '!=', '')
+            ->where('page', '!=', '')
+            ->selectRaw('query, page, SUM(clicks) as total_clicks, SUM(impressions) as total_impressions, AVG(position) as avg_position')
+            ->groupBy('query', 'page')
+            ->get();
+
+        $grouped = $rows->groupBy('query');
+        $out = [];
+
+        foreach ($grouped as $query => $pageRows) {
+            if ($pageRows->count() < 2) {
+                continue;
+            }
+            $pages = $pageRows
+                ->map(fn ($r) => [
+                    'page' => (string) $r->page,
+                    'clicks' => (int) $r->total_clicks,
+                    'impressions' => (int) $r->total_impressions,
+                    'position' => round((float) $r->avg_position, 1),
+                ])
+                ->sortByDesc('clicks')
+                ->values();
+
+            $totalClicks = (int) $pages->sum('clicks');
+            $totalImpressions = (int) $pages->sum('impressions');
+
+            if ($totalImpressions < 100) {
+                continue;
+            }
+
+            $primary = $pages->first();
+            $primaryShare = $totalClicks > 0 ? ($primary['clicks'] / $totalClicks) * 100 : 0.0;
+            if ($totalClicks > 0 && $primaryShare >= 90.0) {
+                continue;
+            }
+
+            $competing = $pages->slice(1)->map(fn (array $p) => $p + [
+                'share' => $totalClicks > 0 ? round(($p['clicks'] / $totalClicks) * 100, 1) : 0.0,
+            ])->values()->toArray();
+
+            if (empty($competing)) {
+                continue;
+            }
+
+            $out[] = [
+                'query' => (string) $query,
+                'primary_page' => $primary['page'],
+                'total_clicks' => $totalClicks,
+                'total_impressions' => $totalImpressions,
+                'page_count' => $pages->count(),
+                'competing_pages' => $competing,
+            ];
+        }
+
+        usort($out, fn ($a, $b) => $b['total_impressions'] <=> $a['total_impressions']);
+
+        return array_slice($out, 0, $limit);
+    }
+
+    /**
+     * Queries ranking 5–20 with high impressions and below-curve CTR — the single
+     * highest-ROI SEO optimization target list.
+     *
+     * @return array<int, array{query: string, impressions: int, clicks: int, ctr: float, position: float, score: float}>
+     */
+    public function strikingDistance(int $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50): array
+    {
+        [$start, $end] = $this->resolveRange($startDate, $endDate, 28);
+
+        return SearchConsoleData::query()
+            ->where('website_id', $websiteId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->where('query', '!=', '')
             ->selectRaw('query, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as avg_position')
             ->groupBy('query')
             ->get()
@@ -546,7 +633,7 @@ class ReportDataService
                 }
                 $score = round(($impressions / 100) + (20 - $position) - ($ctr * 0.6), 1);
                 return [
-                    'query' => $row->query,
+                    'query' => (string) $row->query,
                     'impressions' => $impressions,
                     'clicks' => $clicks,
                     'ctr' => round($ctr, 2),
@@ -556,8 +643,191 @@ class ReportDataService
             })
             ->filter()
             ->sortByDesc('score')
-            ->take(8)
+            ->take($limit)
             ->values()
             ->toArray();
+    }
+
+    /**
+     * Per-page 28d vs prior-28d, and vs same 28d last year. Surfaces pages with
+     * sustained decline that still get impressions (recoverable). Left-joins
+     * indexing status so decay vs. de-indexing is distinguishable.
+     *
+     * @return array{pages: array<int, array<string, mixed>>, has_yoy_history: bool}
+     */
+    public function contentDecay(int $websiteId, int $limit = 25): array
+    {
+        $tz = config('app.timezone');
+        $end = Carbon::yesterday($tz)->endOfDay();
+        $start = $end->copy()->subDays(27)->startOfDay();
+        $prevEnd = $start->copy()->subDay()->endOfDay();
+        $prevStart = $prevEnd->copy()->subDays(27)->startOfDay();
+        $yoyEnd = $end->copy()->subYear()->endOfDay();
+        $yoyStart = $start->copy()->subYear()->startOfDay();
+
+        $earliest = SearchConsoleData::query()
+            ->where('website_id', $websiteId)
+            ->min('date');
+        $hasYoy = $earliest && Carbon::parse($earliest)->lte($yoyStart);
+
+        $current = SearchConsoleData::query()
+            ->where('website_id', $websiteId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->where('page', '!=', '')
+            ->selectRaw('page, SUM(clicks) as clicks, SUM(impressions) as impressions')
+            ->groupBy('page')
+            ->get()
+            ->keyBy('page');
+
+        $previous = SearchConsoleData::query()
+            ->where('website_id', $websiteId)
+            ->whereBetween('date', [$prevStart->toDateString(), $prevEnd->toDateString()])
+            ->whereIn('page', $current->keys()->all())
+            ->selectRaw('page, SUM(clicks) as clicks, SUM(impressions) as impressions')
+            ->groupBy('page')
+            ->get()
+            ->keyBy('page');
+
+        $yoy = $hasYoy
+            ? SearchConsoleData::query()
+                ->where('website_id', $websiteId)
+                ->whereBetween('date', [$yoyStart->toDateString(), $yoyEnd->toDateString()])
+                ->whereIn('page', $current->keys()->all())
+                ->selectRaw('page, SUM(clicks) as clicks, SUM(impressions) as impressions')
+                ->groupBy('page')
+                ->get()
+                ->keyBy('page')
+            : collect();
+
+        $indexing = PageIndexingStatus::query()
+            ->where('website_id', $websiteId)
+            ->whereIn('page', $current->keys()->all())
+            ->get(['page', 'google_verdict', 'google_coverage_state'])
+            ->keyBy('page');
+
+        $pages = $current->map(function ($cur, string $page) use ($previous, $yoy, $indexing, $hasYoy) {
+            $curClicks = (int) $cur->clicks;
+            $curImpr = (int) $cur->impressions;
+            $prev = $previous->get($page);
+            $prevClicks = $prev ? (int) $prev->clicks : 0;
+            $prevImpr = $prev ? (int) $prev->impressions : 0;
+            $yoyRow = $hasYoy ? $yoy->get($page) : null;
+            $yoyClicks = $yoyRow ? (int) $yoyRow->clicks : 0;
+
+            if ($curImpr < 100) {
+                return null;
+            }
+            $clicksDelta = $curClicks - $prevClicks;
+            $clicksPct = $prevClicks > 0 ? round(($clicksDelta / $prevClicks) * 100, 1) : null;
+            if ($clicksPct === null || $clicksPct > -15.0) {
+                return null;
+            }
+            $yoyPct = ($hasYoy && $yoyClicks > 0)
+                ? round((($curClicks - $yoyClicks) / $yoyClicks) * 100, 1)
+                : null;
+
+            $verdict = $indexing->get($page)?->google_verdict;
+
+            return [
+                'page' => $page,
+                'current_clicks' => $curClicks,
+                'previous_clicks' => $prevClicks,
+                'clicks_change_percent' => $clicksPct,
+                'yoy_clicks' => $yoyClicks,
+                'yoy_change_percent' => $yoyPct,
+                'current_impressions' => $curImpr,
+                'previous_impressions' => $prevImpr,
+                'verdict' => $verdict ?: null,
+            ];
+        })->filter()->sortBy('clicks_change_percent')->take($limit)->values()->toArray();
+
+        return [
+            'pages' => $pages,
+            'has_yoy_history' => $hasYoy,
+        ];
+    }
+
+    /**
+     * Pages where Google's last verdict != PASS AND we've had impressions in the
+     * last 14 days — urgent-action cohort.
+     *
+     * @return array<int, array{page: string, verdict: string, coverage_state: string, indexing_state: string, last_crawl_at: ?string, recent_clicks: int, recent_impressions: int}>
+     */
+    public function indexingFailsWithTraffic(int $websiteId, int $windowDays = 14, int $limit = 50): array
+    {
+        $tz = config('app.timezone');
+        $end = Carbon::yesterday($tz)->endOfDay();
+        $start = $end->copy()->subDays($windowDays - 1)->startOfDay();
+
+        $failing = PageIndexingStatus::query()
+            ->where('website_id', $websiteId)
+            ->whereNotNull('google_verdict')
+            ->where('google_verdict', '!=', 'PASS')
+            ->get();
+
+        if ($failing->isEmpty()) {
+            return [];
+        }
+
+        $pages = $failing->pluck('page')->all();
+        $traffic = SearchConsoleData::query()
+            ->where('website_id', $websiteId)
+            ->whereIn('page', $pages)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->selectRaw('page, SUM(clicks) as clicks, SUM(impressions) as impressions')
+            ->groupBy('page')
+            ->get()
+            ->keyBy('page');
+
+        $out = [];
+        foreach ($failing as $row) {
+            $t = $traffic->get($row->page);
+            $impressions = $t ? (int) $t->impressions : 0;
+            if ($impressions <= 0) {
+                continue;
+            }
+            $out[] = [
+                'page' => (string) $row->page,
+                'verdict' => (string) $row->google_verdict,
+                'coverage_state' => (string) ($row->google_coverage_state ?: 'Unknown'),
+                'indexing_state' => (string) ($row->google_indexing_state ?: 'Unknown'),
+                'last_crawl_at' => $row->google_last_crawl_at?->toDateTimeString(),
+                'recent_clicks' => $t ? (int) $t->clicks : 0,
+                'recent_impressions' => $impressions,
+            ];
+        }
+
+        usort($out, fn ($a, $b) => $b['recent_impressions'] <=> $a['recent_impressions']);
+
+        return array_slice($out, 0, $limit);
+    }
+
+    /**
+     * Counts for Dashboard insight cards. Cheap enough to compute on each render.
+     *
+     * @return array{cannibalizations: int, striking_distance: int, indexing_fails_with_traffic: int, content_decay: int}
+     */
+    public function insightCounts(int $websiteId): array
+    {
+        return [
+            'cannibalizations' => count($this->cannibalizationReport($websiteId)),
+            'striking_distance' => count($this->strikingDistance($websiteId)),
+            'indexing_fails_with_traffic' => count($this->indexingFailsWithTraffic($websiteId)),
+            'content_decay' => count($this->contentDecay($websiteId)['pages']),
+        ];
+    }
+
+    /**
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    private function resolveRange(?string $startDate, ?string $endDate, int $defaultDays): array
+    {
+        $tz = config('app.timezone');
+        $end = $endDate ? Carbon::parse($endDate)->endOfDay() : Carbon::yesterday($tz)->endOfDay();
+        $start = $startDate
+            ? Carbon::parse($startDate)->startOfDay()
+            : $end->copy()->subDays($defaultDays - 1)->startOfDay();
+
+        return [$start, $end];
     }
 }

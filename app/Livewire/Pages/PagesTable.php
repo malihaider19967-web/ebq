@@ -19,6 +19,7 @@ class PagesTable extends Component
     public string $search = '';
     public string $sortBy = 'total_clicks';
     public string $sortDir = 'desc';
+    public bool $onlyFailingWithTraffic = false;
 
     public function mount(): void
     {
@@ -45,6 +46,11 @@ class PagesTable extends Component
     }
 
     public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedOnlyFailingWithTraffic(): void
     {
         $this->resetPage();
     }
@@ -84,6 +90,10 @@ class PagesTable extends Component
                 ->where('search_console_data.website_id', $this->websiteId)
                 ->when($gscKeywordWindowFrom, fn ($q) => $q->whereDate('search_console_data.date', '>=', $gscKeywordWindowFrom))
                 ->when($this->search, fn ($q) => $q->where('search_console_data.page', 'like', "%{$this->search}%"))
+                ->when($this->onlyFailingWithTraffic, function ($q): void {
+                    $q->whereNotNull('page_indexing_statuses.google_verdict')
+                        ->where('page_indexing_statuses.google_verdict', '!=', 'PASS');
+                })
                 ->groupBy('search_console_data.page')
                 ->orderBy($sortColumn, $this->sortDir)
                 ->paginate(20);

@@ -2,7 +2,9 @@
 
 namespace App\Livewire\Keywords;
 
+use App\Models\RankTrackingKeyword;
 use App\Models\SearchConsoleData;
+use App\Services\ReportDataService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
@@ -92,6 +94,24 @@ class KeywordsTable extends Component
             }
         }
 
-        return view('livewire.keywords.keywords-table', compact('rows'));
+        $cannibalized = [];
+        $tracked = [];
+        if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
+            $cannibalized = array_flip(
+                array_map(
+                    fn (array $r) => mb_strtolower((string) $r['query']),
+                    app(ReportDataService::class)->cannibalizationReport($this->websiteId, null, null, 500),
+                )
+            );
+            $tracked = array_flip(
+                RankTrackingKeyword::query()
+                    ->where('website_id', $this->websiteId)
+                    ->pluck('keyword')
+                    ->map(fn ($k) => mb_strtolower((string) $k))
+                    ->all()
+            );
+        }
+
+        return view('livewire.keywords.keywords-table', compact('rows', 'cannibalized', 'tracked'));
     }
 }
