@@ -3,7 +3,7 @@
  * One-click OAuth-style connect flow.
  *
  *   1. Settings page shows a "Connect to EBQ" link built by build_connect_url().
- *   2. Click redirects to https://app.ebq.io/wordpress/connect with site_url +
+ *   2. Click redirects to https://ebq.io/wordpress/connect with site_url +
  *      redirect + state params. User authenticates in EBQ and picks a website.
  *   3. EBQ bounces back to admin URL with ?ebq_token=...&website_id=...&state=...
  *   4. maybe_catch_callback() validates state on admin_init, persists the token,

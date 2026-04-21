@@ -18,7 +18,7 @@ EBQ SEO connects your WordPress site to your EBQ workspace so content editors se
 * 30d clicks + avg position columns in the posts list.
 * Counts of cannibalizations, striking-distance keywords, indexing failures with live traffic, and content-decay pages in the WordPress dashboard.
 
-One-click connect — no copying of codes or tokens. Requires an EBQ account. Create yours at https://app.ebq.io.
+One-click connect — no copying of codes or tokens. Requires an EBQ account. Create yours at https://ebq.io.
 
 == Installation ==
 

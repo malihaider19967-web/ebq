@@ -2,7 +2,7 @@
 /**
  * Thin wrapper around wp_remote_request that adds the plugin's bearer token.
  *
- * Base URL defaults to https://app.ebq.io. Self-hosted installs override by
+ * Base URL defaults to https://ebq.io. Self-hosted installs override by
  * defining the EBQ_API_BASE constant in wp-config.php — no UI field needed.
  */
 
@@ -12,7 +12,7 @@ if (! defined('ABSPATH')) {
 
 final class EBQ_Api_Client
 {
-    public const DEFAULT_BASE = 'https://app.ebq.io';
+    public const DEFAULT_BASE = 'https://ebq.io';
 
     public function __construct(
         private readonly string $token,
