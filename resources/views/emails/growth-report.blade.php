@@ -483,6 +483,63 @@
             <p class="empty-note">No indexing status checks recorded yet.</p>
         @endif
 
+        @if (! empty($insights['cannibalization']) || ! empty($insights['striking_distance']) || ! empty($insights['indexing_fails_with_traffic']))
+            <hr class="section-divider">
+
+            <h2 class="section-title">Action Insights</h2>
+
+            @if (! empty($insights['striking_distance']))
+                <h3 style="font-size:13px;margin:12px 0 6px;">Top striking-distance keywords</h3>
+                <table>
+                    <thead><tr><th>Query</th><th class="right">Pos</th><th class="right">Impr</th><th class="right">CTR</th></tr></thead>
+                    <tbody>
+                        @foreach ($insights['striking_distance'] as $row)
+                            <tr>
+                                <td>{{ \Illuminate\Support\Str::limit($row['query'], 60) }}</td>
+                                <td class="right">{{ $row['position'] }}</td>
+                                <td class="right">{{ number_format($row['impressions']) }}</td>
+                                <td class="right">{{ $row['ctr'] }}%</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+
+            @if (! empty($insights['cannibalization']))
+                <h3 style="font-size:13px;margin:12px 0 6px;">Top cannibalization queries</h3>
+                <table>
+                    <thead><tr><th>Query</th><th>Primary page</th><th class="right">Pages</th><th class="right">Impr</th></tr></thead>
+                    <tbody>
+                        @foreach ($insights['cannibalization'] as $row)
+                            <tr>
+                                <td>{{ \Illuminate\Support\Str::limit($row['query'], 40) }}</td>
+                                <td>{{ \Illuminate\Support\Str::limit($row['primary_page'], 45) }}</td>
+                                <td class="right">{{ $row['page_count'] }}</td>
+                                <td class="right">{{ number_format($row['total_impressions']) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+
+            @if (! empty($insights['indexing_fails_with_traffic']))
+                <h3 style="font-size:13px;margin:12px 0 6px;">Indexing failures still getting traffic</h3>
+                <table>
+                    <thead><tr><th>Page</th><th>Verdict</th><th class="right">Clicks (14d)</th><th class="right">Impr (14d)</th></tr></thead>
+                    <tbody>
+                        @foreach ($insights['indexing_fails_with_traffic'] as $row)
+                            <tr>
+                                <td>{{ \Illuminate\Support\Str::limit($row['page'], 55) }}</td>
+                                <td><span style="color:#dc2626;font-weight:700;">{{ $row['verdict'] }}</span></td>
+                                <td class="right">{{ number_format($row['recent_clicks']) }}</td>
+                                <td class="right">{{ number_format($row['recent_impressions']) }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+        @endif
+
         <hr class="section-divider">
 
         <div style="text-align: center; padding-top: 8px;">

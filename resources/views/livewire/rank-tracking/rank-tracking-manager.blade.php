@@ -312,6 +312,13 @@
                                             <span class="rounded bg-slate-100 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $kw->search_type }}</span>
                                             @if (! $kw->is_active)<span class="rounded bg-slate-200 px-1.5 py-px text-[9px] font-semibold uppercase text-slate-600 dark:bg-slate-700 dark:text-slate-300">Paused</span>@endif
                                             @if ($kw->last_status === 'failed')<span class="rounded bg-red-100 px-1.5 py-px text-[9px] font-semibold uppercase text-red-700 dark:bg-red-500/10 dark:text-red-400">Failed</span>@endif
+                                            @php($risk = $serpRisk[$kw->id] ?? null)
+                                            @if ($risk && $risk['at_risk'])
+                                                <span class="rounded bg-amber-100 px-1.5 py-px text-[9px] font-semibold uppercase text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" title="SERP has {{ implode(', ', $risk['features_present']) }} and we don't own the top result">SERP risk</span>
+                                            @endif
+                                            @if ($risk && $risk['lost_feature'])
+                                                <span class="rounded bg-red-100 px-1.5 py-px text-[9px] font-semibold uppercase text-red-700 dark:bg-red-500/10 dark:text-red-400" title="Lost SERP feature: {{ implode(', ', $risk['features_lost']) }}">lost feature</span>
+                                            @endif
                                             @foreach ((array) $kw->tags as $tag)
                                                 <span class="rounded bg-indigo-50 px-1.5 py-px text-[9px] text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">{{ $tag }}</span>
                                             @endforeach

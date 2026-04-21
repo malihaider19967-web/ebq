@@ -267,6 +267,60 @@
             </div>
         @endif
 
+        {{-- Clicks overlay (GSC 90-day daily clicks for the matched query) --}}
+        @if (!empty($gsc['matched']) && !empty($gsc['series']) && count($gsc['series']) > 1)
+            @php
+                $clickSeries = array_values(array_filter($gsc['series'], fn ($r) => $r['clicks'] !== null));
+                $maxClicks = $clickSeries ? max(array_column($clickSeries, 'clicks')) : 0;
+                $maxClicks = $maxClicks > 0 ? $maxClicks : 1;
+                $cWidth = 800; $cHeight = 120;
+                $cPad = ['t' => 10, 'r' => 10, 'b' => 20, 'l' => 36];
+                $cPlotW = $cWidth - $cPad['l'] - $cPad['r'];
+                $cPlotH = $cHeight - $cPad['t'] - $cPad['b'];
+                $cCount = count($clickSeries);
+                $cStep = $cCount > 1 ? $cPlotW / ($cCount - 1) : $cPlotW;
+                $cPoints = [];
+                foreach ($clickSeries as $idx => $p) {
+                    $x = $cPad['l'] + $idx * $cStep;
+                    $y = $cPad['t'] + $cPlotH - (((int) $p['clicks']) / $maxClicks) * $cPlotH;
+                    $cPoints[] = ['x' => round($x, 2), 'y' => round($y, 2), 'clicks' => (int) $p['clicks'], 'date' => $p['date']];
+                }
+                $cLine = '';
+                foreach ($cPoints as $i => $pt) {
+                    $cLine .= ($i === 0 ? 'M' : 'L').$pt['x'].' '.$pt['y'].' ';
+                }
+                $cArea = $cLine;
+                if (! empty($cPoints)) {
+                    $last = end($cPoints); $first = reset($cPoints);
+                    $cArea .= 'L'.$last['x'].' '.($cPad['t'] + $cPlotH).' L'.$first['x'].' '.($cPad['t'] + $cPlotH).' Z';
+                }
+                $cFirstLabel = $cCount > 0 ? \Carbon\Carbon::parse($clickSeries[0]['date'])->format('M j') : '';
+                $cLastLabel = $cCount > 0 ? \Carbon\Carbon::parse($clickSeries[$cCount - 1]['date'])->format('M j') : '';
+            @endphp
+            <div class="mb-5 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <div class="mb-2 flex items-center justify-between">
+                    <div>
+                        <div class="text-xs font-semibold text-slate-900 dark:text-slate-100">Search clicks (last 90d)</div>
+                        <div class="text-[10px] text-slate-400">From Google Search Console for "{{ $keyword->keyword }}"</div>
+                    </div>
+                    <div class="text-[10px] text-slate-400">Peak: <span class="tabular-nums font-semibold text-slate-600 dark:text-slate-300">{{ number_format($maxClicks) }}</span>/day</div>
+                </div>
+                <div class="relative w-full">
+                    <svg viewBox="0 0 {{ $cWidth }} {{ $cHeight }}" preserveAspectRatio="none" class="h-28 w-full">
+                        <line x1="{{ $cPad['l'] }}" x2="{{ $cPad['l'] + $cPlotW }}" y1="{{ $cPad['t'] + $cPlotH }}" y2="{{ $cPad['t'] + $cPlotH }}" stroke="currentColor" stroke-width="0.5" class="text-slate-300 dark:text-slate-600" />
+                        <path d="{{ $cArea }}" class="fill-emerald-500/15" />
+                        <path d="{{ $cLine }}" fill="none" stroke="currentColor" stroke-width="1.5" class="text-emerald-500" stroke-linejoin="round" stroke-linecap="round" />
+                        @foreach ($cPoints as $pt)
+                            <circle cx="{{ $pt['x'] }}" cy="{{ $pt['y'] }}" r="1.8" class="fill-emerald-500"><title>{{ $pt['clicks'] }} clicks · {{ $pt['date'] }}</title></circle>
+                        @endforeach
+                        <text x="{{ $cPad['l'] }}" y="{{ $cHeight - 4 }}" class="fill-slate-400 text-[9px]">{{ $cFirstLabel }}</text>
+                        <text x="{{ $cPad['l'] + $cPlotW }}" y="{{ $cHeight - 4 }}" text-anchor="end" class="fill-slate-400 text-[9px]">{{ $cLastLabel }}</text>
+                    </svg>
+                </div>
+                <div class="mt-1 text-[10px] text-slate-400">Compare against the position history above — rank improvements without a corresponding clicks lift may signal a SERP-feature shift or a tracking mismatch.</div>
+            </div>
+        @endif
+
         {{-- History + snapshot --}}
         <div class="grid grid-cols-1 gap-5 lg:grid-cols-5">
             <div class="lg:col-span-2">

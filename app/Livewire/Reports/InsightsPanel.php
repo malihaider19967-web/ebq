@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Reports;
 
+use App\Services\AuditPerformanceService;
+use App\Services\BacklinkImpactService;
 use App\Services\ReportDataService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
@@ -28,7 +30,7 @@ class InsightsPanel extends Component
 
     public function setTab(string $tab): void
     {
-        if (! in_array($tab, ['cannibalization', 'striking_distance', 'content_decay', 'indexing_fails'], true)) {
+        if (! in_array($tab, ['cannibalization', 'striking_distance', 'content_decay', 'indexing_fails', 'audit_performance', 'backlink_impact'], true)) {
             return;
         }
         $this->tab = $tab;
@@ -49,6 +51,8 @@ class InsightsPanel extends Component
             'striking_distance' => [],
             'content_decay' => ['pages' => [], 'has_yoy_history' => false],
             'indexing_fails' => [],
+            'audit_performance' => [],
+            'backlink_impact' => [],
         ];
 
         if ($hasAccess) {
@@ -57,6 +61,8 @@ class InsightsPanel extends Component
                 'striking_distance' => $service->strikingDistance($this->websiteId),
                 'content_decay' => $service->contentDecay($this->websiteId),
                 'indexing_fails' => $service->indexingFailsWithTraffic($this->websiteId),
+                'audit_performance' => app(AuditPerformanceService::class)->underperformingPages($this->websiteId),
+                'backlink_impact' => app(BacklinkImpactService::class)->impactByTargetPage($this->websiteId),
             };
         }
 

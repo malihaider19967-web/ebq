@@ -25,6 +25,8 @@ class GrowthReportMail extends Mailable
 
     public array $report = [];
 
+    public array $insights = [];
+
     public function __construct(
         public User $user,
         public Website $website,
@@ -38,11 +40,18 @@ class GrowthReportMail extends Mailable
         $this->startDate = $startDate ?? $this->endDate;
         $this->reportType = $reportType ?? 'daily';
 
-        $this->report = app(ReportDataService::class)->generate(
+        $service = app(ReportDataService::class);
+        $this->report = $service->generate(
             $this->website->id,
             $this->startDate,
             $this->endDate,
         );
+
+        $this->insights = [
+            'cannibalization' => array_slice($service->cannibalizationReport($this->website->id), 0, 5),
+            'striking_distance' => array_slice($service->strikingDistance($this->website->id), 0, 5),
+            'indexing_fails_with_traffic' => array_slice($service->indexingFailsWithTraffic($this->website->id), 0, 5),
+        ];
     }
 
     public function envelope(): Envelope

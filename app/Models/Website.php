@@ -23,6 +23,8 @@ class Website extends Model
         'report_recipients',
         'last_analytics_sync_at',
         'last_search_console_sync_at',
+        'last_traffic_drop_alert_at',
+        'last_rank_drop_alert_at',
     ];
 
     protected function casts(): array
@@ -32,6 +34,8 @@ class Website extends Model
             'gsc_keyword_lookback_days' => 'integer',
             'last_analytics_sync_at' => 'datetime',
             'last_search_console_sync_at' => 'datetime',
+            'last_traffic_drop_alert_at' => 'datetime',
+            'last_rank_drop_alert_at' => 'datetime',
         ];
     }
 

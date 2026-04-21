@@ -6,6 +6,7 @@ use App\Jobs\TrackKeywordRankJob;
 use App\Models\RankTrackingKeyword;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
+use App\Services\SerpFeatureRiskService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -300,10 +301,16 @@ class RankTrackingManager extends Component
             }
         }
 
+        $serpRisk = [];
+        if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
+            $serpRisk = app(SerpFeatureRiskService::class)->riskMapForWebsite($this->websiteId);
+        }
+
         return view('livewire.rank-tracking.rank-tracking-manager', [
             'rows' => $rows,
             'stats' => $stats,
             'gscByKeyword' => $gscByKeyword,
+            'serpRisk' => $serpRisk,
             'countries' => $this->countries(),
             'languages' => $this->languages(),
         ]);
