@@ -72,6 +72,7 @@ class RankTrackingDetail extends Component
                 'snapshots' => collect(),
                 'selected' => null,
                 'chartPoints' => [],
+                'gsc' => ['matched' => false],
             ]);
         }
 
