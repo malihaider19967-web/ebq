@@ -3,7 +3,7 @@
  * Plugin Name:       EBQ SEO
  * Plugin URI:        https://ebq.io/features
  * Description:       The only SEO plugin your WordPress site needs. Real-data focus keyword, live competitor SERP, cannibalization-aware canonical, CWV-gated publish, plus Yoast-parity on-page surface (meta/social/schema/sitemap/canonical/robots). One-click connect to your EBQ workspace.
- * Version:           2.0.1
+ * Version:           2.1.0
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            EBQ
@@ -16,7 +16,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('EBQ_SEO_VERSION', '2.0.1');
+define('EBQ_SEO_VERSION', '2.1.0');
 define('EBQ_SEO_FILE', __FILE__);
 define('EBQ_SEO_PATH', plugin_dir_path(__FILE__));
 define('EBQ_SEO_URL', plugin_dir_url(__FILE__));
@@ -39,6 +39,11 @@ require_once EBQ_SEO_PATH . 'includes/class-ebq-schema-output.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-sitemap.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-seo-panel.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-seo-fields-meta-box.php';
+// v2.1 — Redirects
+require_once EBQ_SEO_PATH . 'includes/class-ebq-redirects.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-redirects-auto.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-redirects-admin.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-redirects-importer.php';
 
 register_activation_hook(__FILE__, static function (): void {
     add_option('ebq_site_token', '');

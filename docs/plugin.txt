@@ -1,0 +1,35 @@
+YOAST SEO PREMIUM - FEATURES BY MENU ITEM (NON-AI)
+
+[GENERAL]
+- SEO Workouts: Access step-by-step routines (like the Orphaned Content or Cornerstone workouts) to improve site structure.
+- Yoast Academy: Full access to all premium SEO training courses directly from the dashboard.
+- 24/7 Support: Direct link to the premium support team for email or chat assistance.
+
+[SETTINGS]
+- Site Structure / Cornerstone Content: Mark and manage your most important articles for stricter optimization checks.
+- Internal Linking: Toggle and configure the internal linking suggestion engine.
+- Social Previews: Enable visual preview tools for Facebook, X (Twitter), and LinkedIn.
+
+[REDIRECTIONS]
+- Automatic 301 Redirects: Automatically catches URL changes or deletions and prompts for a destination.
+- Manual Redirect Manager: Create, edit, and delete 301 (Permanent) and 302 (Temporary) redirects.
+- Regex Redirects: Support for complex URL pattern redirects using Regular Expressions.
+- CSV Export/Import: Bulk manage your redirects using spreadsheet files.
+
+[POST/PAGE EDITOR - SEO SIDEBAR]
+- Multiple Focus Keyphrases: Add up to 5 keywords or synonyms for a single post.
+- Synonyms & Related Keyphrases: Analysis that checks if you've included natural variations of your topic.
+- Word Form Recognition: Analysis that understands plurals and different verb tenses of your keyword.
+- Real-time Internal Linking Suggestions: A sidebar list of relevant internal posts to link to while writing.
+- Social Tab: Manually set unique images, titles, and descriptions for social media platforms.
+
+[EXTENSIONS / ADD-ONS]
+- Local SEO: Manage business address, opening hours, and Google Maps schema.
+- Video SEO: Configuration for video sitemaps and rich result appearance.
+- News SEO: Settings for the News XML sitemap and Google News inclusion.
+- WooCommerce SEO: Enhanced shop-specific SEO controls and breadcrumb settings.
+
+[TOOLS]
+- Orphaned Content Filter: Identify and fix posts that have no internal links pointing to them.
+- File Editor: Edit your robots.txt and .htaccess files safely (Ads removed in Premium).
+- Zapier Integration: Connect your SEO data to automated workflows.

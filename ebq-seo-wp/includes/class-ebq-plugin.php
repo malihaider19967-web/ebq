@@ -35,6 +35,12 @@ final class EBQ_Plugin
         (new EBQ_Sitemap())->register();
         (new EBQ_Seo_Panel())->register();
         (new EBQ_Seo_Fields_Meta_Box())->register();
+
+        // v2.1 Redirects
+        (new EBQ_Redirects())->register();
+        (new EBQ_Redirects_Auto())->register();
+        (new EBQ_Redirects_Admin())->register();
+        (new EBQ_Redirects_Importer())->register();
     }
 
     public static function api_client(): EBQ_Api_Client
