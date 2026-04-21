@@ -23,7 +23,9 @@ class PackageWordPressPlugin extends Command
         $output = base_path((string) $this->option('output'));
         File::ensureDirectoryExists(dirname($output));
 
-        $skipDirs = ['node_modules', '.git', 'tests', 'coverage', 'build'];
+        // build/ is intentionally included — the no-build Gutenberg sidebar
+        // lives in build/sidebar.js and must ship with the plugin.
+        $skipDirs = ['node_modules', '.git', 'tests', 'coverage'];
         $skipExts = ['zip', 'log'];
 
         $iterator = new \RecursiveIteratorIterator(
