@@ -43,6 +43,7 @@
 
                 <nav aria-label="Primary" class="hidden items-center gap-8 text-sm font-medium text-slate-100 md:flex">
                     <a href="{{ route('features') }}" class="transition hover:text-indigo-200">Features</a>
+                    <a href="#wordpress" class="transition hover:text-indigo-200">WordPress</a>
                     <a href="#workflow" class="transition hover:text-indigo-200">Workflow</a>
                     <a href="#results" class="transition hover:text-indigo-200">Results</a>
                     <a href="#faq" class="transition hover:text-indigo-200">FAQ</a>
@@ -209,6 +210,60 @@
                             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Average setup time</p>
                             <p class="mt-4 text-4xl font-semibold">&lt; 10 min</p>
                         </article>
+                    </div>
+                </div>
+            </section>
+
+            <section id="wordpress" class="bg-slate-50 py-24 text-slate-900 sm:py-28">
+                <div class="mx-auto grid max-w-7xl gap-12 px-6 lg:grid-cols-2 lg:items-center lg:gap-16 lg:px-8">
+                    <div>
+                        <p class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700">
+                            WordPress plugin · Beta
+                        </p>
+                        <h2 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">SEO intelligence, right inside Gutenberg</h2>
+                        <p class="mt-5 text-base leading-7 text-slate-700 sm:text-lg">
+                            Editors see rank, 30-day clicks, cannibalization warnings, and striking-distance flags while writing. The WordPress dashboard surfaces insight counts. No tab switching.
+                        </p>
+                        <ul class="mt-6 space-y-3 text-sm text-slate-700">
+                            <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span>Gutenberg sidebar with rank, clicks, and cannibalization warnings.</span></li>
+                            <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span>Posts-list column with 30-day clicks and striking-distance badges.</span></li>
+                            <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span>WordPress dashboard widget with deep-links into EBQ Reports.</span></li>
+                            <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span>One-click challenge-response verification — no credentials in browser JS.</span></li>
+                        </ul>
+                        <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+                            <a href="{{ asset('downloads/ebq-seo.zip') }}" class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500" download>
+                                <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                                Download plugin (ZIP)
+                            </a>
+                            <a href="{{ route('features') }}#wordpress" class="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">See all plugin features</a>
+                        </div>
+                        <p class="mt-3 text-xs text-slate-500">WP 6.0+ · PHP 8.1+ · Requires an EBQ account to activate.</p>
+                    </div>
+
+                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+                        <div class="flex items-center gap-2 border-b border-slate-200 pb-3 text-xs font-semibold text-slate-500">
+                            <span class="h-2 w-2 rounded-full bg-red-500"></span>
+                            <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                            <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                            <span class="ml-2">EBQ SEO · Gutenberg sidebar</span>
+                        </div>
+                        <div class="mt-4 space-y-3 text-xs">
+                            <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Search performance · 30d</p>
+                                <div class="mt-2 grid grid-cols-2 gap-2">
+                                    <div class="rounded bg-white px-2 py-1.5 ring-1 ring-slate-200"><span class="block text-[9px] uppercase text-slate-400">Clicks</span><span class="tabular-nums font-bold text-slate-900">1,284</span></div>
+                                    <div class="rounded bg-white px-2 py-1.5 ring-1 ring-slate-200"><span class="block text-[9px] uppercase text-slate-400">Avg pos</span><span class="tabular-nums font-bold text-slate-900">6.4</span></div>
+                                </div>
+                            </div>
+                            <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Cannibalization</p>
+                                <p class="mt-1 text-[11px] text-amber-900">"best seo tools" is split between this page and <span class="font-semibold">/blog/seo-tools-guide</span>. Consolidate.</p>
+                            </div>
+                            <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+                                <p class="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Striking distance</p>
+                                <p class="mt-1 text-[11px] text-indigo-900">3 queries at positions 5–20 with below-curve CTR. Tighten title + meta.</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>

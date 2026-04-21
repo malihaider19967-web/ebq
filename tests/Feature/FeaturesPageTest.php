@@ -27,4 +27,27 @@ class FeaturesPageTest extends TestCase
             ->assertOk()
             ->assertSee(route('features'));
     }
+
+    public function test_landing_advertises_wordpress_plugin_and_download(): void
+    {
+        $this->get(route('landing'))
+            ->assertOk()
+            ->assertSee('WordPress plugin')
+            ->assertSee('downloads/ebq-seo.zip', escape: false);
+    }
+
+    public function test_features_page_has_wordpress_plugin_section(): void
+    {
+        $this->get(route('features'))
+            ->assertOk()
+            ->assertSee('Ship insights where editors already work')
+            ->assertSee('downloads/ebq-seo.zip', escape: false);
+    }
+
+    public function test_plugin_zip_is_publicly_accessible(): void
+    {
+        $path = public_path('downloads/ebq-seo.zip');
+        $this->assertFileExists($path);
+        $this->assertGreaterThan(5_000, filesize($path), 'Plugin zip looks empty.');
+    }
 }

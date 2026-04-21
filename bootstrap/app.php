@@ -20,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'onboarded' => \App\Http\Middleware\EnsureOnboarded::class,
             'feature' => \App\Http\Middleware\EnsureFeatureAccess::class,
+            'website.api' => \App\Http\Middleware\WebsiteApiAuth::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

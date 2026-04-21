@@ -1,0 +1,99 @@
+<?php
+
+namespace App\Http\Controllers\Api\V1;
+
+use App\Http\Controllers\Controller;
+use App\Models\Website;
+use App\Services\PluginInsightResolver;
+use App\Services\ReportDataService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\URL;
+
+class PluginInsightsController extends Controller
+{
+    public function __construct(
+        private readonly PluginInsightResolver $resolver,
+        private readonly ReportDataService $reports,
+    ) {
+    }
+
+    /**
+     * Single-post payload for the Gutenberg sidebar.
+     *   GET /api/v1/posts/{externalPostId}/insights?url=...
+     */
+    public function showPost(Request $request, string $externalPostId): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        $url = (string) $request->query('url', '');
+        $keyword = (string) $request->query('target_keyword', '');
+
+        $payload = $this->resolver->forUrl($website, $url, $keyword ?: null, $externalPostId);
+
+        return response()->json($payload);
+    }
+
+    /**
+     * Bulk variant for the WP admin post list.
+     *   GET /api/v1/posts?urls[]=...&urls[]=...
+     */
+    public function indexPosts(Request $request): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        $urls = (array) $request->query('urls', []);
+        $urls = array_slice(array_filter($urls, 'is_string'), 0, 100);
+
+        return response()->json([
+            'results' => $this->resolver->bulkForUrls($website, $urls),
+        ]);
+    }
+
+    /**
+     * Dashboard-widget counts.
+     *   GET /api/v1/dashboard
+     */
+    public function dashboard(Request $request): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        $counts = $this->reports->insightCounts($website->id);
+
+        return response()->json([
+            'website_id' => $website->id,
+            'domain' => $website->domain,
+            'counts' => $counts,
+            'alert' => [
+                'last_traffic_drop_alert_at' => $website->last_traffic_drop_alert_at?->toIso8601String(),
+            ],
+        ]);
+    }
+
+    /**
+     * Signed short-lived redirect into the EBQ /reports page.
+     *   GET /api/v1/reports/iframe-url?insight=cannibalization
+     */
+    public function iframeUrl(Request $request): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        $insight = (string) $request->query('insight', 'cannibalization');
+
+        $signed = URL::temporarySignedRoute(
+            'reports.index',
+            Carbon::now()->addMinutes(5),
+            ['insight' => $insight, 'website' => $website->id],
+        );
+
+        return response()->json([
+            'url' => $signed,
+            'expires_at' => Carbon::now()->addMinutes(5)->toIso8601String(),
+        ]);
+    }
+
+    private function resolveWebsite(Request $request): Website
+    {
+        $website = $request->attributes->get('api_website');
+        abort_unless($website instanceof Website, 500, 'Website context missing');
+
+        return $website;
+    }
+}

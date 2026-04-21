@@ -79,6 +79,7 @@
                         ['#audits', 'Page audits'],
                         ['#backlinks', 'Backlinks'],
                         ['#reporting', 'Reporting'],
+                        ['#wordpress', 'WordPress plugin'],
                         ['#team', 'Team'],
                         ['#integrations', 'Integrations'],
                     ] as [$href, $label])
@@ -108,6 +109,7 @@
                             ['icon' => 'M2.25 7.125C2.25 6.504 2.754 6 3.375 6h6c.621 0 1.125.504 1.125 1.125v3.75c0 .621-.504 1.125-1.125 1.125h-6a1.125 1.125 0 01-1.125-1.125v-3.75zM14.25 8.625c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v8.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 01-1.125-1.125v-8.25zM3.75 16.125c0-.621.504-1.125 1.125-1.125h5.25c.621 0 1.125.504 1.125 1.125v2.25c0 .621-.504 1.125-1.125 1.125h-5.25a1.125 1.125 0 01-1.125-1.125v-2.25z', 'title' => 'Page audits', 'desc' => 'On-demand Lighthouse audits with full Core Web Vitals, content analysis, readability grade, technical SEO checks, and keyword strategy review.', 'href' => '#audits'],
                             ['icon' => 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244', 'title' => 'Backlinks', 'desc' => 'Bulk import, DA/spam score, anchor/rel verification, and per-target-page impact analysis that quantifies click lift after each link lands.', 'href' => '#backlinks'],
                             ['icon' => 'M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5', 'title' => 'Reporting', 'desc' => 'Daily / weekly / monthly growth reports with YoY comparisons, appended Action Insights, and on-demand custom ranges. Email-ready, white-label friendly.', 'href' => '#reporting'],
+                            ['icon' => 'M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5', 'title' => 'WordPress plugin', 'desc' => 'Gutenberg sidebar, admin column, and dashboard widget that surface EBQ insights inside WordPress. Scoped Sanctum tokens, challenge-response verification.', 'href' => '#wordpress'],
                             ['icon' => 'M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z', 'title' => 'Team & permissions', 'desc' => 'Per-website roles, feature-level access control, and email invitations that auto-accept every pending invite on signup.', 'href' => '#team'],
                             ['icon' => 'M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582', 'title' => 'Integrations', 'desc' => 'Google Search Console, Google Analytics 4, Google Indexing API, Lighthouse, and Serper.dev SERP API — all authenticated and synced daily.', 'href' => '#integrations'],
                         ];
@@ -420,8 +422,106 @@
                 </div>
             </section>
 
+            {{-- WordPress plugin --}}
+            <section id="wordpress" class="bg-slate-50 py-20 text-slate-900 sm:py-24">
+                <div class="mx-auto max-w-7xl px-6 lg:px-8">
+                    <div class="grid gap-12 lg:grid-cols-2 lg:items-center">
+                        <div>
+                            <p class="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-700">WordPress plugin · Beta</p>
+                            <h2 class="mt-5 text-3xl font-semibold tracking-tight sm:text-4xl">Ship insights where editors already work</h2>
+                            <p class="mt-5 text-base leading-7 text-slate-700 sm:text-lg">
+                                The EBQ plugin drops into any WordPress site and surfaces cross-signal insights inside Gutenberg, the post list, and the WP dashboard. No credentials in the browser — a challenge-response verification flow mints a scoped API token.
+                            </p>
+                            <ul class="mt-8 space-y-4 text-sm text-slate-700">
+                                <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span><strong class="text-slate-900">Gutenberg sidebar</strong> — rank chip, 90-day clicks sparkline, cannibalization warning, striking-distance flag, latest audit score per post.</span></li>
+                                <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span><strong class="text-slate-900">Posts-list column</strong> — 30-day clicks, avg position, and cannibalized/tracked badges in the WP admin list.</span></li>
+                                <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span><strong class="text-slate-900">Dashboard widget</strong> — four insight-count cards, each deep-linking to the matching EBQ Reports tab.</span></li>
+                                <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span><strong class="text-slate-900">Per-website scoped tokens</strong> — Sanctum polymorphic tokens. A leaked token can only read its own site.</span></li>
+                                <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span><strong class="text-slate-900">One-click verification</strong> — plugin serves <code class="rounded bg-slate-100 px-1 py-0.5 text-[10px] text-slate-700">/.well-known/ebq-verification.txt</code>, EBQ fetches + mints.</span></li>
+                            </ul>
+                            <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+                                <a href="{{ asset('downloads/ebq-seo.zip') }}" class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500" download>
+                                    <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                                    Download plugin (ZIP)
+                                </a>
+                                <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Start free to get a token</a>
+                            </div>
+                            <p class="mt-3 text-xs text-slate-500">Requires WordPress 6.0+, PHP 8.1+, and an EBQ account. MIT-licensed source included.</p>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+                                <div class="flex items-center gap-2 border-b border-slate-200 pb-3 text-xs font-semibold text-slate-500">
+                                    <span class="h-2 w-2 rounded-full bg-red-500"></span>
+                                    <span class="h-2 w-2 rounded-full bg-amber-400"></span>
+                                    <span class="h-2 w-2 rounded-full bg-emerald-500"></span>
+                                    <span class="ml-2">Gutenberg · EBQ SEO sidebar</span>
+                                </div>
+                                <div class="mt-4 space-y-3 text-xs">
+                                    <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Search performance · 30d</p>
+                                        <div class="mt-2 grid grid-cols-4 gap-2">
+                                            @foreach ([['Clicks', '1,284'], ['Impr', '21.4k'], ['Pos', '6.4'], ['CTR', '6.0%']] as [$l, $v])
+                                                <div class="rounded bg-white px-2 py-1.5 ring-1 ring-slate-200 text-center">
+                                                    <span class="block text-[9px] uppercase text-slate-400">{{ $l }}</span>
+                                                    <span class="block tabular-nums font-bold text-slate-900">{{ $v }}</span>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                    <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Rank tracking</p>
+                                        <div class="mt-1 flex items-center gap-2"><span class="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">#4</span><span class="text-emerald-700 text-[10px]">▲ 2</span><span class="text-[10px] text-slate-500">"best seo tools"</span></div>
+                                    </div>
+                                    <div class="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Cannibalization</p>
+                                        <p class="mt-1 text-[11px] text-amber-900">"best seo tools" is split with <span class="font-semibold">/blog/seo-tools-guide</span>.</p>
+                                    </div>
+                                    <div class="rounded-lg border border-indigo-200 bg-indigo-50 p-3">
+                                        <p class="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Striking distance</p>
+                                        <p class="mt-1 text-[11px] text-indigo-900">3 queries at positions 5–20 with below-curve CTR.</p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {{-- Dashboard widget mock --}}
+                            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+                                <p class="text-xs font-semibold text-slate-500">WordPress dashboard widget</p>
+                                <div class="mt-3 grid grid-cols-2 gap-2">
+                                    @foreach ([['Cannibalizations', '14', 'text-amber-600'], ['Striking distance', '27', 'text-indigo-600'], ['Index fails', '3', 'text-red-600'], ['Content decay', '8', 'text-slate-700']] as [$l, $v, $c])
+                                        <div class="rounded-lg border border-slate-200 px-3 py-2">
+                                            <p class="text-[9px] font-semibold uppercase tracking-wider text-slate-500">{{ $l }}</p>
+                                            <p class="mt-1 text-xl font-bold tabular-nums {{ $c }}">{{ $v }}</p>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {{-- Install steps --}}
+                    <div class="mt-16">
+                        <h3 class="text-xl font-semibold tracking-tight">Install in under five minutes</h3>
+                        <ol class="mt-6 grid gap-4 lg:grid-cols-4">
+                            @foreach ([
+                                ['1', 'Download the plugin', 'Grab the ZIP below and upload it via Plugins → Add New → Upload.'],
+                                ['2', 'Generate a challenge', 'In EBQ: Settings → Integrations → WordPress plugin → Generate challenge.'],
+                                ['3', 'Paste + verify', 'Paste the code into WP Settings → EBQ SEO and hit Verify in EBQ.'],
+                                ['4', 'Copy the token', 'Paste the one-time token into the plugin settings — you\'re live.'],
+                            ] as [$n, $title, $body])
+                                <li class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+                                    <p class="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">{{ $n }}</p>
+                                    <h4 class="mt-3 text-sm font-semibold">{{ $title }}</h4>
+                                    <p class="mt-1 text-xs leading-5 text-slate-600">{{ $body }}</p>
+                                </li>
+                            @endforeach
+                        </ol>
+                    </div>
+                </div>
+            </section>
+
             {{-- Team --}}
-            <section id="team" class="bg-slate-50 py-20 text-slate-900 sm:py-24">
+            <section id="team" class="bg-white py-20 text-slate-900 sm:py-24">
                 <div class="mx-auto max-w-7xl px-6 lg:px-8">
                     <div class="mx-auto max-w-3xl text-center">
                         <p class="text-xs font-semibold uppercase tracking-[0.25em] text-indigo-600">Team &amp; permissions</p>
@@ -443,7 +543,7 @@
             </section>
 
             {{-- Integrations --}}
-            <section id="integrations" class="bg-white py-20 text-slate-900 sm:py-24">
+            <section id="integrations" class="bg-slate-50 py-20 text-slate-900 sm:py-24">
                 <div class="mx-auto max-w-7xl px-6 lg:px-8">
                     <div class="mx-auto max-w-3xl text-center">
                         <p class="text-xs font-semibold uppercase tracking-[0.25em] text-indigo-600">Integrations</p>
@@ -459,7 +559,7 @@
                             ['Serper.dev SERP API', 'SERP-accurate rank tracking with device, country, language, depth, and SERP-feature extraction.'],
                             ['Email (SMTP / Postmark / Resend)', 'Any Laravel-supported mailer for growth reports, invitations, and anomaly alerts.'],
                         ] as [$t, $d])
-                            <article class="rounded-xl border border-slate-200 bg-slate-50 p-6">
+                            <article class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
                                 <h3 class="text-base font-semibold">{{ $t }}</h3>
                                 <p class="mt-2 text-sm leading-6 text-slate-600">{{ $d }}</p>
                             </article>
