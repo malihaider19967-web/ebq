@@ -1,6 +1,6 @@
 <?php
 /**
- * Admin menu + settings page: paste API base + site token, test connection.
+ * Admin menu + settings page. Single Connect button — no fields, no pasting.
  */
 
 if (! defined('ABSPATH')) {
@@ -12,7 +12,6 @@ final class EBQ_Settings
     public function register(): void
     {
         add_action('admin_menu', [$this, 'add_menu']);
-        add_action('admin_init', [$this, 'register_settings']);
     }
 
     public function add_menu(): void
@@ -26,74 +25,84 @@ final class EBQ_Settings
         );
     }
 
-    public function register_settings(): void
-    {
-        register_setting('ebq_seo', 'ebq_api_base', ['type' => 'string', 'sanitize_callback' => 'esc_url_raw']);
-        register_setting('ebq_seo', 'ebq_site_token', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
-        register_setting('ebq_seo', 'ebq_challenge_code', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field']);
-    }
-
     public function render_page(): void
     {
         if (! current_user_can('manage_options')) {
             return;
         }
 
-        $dashboard = null;
-        $status = null;
-
-        if (EBQ_Plugin::is_configured()) {
-            $dashboard = EBQ_Plugin::api_client()->get_dashboard();
-            $status = ! empty($dashboard['website_id']) ? 'connected' : 'error';
-        }
+        $status = isset($_GET['ebq_status']) ? sanitize_key((string) wp_unslash($_GET['ebq_status'])) : '';
+        $connected = EBQ_Plugin::is_configured();
+        $domain = (string) get_option('ebq_website_domain', '');
+        $website_id = (int) get_option('ebq_website_id', 0);
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('EBQ SEO', 'ebq-seo'); ?></h1>
-            <p><?php esc_html_e('Connect this WordPress site to EBQ so editors see insights inside Gutenberg.', 'ebq-seo'); ?></p>
 
-            <?php if ($status === 'connected'): ?>
-                <div class="notice notice-success"><p>
-                    <?php echo esc_html(sprintf(__('Connected to %s', 'ebq-seo'), $dashboard['domain'] ?? '')); ?>
-                </p></div>
-            <?php elseif ($status === 'error'): ?>
-                <div class="notice notice-error"><p>
-                    <?php esc_html_e('Could not reach EBQ with the configured token. Double-check the API base URL and regenerate the token if needed.', 'ebq-seo'); ?>
-                </p></div>
+            <?php $this->render_notice($status); ?>
+
+            <div style="max-width:560px;background:#fff;border:1px solid #c3c4c7;border-radius:8px;padding:20px;margin-top:16px;">
+                <?php if ($connected): ?>
+                    <p style="margin:0 0 4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#64748b;">
+                        <?php esc_html_e('Connected', 'ebq-seo'); ?>
+                    </p>
+                    <h2 style="margin:0 0 6px;font-size:18px;">
+                        <?php echo esc_html($domain ?: __('EBQ workspace', 'ebq-seo')); ?>
+                    </h2>
+                    <p style="margin:0 0 16px;color:#64748b;font-size:13px;">
+                        <?php echo esc_html(sprintf(__('Website #%d · insights are live in the editor, post list, and dashboard.', 'ebq-seo'), $website_id)); ?>
+                    </p>
+                    <p>
+                        <a href="<?php echo esc_url(EBQ_Api_Client::base_url() . '/reports'); ?>" class="button button-primary" target="_blank" rel="noopener">
+                            <?php esc_html_e('Open EBQ Reports', 'ebq-seo'); ?>
+                        </a>
+                        <a href="<?php echo esc_url(EBQ_Connect::disconnect_url()); ?>" class="button" style="margin-left:6px;">
+                            <?php esc_html_e('Disconnect', 'ebq-seo'); ?>
+                        </a>
+                    </p>
+                <?php else: ?>
+                    <h2 style="margin:0 0 6px;font-size:18px;"><?php esc_html_e('Connect this site to EBQ', 'ebq-seo'); ?></h2>
+                    <p style="margin:0 0 16px;color:#64748b;font-size:13px;">
+                        <?php esc_html_e('One click. You\'ll log in to EBQ, pick which website to link, and come back — the token is exchanged for you.', 'ebq-seo'); ?>
+                    </p>
+                    <p>
+                        <a href="<?php echo esc_url(EBQ_Connect::build_connect_url()); ?>" class="button button-primary button-hero">
+                            <?php esc_html_e('Connect to EBQ →', 'ebq-seo'); ?>
+                        </a>
+                    </p>
+                    <p style="margin-top:14px;color:#64748b;font-size:12px;">
+                        <?php echo wp_kses_post(sprintf(
+                            __('No EBQ account yet? <a href="%s" target="_blank" rel="noopener">Create one free</a> — takes under a minute.', 'ebq-seo'),
+                            esc_url(EBQ_Api_Client::base_url() . '/register')
+                        )); ?>
+                    </p>
+                <?php endif; ?>
+            </div>
+
+            <?php if (defined('EBQ_API_BASE')): ?>
+                <p style="margin-top:16px;color:#94a3b8;font-size:11px;">
+                    <?php echo esc_html(sprintf(__('Advanced: EBQ_API_BASE is defined in wp-config.php as %s.', 'ebq-seo'), (string) EBQ_API_BASE)); ?>
+                </p>
             <?php endif; ?>
-
-            <form method="post" action="options.php">
-                <?php settings_fields('ebq_seo'); ?>
-                <table class="form-table" role="presentation">
-                    <tr>
-                        <th scope="row"><label for="ebq_api_base"><?php esc_html_e('API base URL', 'ebq-seo'); ?></label></th>
-                        <td>
-                            <input name="ebq_api_base" id="ebq_api_base" type="url" class="regular-text" value="<?php echo esc_attr((string) get_option('ebq_api_base', 'https://app.ebq.io')); ?>" />
-                            <p class="description"><?php esc_html_e('Your EBQ workspace URL. Defaults to https://app.ebq.io.', 'ebq-seo'); ?></p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="ebq_challenge_code"><?php esc_html_e('Verification code', 'ebq-seo'); ?></label></th>
-                        <td>
-                            <input name="ebq_challenge_code" id="ebq_challenge_code" type="text" class="regular-text code" value="<?php echo esc_attr((string) get_option('ebq_challenge_code', '')); ?>" placeholder="ebq-xxxxxxxxxxxxxx" />
-                            <p class="description">
-                                <?php echo wp_kses_post(sprintf(
-                                    __('Generate this in EBQ under <code>Settings → Integrations → WordPress plugin</code>. While it\'s saved here, this site serves it at <code>%s</code>.', 'ebq-seo'),
-                                    esc_url(home_url('/.well-known/ebq-verification.txt'))
-                                )); ?>
-                            </p>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="ebq_site_token"><?php esc_html_e('API token', 'ebq-seo'); ?></label></th>
-                        <td>
-                            <input name="ebq_site_token" id="ebq_site_token" type="password" class="regular-text code" autocomplete="off" value="<?php echo esc_attr((string) get_option('ebq_site_token', '')); ?>" />
-                            <p class="description"><?php esc_html_e('Paste the token shown by EBQ after successful verification.', 'ebq-seo'); ?></p>
-                        </td>
-                    </tr>
-                </table>
-                <?php submit_button(); ?>
-            </form>
         </div>
         <?php
+    }
+
+    private function render_notice(string $status): void
+    {
+        if ($status === '') {
+            return;
+        }
+        $map = [
+            'connected' => ['success', __('Connected successfully. Insights are now live.', 'ebq-seo')],
+            'disconnected' => ['warning', __('Disconnected. Local token cleared.', 'ebq-seo')],
+            'state_mismatch' => ['error', __('Connection rejected — the returned state did not match what this site issued. Try again.', 'ebq-seo')],
+            'bad_token' => ['error', __('EBQ sent back an empty or invalid token. Try again.', 'ebq-seo')],
+        ];
+        if (! isset($map[$status])) {
+            return;
+        }
+        [$level, $message] = $map[$status];
+        printf('<div class="notice notice-%s"><p>%s</p></div>', esc_attr($level), esc_html($message));
     }
 }

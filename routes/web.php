@@ -2,10 +2,17 @@
 
 use App\Http\Controllers\GoogleOAuthController;
 use App\Http\Controllers\PageAuditController;
+use App\Http\Controllers\WordPressConnectController;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'landing')->name('landing');
 Route::view('/features', 'features')->name('features');
+
+// OAuth-style one-click link from the WordPress plugin.
+Route::middleware(['web', 'auth'])->group(function (): void {
+    Route::get('/wordpress/connect', [WordPressConnectController::class, 'start'])->name('wordpress.connect.start');
+    Route::post('/wordpress/connect', [WordPressConnectController::class, 'approve'])->name('wordpress.connect.approve');
+});
 
 Route::middleware(['auth', 'onboarded'])->group(function () {
     Route::view('/dashboard', 'dashboard')->middleware('feature:dashboard')->name('dashboard');

@@ -1,6 +1,6 @@
 <?php
 /**
- * Singleton that wires every subsystem into the appropriate WP hooks.
+ * Singleton wiring every subsystem into WordPress hooks.
  */
 
 if (! defined('ABSPATH')) {
@@ -18,7 +18,7 @@ final class EBQ_Plugin
 
     public function boot(): void
     {
-        (new EBQ_Verification())->register();
+        (new EBQ_Connect())->register();
         (new EBQ_Settings())->register();
         (new EBQ_Rest_Proxy())->register();
         (new EBQ_Post_Column())->register();
@@ -28,10 +28,7 @@ final class EBQ_Plugin
 
     public static function api_client(): EBQ_Api_Client
     {
-        return new EBQ_Api_Client(
-            (string) get_option('ebq_api_base', 'https://app.ebq.io'),
-            (string) get_option('ebq_site_token', '')
-        );
+        return new EBQ_Api_Client((string) get_option('ebq_site_token', ''));
     }
 
     public static function is_configured(): bool

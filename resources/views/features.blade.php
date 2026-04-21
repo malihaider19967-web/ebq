@@ -437,7 +437,7 @@
                                 <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span><strong class="text-slate-900">Posts-list column</strong> — 30-day clicks, avg position, and cannibalized/tracked badges in the WP admin list.</span></li>
                                 <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span><strong class="text-slate-900">Dashboard widget</strong> — four insight-count cards, each deep-linking to the matching EBQ Reports tab.</span></li>
                                 <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span><strong class="text-slate-900">Per-website scoped tokens</strong> — Sanctum polymorphic tokens. A leaked token can only read its own site.</span></li>
-                                <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span><strong class="text-slate-900">One-click verification</strong> — plugin serves <code class="rounded bg-slate-100 px-1 py-0.5 text-[10px] text-slate-700">/.well-known/ebq-verification.txt</code>, EBQ fetches + mints.</span></li>
+                                <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span><strong class="text-slate-900">One-click connect</strong> — plugin redirects to EBQ, user picks a website, EBQ bounces the token back. Standard OAuth redirect flow, state-nonce protected.</span></li>
                             </ul>
                             <div class="mt-8 flex flex-col gap-3 sm:flex-row">
                                 <a href="{{ asset('downloads/ebq-seo.zip') }}" class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500" download>
@@ -501,13 +501,12 @@
 
                     {{-- Install steps --}}
                     <div class="mt-16">
-                        <h3 class="text-xl font-semibold tracking-tight">Install in under five minutes</h3>
-                        <ol class="mt-6 grid gap-4 lg:grid-cols-4">
+                        <h3 class="text-xl font-semibold tracking-tight">Install in under sixty seconds</h3>
+                        <ol class="mt-6 grid gap-4 lg:grid-cols-3">
                             @foreach ([
-                                ['1', 'Download the plugin', 'Grab the ZIP below and upload it via Plugins → Add New → Upload.'],
-                                ['2', 'Generate a challenge', 'In EBQ: Settings → Integrations → WordPress plugin → Generate challenge.'],
-                                ['3', 'Paste + verify', 'Paste the code into WP Settings → EBQ SEO and hit Verify in EBQ.'],
-                                ['4', 'Copy the token', 'Paste the one-time token into the plugin settings — you\'re live.'],
+                                ['1', 'Upload + activate', 'Download the ZIP, upload via Plugins → Add New → Upload, activate.'],
+                                ['2', 'Click Connect to EBQ', 'In WP: Settings → EBQ SEO → Connect. Log in to EBQ, pick which website to link, approve.'],
+                                ['3', 'Done', 'EBQ bounces the token back automatically. Insights appear in Gutenberg, the post list, and the WP dashboard.'],
                             ] as [$n, $title, $body])
                                 <li class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
                                     <p class="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">{{ $n }}</p>

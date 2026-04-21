@@ -1,6 +1,9 @@
 <?php
 /**
  * Thin wrapper around wp_remote_request that adds the plugin's bearer token.
+ *
+ * Base URL defaults to https://app.ebq.io. Self-hosted installs override by
+ * defining the EBQ_API_BASE constant in wp-config.php — no UI field needed.
  */
 
 if (! defined('ABSPATH')) {
@@ -9,10 +12,21 @@ if (! defined('ABSPATH')) {
 
 final class EBQ_Api_Client
 {
+    public const DEFAULT_BASE = 'https://app.ebq.io';
+
     public function __construct(
-        private readonly string $base_url,
         private readonly string $token,
+        private readonly string $base_url = '',
     ) {}
+
+    public static function base_url(): string
+    {
+        if (defined('EBQ_API_BASE') && is_string(EBQ_API_BASE) && EBQ_API_BASE !== '') {
+            return rtrim((string) EBQ_API_BASE, '/');
+        }
+
+        return self::DEFAULT_BASE;
+    }
 
     public function get_post_insights(string $post_id, string $canonical_url, ?string $target_keyword = null): array
     {
@@ -47,7 +61,8 @@ final class EBQ_Api_Client
             return ['ok' => false, 'error' => 'not_connected'];
         }
 
-        $url = rtrim($this->base_url, '/') . $path;
+        $base = $this->base_url !== '' ? rtrim($this->base_url, '/') : self::base_url();
+        $url = $base . $path;
         if (! empty($query)) {
             $url .= (str_contains($path, '?') ? '&' : '?') . http_build_query($query);
         }

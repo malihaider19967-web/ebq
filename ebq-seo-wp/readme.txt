@@ -18,18 +18,19 @@ EBQ SEO connects your WordPress site to your EBQ workspace so content editors se
 * 30d clicks + avg position columns in the posts list.
 * Counts of cannibalizations, striking-distance keywords, indexing failures with live traffic, and content-decay pages in the WordPress dashboard.
 
-Requires an active EBQ workspace. Create yours at https://app.ebq.io.
+One-click connect — no copying of codes or tokens. Requires an EBQ account. Create yours at https://app.ebq.io.
 
 == Installation ==
 
-1. Upload the `ebq-seo` folder to `/wp-content/plugins/`.
+1. Upload the `ebq-seo` folder to `/wp-content/plugins/` (or use *Plugins → Add New → Upload*).
 2. Activate through **Plugins** in WordPress.
-3. Go to **Settings → EBQ SEO**.
-4. In EBQ, open **Settings → Integrations → WordPress plugin** and generate a verification code.
-5. Paste the code into the plugin settings, save, then click Verify in EBQ.
-6. Paste the issued API token back into the plugin settings and save.
+3. Go to **Settings → EBQ SEO** and click **Connect to EBQ**.
+4. Log in to EBQ, pick which website to link, approve.
+5. You'll bounce back to WordPress with the connection live.
+
+**Self-hosted EBQ:** add `define('EBQ_API_BASE', 'https://your-ebq-host');` to `wp-config.php` before activating.
 
 == Changelog ==
 
 = 1.0.0 =
-* Initial release: verification flow, Gutenberg sidebar, admin column, dashboard widget.
+* Initial release: one-click OAuth-style connect, Gutenberg sidebar, admin column, dashboard widget.
