@@ -21,8 +21,15 @@ final class EBQ_Api_Client
 
     public static function base_url(): string
     {
+        // 1. Constant in wp-config.php wins (for locked-down self-hosted installs).
         if (defined('EBQ_API_BASE') && is_string(EBQ_API_BASE) && EBQ_API_BASE !== '') {
             return rtrim((string) EBQ_API_BASE, '/');
+        }
+
+        // 2. Per-site override saved from the settings page.
+        $override = (string) get_option('ebq_api_base_override', '');
+        if ($override !== '') {
+            return rtrim($override, '/');
         }
 
         return self::DEFAULT_BASE;

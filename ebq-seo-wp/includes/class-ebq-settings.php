@@ -12,6 +12,29 @@ final class EBQ_Settings
     public function register(): void
     {
         add_action('admin_menu', [$this, 'add_menu']);
+        add_action('admin_post_ebq_save_api_base', [$this, 'save_api_base']);
+    }
+
+    public function save_api_base(): void
+    {
+        if (! current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have permission to change this.', 'ebq-seo'), '', ['response' => 403]);
+        }
+        check_admin_referer('ebq_save_api_base');
+
+        $input = isset($_POST['ebq_api_base']) ? esc_url_raw(trim((string) wp_unslash($_POST['ebq_api_base']))) : '';
+        if ($input === '') {
+            delete_option('ebq_api_base_override');
+        } else {
+            update_option('ebq_api_base_override', rtrim($input, '/'));
+        }
+
+        // Drop any cached version metadata so the new base is queried next.
+        delete_transient(EBQ_Updater::TRANSIENT_KEY);
+        delete_site_transient('update_plugins');
+
+        wp_safe_redirect(admin_url('options-general.php?page=ebq-seo&ebq_status=api_base_saved'));
+        exit;
     }
 
     public function add_menu(): void
@@ -177,6 +200,39 @@ final class EBQ_Settings
                 <?php endif; ?>
             </div>
 
+            <?php // API base URL override — for connecting to a local/staging EBQ instance ?>
+            <?php
+                $override = (string) get_option('ebq_api_base_override', '');
+                $locked_by_constant = defined('EBQ_API_BASE');
+                $active_base = EBQ_Api_Client::base_url();
+            ?>
+            <div style="max-width:560px;background:#fff;border:1px solid #c3c4c7;border-radius:8px;padding:16px 20px;margin-top:16px;">
+                <p style="margin:0 0 2px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#64748b;"><?php esc_html_e('EBQ workspace', 'ebq-seo'); ?></p>
+                <p style="margin:0 0 12px;font-size:12px;color:#475569;"><?php esc_html_e('The plugin queries this URL for insights, version metadata, and the connect flow.', 'ebq-seo'); ?></p>
+                <?php if ($locked_by_constant): ?>
+                    <p style="margin:0;padding:10px;background:#f1f5f9;border-radius:4px;font-family:monospace;font-size:12px;">
+                        <?php echo esc_html((string) EBQ_API_BASE); ?>
+                        <span style="margin-left:8px;font-family:inherit;font-size:10px;color:#64748b;">(<?php esc_html_e('locked by EBQ_API_BASE in wp-config.php', 'ebq-seo'); ?>)</span>
+                    </p>
+                <?php else: ?>
+                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <input type="hidden" name="action" value="ebq_save_api_base">
+                        <?php wp_nonce_field('ebq_save_api_base'); ?>
+                        <input type="url" name="ebq_api_base" value="<?php echo esc_attr($override); ?>"
+                            placeholder="<?php echo esc_attr(EBQ_Api_Client::DEFAULT_BASE); ?>"
+                            style="flex:1;min-width:240px;" class="regular-text code" />
+                        <button type="submit" class="button"><?php esc_html_e('Save', 'ebq-seo'); ?></button>
+                    </form>
+                    <p style="margin:8px 0 0;font-size:11px;color:#64748b;">
+                        <?php echo esc_html(sprintf(
+                            __('Leave empty to use the default (%s). Active URL: %s', 'ebq-seo'),
+                            EBQ_Api_Client::DEFAULT_BASE,
+                            $active_base
+                        )); ?>
+                    </p>
+                <?php endif; ?>
+            </div>
+
             <?php // Always-on diagnostics panel ?>
             <div style="max-width:560px;background:#fff;border:1px solid #c3c4c7;border-radius:8px;padding:16px 20px;margin-top:16px;">
                 <details <?php echo $connected ? '' : 'open'; ?>>
@@ -231,6 +287,7 @@ final class EBQ_Settings
             'disconnected' => ['warning', __('Disconnected. Local token cleared.', 'ebq-seo')],
             'state_mismatch' => ['error', __('Connection rejected — the returned state did not match what this site issued. Try again.', 'ebq-seo')],
             'bad_token' => ['error', __('EBQ sent back an empty or invalid token. Try again.', 'ebq-seo')],
+            'api_base_saved' => ['success', __('EBQ workspace URL saved. Version cache cleared.', 'ebq-seo')],
         ];
         if (! isset($map[$status])) {
             return;
