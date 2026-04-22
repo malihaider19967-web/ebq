@@ -10,7 +10,7 @@ use Illuminate\Support\Carbon;
 
 class ReportDataService
 {
-    public function generate(int $websiteId, string $startDate, string $endDate): array
+    public function generate(int $websiteId, string $startDate, string $endDate, ?string $country = null): array
     {
         $start = Carbon::parse($startDate)->startOfDay();
         $end = Carbon::parse($endDate)->endOfDay();
@@ -22,6 +22,7 @@ class ReportDataService
         $periodLabel = $this->periodLabel($days);
         $currentLabel = $this->currentPeriodLabel($days);
         $previousLabel = $this->previousPeriodLabel($days);
+        $country = $this->normalizeCountry($country);
 
         return [
             'period' => [
@@ -33,9 +34,10 @@ class ReportDataService
                 'label' => $periodLabel,
                 'current_label' => $currentLabel,
                 'previous_label' => $previousLabel,
+                'country' => $country,
             ],
             'analytics' => $this->buildAnalytics($websiteId, $start, $end, $prevStart, $prevEnd),
-            'search_console' => $this->buildSearchConsole($websiteId, $start, $end, $prevStart, $prevEnd),
+            'search_console' => $this->buildSearchConsole($websiteId, $start, $end, $prevStart, $prevEnd, $country),
             'backlinks' => $this->buildBacklinks($websiteId, $start, $end, $prevStart, $prevEnd),
             'indexing' => $this->buildIndexing($websiteId),
         ];
@@ -106,13 +108,15 @@ class ReportDataService
         ];
     }
 
-    private function buildSearchConsole(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
+    private function buildSearchConsole(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd, ?string $country = null): array
     {
         $current = SearchConsoleData::where('website_id', $websiteId)
-            ->whereBetween('date', [$start->toDateString(), $end->toDateString()]);
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->when($country, fn ($q, $c) => $q->where('country', $c));
 
         $previous = SearchConsoleData::where('website_id', $websiteId)
-            ->whereBetween('date', [$prevStart->toDateString(), $prevEnd->toDateString()]);
+            ->whereBetween('date', [$prevStart->toDateString(), $prevEnd->toDateString()])
+            ->when($country, fn ($q, $c) => $q->where('country', $c));
 
         $curClicks = (int) (clone $current)->sum('clicks');
         $prevClicks = (int) (clone $previous)->sum('clicks');
@@ -139,15 +143,17 @@ class ReportDataService
 
         $topQueries = SearchConsoleData::where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('query, SUM(clicks) as total_clicks, SUM(impressions) as total_impressions, AVG(position) as avg_position, AVG(ctr) as avg_ctr')
             ->groupBy('query')
             ->orderByDesc('total_clicks')
             ->limit(10)
             ->get()
-            ->map(function ($row) use ($websiteId, $prevStart, $prevEnd) {
+            ->map(function ($row) use ($websiteId, $prevStart, $prevEnd, $country) {
                 $prevClicks = (int) SearchConsoleData::where('website_id', $websiteId)
                     ->whereBetween('date', [$prevStart->toDateString(), $prevEnd->toDateString()])
                     ->where('query', $row->query)
+                    ->when($country, fn ($q, $c) => $q->where('country', $c))
                     ->sum('clicks');
 
                 return [
@@ -164,15 +170,17 @@ class ReportDataService
 
         $topPages = SearchConsoleData::where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('page, SUM(clicks) as total_clicks, SUM(impressions) as total_impressions, AVG(ctr) as avg_ctr')
             ->groupBy('page')
             ->orderByDesc('total_clicks')
             ->limit(10)
             ->get()
-            ->map(function ($row) use ($websiteId, $prevStart, $prevEnd) {
+            ->map(function ($row) use ($websiteId, $prevStart, $prevEnd, $country) {
                 $prevClicks = (int) SearchConsoleData::where('website_id', $websiteId)
                     ->whereBetween('date', [$prevStart->toDateString(), $prevEnd->toDateString()])
                     ->where('page', $row->page)
+                    ->when($country, fn ($q, $c) => $q->where('country', $c))
                     ->sum('clicks');
 
                 return [
@@ -189,14 +197,16 @@ class ReportDataService
         $devices = SearchConsoleData::where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
             ->where('device', '!=', '')
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('device, SUM(clicks) as total_clicks')
             ->groupBy('device')
             ->orderByDesc('total_clicks')
             ->get()
-            ->map(function ($row) use ($websiteId, $prevStart, $prevEnd, $curClicks) {
+            ->map(function ($row) use ($websiteId, $prevStart, $prevEnd, $curClicks, $country) {
                 $prevDevClicks = (int) SearchConsoleData::where('website_id', $websiteId)
                     ->whereBetween('date', [$prevStart->toDateString(), $prevEnd->toDateString()])
                     ->where('device', $row->device)
+                    ->when($country, fn ($q, $c) => $q->where('country', $c))
                     ->sum('clicks');
 
                 return [
@@ -233,10 +243,10 @@ class ReportDataService
             })
             ->toArray();
 
-        $queryMovers = $this->buildQueryMovers($websiteId, $start, $end, $prevStart, $prevEnd);
-        $pageMovers = $this->buildPageMovers($websiteId, $start, $end, $prevStart, $prevEnd);
-        $positionBuckets = $this->buildPositionBuckets($websiteId, $start, $end);
-        $opportunities = $this->buildOpportunities($websiteId, $start, $end);
+        $queryMovers = $this->buildQueryMovers($websiteId, $start, $end, $prevStart, $prevEnd, $country);
+        $pageMovers = $this->buildPageMovers($websiteId, $start, $end, $prevStart, $prevEnd, $country);
+        $positionBuckets = $this->buildPositionBuckets($websiteId, $start, $end, $country);
+        $opportunities = $this->buildOpportunities($websiteId, $start, $end, $country);
 
         return [
             'clicks' => $this->calcChange($curClicks, $prevClicks, true),
@@ -440,15 +450,17 @@ class ReportDataService
         ];
     }
 
-    private function buildQueryMovers(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
+    private function buildQueryMovers(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd, ?string $country = null): array
     {
         $current = SearchConsoleData::where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('query, SUM(clicks) as clicks')
             ->groupBy('query')
             ->pluck('clicks', 'query');
         $previous = SearchConsoleData::where('website_id', $websiteId)
             ->whereBetween('date', [$prevStart->toDateString(), $prevEnd->toDateString()])
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('query, SUM(clicks) as clicks')
             ->groupBy('query')
             ->pluck('clicks', 'query');
@@ -469,15 +481,17 @@ class ReportDataService
         ];
     }
 
-    private function buildPageMovers(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
+    private function buildPageMovers(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd, ?string $country = null): array
     {
         $current = SearchConsoleData::where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('page, SUM(clicks) as clicks')
             ->groupBy('page')
             ->pluck('clicks', 'page');
         $previous = SearchConsoleData::where('website_id', $websiteId)
             ->whereBetween('date', [$prevStart->toDateString(), $prevEnd->toDateString()])
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('page, SUM(clicks) as clicks')
             ->groupBy('page')
             ->pluck('clicks', 'page');
@@ -498,10 +512,11 @@ class ReportDataService
         ];
     }
 
-    private function buildPositionBuckets(int $websiteId, Carbon $start, Carbon $end): array
+    private function buildPositionBuckets(int $websiteId, Carbon $start, Carbon $end, ?string $country = null): array
     {
         $rows = SearchConsoleData::where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('query, AVG(position) as avg_position')
             ->groupBy('query')
             ->get();
@@ -529,9 +544,9 @@ class ReportDataService
         return $buckets;
     }
 
-    private function buildOpportunities(int $websiteId, Carbon $start, Carbon $end): array
+    private function buildOpportunities(int $websiteId, Carbon $start, Carbon $end, ?string $country = null): array
     {
-        return $this->strikingDistance($websiteId, $start->toDateString(), $end->toDateString(), 8);
+        return $this->strikingDistance($websiteId, $start->toDateString(), $end->toDateString(), 8, $country);
     }
 
     /**

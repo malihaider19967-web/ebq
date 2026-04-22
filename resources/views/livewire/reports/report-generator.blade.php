@@ -60,6 +60,16 @@
             </div>
         </div>
 
+        <div class="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3 dark:border-slate-800">
+            <livewire:dashboard.country-filter />
+            @if ($country !== '')
+                <button type="button" wire:click="onCountryChanged('')"
+                    class="text-[11px] font-medium text-slate-500 underline-offset-2 hover:text-indigo-600 hover:underline dark:text-slate-400 dark:hover:text-indigo-400">
+                    Clear
+                </button>
+            @endif
+        </div>
+
         @if ($sendSuccess)
             <div class="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-700 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400" role="status">
                 {{ $sendSuccess }}
@@ -80,6 +90,6 @@
             :report-type="$reportType"
             :start-date="$startDate"
             :end-date="$endDate"
-            :key="$startDate.'-'.$endDate.'-'.$websiteId" />
+            :key="$startDate.'-'.$endDate.'-'.$websiteId.'-'.$country" />
     @endif
 </div>

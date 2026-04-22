@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Throwable;
 
@@ -31,6 +32,9 @@ class ReportGenerator extends Component
 
     public ?string $sendError = null;
 
+    #[Url(as: 'country', history: true)]
+    public string $country = '';
+
     public function mount(): void
     {
         $this->websiteId = (int) session('current_website_id', 0);
@@ -41,6 +45,16 @@ class ReportGenerator extends Component
     public function switchWebsite(int $websiteId): void
     {
         $this->websiteId = $websiteId;
+        $this->country = '';
+        $this->showPreview = false;
+        $this->report = [];
+        $this->resetMessages();
+    }
+
+    #[On('country-changed')]
+    public function onCountryChanged(string $country): void
+    {
+        $this->country = $country;
         $this->showPreview = false;
         $this->report = [];
         $this->resetMessages();
@@ -68,6 +82,7 @@ class ReportGenerator extends Component
             $this->websiteId,
             $this->startDate,
             $this->endDate,
+            $this->country !== '' ? strtoupper($this->country) : null,
         );
 
         $this->showPreview = true;
