@@ -73,9 +73,26 @@ class PageAuditDetail extends Component
             10,
         );
 
+        $rows = $breakdown['by_country'];
+        $totalClicks = array_sum(array_map(fn ($r) => (int) $r['clicks'], $rows));
+        $totalImpr = array_sum(array_map(fn ($r) => (int) $r['impressions'], $rows));
+        $maxClicks = max(1, (int) (collect($rows)->max('clicks') ?? 0));
+
+        $rows = array_map(fn ($r) => $r + [
+            'name' => \App\Support\Countries::name((string) $r['country']),
+            'flag' => \App\Support\Countries::flag((string) $r['country']),
+            'width_pct' => max(2, (int) round(((int) $r['clicks'] / $maxClicks) * 100)),
+            'share_pct' => $totalClicks > 0 ? round(((int) $r['clicks'] / $totalClicks) * 100, 1) : 0.0,
+        ], $rows);
+
         return view('livewire.pages.page-audit-detail', [
             'trackedRankings' => $this->trackedRankingsForAudit(),
-            'countryBreakdown' => $breakdown['by_country'],
+            'countryBreakdown' => $rows,
+            'countryTotals' => [
+                'clicks' => $totalClicks,
+                'impressions' => $totalImpr,
+                'markets' => count($rows),
+            ],
         ]);
     }
 
