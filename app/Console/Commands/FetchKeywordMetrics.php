@@ -6,6 +6,7 @@ use App\Jobs\FetchKeywordMetricsJob;
 use App\Models\KeywordMetric;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
+use App\Services\KeywordMetricsService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 
@@ -28,6 +29,7 @@ class FetchKeywordMetrics extends Command
                             {--days=28 : Lookback window in days}
                             {--limit=500 : Max number of keywords to queue this run}
                             {--force : Refetch even if the cached row is still fresh}
+                            {--sync : Fetch synchronously (bypass the queue) so rows land before the command exits}
                             {--dry-run : Print the candidate keyword list without dispatching}';
 
     protected $description = 'Queue Keywords Everywhere lookups for GSC queries above the impression threshold.';
@@ -119,12 +121,31 @@ class FetchKeywordMetrics extends Command
             return self::SUCCESS;
         }
 
+        if ((bool) $this->option('sync')) {
+            $service = app(KeywordMetricsService::class);
+            $total = 0;
+            $batches = (int) ceil(count($candidates) / 100);
+            foreach (array_chunk($candidates, 100) as $i => $chunk) {
+                $this->line(sprintf('  → batch %d/%d (%d keyword(s))…', $i + 1, $batches, count($chunk)));
+                $written = $service->refresh(array_values($chunk), $country);
+                $this->line(sprintf('    wrote %d row(s)', $written));
+                $total += $written;
+            }
+
+            $this->info(sprintf('Fetched %d keyword(s) → wrote %d row(s) to keyword_metrics.', count($candidates), $total));
+            if ($total === 0) {
+                $this->warn('No rows written. Check storage/logs/laravel.log for "KeywordsEverywhere" entries.');
+            }
+
+            return self::SUCCESS;
+        }
+
         foreach (array_chunk($candidates, 100) as $chunk) {
             FetchKeywordMetricsJob::dispatch(array_values($chunk), $country);
         }
 
         $this->info(sprintf(
-            'Queued %d keyword(s) across %d batch(es).',
+            'Queued %d keyword(s) across %d batch(es). Ensure a queue worker is running to process them.',
             count($candidates),
             (int) ceil(count($candidates) / 100)
         ));
