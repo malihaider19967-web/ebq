@@ -53,6 +53,7 @@
                             <x-sort-header column="ctr" :sortBy="$sortBy" :sortDir="$sortDir" align="right">CTR</x-sort-header>
                             <x-sort-header column="position" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Position</x-sort-header>
                             <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" title="Monthly search volume (Keywords Everywhere, global)">Volume</th>
+                            <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" title="Projected monthly organic value at your current position (volume × CTR × CPC)">Value/mo</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -86,7 +87,27 @@
                                 <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">
                                     @php($ke = ($keMetrics ?? [])[\App\Models\KeywordMetric::hashKeyword((string) $row->query)] ?? null)
                                     @if ($ke && $ke->search_volume !== null)
-                                        <span title="Updated {{ $ke->fetched_at->diffForHumans() }}@if ($ke->cpc !== null) · CPC {{ $ke->currency ?: 'USD' }} {{ number_format((float) $ke->cpc, 2) }}@endif">{{ number_format($ke->search_volume) }}</span>
+                                        <span class="inline-flex items-center gap-1" title="Updated {{ $ke->fetched_at->diffForHumans() }}@if ($ke->cpc !== null) · CPC {{ $ke->currency ?: 'USD' }} {{ number_format((float) $ke->cpc, 2) }}@endif">
+                                            {{ number_format($ke->search_volume) }}
+                                            @php($_trend = $ke->trend_class)
+                                            @if ($_trend === 'rising')
+                                                <span class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400" title="Trend: rising">↑</span>
+                                            @elseif ($_trend === 'falling')
+                                                <span class="text-[9px] font-bold text-rose-600 dark:text-rose-400" title="Trend: falling">↓</span>
+                                            @elseif ($_trend === 'seasonal')
+                                                <span class="text-[9px] font-bold text-amber-600 dark:text-amber-400" title="Seasonal pattern">◐</span>
+                                            @endif
+                                        </span>
+                                    @else
+                                        <span class="text-slate-400">—</span>
+                                    @endif
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums">
+                                    @php
+                                        $_keValue = $ke ? \App\Services\KeywordValueCalculator::projectedMonthlyValue($ke->search_volume, (float) $row->position, $ke->cpc) : null;
+                                    @endphp
+                                    @if ($_keValue !== null && $_keValue > 0)
+                                        <span class="font-semibold text-slate-900 dark:text-slate-100">${{ number_format($_keValue, 0) }}</span>
                                     @else
                                         <span class="text-slate-400">—</span>
                                     @endif

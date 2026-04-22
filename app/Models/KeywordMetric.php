@@ -65,4 +65,18 @@ class KeywordMetric extends Model
     {
         return $this->expires_at !== null && $this->expires_at->isFuture();
     }
+
+    /**
+     * Computed trend classification. Cached by Eloquent's accessor cache so
+     * calling it repeatedly on the same row is essentially free.
+     */
+    public function getTrendClassAttribute(): string
+    {
+        return \App\Services\KeywordValueCalculator::trendClassify($this->trend_12m);
+    }
+
+    public function getNextPeakMonthAttribute(): ?int
+    {
+        return \App\Services\KeywordValueCalculator::nextPeakMonth($this->trend_12m);
+    }
 }

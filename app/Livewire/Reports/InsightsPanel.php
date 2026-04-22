@@ -40,7 +40,7 @@ class InsightsPanel extends Component
 
     public function setTab(string $tab): void
     {
-        if (! in_array($tab, ['cannibalization', 'striking_distance', 'content_decay', 'indexing_fails', 'audit_performance', 'backlink_impact'], true)) {
+        if (! in_array($tab, ['cannibalization', 'striking_distance', 'content_decay', 'indexing_fails', 'audit_performance', 'backlink_impact', 'quick_wins'], true)) {
             return;
         }
         $this->tab = $tab;
@@ -56,7 +56,7 @@ class InsightsPanel extends Component
 
         $counts = $hasAccess
             ? $service->insightCounts($this->websiteId, $country)
-            : ['cannibalizations' => 0, 'striking_distance' => 0, 'indexing_fails_with_traffic' => 0, 'content_decay' => 0];
+            : ['cannibalizations' => 0, 'striking_distance' => 0, 'indexing_fails_with_traffic' => 0, 'content_decay' => 0, 'quick_wins' => 0];
 
         $data = [
             'cannibalization' => [],
@@ -65,6 +65,7 @@ class InsightsPanel extends Component
             'indexing_fails' => [],
             'audit_performance' => [],
             'backlink_impact' => [],
+            'quick_wins' => [],
         ];
 
         if ($hasAccess) {
@@ -73,7 +74,8 @@ class InsightsPanel extends Component
                 'striking_distance' => $service->strikingDistance($this->websiteId, null, null, 50, $country),
                 'content_decay' => $service->contentDecay($this->websiteId, 25, $country),
                 'indexing_fails' => $service->indexingFailsWithTraffic($this->websiteId, 14, 50, $country),
-                // Backlink impact isn't country-segmented today — stays aggregate.
+                // Quick-wins + backlink impact aren't country-segmented today — both stay aggregate.
+                'quick_wins' => $service->quickWins($this->websiteId, 25),
                 'audit_performance' => app(AuditPerformanceService::class)->underperformingPages($this->websiteId, 28, 25, $country),
                 'backlink_impact' => app(BacklinkImpactService::class)->impactByTargetPage($this->websiteId),
             };

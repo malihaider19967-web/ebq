@@ -292,6 +292,7 @@
                                 </th>
                                 <th class="px-4 py-3 text-left">GSC (30d)</th>
                                 <th class="px-4 py-3 text-left" title="Monthly search volume · CPC · competition (Keywords Everywhere, global)">Volume</th>
+                                <th class="px-4 py-3 text-right" title="Projected monthly organic value at current position (volume × CTR × CPC)">Value/mo</th>
                                 <th class="px-4 py-3 text-left">
                                     <button wire:click="sort('last_checked_at')" class="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200">
                                         Last check
@@ -385,6 +386,14 @@
                                                 <div class="flex items-baseline gap-1.5">
                                                     <span class="tabular-nums font-semibold text-slate-800 dark:text-slate-200">{{ number_format($ke->search_volume) }}</span>
                                                     <span class="text-[10px] text-slate-400">/mo</span>
+                                                    @php($_trend = $ke->trend_class)
+                                                    @if ($_trend === 'rising')
+                                                        <span class="rounded bg-emerald-100 px-1 py-px text-[9px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400" title="Search volume rising over last 6 months">↑</span>
+                                                    @elseif ($_trend === 'falling')
+                                                        <span class="rounded bg-rose-100 px-1 py-px text-[9px] font-bold text-rose-700 dark:bg-rose-500/15 dark:text-rose-400" title="Search volume falling over last 6 months">↓</span>
+                                                    @elseif ($_trend === 'seasonal')
+                                                        <span class="rounded bg-amber-100 px-1 py-px text-[9px] font-bold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" title="Seasonal pattern @if($ke->next_peak_month !== null)— peaks in {{ \Carbon\Carbon::create(null, $ke->next_peak_month, 1)->format('F') }}@endif">◐</span>
+                                                    @endif
                                                 </div>
                                                 <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10px] text-slate-400">
                                                     @if ($ke->cpc !== null)
@@ -398,6 +407,22 @@
                                             </div>
                                         @else
                                             <span class="text-[10px] text-slate-400" title="Will populate on the next background fetch">—</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-4 py-3 text-right tabular-nums">
+                                        @php
+                                            $_value = $ke ? \App\Services\KeywordValueCalculator::projectedMonthlyValue(
+                                                $ke->search_volume,
+                                                $kw->current_position !== null ? (float) $kw->current_position : null,
+                                                $ke->cpc
+                                            ) : null;
+                                        @endphp
+                                        @if ($_value !== null && $_value > 0)
+                                            <span class="text-xs font-semibold text-slate-900 dark:text-slate-100" title="Volume {{ number_format($ke->search_volume) }} × CTR at pos #{{ $kw->current_position }} × {{ $ke->currency ?: 'USD' }} {{ number_format((float) $ke->cpc, 2) }}">
+                                                ${{ number_format($_value, 0) }}
+                                            </span>
+                                        @else
+                                            <span class="text-[10px] text-slate-400">—</span>
                                         @endif
                                     </td>
                                     <td class="px-4 py-3 text-slate-600 dark:text-slate-400">

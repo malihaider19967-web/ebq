@@ -17,8 +17,10 @@
             <div class="lg:col-span-2">
                 <livewire:dashboard.traffic-chart />
             </div>
-            <div class="lg:col-span-1">
+            <div class="lg:col-span-1 space-y-5">
                 <livewire:dashboard.top-countries-card />
+                <livewire:dashboard.seasonality-card />
+                <livewire:dashboard.quick-wins-card />
             </div>
         </div>
     </div>

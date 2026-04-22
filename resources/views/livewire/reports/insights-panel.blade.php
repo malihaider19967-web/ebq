@@ -4,6 +4,7 @@
         ['key' => 'striking_distance','label' => 'Striking distance',       'count' => $counts['striking_distance'],            'tone' => 'indigo',  'hint' => 'Pos 5–20, low CTR'],
         ['key' => 'indexing_fails',   'label' => 'Index fails w/ traffic',  'count' => $counts['indexing_fails_with_traffic'],  'tone' => 'red',     'hint' => 'Non-PASS, still earning impressions'],
         ['key' => 'content_decay',    'label' => 'Content decay',           'count' => $counts['content_decay'],                'tone' => 'slate',   'hint' => 'Losing clicks 28d/28d'],
+        ['key' => 'quick_wins',       'label' => 'Quick wins',              'count' => $counts['quick_wins'] ?? null,           'tone' => 'emerald', 'hint' => 'Low-competition keywords you aren\'t winning'],
         ['key' => 'audit_performance','label' => 'Audit vs traffic',        'count' => null,                                     'tone' => 'rose',    'hint' => 'Poor CWV, high impressions'],
         ['key' => 'backlink_impact',  'label' => 'Backlink impact',         'count' => null,                                     'tone' => 'emerald', 'hint' => 'Click Δ before/after link'],
     ];
@@ -23,7 +24,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" role="tablist" aria-label="Insight categories">
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7" role="tablist" aria-label="Insight categories">
             @foreach ($tabs as $t)
                 @php($active = $tab === $t['key'])
                 <button type="button" wire:click="setTab('{{ $t['key'] }}')"
@@ -87,6 +88,7 @@
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Pages</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Clicks</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Impr.</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold" title="Full market value of this keyword at position 1 (volume × top-CTR × CPC). This is what the split is costing.">At stake</th>
                                         <th scope="col" class="py-2 font-semibold">Competing pages (share %)</th>
                                     </tr>
                                 </thead>
@@ -98,6 +100,13 @@
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ $row['page_count'] }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['total_clicks']) }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['total_impressions']) }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">
+                                                @if (! empty($row['addressable_value']))
+                                                    <span class="font-semibold text-amber-600 dark:text-amber-400">${{ number_format($row['addressable_value'], 0) }}</span>
+                                                @else
+                                                    <span class="text-slate-400">—</span>
+                                                @endif
+                                            </td>
                                             <td class="py-2">
                                                 <ul class="space-y-0.5">
                                                     @foreach ($row['competing_pages'] as $p)
@@ -129,7 +138,7 @@
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Impressions</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Clicks</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">CTR</th>
-                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Score</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold" title="Estimated monthly value if this keyword reached position 3">Upside/mo</th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -140,7 +149,13 @@
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['impressions']) }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['clicks']) }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ $row['ctr'] }}%</td>
-                                            <td class="py-2 pr-3 text-right tabular-nums font-semibold text-indigo-600 dark:text-indigo-400">{{ $row['score'] }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums font-semibold text-indigo-600 dark:text-indigo-400">
+                                                @if (! empty($row['upside_value']))
+                                                    ${{ number_format($row['upside_value'], 0) }}
+                                                @else
+                                                    <span class="text-slate-400">score {{ $row['score'] }}</span>
+                                                @endif
+                                            </td>
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -284,7 +299,12 @@
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                     @foreach ($data['content_decay']['pages'] as $row)
                                         <tr>
-                                            <td class="py-2 pr-3 max-w-[320px] truncate text-slate-800 dark:text-slate-200" title="{{ $row['page'] }}">{{ $row['page'] }}</td>
+                                            <td class="py-2 pr-3 max-w-[320px] truncate text-slate-800 dark:text-slate-200" title="{{ $row['page'] }}">
+                                                {{ $row['page'] }}
+                                                @if (($row['decay_reason'] ?? null) === 'market_decline')
+                                                    <span class="ml-1.5 inline-flex rounded-full bg-amber-100 px-1.5 py-px text-[9px] font-bold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" title="Top queries for this page are declining market-wide — demand is shrinking, not your page's ranking">market decline</span>
+                                                @endif
+                                            </td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['current_clicks']) }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums hidden md:table-cell">{{ number_format($row['previous_clicks']) }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums font-semibold text-red-600 dark:text-red-400">{{ $row['clicks_change_percent'] }}%</td>
@@ -318,6 +338,59 @@
                         @if (! $data['content_decay']['has_yoy_history'])
                             <p class="mt-3 text-[11px] text-slate-400 dark:text-slate-500">YoY column will populate once you have 13+ months of Search Console history.</p>
                         @endif
+                    @endif
+                </x-insights.card>
+            @elseif ($tab === 'quick_wins')
+                <x-insights.card title="Quick wins" description="Low-competition keywords with real search volume where you either don't rank or rank outside the top 10. Sorted by the dollar upside of reaching position 3.">
+                    @if (empty($data['quick_wins']))
+                        <x-insights.empty-state title="No quick wins surfaced yet" body="Either the Keywords Everywhere cache hasn't filled in for your queries yet, or everything with real volume is already in your top 10. Run `php artisan ebq:fetch-keyword-metrics` to broaden the candidate pool." />
+                    @else
+                        <x-insights.scroll-area>
+                            <table class="min-w-full text-left text-xs">
+                                <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                                    <tr>
+                                        <th scope="col" class="py-2 pr-3 font-semibold">Keyword</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Volume/mo</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold hidden md:table-cell">Comp.</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Current pos</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold" title="Projected monthly value if this keyword reached position 3">Upside/mo</th>
+                                        <th scope="col" class="py-2 font-semibold">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                    @foreach ($data['quick_wins'] as $row)
+                                        <tr>
+                                            <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['keyword'] }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['search_volume']) }}</td>
+                                            <td class="py-2 pr-3 text-right tabular-nums hidden md:table-cell">
+                                                @if ($row['competition'] !== null)
+                                                    {{ number_format($row['competition'] * 100, 0) }}%
+                                                @else
+                                                    <span class="text-slate-400">—</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">
+                                                @if ($row['current_position'] !== null)
+                                                    #{{ $row['current_position'] }}
+                                                @else
+                                                    <span class="text-slate-400">unranked</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2 pr-3 text-right tabular-nums font-semibold text-emerald-600 dark:text-emerald-400">
+                                                ${{ number_format($row['upside_value'], 0) }}
+                                            </td>
+                                            <td class="py-2">
+                                                @if (! empty($row['current_page']))
+                                                    <a href="{{ route('pages.show', ['id' => urlencode($row['current_page'])]) }}" wire:navigate class="font-semibold text-indigo-600 hover:underline dark:text-indigo-400">Audit current page →</a>
+                                                @else
+                                                    <a href="{{ route('custom-audit.index') }}?keyword={{ urlencode($row['keyword']) }}" wire:navigate class="font-semibold text-indigo-600 hover:underline dark:text-indigo-400">Start new audit →</a>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
+                        </x-insights.scroll-area>
                     @endif
                 </x-insights.card>
             @endif

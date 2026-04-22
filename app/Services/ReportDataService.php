@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\AnalyticsData;
 use App\Models\Backlink;
+use App\Models\KeywordMetric;
 use App\Models\PageIndexingStatus;
 use App\Models\SearchConsoleData;
 use Illuminate\Support\Carbon;
@@ -40,7 +41,66 @@ class ReportDataService
             'search_console' => $this->buildSearchConsole($websiteId, $start, $end, $prevStart, $prevEnd, $country),
             'backlinks' => $this->buildBacklinks($websiteId, $start, $end, $prevStart, $prevEnd),
             'indexing' => $this->buildIndexing($websiteId),
+            'ppc_equivalent' => $this->buildPpcEquivalent($websiteId, $start, $end, $country),
         ];
+    }
+
+    /**
+     * Sum of projected monthly organic value across all GSC queries in the
+     * report window for which we have cached Keywords Everywhere metrics.
+     * Returns {value, keywords} or null if fewer than 10 queries were priced
+     * (small samples underestimate and mislead).
+     *
+     * @return array{value: float, keywords: int}|null
+     */
+    private function buildPpcEquivalent(int $websiteId, Carbon $start, Carbon $end, ?string $country): ?array
+    {
+        $rows = SearchConsoleData::query()
+            ->where('website_id', $websiteId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->where('query', '!=', '')
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
+            ->selectRaw('query, SUM(impressions) as impressions, AVG(position) as avg_position')
+            ->groupBy('query')
+            ->havingRaw('SUM(impressions) >= ?', [50])
+            ->orderByDesc('impressions')
+            ->limit(1000)
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return null;
+        }
+
+        $hashes = $rows->map(fn ($r) => KeywordMetric::hashKeyword((string) $r->query))->unique()->all();
+        $metrics = KeywordMetric::query()
+            ->whereIn('keyword_hash', $hashes)
+            ->where('country', 'global')
+            ->get()
+            ->keyBy('keyword_hash');
+
+        $sum = 0.0;
+        $count = 0;
+        foreach ($rows as $r) {
+            $hit = $metrics[KeywordMetric::hashKeyword((string) $r->query)] ?? null;
+            if (! $hit || $hit->cpc === null || $hit->search_volume === null) {
+                continue;
+            }
+            $val = \App\Services\KeywordValueCalculator::projectedMonthlyValue(
+                $hit->search_volume,
+                (float) $r->avg_position,
+                $hit->cpc,
+            );
+            if ($val !== null) {
+                $sum += $val;
+                $count++;
+            }
+        }
+
+        if ($count < 10) {
+            return null;
+        }
+
+        return ['value' => round($sum, 2), 'keywords' => $count];
     }
 
     private function buildAnalytics(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
@@ -659,12 +719,29 @@ class ReportDataService
                 ];
             })
             ->filter()
-            ->sortByDesc('score')
-            ->take($limit)
             ->values()
             ->toArray();
 
-        return $this->attachKeywordMetrics($list, 'query');
+        $enriched = $this->attachKeywordMetrics($list, 'query');
+
+        // Rows with a real upside_value sort first (by $ desc), rows that
+        // can't be valued yet fall back to the legacy impression-based score.
+        usort($enriched, function (array $a, array $b): int {
+            $au = $a['upside_value'];
+            $bu = $b['upside_value'];
+            if ($au !== null && $bu !== null) {
+                return $bu <=> $au;
+            }
+            if ($au !== null) {
+                return -1;
+            }
+            if ($bu !== null) {
+                return 1;
+            }
+            return ($b['score'] ?? 0) <=> ($a['score'] ?? 0);
+        });
+
+        return array_slice($enriched, 0, $limit);
     }
 
     /**
@@ -705,6 +782,30 @@ class ReportDataService
             $rows[$i]['cpc'] = $hit?->cpc;
             $rows[$i]['cpc_currency'] = $hit?->currency;
             $rows[$i]['competition'] = $hit?->competition;
+            $rows[$i]['trend_class'] = $hit ? \App\Services\KeywordValueCalculator::trendClassify($hit->trend_12m) : 'unknown';
+
+            // Projected current value (what this row is worth to the site today)
+            // and upside value (what it would gain from moving to position 3).
+            $position = isset($r['position']) && is_numeric($r['position']) ? (float) $r['position'] : null;
+            $rows[$i]['projected_value'] = \App\Services\KeywordValueCalculator::projectedMonthlyValue(
+                $hit?->search_volume,
+                $position,
+                $hit?->cpc,
+            );
+            $rows[$i]['upside_value'] = \App\Services\KeywordValueCalculator::upsideValue(
+                $hit?->search_volume,
+                $position,
+                3,
+                $hit?->cpc,
+            );
+            // "Addressable" value = the whole market at position 1. For
+            // cannibalization rows this is what the split is costing in total;
+            // for striking-distance it doubles as the ceiling.
+            $rows[$i]['addressable_value'] = \App\Services\KeywordValueCalculator::projectedMonthlyValue(
+                $hit?->search_volume,
+                1.0,
+                $hit?->cpc,
+            );
         }
 
         return $rows;
@@ -808,10 +909,86 @@ class ReportDataService
             ];
         })->filter()->sortBy('clicks_change_percent')->take($limit)->values()->toArray();
 
+        $pages = $this->tagDecayReasons($websiteId, $start, $end, $pages, $country);
+
         return [
             'pages' => $pages,
             'has_yoy_history' => $hasYoy,
         ];
+    }
+
+    /**
+     * For each decaying page, inspect the 3 top-impression GSC queries that
+     * drove it over the last 28 days. If ≥2 of those queries have a cached
+     * KE trend classified as 'falling', the decay is driven by shrinking
+     * demand, not the page losing rankings — we tag it as `market_decline`
+     * so the UI can badge it differently and the email can bucket it into
+     * a "monitor, not fix" section.
+     *
+     * @param  array<int, array<string, mixed>>  $pages
+     * @return array<int, array<string, mixed>>
+     */
+    private function tagDecayReasons(int $websiteId, Carbon $start, Carbon $end, array $pages, ?string $country): array
+    {
+        if ($pages === []) {
+            return $pages;
+        }
+
+        $pageUrls = array_values(array_filter(array_map(fn ($p) => (string) ($p['page'] ?? ''), $pages)));
+        if ($pageUrls === []) {
+            return $pages;
+        }
+
+        $queryRows = SearchConsoleData::query()
+            ->where('website_id', $websiteId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->whereIn('page', $pageUrls)
+            ->where('query', '!=', '')
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
+            ->selectRaw('page, query, SUM(impressions) as impressions')
+            ->groupBy('page', 'query')
+            ->get();
+
+        $topQueriesPerPage = [];
+        foreach ($queryRows->groupBy('page') as $page => $rows) {
+            $topQueriesPerPage[(string) $page] = $rows
+                ->sortByDesc('impressions')
+                ->take(3)
+                ->pluck('query')
+                ->map(fn ($q) => (string) $q)
+                ->all();
+        }
+
+        $allQueries = array_unique(array_merge(...array_values($topQueriesPerPage)) ?: []);
+        $metricsByHash = [];
+        if ($allQueries !== []) {
+            $metricsByHash = KeywordMetric::query()
+                ->whereIn('keyword_hash', array_map(fn ($q) => KeywordMetric::hashKeyword($q), $allQueries))
+                ->where('country', 'global')
+                ->get()
+                ->keyBy('keyword_hash')
+                ->all();
+        }
+
+        foreach ($pages as $i => $p) {
+            $queries = $topQueriesPerPage[(string) ($p['page'] ?? '')] ?? [];
+            $falling = 0;
+            $knownTrends = 0;
+            foreach ($queries as $q) {
+                $hit = $metricsByHash[KeywordMetric::hashKeyword($q)] ?? null;
+                if ($hit === null) {
+                    continue;
+                }
+                $knownTrends++;
+                if (\App\Services\KeywordValueCalculator::trendClassify($hit->trend_12m) === 'falling') {
+                    $falling++;
+                }
+            }
+            $pages[$i]['top_queries'] = $queries;
+            $pages[$i]['decay_reason'] = ($knownTrends >= 2 && $falling >= 2) ? 'market_decline' : 'recoverable';
+        }
+
+        return $pages;
     }
 
     /**
@@ -885,7 +1062,106 @@ class ReportDataService
             'striking_distance' => count($this->strikingDistance($websiteId, null, null, 50, $country)),
             'indexing_fails_with_traffic' => count($this->indexingFailsWithTraffic($websiteId, 14, 50, $country)),
             'content_decay' => count($this->contentDecay($websiteId, 25, $country)['pages']),
+            'quick_wins' => count($this->quickWins($websiteId, 20)),
         ];
+    }
+
+    /**
+     * Quick-wins radar: keywords with real search volume (≥500/mo) AND low
+     * competition (≤0.4) where the site either doesn't rank or ranks below
+     * position 10. Scored by the dollar upside of moving to position 3.
+     *
+     * Pure DB join — zero API calls. Relies on whatever KE data the site has
+     * already paid for via the nightly sync.
+     *
+     * @return array<int, array{keyword: string, search_volume: int, cpc: ?float, competition: ?float, current_position: ?float, current_page: ?string, projected_value: ?float, upside_value: ?float, impressions: int}>
+     */
+    public function quickWins(int $websiteId, int $limit = 20): array
+    {
+        $minVolume = 500;
+        $maxCompetition = 0.4;
+
+        $candidates = KeywordMetric::query()
+            ->where('country', 'global')
+            ->where('search_volume', '>=', $minVolume)
+            ->where(function ($q) use ($maxCompetition) {
+                $q->whereNull('competition')->orWhere('competition', '<=', $maxCompetition);
+            })
+            ->orderByDesc('search_volume')
+            ->limit(2000)
+            ->get();
+
+        if ($candidates->isEmpty()) {
+            return [];
+        }
+
+        $tz = config('app.timezone');
+        $end = Carbon::yesterday($tz)->toDateString();
+        $start = Carbon::yesterday($tz)->subDays(89)->toDateString();
+
+        // Per-query aggregate over 90d: best (min) position + top page by clicks + impressions
+        $gsc = SearchConsoleData::query()
+            ->where('website_id', $websiteId)
+            ->whereBetween('date', [$start, $end])
+            ->whereIn('query', $candidates->pluck('keyword')->all())
+            ->selectRaw('query, MIN(position) as best_position, SUM(impressions) as impressions')
+            ->groupBy('query')
+            ->get()
+            ->keyBy(fn ($row) => mb_strtolower((string) $row->query));
+
+        // Best-ranking page per query (for the "audit" deep-link)
+        $bestPages = SearchConsoleData::query()
+            ->where('website_id', $websiteId)
+            ->whereBetween('date', [$start, $end])
+            ->whereIn('query', $candidates->pluck('keyword')->all())
+            ->selectRaw('query, page, SUM(clicks) as clicks')
+            ->groupBy('query', 'page')
+            ->get()
+            ->groupBy(fn ($r) => mb_strtolower((string) $r->query))
+            ->map(fn ($rows) => $rows->sortByDesc('clicks')->first()?->page)
+            ->all();
+
+        $out = [];
+        foreach ($candidates as $m) {
+            $keyLower = mb_strtolower((string) $m->keyword);
+            $match = $gsc->get($keyLower);
+            $bestPos = $match ? (float) $match->best_position : null;
+
+            // Keep only rows where we don't rank OR rank outside top 10.
+            if ($bestPos !== null && $bestPos <= 10.0) {
+                continue;
+            }
+
+            $upside = KeywordValueCalculator::upsideValue(
+                $m->search_volume,
+                $bestPos,
+                3,
+                $m->cpc,
+            );
+            if ($upside === null || $upside <= 0.0) {
+                continue;
+            }
+
+            $out[] = [
+                'keyword' => (string) $m->keyword,
+                'search_volume' => (int) $m->search_volume,
+                'cpc' => $m->cpc !== null ? (float) $m->cpc : null,
+                'competition' => $m->competition !== null ? (float) $m->competition : null,
+                'current_position' => $bestPos !== null ? round($bestPos, 1) : null,
+                'current_page' => $bestPages[$keyLower] ?? null,
+                'impressions' => $match ? (int) $match->impressions : 0,
+                'projected_value' => KeywordValueCalculator::projectedMonthlyValue(
+                    $m->search_volume,
+                    $bestPos ?? 100.0,
+                    $m->cpc,
+                ),
+                'upside_value' => $upside,
+            ];
+        }
+
+        usort($out, fn ($a, $b) => ($b['upside_value'] ?? 0) <=> ($a['upside_value'] ?? 0));
+
+        return array_slice($out, 0, $limit);
     }
 
     /**

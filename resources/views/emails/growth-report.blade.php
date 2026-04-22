@@ -216,6 +216,15 @@
             </tr>
         </table>
 
+        @if (! empty($report['ppc_equivalent']))
+            <p style="margin: 8px 0 0; font-size: 13px; color: #4f46e5;">
+                Your organic traffic is worth approximately
+                <strong>${{ number_format($report['ppc_equivalent']['value'], 0) }}/month</strong>
+                in PPC equivalent
+                <span style="color: #94a3b8; font-size: 11px;">(based on {{ number_format($report['ppc_equivalent']['keywords']) }} priced queries · Google Ads CPC rates)</span>.
+            </p>
+        @endif
+
         @if (count($report['search_console']['top_queries']) > 0)
             <p class="sub-heading">Top Search Queries</p>
             <table class="data-table" role="presentation">

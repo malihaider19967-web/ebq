@@ -2,7 +2,11 @@
 
 namespace App\Livewire\Dashboard;
 
+use App\Models\KeywordMetric;
+use App\Models\SearchConsoleData;
+use App\Services\KeywordValueCalculator;
 use App\Services\ReportDataService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
 use Livewire\Attributes\On;
@@ -37,6 +41,8 @@ class InsightCards extends Component
     public function render()
     {
         $counts = ['cannibalizations' => 0, 'striking_distance' => 0, 'indexing_fails_with_traffic' => 0, 'content_decay' => 0];
+        $ppcEquivalent = null;
+        $ppcKeywordCount = 0;
 
         if ($this->websiteId && Auth::user()?->canViewWebsiteId($this->websiteId)) {
             $country = $this->country !== '' ? $this->country : null;
@@ -46,11 +52,81 @@ class InsightCards extends Component
                 600,
                 fn () => app(ReportDataService::class)->insightCounts($this->websiteId, $country),
             );
+
+            $ppc = Cache::remember(
+                'insights:ppc:'.$this->websiteId.':'.($country ?? 'all'),
+                600,
+                fn () => $this->computePpcEquivalent($country),
+            );
+            $ppcEquivalent = $ppc['value'];
+            $ppcKeywordCount = $ppc['keywords'];
         }
 
         return view('livewire.dashboard.insight-cards', [
             'counts' => $counts,
             'country' => $this->country,
+            'ppcEquivalent' => $ppcEquivalent,
+            'ppcKeywordCount' => $ppcKeywordCount,
         ]);
+    }
+
+    /**
+     * Sum of projectedMonthlyValue across all GSC queries (last 30 days) where
+     * we have cached Keywords Everywhere metrics. Requires ≥10 priced queries
+     * before we show the number — keeps the message from being misleading when
+     * the KE cache is sparse.
+     *
+     * @return array{value: ?float, keywords: int}
+     */
+    private function computePpcEquivalent(?string $country): array
+    {
+        $since = Carbon::now()->subDays(30)->toDateString();
+
+        $rows = SearchConsoleData::query()
+            ->where('website_id', $this->websiteId)
+            ->whereDate('date', '>=', $since)
+            ->where('query', '!=', '')
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
+            ->selectRaw('query, SUM(impressions) as impressions, AVG(position) as avg_position')
+            ->groupBy('query')
+            ->havingRaw('SUM(impressions) >= ?', [50])
+            ->orderByDesc('impressions')
+            ->limit(1000)
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return ['value' => null, 'keywords' => 0];
+        }
+
+        $hashes = $rows->map(fn ($r) => KeywordMetric::hashKeyword((string) $r->query))->unique()->all();
+        $metrics = KeywordMetric::query()
+            ->whereIn('keyword_hash', $hashes)
+            ->where('country', 'global')
+            ->get()
+            ->keyBy('keyword_hash');
+
+        $sum = 0.0;
+        $count = 0;
+        foreach ($rows as $r) {
+            $hit = $metrics[KeywordMetric::hashKeyword((string) $r->query)] ?? null;
+            if (! $hit || $hit->cpc === null || $hit->search_volume === null) {
+                continue;
+            }
+            $val = KeywordValueCalculator::projectedMonthlyValue(
+                $hit->search_volume,
+                (float) $r->avg_position,
+                $hit->cpc,
+            );
+            if ($val !== null) {
+                $sum += $val;
+                $count++;
+            }
+        }
+
+        if ($count < 10) {
+            return ['value' => null, 'keywords' => $count];
+        }
+
+        return ['value' => round($sum, 2), 'keywords' => $count];
     }
 }
