@@ -56,13 +56,12 @@ return [
         'key' => env('KEYWORDS_EVERYWHERE_API_KEY'),
         'base_url' => env('KEYWORDS_EVERYWHERE_BASE_URL', 'https://api.keywordseverywhere.com'),
         'fresh_days' => (int) env('KEYWORDS_EVERYWHERE_FRESH_DAYS', 30),
-    ],
-
-    'dataforseo' => [
-        // DataForSEO accepts HTTP Basic auth with email + API key (password).
-        'login' => env('DATAFORSEO_LOGIN'),
-        'password' => env('DATAFORSEO_PASSWORD'),
-        'base_url' => env('DATAFORSEO_BASE_URL', 'https://api.dataforseo.com'),
+        // Competitor-backlinks knobs — all env-overridable so the endpoint or
+        // defaults can shift without a code change.
+        'backlinks_endpoint' => env('KEYWORDS_EVERYWHERE_BACKLINKS_ENDPOINT', '/v1/get_domain_backlinks'),
+        'backlinks_country' => env('KEYWORDS_EVERYWHERE_BACKLINKS_COUNTRY', 'us'),
+        'backlinks_currency' => env('KEYWORDS_EVERYWHERE_BACKLINKS_CURRENCY', 'USD'),
+        'backlinks_data_source' => env('KEYWORDS_EVERYWHERE_BACKLINKS_DATASOURCE', 'g'),
     ],
 
     'competitor_backlinks' => [

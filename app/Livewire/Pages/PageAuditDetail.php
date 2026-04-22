@@ -65,6 +65,24 @@ class PageAuditDetail extends Component
 
     public function render()
     {
+        // Stale-while-revalidate: if this audit's competitor domains aren't
+        // cached yet, queue a background refresh so the backlinks disclosure
+        // populates on the next view. Safe to call every render — the service
+        // no-ops for domains that are already fresh.
+        $competitors = data_get($this->pageAuditReport->result, 'benchmark.competitors', []);
+        if (is_array($competitors) && $competitors !== []) {
+            $domains = [];
+            foreach ($competitors as $row) {
+                if (isset($row['url']) && is_string($row['url'])) {
+                    $d = \App\Models\CompetitorBacklink::extractDomain($row['url']);
+                    if ($d !== '') $domains[$d] = true;
+                }
+            }
+            if ($domains !== []) {
+                app(\App\Services\CompetitorBacklinkService::class)->queueRefresh(array_keys($domains));
+            }
+        }
+
         return view('livewire.pages.page-audit-detail', [
             'trackedRankings' => $this->trackedRankingsForAudit(),
         ]);

@@ -690,7 +690,7 @@
                                                 <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ $row['grade'] ?? '—' }}</td>
                                                 <td class="px-3 py-2">
                                                     @if ($_compLinkCount === 0)
-                                                        <span class="text-[10px] text-slate-400" title="Competitor backlinks will appear here once the background fetch completes (usually within a minute of the audit finishing). 30-day cache — no re-fetch if already cached.">fetching…</span>
+                                                        <span class="text-[10px] text-slate-400" title="Competitor backlinks will appear here once the background fetch completes. If this has stayed blank for more than a few minutes, the queue worker may not be running — re-open this page to re-queue.">pending…</span>
                                                     @else
                                                         <details class="group/cblk">
                                                             <summary class="cursor-pointer list-none text-[10px] font-semibold text-indigo-600 transition hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 [&::-webkit-details-marker]:hidden">

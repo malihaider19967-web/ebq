@@ -17,7 +17,7 @@ use Illuminate\Support\Facades\Log;
  */
 class CompetitorBacklinkService
 {
-    public function __construct(private DataForSeoBacklinkClient $client)
+    public function __construct(private KeywordsEverywhereBacklinkClient $client)
     {
     }
 
@@ -110,7 +110,10 @@ class CompetitorBacklinkService
         $written = 0;
 
         foreach (array_slice($items, 0, $limit) as $item) {
-            $url = isset($item['url_from']) && is_string($item['url_from']) ? trim($item['url_from']) : '';
+            // Accept a handful of common field spellings for each attribute —
+            // lets the same parser work across provider-shape variations.
+            // url_source + domain_source are the Keywords Everywhere shape.
+            $url = $this->firstString($item, ['url_source', 'url_from', 'page_url', 'url', 'source_url', 'referring_url']);
             if ($url === '') {
                 continue;
             }
@@ -118,19 +121,48 @@ class CompetitorBacklinkService
             $hash = CompetitorBacklink::hashUrl($url);
             $keepHashes[] = $hash;
 
+            $refDomainRaw = $this->firstString($item, ['domain_source', 'domain_from', 'domain', 'referring_domain', 'source_domain']);
+            $refDomain = $refDomainRaw !== '' ? strtolower($refDomainRaw) : null;
+
+            $anchorRaw = $this->firstString($item, ['anchor_text', 'anchor', 'link_text']);
+            $anchor = $anchorRaw !== '' ? mb_substr($anchorRaw, 0, 500) : null;
+
+            $da = null;
+            foreach (['domain_rating', 'domain_from_rank', 'domain_rank', 'da', 'dr', 'domain_authority'] as $k) {
+                if (isset($item[$k]) && is_numeric($item[$k])) {
+                    $da = min(100, max(0, (int) $item[$k]));
+                    break;
+                }
+            }
+
             $type = null;
-            if (array_key_exists('dofollow', $item)) {
-                $type = $item['dofollow'] === true ? 'dofollow' : 'nofollow';
-            } elseif (isset($item['backlink_type']) && is_string($item['backlink_type'])) {
-                $type = strtolower($item['backlink_type']);
+            foreach (['dofollow', 'is_dofollow'] as $k) {
+                if (array_key_exists($k, $item) && is_bool($item[$k])) {
+                    $type = $item[$k] ? 'dofollow' : 'nofollow';
+                    break;
+                }
+            }
+            if ($type === null) {
+                $rawType = $this->firstString($item, ['backlink_type', 'rel', 'type', 'link_type']);
+                if ($rawType !== '') {
+                    $type = strtolower($rawType);
+                    // Normalize common rel-attribute tokens.
+                    if (str_contains($type, 'nofollow')) $type = 'nofollow';
+                    elseif (str_contains($type, 'sponsored')) $type = 'sponsored';
+                    elseif (str_contains($type, 'ugc')) $type = 'ugc';
+                    elseif ($type === 'follow' || $type === '') $type = 'dofollow';
+                }
             }
 
             $firstSeen = null;
-            if (isset($item['first_seen']) && is_string($item['first_seen'])) {
-                try {
-                    $firstSeen = Carbon::parse($item['first_seen'])->toDateString();
-                } catch (\Throwable) {
-                    $firstSeen = null;
+            foreach (['first_seen', 'first_seen_at', 'discovered_at', 'date'] as $k) {
+                if (isset($item[$k]) && is_string($item[$k]) && $item[$k] !== '') {
+                    try {
+                        $firstSeen = Carbon::parse($item[$k])->toDateString();
+                        break;
+                    } catch (\Throwable) {
+                        // keep looking
+                    }
                 }
             }
 
@@ -141,11 +173,9 @@ class CompetitorBacklinkService
                 ],
                 [
                     'referring_page_url' => $url,
-                    'referring_domain' => isset($item['domain_from']) && is_string($item['domain_from']) ? strtolower(trim($item['domain_from'])) : null,
-                    'anchor_text' => isset($item['anchor']) && is_string($item['anchor']) ? mb_substr(trim($item['anchor']), 0, 500) : null,
-                    'domain_authority' => isset($item['domain_from_rank']) && is_numeric($item['domain_from_rank'])
-                        ? min(100, max(0, (int) $item['domain_from_rank']))
-                        : null,
+                    'referring_domain' => $refDomain,
+                    'anchor_text' => $anchor,
+                    'domain_authority' => $da,
                     'backlink_type' => $type,
                     'first_seen_at' => $firstSeen,
                     'fetched_at' => $fetchedAt,
@@ -175,5 +205,26 @@ class CompetitorBacklinkService
     private function limit(): int
     {
         return max(1, min(1000, (int) config('services.competitor_backlinks.limit_per_competitor', 50)));
+    }
+
+    /**
+     * Pick the first non-empty string value from $item among the candidate keys.
+     * Lets the parser accept multiple API shapes without branchy ifs everywhere.
+     *
+     * @param  array<string, mixed>  $item
+     * @param  list<string>  $keys
+     */
+    private function firstString(array $item, array $keys): string
+    {
+        foreach ($keys as $k) {
+            if (isset($item[$k]) && is_string($item[$k])) {
+                $v = trim($item[$k]);
+                if ($v !== '') {
+                    return $v;
+                }
+            }
+        }
+
+        return '';
     }
 }

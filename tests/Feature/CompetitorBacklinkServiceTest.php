@@ -19,9 +19,9 @@ class CompetitorBacklinkServiceTest extends TestCase
     {
         parent::setUp();
         config([
-            'services.dataforseo.login' => 'test-login',
-            'services.dataforseo.password' => 'test-password',
-            'services.dataforseo.base_url' => 'https://api.dataforseo.com',
+            'services.keywords_everywhere.key' => 'test-ke-key',
+            'services.keywords_everywhere.base_url' => 'https://api.keywordseverywhere.com',
+            'services.keywords_everywhere.backlinks_endpoint' => '/v1/get_backlinks',
             'services.competitor_backlinks.fresh_days' => 30,
             'services.competitor_backlinks.limit_per_competitor' => 50,
         ]);
@@ -90,19 +90,15 @@ class CompetitorBacklinkServiceTest extends TestCase
         });
     }
 
-    public function test_refresh_upserts_dataforseo_response(): void
+    public function test_refresh_upserts_keywords_everywhere_response(): void
     {
         Http::fake([
-            '*dataforseo.com*' => Http::response([
-                'tasks' => [[
-                    'status_code' => 20000,
-                    'result' => [[
-                        'items' => [
-                            ['url_from' => 'https://news.com/article', 'domain_from' => 'news.com', 'anchor' => 'read more', 'domain_from_rank' => 72, 'dofollow' => true, 'first_seen' => '2025-06-01'],
-                            ['url_from' => 'https://blog.io/post', 'domain_from' => 'blog.io', 'anchor' => 'see this', 'domain_from_rank' => 54, 'dofollow' => false, 'first_seen' => '2025-07-15'],
-                        ],
-                    ]],
-                ]],
+            '*keywordseverywhere.com*' => Http::response([
+                'data' => [
+                    ['url_from' => 'https://news.com/article', 'domain_from' => 'news.com', 'anchor' => 'read more', 'domain_rating' => 72, 'dofollow' => true, 'first_seen' => '2025-06-01'],
+                    ['url_from' => 'https://blog.io/post', 'domain_from' => 'blog.io', 'anchor' => 'see this', 'domain_rating' => 54, 'dofollow' => false, 'first_seen' => '2025-07-15'],
+                ],
+                'credits' => 99500,
             ], 200),
         ]);
 
@@ -120,9 +116,58 @@ class CompetitorBacklinkServiceTest extends TestCase
         $this->assertTrue($top->fetched_at->isToday());
     }
 
+    public function test_refresh_parses_exact_keywords_everywhere_shape(): void
+    {
+        // The actual response shape from /v1/get_domain_backlinks.
+        Http::fake([
+            '*keywordseverywhere.com*' => Http::response([
+                'data' => [[
+                    'anchor_text' => 'Nickfinder',
+                    'domain_source' => 'lifewire.com',
+                    'domain_target' => 'nickfinder.com',
+                    'url_source' => 'https://www.lifewire.com/how-to-rename-airpods-4691178',
+                    'url_target' => 'https://nickfinder.com/AirPods',
+                ]],
+                'credits_consumed' => 1,
+                'time_taken' => 4.9032,
+            ], 200),
+        ]);
+
+        $written = app(CompetitorBacklinkService::class)->refresh('nickfinder.com');
+
+        $this->assertSame(1, $written);
+        $row = CompetitorBacklink::query()->where('competitor_domain', 'nickfinder.com')->firstOrFail();
+        $this->assertSame('https://www.lifewire.com/how-to-rename-airpods-4691178', $row->referring_page_url);
+        $this->assertSame('lifewire.com', $row->referring_domain);
+        $this->assertSame('Nickfinder', $row->anchor_text);
+        // KE's domain-backlinks endpoint doesn't currently return DA or follow-type.
+        $this->assertNull($row->domain_authority);
+        $this->assertNull($row->backlink_type);
+    }
+
+    public function test_refresh_accepts_alternate_field_names(): void
+    {
+        // Response uses `page_url`, `domain`, `anchor_text`, `dr`, `rel` — all
+        // common alternate spellings the parser should handle.
+        Http::fake([
+            '*keywordseverywhere.com*' => Http::response([
+                'data' => [
+                    ['page_url' => 'https://ref.com/x', 'domain' => 'ref.com', 'anchor_text' => 'click here', 'dr' => 40, 'rel' => 'nofollow', 'discovered_at' => '2025-05-01'],
+                ],
+            ], 200),
+        ]);
+
+        app(CompetitorBacklinkService::class)->refresh('example.com');
+
+        $row = CompetitorBacklink::query()->where('competitor_domain', 'example.com')->firstOrFail();
+        $this->assertSame('ref.com', $row->referring_domain);
+        $this->assertSame('click here', $row->anchor_text);
+        $this->assertSame(40, $row->domain_authority);
+        $this->assertSame('nofollow', $row->backlink_type);
+    }
+
     public function test_refresh_prunes_rows_absent_from_latest_fetch(): void
     {
-        // Stale row that won't appear in the new response.
         CompetitorBacklink::create([
             'competitor_domain' => 'example.com',
             'referring_page_url' => 'https://old.com/gone',
@@ -132,15 +177,10 @@ class CompetitorBacklinkServiceTest extends TestCase
         ]);
 
         Http::fake([
-            '*dataforseo.com*' => Http::response([
-                'tasks' => [[
-                    'status_code' => 20000,
-                    'result' => [[
-                        'items' => [
-                            ['url_from' => 'https://news.com/article', 'domain_from' => 'news.com', 'anchor' => 'x', 'domain_from_rank' => 60, 'dofollow' => true],
-                        ],
-                    ]],
-                ]],
+            '*keywordseverywhere.com*' => Http::response([
+                'data' => [
+                    ['url_from' => 'https://news.com/article', 'domain_from' => 'news.com', 'anchor' => 'x', 'domain_rating' => 60, 'dofollow' => true],
+                ],
             ], 200),
         ]);
 
@@ -156,13 +196,11 @@ class CompetitorBacklinkServiceTest extends TestCase
 
         $items = [];
         for ($i = 0; $i < 10; $i++) {
-            $items[] = ['url_from' => "https://s{$i}.com/p", 'domain_from' => "s{$i}.com", 'anchor' => "a{$i}", 'domain_from_rank' => 50 - $i, 'dofollow' => true];
+            $items[] = ['url_from' => "https://s{$i}.com/p", 'domain_from' => "s{$i}.com", 'anchor' => "a{$i}", 'domain_rating' => 50 - $i, 'dofollow' => true];
         }
 
         Http::fake([
-            '*dataforseo.com*' => Http::response([
-                'tasks' => [['status_code' => 20000, 'result' => [['items' => $items]]]],
-            ], 200),
+            '*keywordseverywhere.com*' => Http::response(['data' => $items], 200),
         ]);
 
         $written = app(CompetitorBacklinkService::class)->refresh('example.com');
@@ -171,9 +209,9 @@ class CompetitorBacklinkServiceTest extends TestCase
         $this->assertSame(3, CompetitorBacklink::query()->where('competitor_domain', 'example.com')->count());
     }
 
-    public function test_refresh_is_a_noop_when_credentials_missing(): void
+    public function test_refresh_is_a_noop_when_api_key_missing(): void
     {
-        config(['services.dataforseo.login' => '']);
+        config(['services.keywords_everywhere.key' => '']);
         Http::fake();
 
         $written = app(CompetitorBacklinkService::class)->refresh('example.com');
