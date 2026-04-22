@@ -22,7 +22,7 @@
             ];
         @endphp
         @foreach ($cards as $card)
-            @php($count = $counts[$card['key']] ?? 0)
+            @php $count = $counts[$card['key']] ?? 0; @endphp
             <a href="{{ route('reports.index') }}?insight={{ $card['tab'] }}"
                 wire:loading.class.delay="opacity-60"
                 aria-label="{{ $card['label'] }}: {{ $count }}. {{ $card['hint'] }}. Opens Insights in Reports."
