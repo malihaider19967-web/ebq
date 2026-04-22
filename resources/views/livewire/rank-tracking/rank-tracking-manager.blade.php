@@ -314,7 +314,7 @@
                                             <span class="rounded bg-slate-100 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $kw->search_type }}</span>
                                             @if (! $kw->is_active)<span class="rounded bg-slate-200 px-1.5 py-px text-[9px] font-semibold uppercase text-slate-600 dark:bg-slate-700 dark:text-slate-300">Paused</span>@endif
                                             @if ($kw->last_status === 'failed')<span class="rounded bg-red-100 px-1.5 py-px text-[9px] font-semibold uppercase text-red-700 dark:bg-red-500/10 dark:text-red-400">Failed</span>@endif
-                                            @php($risk = $serpRisk[$kw->id] ?? null)
+                                            @php $risk = $serpRisk[$kw->id] ?? null; @endphp
                                             @if ($risk && $risk['at_risk'])
                                                 <span class="rounded bg-amber-100 px-1.5 py-px text-[9px] font-semibold uppercase text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" title="SERP has {{ implode(', ', $risk['features_present']) }} and we don't own the top result">SERP risk</span>
                                             @endif
@@ -365,7 +365,7 @@
                                     </td>
                                     <td class="px-4 py-3 text-right tabular-nums text-slate-700 dark:text-slate-300">{{ $kw->best_position ? '#'.$kw->best_position : '—' }}</td>
                                     <td class="px-4 py-3">
-                                        @php($gsc = ($gscByKeyword ?? [])[mb_strtolower(trim($kw->keyword))] ?? null)
+                                        @php $gsc = ($gscByKeyword ?? [])[mb_strtolower(trim($kw->keyword))] ?? null; @endphp
                                         @if ($gsc)
                                             <div class="text-[11px] text-slate-600 dark:text-slate-400">
                                                 <div class="flex items-center gap-1.5">
@@ -380,19 +380,25 @@
                                         @endif
                                     </td>
                                     <td class="px-4 py-3">
-                                        @php($ke = ($keMetrics ?? [])[\App\Models\KeywordMetric::hashKeyword((string) $kw->keyword)] ?? null)
+                                        @php $ke = ($keMetrics ?? [])[\App\Models\KeywordMetric::hashKeyword((string) $kw->keyword)] ?? null; @endphp
                                         @if ($ke && $ke->search_volume !== null)
                                             <div class="text-[11px]" title="Updated {{ $ke->fetched_at->diffForHumans() }}">
                                                 <div class="flex items-baseline gap-1.5">
                                                     <span class="tabular-nums font-semibold text-slate-800 dark:text-slate-200">{{ number_format($ke->search_volume) }}</span>
                                                     <span class="text-[10px] text-slate-400">/mo</span>
-                                                    @php($_trend = $ke->trend_class)
+                                                    @php
+                                                        $_trend = $ke->trend_class;
+                                                        $_seasonalTitle = 'Seasonal pattern';
+                                                        if ($_trend === 'seasonal' && $ke->next_peak_month !== null) {
+                                                            $_seasonalTitle .= ' — peaks in '.\Carbon\Carbon::create(null, $ke->next_peak_month, 1)->format('F');
+                                                        }
+                                                    @endphp
                                                     @if ($_trend === 'rising')
                                                         <span class="rounded bg-emerald-100 px-1 py-px text-[9px] font-bold text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-400" title="Search volume rising over last 6 months">↑</span>
                                                     @elseif ($_trend === 'falling')
                                                         <span class="rounded bg-rose-100 px-1 py-px text-[9px] font-bold text-rose-700 dark:bg-rose-500/15 dark:text-rose-400" title="Search volume falling over last 6 months">↓</span>
                                                     @elseif ($_trend === 'seasonal')
-                                                        <span class="rounded bg-amber-100 px-1 py-px text-[9px] font-bold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" title="Seasonal pattern @if($ke->next_peak_month !== null)— peaks in {{ \Carbon\Carbon::create(null, $ke->next_peak_month, 1)->format('F') }}@endif">◐</span>
+                                                        <span class="rounded bg-amber-100 px-1 py-px text-[9px] font-bold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" title="{{ $_seasonalTitle }}">◐</span>
                                                     @endif
                                                 </div>
                                                 <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10px] text-slate-400">

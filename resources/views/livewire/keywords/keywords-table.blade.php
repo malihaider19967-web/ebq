@@ -85,11 +85,21 @@
                                     ])>{{ number_format($row->position, 1) }}</span>
                                 </td>
                                 <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">
-                                    @php($ke = ($keMetrics ?? [])[\App\Models\KeywordMetric::hashKeyword((string) $row->query)] ?? null)
+                                    @php
+                                        $ke = ($keMetrics ?? [])[\App\Models\KeywordMetric::hashKeyword((string) $row->query)] ?? null;
+                                        $_keTitle = '';
+                                        $_trend = 'unknown';
+                                        if ($ke) {
+                                            $_keTitle = 'Updated '.$ke->fetched_at->diffForHumans();
+                                            if ($ke->cpc !== null) {
+                                                $_keTitle .= ' · CPC '.($ke->currency ?: 'USD').' '.number_format((float) $ke->cpc, 2);
+                                            }
+                                            $_trend = $ke->trend_class;
+                                        }
+                                    @endphp
                                     @if ($ke && $ke->search_volume !== null)
-                                        <span class="inline-flex items-center gap-1" title="Updated {{ $ke->fetched_at->diffForHumans() }}@if ($ke->cpc !== null) · CPC {{ $ke->currency ?: 'USD' }} {{ number_format((float) $ke->cpc, 2) }}@endif">
+                                        <span class="inline-flex items-center gap-1" title="{{ $_keTitle }}">
                                             {{ number_format($ke->search_volume) }}
-                                            @php($_trend = $ke->trend_class)
                                             @if ($_trend === 'rising')
                                                 <span class="text-[9px] font-bold text-emerald-600 dark:text-emerald-400" title="Trend: rising">↑</span>
                                             @elseif ($_trend === 'falling')
