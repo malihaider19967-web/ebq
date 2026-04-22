@@ -2,10 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\PageAuditReport;
 use App\Models\PageIndexingStatus;
 use App\Models\SearchConsoleData;
 use App\Models\User;
 use App\Models\Website;
+use App\Services\AuditPerformanceService;
 use App\Services\PluginInsightResolver;
 use App\Services\ReportDataService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -165,6 +167,62 @@ class PerCountryInsightsTest extends TestCase
         $this->assertSame('US', $top[0]['country']);
         $this->assertSame('IN', $top[1]['country']);
         $this->assertGreaterThan($top[1]['clicks'], $top[0]['clicks']);
+    }
+
+    public function test_audit_performance_respects_country_filter(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-04-22 09:00:00', 'UTC'));
+        $user = User::factory()->create();
+        $website = Website::factory()->create(['user_id' => $user->id, 'domain' => 'example.com']);
+        $url = 'https://example.com/slow-page';
+
+        PageAuditReport::create([
+            'website_id' => $website->id,
+            'page' => $url,
+            'page_hash' => hash('sha256', $url),
+            'audited_at' => Carbon::now(),
+            'result' => [
+                'core_web_vitals' => [
+                    'mobile' => ['performance_score' => 35, 'lcp_ms' => 4200, 'cls' => 0.18],
+                    'desktop' => ['performance_score' => 50],
+                ],
+            ],
+        ]);
+
+        // USA: 150 impressions in the last 28 days
+        for ($i = 0; $i < 3; $i++) {
+            SearchConsoleData::create([
+                'website_id' => $website->id,
+                'date' => Carbon::parse('2026-04-21')->subDays($i)->toDateString(),
+                'query' => 'slow query', 'page' => $url,
+                'clicks' => 1, 'impressions' => 50, 'position' => 8.0, 'ctr' => 0.02,
+                'country' => 'USA', 'device' => '',
+            ]);
+        }
+        // India: 200 impressions in the last 28 days
+        for ($i = 0; $i < 4; $i++) {
+            SearchConsoleData::create([
+                'website_id' => $website->id,
+                'date' => Carbon::parse('2026-04-21')->subDays($i)->toDateString(),
+                'query' => 'slow query', 'page' => $url,
+                'clicks' => 1, 'impressions' => 50, 'position' => 8.0, 'ctr' => 0.02,
+                'country' => 'IND', 'device' => '',
+            ]);
+        }
+
+        $svc = app(AuditPerformanceService::class);
+
+        $all = $svc->underperformingPages($website->id);
+        $usa = $svc->underperformingPages($website->id, 28, 25, 'USA');
+        $deu = $svc->underperformingPages($website->id, 28, 25, 'DEU');
+
+        $this->assertCount(1, $all);
+        $this->assertSame(350, $all[0]['impressions']);
+
+        $this->assertCount(1, $usa);
+        $this->assertSame(150, $usa[0]['impressions']);
+
+        $this->assertEmpty($deu, 'DEU has no impressions → page drops below the 100-impression gate');
     }
 
     public function test_country_breakdown_returns_per_country_totals_for_a_url(): void

@@ -24,7 +24,7 @@ class AuditPerformanceService
      *     position: ?float,
      * }>
      */
-    public function underperformingPages(int $websiteId, int $windowDays = 28, int $limit = 25): array
+    public function underperformingPages(int $websiteId, int $windowDays = 28, int $limit = 25, ?string $country = null): array
     {
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz)->endOfDay();
@@ -44,6 +44,7 @@ class AuditPerformanceService
             ->whereIn('page', $pages)
             ->whereDate('date', '>=', $start->toDateString())
             ->whereDate('date', '<=', $end->toDateString())
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('page, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position')
             ->groupBy('page')
             ->get()

@@ -73,8 +73,8 @@ class InsightsPanel extends Component
                 'striking_distance' => $service->strikingDistance($this->websiteId, null, null, 50, $country),
                 'content_decay' => $service->contentDecay($this->websiteId, 25, $country),
                 'indexing_fails' => $service->indexingFailsWithTraffic($this->websiteId, 14, 50, $country),
-                // Audit + backlink reports aren't country-segmented today — they stay aggregate.
-                'audit_performance' => app(AuditPerformanceService::class)->underperformingPages($this->websiteId),
+                // Backlink impact isn't country-segmented today — stays aggregate.
+                'audit_performance' => app(AuditPerformanceService::class)->underperformingPages($this->websiteId, 28, 25, $country),
                 'backlink_impact' => app(BacklinkImpactService::class)->impactByTargetPage($this->websiteId),
             };
         }
