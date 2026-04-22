@@ -12,9 +12,12 @@
             </a>
             <div class="mt-3 flex flex-wrap items-start justify-between gap-3">
                 <div class="min-w-0">
-                    <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">Custom page audit</h1>
+                    <div class="flex items-center gap-2">
+                        <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100 sm:text-2xl">Custom page audit</h1>
+                        <x-guide-link anchor="custom-audit" />
+                    </div>
                     <p class="mt-1 max-w-2xl text-sm leading-relaxed text-slate-500 dark:text-slate-400">
-                        Run an audit for any URL on the selected site and set the <span class="font-medium text-slate-700 dark:text-slate-300">SERP benchmark keyword</span> yourself. Search Console’s primary query is not used for the Serper snapshot on this flow.
+                        Run an audit for any URL on the selected site and set the <span class="font-medium text-slate-700 dark:text-slate-300">SERP benchmark keyword</span> yourself. Search Console’s primary query is not used for the SERP snapshot on this flow.
                     </p>
                 </div>
                 @if ($website)
@@ -88,7 +91,7 @@
 
                     <div>
                         <label for="custom-audit-keyword" class="block text-xs font-semibold uppercase tracking-wide text-slate-700 dark:text-slate-300">Target keyword (SERP)</label>
-                        <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Drives Serper organic results, in-sample rank checks, and competitor readability averages.</p>
+                        <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Drives SERP organic results, in-sample rank checks, and competitor readability averages.</p>
                         <input
                             id="custom-audit-keyword"
                             type="text"
@@ -211,7 +214,7 @@
                                     <td class="max-w-[14rem] px-4 py-3">
                                         <span class="block truncate font-mono text-[11px] text-slate-800 dark:text-slate-200" title="{{ $row->page_url }}">{{ Str::limit($row->page_url, 56) }}</span>
                                     </td>
-                                    <td class="max-w-[10rem] truncate px-4 py-3 text-slate-600 dark:text-slate-300" title="{{ $row->serp_sample_gl ? 'Serper gl='.$row->serp_sample_gl : '' }}">
+                                    <td class="max-w-[10rem] truncate px-4 py-3 text-slate-600 dark:text-slate-300" title="{{ $row->serp_sample_gl ? 'SERP country: '.$row->serp_sample_gl : '' }}">
                                         @php
                                             $caPl = is_array($row->pageAuditReport?->result['page_locale'] ?? null) ? $row->pageAuditReport->result['page_locale'] : null;
                                             $mkt = \App\Support\Audit\PageLocalePresentation::shortLabel($caPl);

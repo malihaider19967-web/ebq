@@ -197,9 +197,9 @@
                     @endif
                 </x-insights.card>
             @elseif ($tab === 'audit_performance')
-                <x-insights.card title="Audit vs. performance" description="Pages with poor Lighthouse performance scores (under 70) that still attract real search impressions — technical debt measurably costing traffic.">
+                <x-insights.card title="Audit vs. performance" description="Pages with poor Core Web Vitals scores that still attract real search impressions — technical debt measurably costing traffic.">
                     @if (empty($data['audit_performance']))
-                        <x-insights.empty-state title="No underperforming audited pages" body="Every audited page is scoring 70+ on Lighthouse, or you haven't audited many pages yet. Run a page audit from the Audits tab to populate this list." />
+                        <x-insights.empty-state title="No underperforming audited pages" body="Every audited page is scoring well on Core Web Vitals, or you haven't audited many pages yet. Run a page audit from the Audits tab to populate this list." />
                     @else
                         <x-insights.scroll-area>
                             <table class="min-w-full text-left text-xs">
@@ -343,7 +343,7 @@
             @elseif ($tab === 'quick_wins')
                 <x-insights.card title="Quick wins" description="Low-competition keywords with real search volume where you either don't rank or rank outside the top 10. Sorted by the dollar upside of reaching position 3.">
                     @if (empty($data['quick_wins']))
-                        <x-insights.empty-state title="No quick wins surfaced yet" body="Either the Keywords Everywhere cache hasn't filled in for your queries yet, or everything with real volume is already in your top 10. Run `php artisan ebq:fetch-keyword-metrics` to broaden the candidate pool." />
+                        <x-insights.empty-state title="No quick wins surfaced yet" body="Either our keyword intelligence hasn't filled in for your queries yet, or everything with real volume is already in your top 10. Check back in a day or two as the cache warms up." />
                     @else
                         <x-insights.scroll-area>
                             <table class="min-w-full text-left text-xs">

@@ -1,4 +1,4 @@
-{{-- Compare Serper organic row (search-result style) with the audited page’s title + meta description from fetched HTML. --}}
+{{-- Compare the live SERP organic row (search-result style) with the audited page’s title + meta description from fetched HTML. --}}
 @php
     $hasSerpListing = ! empty($ys['matched_listing_url']);
     $hasAudited = ! empty($ys['audited_page_url'] ?? null);
@@ -7,7 +7,7 @@
     <div class="mt-3 grid gap-4 sm:grid-cols-2">
         <div class="rounded-xl border border-slate-200 bg-white/90 p-4 shadow-inner dark:border-slate-600 dark:bg-slate-950/40">
             <p class="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">SERP sample (organic listing)</p>
-            <p class="mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400">From Serper search results for the benchmark keyword — not guaranteed to match live Google.</p>
+            <p class="mt-1 text-[11px] leading-snug text-slate-500 dark:text-slate-400">From live search results for the benchmark keyword — not guaranteed to match live Google.</p>
             @if ($hasSerpListing)
                 <p class="mt-2 text-xs leading-snug text-emerald-800 dark:text-emerald-400/90">{{ $ys['matched_listing_display'] ?? '' }}</p>
                 <a href="{{ $ys['matched_listing_url'] }}" target="_blank" rel="noopener noreferrer" class="mt-1 block text-base font-medium leading-snug text-blue-700 hover:underline dark:text-blue-400">

@@ -38,7 +38,7 @@ This guide is deliberately long — use the table of contents to jump to the fea
    - [Audit detail view](#audit-detail-view)
    - [Every section of the audit report](#every-section-of-the-audit-report)
    - [Downloading and emailing a report](#downloading-and-emailing-a-report)
-9. [Keyword metrics (Keywords Everywhere layer)](#keyword-metrics-keywords-everywhere-layer)
+9. [Keyword metrics (keyword intelligence layer)](#keyword-metrics-keywords-everywhere-layer)
 10. [Country filtering across the app](#country-filtering-across-the-app)
 11. [Glossary](#glossary)
 
@@ -53,10 +53,10 @@ EBQ blends **five live data sources**. Every number in the app traces back to on
 | **Google Search Console** (GSC) | Queries, pages, clicks, impressions, CTR, position, country, device | Nightly sync (configurable window) |
 | **Google Analytics 4** (GA4) | Users, sessions, source, bounce rate | Nightly sync |
 | **Google URL Inspection API** | Per-URL index verdict, coverage state, last crawl date | On demand + nightly poll |
-| **Serper.dev** (SERP API) | Organic rankings for tracked keywords, SERP features, competitor URLs | Per-keyword cadence you set (12h default) |
-| **Keywords Everywhere** | Monthly search volume, CPC, competition score, 12-month trend | Every 30 days per keyword (cached) |
+| **our SERP provider** (SERP API) | Organic rankings for tracked keywords, SERP features, competitor URLs | Per-keyword cadence you set (12h default) |
+| **keyword intelligence** | Monthly search volume, CPC, competition score, 12-month trend | Every 30 days per keyword (cached) |
 
-Lighthouse-style Core Web Vitals come from EBQ's own audit runner that fetches the page and records LCP, CLS, performance score (mobile + desktop).
+Core Web Vitals come from EBQ's own audit runner that fetches the page and records LCP, CLS, and the performance score on mobile + desktop.
 
 No number in the app is made up or estimated — every cell tells you which source it came from on hover.
 
@@ -87,7 +87,7 @@ Indigo strip above the insight cards:
 
 > Your organic traffic is worth **$4,230/month** in PPC equivalent · based on 187 priced queries
 
-**Formula**: For every GSC query in the last 30 days where we have Keywords Everywhere data, we compute `(impressions at this position × CTR for that position) × CPC`, then sum.
+**Formula**: For every GSC query in the last 30 days where we have keyword intelligence data, we compute `(impressions at this position × CTR for that position) × CPC`, then sum.
 
 **Why it's useful**: Turns organic SEO into a number a finance team cares about — "if we turned this off, we'd need this much Google Ads budget to replace it."
 
@@ -124,7 +124,7 @@ Horizontal-bar list of the top 10 countries driving clicks, last 30 days vs. pre
 
 ### Seasonal peaks ahead
 
-Amber card that only renders when Keywords Everywhere data flags keywords as **seasonal** AND their historical peak month is within the next 60 days.
+Amber card that only renders when keyword intelligence data flags keywords as **seasonal** AND their historical peak month is within the next 60 days.
 
 | Column | Meaning |
 |---|---|
@@ -178,7 +178,7 @@ A query is "cannibalizing" when **two or more of your pages** rank for it and ne
 | **Pages** | How many of your pages compete on this query |
 | **Clicks** | Total clicks the query attracted across all competing pages (28d) |
 | **Impr.** | Total impressions across all competing pages (28d) |
-| **At stake** | Full-market dollar value at position 1 (volume × top-of-SERP CTR × CPC). What your weakest pages are bleeding away. Dash if Keywords Everywhere has no data yet. |
+| **At stake** | Full-market dollar value at position 1 (volume × top-of-SERP CTR × CPC). What your weakest pages are bleeding away. Dash if keyword intelligence has no data yet. |
 | **Competing pages (share %)** | All competing URLs with the click share each one captures. Amber % label = they should consolidate. |
 
 **What to do**: Pick the primary page. Redirect the others to it, or heavily de-optimize them for the query. Update internal links to point at the primary.
@@ -201,9 +201,9 @@ Queries ranking **positions 5–20** with high impressions and below-curve CTR �
 | **Impressions** | Total impressions (28d) |
 | **Clicks** | Total clicks (28d) |
 | **CTR** | Click-through rate as a percentage |
-| **Upside/mo** | Projected **extra monthly dollars** if this query reached position 3. Uses volume × CTR-curve-delta × CPC. Rows with Keywords Everywhere data sort first; rows without fall back to the legacy impression-based score. |
+| **Upside/mo** | Projected **extra monthly dollars** if this query reached position 3. Uses volume × CTR-curve-delta × CPC. Rows with keyword intelligence data sort first; rows without fall back to the legacy impression-based score. |
 
-**How the sort works**: rows where we know the dollar upside come first (largest upside at the top). Rows still pending Keywords Everywhere data fall to the bottom, sorted by a heuristic score (impressions ÷ 100 + distance-to-top-3 − CTR penalty).
+**How the sort works**: rows where we know the dollar upside come first (largest upside at the top). Rows still pending keyword intelligence data fall to the bottom, sorted by a heuristic score (impressions ÷ 100 + distance-to-top-3 − CTR penalty).
 
 **What to do**: One push (title, meta, H1, intent fix, one strong internal link, one backlink) moves page-2 results onto page 1. These are your highest-ROI SEO bets.
 
@@ -243,14 +243,14 @@ Pages showing **sustained click decline** over the last 28 days vs. the prior 28
 | **YoY** | Same 28 days vs. a year ago. Green if you're still up YoY despite recent slip. Dash if we don't yet have 13 months of history. |
 | **Verdict** | Google indexing verdict. A non-PASS here means the decay is being masked by de-indexing and the problem is more urgent. |
 
-**The `market decline` pill**: When ≥2 of the page's top-3 queries are themselves trending down in Keywords Everywhere's 12-month data, the decay is not your fault — the topic is fading. Don't waste hours rewriting; monitor and plan next-quarter content instead. Pages without the pill are **recoverable** and worth rewriting.
+**The `market decline` pill**: When ≥2 of the page's top-3 queries are themselves trending down in keyword intelligence's 12-month data, the decay is not your fault — the topic is fading. Don't waste hours rewriting; monitor and plan next-quarter content instead. Pages without the pill are **recoverable** and worth rewriting.
 
 ### Quick wins tab
 
 Low-competition keywords with real search volume where your site either doesn't rank or ranks outside the top 10. **Scored by the dollar upside of reaching position 3.**
 
 **Filters we apply**:
-- Keywords Everywhere volume ≥ 500/month
+- keyword intelligence volume ≥ 500/month
 - Competition score ≤ 0.4 (where 1.0 = max)
 - Site either has no GSC match OR best position > 10 in the last 90 days
 
@@ -259,7 +259,7 @@ Low-competition keywords with real search volume where your site either doesn't 
 | Column | Meaning |
 |---|---|
 | **Keyword** | The query to target |
-| **Volume/mo** | Keywords Everywhere monthly search volume (global) |
+| **Volume/mo** | keyword intelligence monthly search volume (global) |
 | **Comp.** | Competition score as a percentage (0–100). Lower = easier. |
 | **Current pos** | Your best observed position for this query in the last 90 days, or "unranked" if we've never shown up |
 | **Upside/mo** | Projected dollar value if this keyword reached position 3 |
@@ -408,7 +408,7 @@ Sort any column by clicking its header. Bottom panel paginates 20 rows at a time
 | **Impressions** | Impressions in the window |
 | **CTR** | Click-through rate |
 | **Position** | Average position, color-coded: green ≤ 3, blue 4–10, amber 11–20, grey 21+ |
-| **Volume** | Monthly search volume from Keywords Everywhere. Trend arrow next to the number: ↑ rising, ↓ falling, ◐ seasonal. Hover for last-updated date + CPC. |
+| **Volume** | Monthly search volume from keyword intelligence. Trend arrow next to the number: ↑ rising, ↓ falling, ◐ seasonal. Hover for last-updated date + CPC. |
 | **Value/mo** | Projected monthly dollar value at your current average position. `(volume × CTR for that position × CPC)` |
 
 **What to do**: Sort by Value/mo descending to find your biggest commercial keywords. Click a cannibalized pill to jump to the fix list.
@@ -467,8 +467,8 @@ Dedicated rank-tracker for keywords you want to watch at a specific cadence (vs.
 | **Position** | Current rank. Pill colors: green ≤ 3, blue 4–10, amber 11–20, grey 21+. Dash = unranked. |
 | **∆** (change) | Δ vs. last check. ▲ green for improvement, ▼ red for decline. |
 | **Best** | Best-ever position since you started tracking. |
-| **GSC (30d)** | Side-by-side with your Serper-measured position, this is what Google Search Console recorded for the same keyword in the last 30 days. Big number = clicks. Subtle second line = avg position and impressions. Differences between the two columns tell you about personalization, locale, or CTR-under-curve. |
-| **Volume** | Keywords Everywhere monthly search volume, plus trend arrow (↑ ↓ ◐). Underneath: CPC ({currency} X.XX) and competition percentage. Dash while the first background fetch is pending. |
+| **GSC (30d)** | Side-by-side with your SERP-measured position, this is what Google Search Console recorded for the same keyword in the last 30 days. Big number = clicks. Subtle second line = avg position and impressions. Differences between the two columns tell you about personalization, locale, or CTR-under-curve. |
+| **Volume** | keyword intelligence monthly search volume, plus trend arrow (↑ ↓ ◐). Underneath: CPC ({currency} X.XX) and competition percentage. Dash while the first background fetch is pending. |
 | **Value/mo** | Projected monthly dollar value at current position (volume × CTR for this position × CPC). Hover for the formula breakdown. |
 | **Last check** | How long ago we last checked + when the next check is due. "Pending first check" if queued but not yet run. |
 | **Actions** | `View` (detail), **Re-check** (force immediate check), Pause/Resume, Delete (with confirmation). |
@@ -574,7 +574,7 @@ Side-by-side mobile + desktop. For each device:
 
 | Metric | Meaning | Good / Needs work / Poor |
 |---|---|---|
-| **Performance score** | 0–100 Lighthouse score | ≥ 90 / 50–89 / < 50 |
+| **Performance score** | 0–100 Core Web Vitals runner score | ≥ 90 / 50–89 / < 50 |
 | **LCP (ms)** | Largest Contentful Paint — when the main visual element loads | ≤ 2500 / ≤ 4000 / > 4000 |
 | **CLS** | Cumulative Layout Shift — how much stuff jumps around | ≤ 0.1 / ≤ 0.25 / > 0.25 |
 | **FID/INP** | Input delay | See tooltips |
@@ -596,7 +596,7 @@ Side-by-side mobile + desktop. For each device:
 
 #### 4. SERP readability benchmark
 
-Runs your target keyword through Google (via Serper.dev), fetches the top 5 organic results, extracts their readability + structure metrics, and compares yours to the average.
+Runs your target keyword through Google (via our SERP provider), fetches the top 5 organic results, extracts their readability + structure metrics, and compares yours to the average.
 
 **Your SERP position hero**:
 - Rank (1–100) + first-page badge (green) / page-2+ badge (amber)
@@ -614,7 +614,7 @@ Runs your target keyword through Google (via Serper.dev), fetches the top 5 orga
 
 #### 5. Keyword Strategy
 
-Powered by GSC + Keywords Everywhere. Answers "Are you targeting the right keywords on this page?"
+Powered by GSC + keyword intelligence. Answers "Are you targeting the right keywords on this page?"
 
 - **Primary keyword** — either pulled from GSC (highest-click query) or overridden by the "Target keyword" you used when queuing the custom audit. Shows clicks, impressions, avg position.
 - **Power placement** — checks if the primary keyword appears in the Title, H1, and Meta description. Each shown as a pill with the value (or "missing").
@@ -622,7 +622,7 @@ Powered by GSC + Keywords Everywhere. Answers "Are you targeting the right keywo
 - **Intent mix** — commercial / informational / navigational blend of your target queries. Helps you spot a page that targets confused intents.
 - **Accidental authority** — queries you rank for but never explicitly targeted. Opportunities for an H2 or FAQ addition.
 - **Missing queries** — queries you rank for but whose text doesn't appear in the page body.
-- **Target keywords from Search Console** — table with: Keyword, Clicks, Impressions, Position, **Vol** (Keywords Everywhere volume), In-body YES/NO pill. Sort by Vol to prioritize; rewrite pages where high-volume keywords are YES in GSC but absent from the body.
+- **Target keywords from Search Console** — table with: Keyword, Clicks, Impressions, Position, **Vol** (keyword intelligence volume), In-body YES/NO pill. Sort by Vol to prioritize; rewrite pages where high-volume keywords are YES in GSC but absent from the body.
 
 #### 6. Traffic by country (GSC)
 
@@ -681,7 +681,7 @@ Problems here become `critical` or `warning` recommendations in section 1.
 
 #### 10. Technical Performance
 
-Raw Lighthouse output with top opportunities (render-blocking resources, unused JS, etc.) — the items Core Web Vitals section summarized.
+Raw Core Web Vitals runner output with top opportunities (render-blocking resources, unused JS, etc.) — the items Core Web Vitals section summarized.
 
 #### 11. Advanced Data
 
@@ -698,9 +698,9 @@ Both versions include all sections (Traffic by country, SERP benchmark, Keyword 
 
 ---
 
-## Keyword metrics (Keywords Everywhere layer)
+## Keyword metrics (keyword intelligence layer)
 
-Every "Volume", "Value/mo", "CPC", "Competition", and trend arrow in the app reads from a cached Keywords Everywhere lookup.
+Every "Volume", "Value/mo", "CPC", "Competition", and trend arrow in the app reads from a cached keyword intelligence lookup.
 
 ### What we fetch
 
@@ -750,7 +750,7 @@ Formulas:
 
 ### How data gets cached
 
-- **On nightly GSC sync**: queries with ≥ 100 impressions in the sync window get auto-queued for Keywords Everywhere lookup (skipping anything already fresh).
+- **On nightly GSC sync**: queries with ≥ 100 impressions in the sync window get auto-queued for keyword intelligence lookup (skipping anything already fresh).
 - **On new tracked keyword**: single global fetch when you add a rank-tracker keyword.
 - **On-demand**: `php artisan ebq:fetch-keyword-metrics` (ops-facing).
 - **Stale-while-revalidate**: when any page renders and finds a stale row (older than 30 days), it re-queues a fetch in the background while showing what we already have.
@@ -759,7 +759,7 @@ Each row stays fresh for 30 days. No re-billing on cached data.
 
 ### Why rows show "—"
 
-A dash (—) in any Volume/Value column means Keywords Everywhere hasn't been queried for that specific keyword yet. Auto-fetch will pick it up within ~24 hours on the next sync, or you can force it via the command.
+A dash (—) in any Volume/Value column means keyword intelligence hasn't been queried for that specific keyword yet. Auto-fetch will pick it up within ~24 hours on the next sync, or you can force it via the command.
 
 ---
 
@@ -798,7 +798,7 @@ Only countries where your site has recorded GSC impressions appear in the dropdo
 | **CTR** | Click-through rate — clicks ÷ impressions. |
 | **CTR curve** | Industry-accepted CTR-by-position table. We use Sistrix rounded numbers. |
 | **Custom audit** | A user-triggered audit of a specific URL + target keyword, with SERP benchmark. Queues in the background; updates itself. |
-| **Decay reason** | `recoverable` (your page lost rank) vs. `market_decline` (the query itself is falling in KE trend data). |
+| **Decay reason** | `recoverable` (your page lost rank) vs. `market_decline` (the query itself is falling in our keyword intelligence trend data). |
 | **Depth** (rank tracker) | How many SERP positions to scan. 100 = you'll find the ranking even if it's on page 10. |
 | **Impressions** | Times your page appeared in a search result anyone saw. |
 | **Index verdict** | Google's own word on whether your page is indexable — `PASS`, `FAIL`, or specific reasons like `"Crawled - currently not indexed"`. |
@@ -813,7 +813,7 @@ Only countries where your site has recorded GSC impressions appear in the dropdo
 | **Target keyword** | The keyword you specify when queuing a custom audit. Used for SERP benchmark + primary-keyword override. |
 | **Trend class** | rising / falling / seasonal / stable / unknown — classification of a keyword's 12-month search-volume pattern. |
 | **Upside value** | Dollars you'd gain if a keyword reached position 3 — `projected_value(3) − projected_value(current)`. |
-| **Volume** | Monthly global search volume from Keywords Everywhere. |
+| **Volume** | Monthly global search volume from keyword intelligence. |
 | **YoY** | Year-over-year. "Same 28-day window vs. the equivalent window a year ago." |
 
 ---

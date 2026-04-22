@@ -5,7 +5,10 @@
                 <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" /></svg>
                 Pages
             </a>
-            <h1 class="mt-2 text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Page audit</h1>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+                <h1 class="text-xl font-bold tracking-tight text-slate-900 dark:text-slate-100">Page audit</h1>
+                <x-guide-link anchor="audit-report-sections" label="Guide to this report" />
+            </div>
             <p class="mt-1 break-all font-mono text-sm text-slate-600 dark:text-slate-300">{{ $pageAuditReport->page }}</p>
             @php
                 $hdrPl = is_array($pageAuditReport->result ?? null) ? ($pageAuditReport->result['page_locale'] ?? null) : null;

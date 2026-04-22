@@ -291,7 +291,7 @@
                                     </button>
                                 </th>
                                 <th class="px-4 py-3 text-left">GSC (30d)</th>
-                                <th class="px-4 py-3 text-left" title="Monthly search volume · CPC · competition (Keywords Everywhere, global)">Volume</th>
+                                <th class="px-4 py-3 text-left" title="Global monthly search volume · CPC · competition">Volume</th>
                                 <th class="px-4 py-3 text-right" title="Projected monthly organic value at current position (volume × CTR × CPC)">Value/mo</th>
                                 <th class="px-4 py-3 text-left">
                                     <button wire:click="sort('last_checked_at')" class="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200">

@@ -761,7 +761,7 @@
 
                 {{-- Section 2 --}}
                 <h4 class="!mt-10 text-lg font-semibold text-slate-900">2. Core Web Vitals</h4>
-                <p>Mobile + desktop performance score, LCP, CLS, and related load metrics — pulled straight from EBQ's Lighthouse runner. Each number is color-coded against Google's public good/needs-improvement/poor thresholds.</p>
+                <p>Mobile + desktop performance score, LCP, CLS, and related load metrics — measured by our Core Web Vitals runner. Each number is color-coded against Google's public good/needs-improvement/poor thresholds.</p>
 
                 {{-- Section 3 --}}
                 <h4 class="!mt-10 text-lg font-semibold text-slate-900">3. Technical</h4>
@@ -844,7 +844,7 @@
                 <p>Images: total, missing alt attributes, oversized files, next-gen format adoption. Links: internal/external counts, broken links (auto-opens when present), full link outline.</p>
 
                 <h4 class="!mt-10 text-lg font-semibold text-slate-900">10. Technical Performance</h4>
-                <p>Raw Lighthouse output — render-blocking resources, unused JS, image-format opportunities.</p>
+                <p>Raw performance output — render-blocking resources, unused JS, image-format opportunities.</p>
 
                 <h4 class="!mt-10 text-lg font-semibold text-slate-900">11. Advanced Data</h4>
                 <p>HTTP headers, structured data validation, canonical chains, redirect chains, robots.txt excerpt. Power-user reference.</p>

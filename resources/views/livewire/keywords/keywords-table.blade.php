@@ -52,7 +52,7 @@
                             <x-sort-header column="impressions" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Impressions</x-sort-header>
                             <x-sort-header column="ctr" :sortBy="$sortBy" :sortDir="$sortDir" align="right">CTR</x-sort-header>
                             <x-sort-header column="position" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Position</x-sort-header>
-                            <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" title="Monthly search volume (Keywords Everywhere, global)">Volume</th>
+                            <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" title="Global monthly search volume">Volume</th>
                             <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" title="Projected monthly organic value at your current position (volume × CTR × CPC)">Value/mo</th>
                         </tr>
                     </thead>

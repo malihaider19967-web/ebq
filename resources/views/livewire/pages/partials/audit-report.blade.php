@@ -433,7 +433,7 @@
                                                 <th class="px-3 py-1.5 text-right">Clicks</th>
                                                 <th class="px-3 py-1.5 text-right">Impr.</th>
                                                 <th class="px-3 py-1.5 text-right">Pos</th>
-                                                <th class="px-3 py-1.5 text-right" title="Monthly search volume (Keywords Everywhere)">Vol</th>
+                                                <th class="px-3 py-1.5 text-right" title="Monthly search volume">Vol</th>
                                                 <th class="px-3 py-1.5 text-center">In body</th>
                                             </tr>
                                         </thead>
@@ -544,7 +544,7 @@
 
                 @php ob_start(); @endphp
                 @if ($benchmarkNav)
-                    {{-- ══════ SERP readability benchmark (Serper) ══════ --}}
+                    {{-- ══════ SERP readability benchmark ══════ --}}
                     <section id="audit-benchmark" class="scroll-mt-16">
                         <div class="mb-3 flex items-center gap-2">
                             <div class="flex h-7 w-7 items-center justify-center rounded-md bg-violet-100 text-violet-600 dark:bg-violet-500/10 dark:text-violet-400">
@@ -580,7 +580,7 @@
                                         <div class="min-w-0 flex-1 text-sm leading-relaxed text-slate-700 dark:text-slate-300">
                                             <p class="font-bold text-slate-900 dark:text-slate-100">Search position in this snapshot</p>
                                             @if ($ysFirst === true)
-                                                <p class="mt-1.5">Your site (same domain in this sample) appears in the <strong>top 10</strong> organic results for the primary query below — the listing URL may differ from the page you audited. Serper approximates Google; use Search Console for official average position.</p>
+                                                <p class="mt-1.5">Your site (same domain in this sample) appears in the <strong>top 10</strong> organic results for the primary query below — the listing URL may differ from the page you audited. This snapshot approximates Google; use Search Console for official average position.</p>
                                             @else
                                                 <p class="mt-1.5">Your site shows at <strong class="tabular-nums">#{{ $ysPos }}</strong> in this sample — <strong>outside the first results page</strong> (positions 1–10) in this snapshot.</p>
                                             @endif
@@ -591,7 +591,7 @@
                                             <div class="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-slate-200/80 text-2xl font-black text-slate-500 dark:bg-slate-700 dark:text-slate-400">—</div>
                                             <div class="mt-3 min-w-0 flex-1 text-sm sm:mt-0">
                                                 <p class="font-bold text-slate-900 dark:text-slate-100">Search position</p>
-                                                <p class="mt-1 text-slate-600 dark:text-slate-400">Rank could not be checked — no organic links were returned in the Serper response.</p>
+                                                <p class="mt-1 text-slate-600 dark:text-slate-400">Rank could not be checked — no organic links were returned in the SERP response.</p>
                                             </div>
                                         </div>
                                     @else
@@ -608,7 +608,7 @@
                             </div>
                         @endif
                         <p class="mb-3 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                            Organic URLs from <strong class="text-slate-600 dark:text-slate-300">Serper.dev</strong>; Flesch scores computed from HTML fetched at audit time. Not identical to live Google rankings; use as a directional sample.
+                            Organic URLs pulled live from Google at audit time; Flesch scores computed from HTML we fetched ourselves. Not identical to live Google rankings; use as a directional sample.
                             @if (\App\Support\Audit\PageLocalePresentation::shouldShowSerpLocationNote($benchmark['serp_locale'] ?? null))
                                 @php $serpLocLine = \App\Support\Audit\PageLocalePresentation::serpParamsLine($benchmark['serp_locale'] ?? null); @endphp
                                 @if ($serpLocLine)
@@ -1156,17 +1156,17 @@
                                             <x-audit.stat label="Speed Index" :value="$fmt($d['speed_index_ms'] ?? null, ' ms')" tone="neutral" />
                                         </div>
                                         @if (! empty($d['runtime_error']))
-                                            <p class="mt-2 text-[10px] text-rose-600 dark:text-rose-400">Lighthouse runtime note: {{ $d['runtime_error'] }}</p>
+                                            <p class="mt-2 text-[10px] text-rose-600 dark:text-rose-400">Runtime note: {{ $d['runtime_error'] }}</p>
                                         @endif
                                     @else
-                                        <p class="mt-3 text-[11px] text-slate-500 dark:text-slate-400">This strategy failed on Lighthouse. Re-run the audit to retry.</p>
+                                        <p class="mt-3 text-[11px] text-slate-500 dark:text-slate-400">This strategy failed during the performance scan. Re-run the audit to retry.</p>
                                     @endif
                                 </div>
                             @endforeach
                         </div>
 
                         <p class="mt-3 text-[10px] leading-relaxed text-slate-500 dark:text-slate-500">
-                            Lab data from a single Lighthouse run. TBT is the lab-side proxy for INP — field INP requires CrUX and is not available here. Thresholds follow <span class="font-mono">web.dev/vitals</span> (good / needs-improvement / poor).
+                            Lab data from a single Core Web Vitals run. TBT is the lab-side proxy for INP — field INP requires CrUX and is not available here. Thresholds follow <span class="font-mono">web.dev/vitals</span> (good / needs-improvement / poor).
                         </p>
                     </section>
                 @endif

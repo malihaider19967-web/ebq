@@ -556,7 +556,7 @@
                                         </p>
                                     </td>
                                     <td style="vertical-align: middle; padding-left: 12px; border-left: 1px solid rgba(148,163,184,0.5); font-size: 12px; line-height: 1.55; color: #334155;">
-                                        <strong style="color: #0f172a;">Search position (Serper snapshot)</strong><br>
+                                        <strong style="color: #0f172a;">Search position (live SERP snapshot)</strong><br>
                                         @if ($ysFirst === true)
                                             Your site (same domain in this sample) appears in the <strong>top 10</strong> organic results — the listing URL may differ from the page you audited. Use Search Console for official average position.
                                         @else
@@ -568,7 +568,7 @@
                             </table>
                         @elseif ($ysN === 0)
                             <p style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">Search position</p>
-                            <p style="margin: 6px 0 0; font-size: 12px; color: #475569;">Rank could not be checked — no organic links in the Serper response.</p>
+                            <p style="margin: 6px 0 0; font-size: 12px; color: #475569;">Rank could not be checked — no organic links in the SERP response.</p>
                         @else
                             <p style="margin: 0; font-size: 13px; font-weight: 700; color: #0f172a;">Not in top {{ $ysN }} of this sample</p>
                             <p style="margin: 6px 0 0; font-size: 12px; color: #475569;">Your site’s domain did not match any of the {{ $ysN }} organic results in this snapshot (domain match, not full URL path). Check Search Console for your real average position.</p>
@@ -577,7 +577,7 @@
                     </div>
                 @endif
                 <p class="muted" style="margin-bottom: 10px;">
-                    Organic URLs via <strong>Serper.dev</strong>. Flesch scores are from HTML fetched at audit time; rankings are approximate and not identical to live Google.
+                    Organic URLs pulled live from Google at audit time. Flesch scores are from HTML we fetched ourselves; rankings are approximate and not identical to live Google.
                     @if (\App\Support\Audit\PageLocalePresentation::shouldShowSerpLocationNote($benchmark['serp_locale'] ?? null))
                         @php $exportSerpLoc = \App\Support\Audit\PageLocalePresentation::serpParamsLine($benchmark['serp_locale'] ?? null); @endphp
                         @if ($exportSerpLoc)

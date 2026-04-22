@@ -1,4 +1,4 @@
-{{-- PDF / print export: Serper organic row vs audited HTML title + meta. --}}
+{{-- PDF / print export: live SERP organic row vs audited HTML title + meta. --}}
 @php
     $hasSerpListing = ! empty($ys['matched_listing_url']);
     $hasAudited = ! empty($ys['audited_page_url'] ?? null);
@@ -8,7 +8,7 @@
         <tr>
             <td style="width: 50%; vertical-align: top; padding: 12px 14px; border-radius: 10px; border: 1px solid #e2e8f0; background: #ffffff;">
                 <p style="margin: 0; font-size: 9px; font-weight: 800; letter-spacing: 0.12em; text-transform: uppercase; color: #64748b;">SERP sample (organic listing)</p>
-                <p style="margin: 6px 0 0; font-size: 10px; line-height: 1.45; color: #64748b;">From Serper search results for the benchmark keyword.</p>
+                <p style="margin: 6px 0 0; font-size: 10px; line-height: 1.45; color: #64748b;">From live search results for the benchmark keyword.</p>
                 @if ($hasSerpListing)
                     @if (! empty($ys['matched_listing_display']))
                         <p style="margin: 10px 0 0; font-size: 12px; line-height: 1.4; color: #065f46;">{{ $ys['matched_listing_display'] }}</p>
