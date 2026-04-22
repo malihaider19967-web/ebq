@@ -64,7 +64,7 @@
                                 @endif
                                 <td class="whitespace-nowrap px-4 py-2.5 font-medium text-slate-900 dark:text-slate-100">
                                     {{ $row->query }}
-                                    @php($qKey = mb_strtolower((string) $row->query))
+                                    @php $qKey = mb_strtolower((string) $row->query); @endphp
                                     @if (isset($cannibalized[$qKey]))
                                         <span class="ml-1.5 inline-flex items-center rounded-full bg-amber-50 px-1.5 py-px text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" title="Multiple pages rank for this query">cannibalized</span>
                                     @endif
