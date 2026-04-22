@@ -5,6 +5,7 @@ namespace App\Livewire\Pages;
 use App\Mail\PageAuditReportMail;
 use App\Models\PageAuditReport;
 use App\Models\RankTrackingKeyword;
+use App\Services\PluginInsightResolver;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -65,8 +66,16 @@ class PageAuditDetail extends Component
 
     public function render()
     {
+        $breakdown = app(PluginInsightResolver::class)->countryBreakdown(
+            $this->pageAuditReport->website,
+            (string) $this->pageAuditReport->page,
+            null,
+            10,
+        );
+
         return view('livewire.pages.page-audit-detail', [
             'trackedRankings' => $this->trackedRankingsForAudit(),
+            'countryBreakdown' => $breakdown['by_country'],
         ]);
     }
 

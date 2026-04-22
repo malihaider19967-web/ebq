@@ -173,5 +173,32 @@
         </section>
     @endif
 
+    @if (! empty($countryBreakdown))
+        <section class="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <div class="flex items-center gap-2">
+                <span class="inline-flex h-5 items-center gap-1 rounded-full bg-slate-200 px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-600 dark:bg-slate-700 dark:text-slate-300">GSC traffic by country</span>
+                <span class="text-[11px] text-slate-500 dark:text-slate-400">Last 30 days · top 10</span>
+            </div>
+            <ul class="mt-3 divide-y divide-slate-100 text-xs dark:divide-slate-800">
+                @foreach ($countryBreakdown as $row)
+                    <li class="flex items-center justify-between gap-3 py-2">
+                        <span class="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+                            <span aria-hidden="true">{{ \App\Support\Countries::flag($row['country']) }}</span>
+                            <span class="font-medium">{{ \App\Support\Countries::name($row['country']) }}</span>
+                            <span class="text-[10px] text-slate-400">{{ $row['country'] }}</span>
+                        </span>
+                        <span class="flex items-center gap-4 tabular-nums text-slate-600 dark:text-slate-400">
+                            <span>{{ number_format($row['clicks']) }} clicks</span>
+                            <span>{{ number_format($row['impressions']) }} impr</span>
+                            @if ($row['position'] !== null)
+                                <span>pos {{ $row['position'] }}</span>
+                            @endif
+                        </span>
+                    </li>
+                @endforeach
+            </ul>
+        </section>
+    @endif
+
     @include('livewire.pages.partials.audit-report', ['auditReport' => $pageAuditReport, 'openAuditSummary' => true])
 </div>
