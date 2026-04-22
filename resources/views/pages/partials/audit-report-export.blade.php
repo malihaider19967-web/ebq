@@ -294,17 +294,19 @@
         @endif
 
         {{-- Traffic by country (GSC) --}}
-        @inject('countryResolver', 'App\Services\PluginInsightResolver')
-        @php($countryData = $countryResolver->countryBreakdownForAuditReport($auditReport->website, (string) $auditReport->page, 10))
-        @php($countryRows = $countryData['rows'])
-        @php($countryTotalClicks = $countryData['total_clicks'])
+        @php
+            $countryData = app(\App\Services\PluginInsightResolver::class)
+                ->countryBreakdownForAuditReport($auditReport->website, (string) $auditReport->page, 10);
+            $countryRows = $countryData['rows'];
+            $countryTotalClicks = $countryData['total_clicks'];
+        @endphp
         <div class="card">
             <h2>Traffic by country</h2>
             <p class="muted" style="margin-top: -6px;">Search Console data for this URL, last 30 days.</p>
             @if (empty($countryRows))
                 <p class="muted" style="margin-top: 10px;">No Search Console country data yet for this page.</p>
             @else
-                @php($primaryCountry = $countryRows[0])
+                @php $primaryCountry = $countryRows[0]; @endphp
                 <p style="margin-top: 8px; font-size: 12px; color: #334155;">
                     <strong>{{ count($countryRows) }}</strong> {{ \Illuminate\Support\Str::plural('market', count($countryRows)) }}
                     &nbsp;·&nbsp; <strong>{{ number_format($countryTotalClicks) }}</strong> clicks

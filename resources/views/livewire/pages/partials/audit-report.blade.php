@@ -451,12 +451,14 @@
                 </section>
                 @php $sectionHtml['keywords'] = ob_get_clean(); @endphp
 
-                @inject('countryResolver', 'App\Services\PluginInsightResolver')
                 @php ob_start(); @endphp
                 {{-- ══════ Traffic by country (GSC) ══════ --}}
-                @php($country_data = $countryResolver->countryBreakdownForAuditReport($auditReport->website, (string) $auditReport->page, 10))
-                @php($country_rows = $country_data['rows'])
-                @php($country_totalClicks = $country_data['total_clicks'])
+                @php
+                    $country_data = app(\App\Services\PluginInsightResolver::class)
+                        ->countryBreakdownForAuditReport($auditReport->website, (string) $auditReport->page, 10);
+                    $country_rows = $country_data['rows'];
+                    $country_totalClicks = $country_data['total_clicks'];
+                @endphp
                 <section id="audit-country" class="scroll-mt-16">
                     <div class="mb-3 flex items-center gap-2">
                         <div class="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
@@ -471,7 +473,7 @@
                             No Search Console country data yet for this page.
                         </div>
                     @else
-                        @php($country_primary = $country_rows[0])
+                        @php $country_primary = $country_rows[0]; @endphp
                         <p class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
                             <span>{{ count($country_rows) }} {{ \Illuminate\Support\Str::plural('market', count($country_rows)) }}</span>
                             <span aria-hidden="true" class="text-slate-300 dark:text-slate-600">·</span>
