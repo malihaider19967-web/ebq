@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Jobs\FetchKeywordMetricsJob;
 use App\Models\KeywordMetric;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Sole entrypoint for every Keywords Everywhere read in the app. All callers
@@ -110,8 +111,23 @@ class KeywordMetricsService
             return 0;
         }
 
+        Log::info('KeywordMetricsService.refresh: starting', [
+            'count' => count($cleaned),
+            'country' => $country,
+            'sample' => array_slice($cleaned, 0, 3),
+        ]);
+
         $response = $this->client->getKeywordData($cleaned, $country);
-        if ($response === null || empty($response['data'])) {
+        if ($response === null) {
+            Log::warning('KeywordMetricsService.refresh: client returned null (check API key + log lines above)');
+
+            return 0;
+        }
+        if (empty($response['data'])) {
+            Log::warning('KeywordMetricsService.refresh: response had empty data', [
+                'credits' => $response['credits'] ?? null,
+            ]);
+
             return 0;
         }
 
@@ -165,6 +181,12 @@ class KeywordMetricsService
             );
             $written++;
         }
+
+        Log::info('KeywordMetricsService.refresh: done', [
+            'requested' => count($cleaned),
+            'written' => $written,
+            'credits_remaining' => $response['credits'] ?? null,
+        ]);
 
         return $written;
     }
