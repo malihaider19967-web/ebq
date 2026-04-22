@@ -58,4 +58,16 @@ return [
         'fresh_days' => (int) env('KEYWORDS_EVERYWHERE_FRESH_DAYS', 30),
     ],
 
+    'dataforseo' => [
+        // DataForSEO accepts HTTP Basic auth with email + API key (password).
+        'login' => env('DATAFORSEO_LOGIN'),
+        'password' => env('DATAFORSEO_PASSWORD'),
+        'base_url' => env('DATAFORSEO_BASE_URL', 'https://api.dataforseo.com'),
+    ],
+
+    'competitor_backlinks' => [
+        'limit_per_competitor' => (int) env('COMPETITOR_BACKLINKS_LIMIT', 50),
+        'fresh_days' => (int) env('COMPETITOR_BACKLINKS_FRESH_DAYS', 30),
+    ],
+
 ];

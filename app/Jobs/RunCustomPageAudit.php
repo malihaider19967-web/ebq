@@ -2,7 +2,9 @@
 
 namespace App\Jobs;
 
+use App\Models\CompetitorBacklink;
 use App\Models\CustomPageAudit;
+use App\Services\CompetitorBacklinkService;
 use App\Services\PageAuditService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -76,6 +78,7 @@ class RunCustomPageAudit implements ShouldBeUnique, ShouldQueue
 
         if ($report->status === 'completed') {
             $audit->markCompleted($report);
+            $this->queueCompetitorBacklinks($report);
 
             return;
         }
@@ -86,6 +89,36 @@ class RunCustomPageAudit implements ShouldBeUnique, ShouldQueue
                 : 'Audit did not complete.',
             $report,
         );
+    }
+
+    /**
+     * After a successful audit, kick off a background fetch of up to 50
+     * backlinks for each unique competitor domain mentioned in the SERP
+     * benchmark. Skips any domain already cached fresh — no credits spent.
+     */
+    private function queueCompetitorBacklinks(\App\Models\PageAuditReport $report): void
+    {
+        $competitors = data_get($report->result, 'benchmark.competitors', []);
+        if (! is_array($competitors) || $competitors === []) {
+            return;
+        }
+
+        $domains = [];
+        foreach ($competitors as $row) {
+            if (! is_array($row) || empty($row['url']) || ! is_string($row['url'])) {
+                continue;
+            }
+            $domain = CompetitorBacklink::extractDomain($row['url']);
+            if ($domain !== '') {
+                $domains[$domain] = true;
+            }
+        }
+
+        if ($domains === []) {
+            return;
+        }
+
+        app(CompetitorBacklinkService::class)->queueRefresh(array_keys($domains));
     }
 
     /**

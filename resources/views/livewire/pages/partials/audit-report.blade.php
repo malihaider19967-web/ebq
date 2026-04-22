@@ -633,6 +633,24 @@
                             </div>
                         @endif
                         @if (! empty($benchmark['competitors']))
+                            @php
+                                // Batch-load cached competitor backlinks once per render — no N+1.
+                                $competitorDomains = [];
+                                foreach ($benchmark['competitors'] as $_cRow) {
+                                    if (isset($_cRow['url']) && is_string($_cRow['url'])) {
+                                        $d = \App\Models\CompetitorBacklink::extractDomain($_cRow['url']);
+                                        if ($d !== '') $competitorDomains[$d] = true;
+                                    }
+                                }
+                                $competitorDomains = array_keys($competitorDomains);
+                                $competitorBacklinks = $competitorDomains === []
+                                    ? collect()
+                                    : \App\Models\CompetitorBacklink::query()
+                                        ->whereIn('competitor_domain', $competitorDomains)
+                                        ->orderByDesc('domain_authority')
+                                        ->get()
+                                        ->groupBy('competitor_domain');
+                            @endphp
                             <div class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
                                 <table class="w-full min-w-[320px] text-xs">
                                     <thead>
@@ -640,6 +658,7 @@
                                             <th class="px-3 py-2 text-left">Page</th>
                                             <th class="px-3 py-2 text-right">Flesch</th>
                                             <th class="px-3 py-2 text-left">Grade band</th>
+                                            <th class="px-3 py-2 text-left">Top backlinks</th>
                                         </tr>
                                     </thead>
                                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -647,17 +666,63 @@
                                             <td class="px-3 py-2 font-semibold text-slate-900 dark:text-slate-100">This page (audited)</td>
                                             <td class="px-3 py-2 text-right tabular-nums font-semibold text-slate-900 dark:text-slate-100">{{ is_numeric($benchmark['your_flesch'] ?? null) ? $benchmark['your_flesch'] : '—' }}</td>
                                             <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ data_get($advanced, 'readability.grade') ?? '—' }}</td>
+                                            <td class="px-3 py-2 text-slate-400">—</td>
                                         </tr>
                                         @foreach ($benchmark['competitors'] as $row)
+                                            @php
+                                                $_compDomain = isset($row['url']) && is_string($row['url'])
+                                                    ? \App\Models\CompetitorBacklink::extractDomain($row['url'])
+                                                    : '';
+                                                $_compLinks = $_compDomain !== '' ? ($competitorBacklinks[$_compDomain] ?? collect()) : collect();
+                                                $_compLinkCount = $_compLinks->count();
+                                            @endphp
                                             <tr>
                                                 <td class="max-w-[200px] px-3 py-2">
                                                     <a href="{{ $row['url'] }}" target="_blank" rel="noopener noreferrer" class="font-medium text-indigo-600 hover:underline dark:text-indigo-400">{{ \Illuminate\Support\Str::limit($row['title'] ?: $row['url'], 48) }}</a>
                                                     @if (isset($row['position']))
                                                         <span class="ml-1 text-[10px] text-slate-400">#{{ $row['position'] }}</span>
                                                     @endif
+                                                    @if ($_compDomain !== '')
+                                                        <div class="mt-0.5 text-[10px] text-slate-400">{{ $_compDomain }}</div>
+                                                    @endif
                                                 </td>
                                                 <td class="px-3 py-2 text-right tabular-nums text-slate-800 dark:text-slate-100">{{ is_numeric($row['flesch'] ?? null) ? $row['flesch'] : '—' }}</td>
                                                 <td class="px-3 py-2 text-slate-600 dark:text-slate-300">{{ $row['grade'] ?? '—' }}</td>
+                                                <td class="px-3 py-2">
+                                                    @if ($_compLinkCount === 0)
+                                                        <span class="text-[10px] text-slate-400" title="Competitor backlinks will appear here once the background fetch completes (usually within a minute of the audit finishing). 30-day cache — no re-fetch if already cached.">fetching…</span>
+                                                    @else
+                                                        <details class="group/cblk">
+                                                            <summary class="cursor-pointer list-none text-[10px] font-semibold text-indigo-600 transition hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 [&::-webkit-details-marker]:hidden">
+                                                                <span class="inline-flex items-center gap-1">
+                                                                    {{ $_compLinkCount }} link{{ $_compLinkCount === 1 ? '' : 's' }}
+                                                                    <svg class="h-3 w-3 transition-transform group-open/cblk:rotate-180" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                                                                </span>
+                                                            </summary>
+                                                            <ul class="mt-2 max-h-64 space-y-1.5 overflow-y-auto rounded-md border border-slate-200 bg-slate-50 p-2 text-[10px] dark:border-slate-700 dark:bg-slate-800/40">
+                                                                @foreach ($_compLinks->take(10) as $_link)
+                                                                    <li class="flex items-start gap-2">
+                                                                        @if ($_link->domain_authority !== null)
+                                                                            <span class="mt-0.5 inline-flex h-5 w-7 shrink-0 items-center justify-center rounded bg-indigo-100 text-[9px] font-bold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300" title="Referring domain authority (0–100)">{{ $_link->domain_authority }}</span>
+                                                                        @endif
+                                                                        <div class="min-w-0 flex-1">
+                                                                            <a href="{{ $_link->referring_page_url }}" target="_blank" rel="noopener noreferrer" class="block truncate font-medium text-slate-800 hover:text-indigo-600 dark:text-slate-200 dark:hover:text-indigo-400" title="{{ $_link->referring_page_url }}">{{ $_link->referring_domain ?: \Illuminate\Support\Str::limit($_link->referring_page_url, 60) }}</a>
+                                                                            @if ($_link->anchor_text)
+                                                                                <p class="truncate text-slate-500 dark:text-slate-400" title="{{ $_link->anchor_text }}">“{{ \Illuminate\Support\Str::limit($_link->anchor_text, 80) }}”</p>
+                                                                            @endif
+                                                                            @if ($_link->backlink_type)
+                                                                                <span class="mr-1 inline-flex items-center rounded bg-slate-200 px-1 py-px text-[9px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-700 dark:text-slate-300">{{ $_link->backlink_type }}</span>
+                                                                            @endif
+                                                                        </div>
+                                                                    </li>
+                                                                @endforeach
+                                                                @if ($_compLinkCount > 10)
+                                                                    <li class="pt-1 text-[9px] text-slate-400">showing 10 of {{ $_compLinkCount }} cached</li>
+                                                                @endif
+                                                            </ul>
+                                                        </details>
+                                                    @endif
+                                                </td>
                                             </tr>
                                         @endforeach
                                     </tbody>
