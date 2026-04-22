@@ -5,7 +5,6 @@ namespace App\Livewire\Pages;
 use App\Mail\PageAuditReportMail;
 use App\Models\PageAuditReport;
 use App\Models\RankTrackingKeyword;
-use App\Services\PluginInsightResolver;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -66,42 +65,8 @@ class PageAuditDetail extends Component
 
     public function render()
     {
-        $breakdown = app(PluginInsightResolver::class)->countryBreakdown(
-            $this->pageAuditReport->website,
-            (string) $this->pageAuditReport->page,
-            null,
-            10,
-        );
-
-        $rows = $breakdown['by_country'];
-        $totalClicks = array_sum(array_map(fn ($r) => (int) $r['clicks'], $rows));
-        $totalImpr = array_sum(array_map(fn ($r) => (int) $r['impressions'], $rows));
-        $maxClicks = max(1, (int) (collect($rows)->max('clicks') ?? 0));
-
-        $rows = array_map(function ($r) use ($totalClicks, $maxClicks) {
-            $name = \App\Support\Countries::name((string) $r['country']);
-            $title = $name.' · '.number_format((int) $r['impressions']).' impressions';
-            if ($r['position'] !== null) {
-                $title .= ' · avg position '.$r['position'];
-            }
-
-            return $r + [
-                'name' => $name,
-                'flag' => \App\Support\Countries::flag((string) $r['country']),
-                'width_pct' => max(2, (int) round(((int) $r['clicks'] / $maxClicks) * 100)),
-                'share_pct' => $totalClicks > 0 ? round(((int) $r['clicks'] / $totalClicks) * 100, 1) : 0.0,
-                'hover_title' => $title,
-            ];
-        }, $rows);
-
         return view('livewire.pages.page-audit-detail', [
             'trackedRankings' => $this->trackedRankingsForAudit(),
-            'countryBreakdown' => $rows,
-            'countryTotals' => [
-                'clicks' => $totalClicks,
-                'impressions' => $totalImpr,
-                'markets' => count($rows),
-            ],
         ]);
     }
 

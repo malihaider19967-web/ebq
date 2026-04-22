@@ -293,6 +293,78 @@
             </div>
         @endif
 
+        {{-- Traffic by country (GSC) --}}
+        @inject('countryResolver', 'App\Services\PluginInsightResolver')
+        @php($countryData = $countryResolver->countryBreakdownForAuditReport($auditReport->website, (string) $auditReport->page, 10))
+        @php($countryRows = $countryData['rows'])
+        @php($countryTotalClicks = $countryData['total_clicks'])
+        <div class="card">
+            <h2>Traffic by country</h2>
+            <p class="muted" style="margin-top: -6px;">Search Console data for this URL, last 30 days.</p>
+            @if (empty($countryRows))
+                <p class="muted" style="margin-top: 10px;">No Search Console country data yet for this page.</p>
+            @else
+                @php($primaryCountry = $countryRows[0])
+                <p style="margin-top: 8px; font-size: 12px; color: #334155;">
+                    <strong>{{ count($countryRows) }}</strong> {{ \Illuminate\Support\Str::plural('market', count($countryRows)) }}
+                    &nbsp;·&nbsp; <strong>{{ number_format($countryTotalClicks) }}</strong> clicks
+                    &nbsp;·&nbsp; top:
+                    @if (! empty($primaryCountry['flag']))
+                        {{ $primaryCountry['flag'] }}
+                    @endif
+                    <strong>{{ $primaryCountry['name'] }}</strong>
+                    <span class="muted">({{ $primaryCountry['share_pct'] }}%)</span>
+                </p>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 11px;">
+                    <thead>
+                        <tr style="background: #f8fafc; border-bottom: 2px solid #e2e8f0;">
+                            <th style="padding: 6px 8px; text-align: left; width: 28px; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">#</th>
+                            <th style="padding: 6px 8px; text-align: left; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">Market</th>
+                            <th style="padding: 6px 8px; text-align: left; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">Share</th>
+                            <th style="padding: 6px 8px; text-align: right; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">Clicks</th>
+                            <th style="padding: 6px 8px; text-align: right; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">Impressions</th>
+                            <th style="padding: 6px 8px; text-align: right; color: #64748b; font-weight: 700; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em;">Avg pos</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach ($countryRows as $i => $row)
+                            <tr style="border-bottom: 1px solid #f1f5f9;">
+                                <td style="padding: 6px 8px; color: #94a3b8; font-family: ui-monospace, monospace;">{{ $i + 1 }}</td>
+                                <td style="padding: 6px 8px; color: #0f172a;">
+                                    @if (! empty($row['flag']))
+                                        {{ $row['flag'] }}
+                                    @endif
+                                    <strong>{{ $row['name'] }}</strong>
+                                    <span class="muted" style="font-family: ui-monospace, monospace;">{{ $row['country'] }}</span>
+                                </td>
+                                <td style="padding: 6px 8px; min-width: 140px;">
+                                    <table cellpadding="0" cellspacing="0" style="width: 100%; border-collapse: collapse;">
+                                        <tr>
+                                            <td style="padding: 0;">
+                                                <div style="background: #e2e8f0; height: 6px; border-radius: 3px; overflow: hidden;">
+                                                    <div style="background: {{ $i === 0 ? '#4f46e5' : '#818cf8' }}; width: {{ $row['width_pct'] }}%; height: 100%;"></div>
+                                                </div>
+                                            </td>
+                                            <td style="padding: 0 0 0 8px; width: 38px; text-align: right; font-weight: 700; color: #475569; font-variant-numeric: tabular-nums;">{{ $row['share_pct'] }}%</td>
+                                        </tr>
+                                    </table>
+                                </td>
+                                <td style="padding: 6px 8px; text-align: right; font-weight: 700; color: #0f172a; font-variant-numeric: tabular-nums;">{{ number_format($row['clicks']) }}</td>
+                                <td style="padding: 6px 8px; text-align: right; color: #475569; font-variant-numeric: tabular-nums;">{{ number_format($row['impressions']) }}</td>
+                                <td style="padding: 6px 8px; text-align: right; color: #475569; font-variant-numeric: tabular-nums;">
+                                    @if ($row['position'] !== null)
+                                        {{ $row['position'] }}
+                                    @else
+                                        —
+                                    @endif
+                                </td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+        </div>
+
         {{-- 1. Metadata --}}
         <div class="card">
             <h2>1. Metadata</h2>

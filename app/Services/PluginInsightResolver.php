@@ -424,4 +424,42 @@ class PluginInsightResolver
             'by_country' => $out,
         ];
     }
+
+    /**
+     * Presentation-shaped per-country breakdown for the audit report (web,
+     * download, and email share the same enrichment). Rows are sorted by
+     * clicks desc and include flag, display name, share %, and bar width %.
+     *
+     * @return array{rows: list<array<string, mixed>>, total_clicks: int, total_impressions: int, max_clicks: int}
+     */
+    public function countryBreakdownForAuditReport(Website $website, string $canonicalUrl, int $limit = 10): array
+    {
+        $raw = $this->countryBreakdown($website, $canonicalUrl, null, $limit)['by_country'];
+        $totalClicks = array_sum(array_map(fn ($r) => (int) $r['clicks'], $raw));
+        $totalImpr = array_sum(array_map(fn ($r) => (int) $r['impressions'], $raw));
+        $maxClicks = max(1, (int) (collect($raw)->max('clicks') ?? 0));
+
+        $rows = [];
+        foreach ($raw as $r) {
+            $name = \App\Support\Countries::name((string) $r['country']);
+            $hover = $name.' · '.number_format((int) $r['impressions']).' impressions';
+            if ($r['position'] !== null) {
+                $hover .= ' · avg position '.$r['position'];
+            }
+            $rows[] = $r + [
+                'name' => $name,
+                'flag' => \App\Support\Countries::flag((string) $r['country']),
+                'width_pct' => max(2, (int) round(((int) $r['clicks'] / $maxClicks) * 100)),
+                'share_pct' => $totalClicks > 0 ? round(((int) $r['clicks'] / $totalClicks) * 100, 1) : 0.0,
+                'hover_title' => $hover,
+            ];
+        }
+
+        return [
+            'rows' => $rows,
+            'total_clicks' => $totalClicks,
+            'total_impressions' => $totalImpr,
+            'max_clicks' => $maxClicks,
+        ];
+    }
 }

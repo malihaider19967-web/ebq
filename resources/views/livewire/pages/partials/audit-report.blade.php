@@ -65,6 +65,7 @@
         ['key' => 'technical',       'label' => 'Technical',       'count' => null,         'show' => true],
         ['key' => 'benchmark',       'label' => 'SERP benchmark',  'count' => is_array($benchmark) ? count($benchmark['competitors'] ?? []) : null, 'show' => $benchmarkNav],
         ['key' => 'keywords',        'label' => 'Keywords',        'count' => $kwAvailable ? (int) ($keywordData['coverage']['total'] ?? 0) : null, 'show' => true],
+        ['key' => 'country',         'label' => 'Traffic by country', 'count' => null,      'show' => true],
         ['key' => 'metadata',        'label' => 'Metadata',        'count' => null,         'show' => true],
         ['key' => 'content',         'label' => 'Content',         'count' => null,         'show' => true],
         ['key' => 'links',           'label' => 'Images & Links',  'count' => null,         'show' => true],
@@ -449,6 +450,73 @@
                     @endif
                 </section>
                 @php $sectionHtml['keywords'] = ob_get_clean(); @endphp
+
+                @inject('countryResolver', 'App\Services\PluginInsightResolver')
+                @php ob_start(); @endphp
+                {{-- ══════ Traffic by country (GSC) ══════ --}}
+                @php($country_data = $countryResolver->countryBreakdownForAuditReport($auditReport->website, (string) $auditReport->page, 10))
+                @php($country_rows = $country_data['rows'])
+                @php($country_totalClicks = $country_data['total_clicks'])
+                <section id="audit-country" class="scroll-mt-16">
+                    <div class="mb-3 flex items-center gap-2">
+                        <div class="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-100 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400">
+                            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18zm0 0a8.949 8.949 0 004.951-1.488A3.987 3.987 0 0013 16.128V15a2 2 0 012-2h3.88A9 9 0 0012 21zm3-10a1 1 0 11-2 0 1 1 0 012 0zm-7 4a3 3 0 100-6 3 3 0 000 6z" /></svg>
+                        </div>
+                        <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Traffic by country</h3>
+                        <span class="ml-auto text-[11px] text-slate-500 dark:text-slate-400">Search Console · last 30 days</span>
+                    </div>
+
+                    @if (empty($country_rows))
+                        <div class="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-xs text-slate-500 dark:border-slate-700 dark:bg-slate-800/40 dark:text-slate-400">
+                            No Search Console country data yet for this page.
+                        </div>
+                    @else
+                        @php($country_primary = $country_rows[0])
+                        <p class="mb-3 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                            <span>{{ count($country_rows) }} {{ \Illuminate\Support\Str::plural('market', count($country_rows)) }}</span>
+                            <span aria-hidden="true" class="text-slate-300 dark:text-slate-600">·</span>
+                            <span><span class="font-semibold text-slate-700 dark:text-slate-200">{{ number_format($country_totalClicks) }}</span> clicks</span>
+                            <span aria-hidden="true" class="text-slate-300 dark:text-slate-600">·</span>
+                            <span>
+                                top:
+                                @if (! empty($country_primary['flag']))
+                                    <span aria-hidden="true">{{ $country_primary['flag'] }}</span>
+                                @endif
+                                <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $country_primary['name'] }}</span>
+                                <span class="text-slate-400 dark:text-slate-500">({{ $country_primary['share_pct'] }}%)</span>
+                            </span>
+                        </p>
+
+                        <div class="overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700">
+                            <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                                @foreach ($country_rows as $i => $row)
+                                    <li class="flex items-center gap-3 px-4 py-2 text-xs">
+                                        <span class="w-4 shrink-0 text-right text-[10px] font-mono text-slate-400 dark:text-slate-500">{{ $i + 1 }}</span>
+
+                                        <span class="flex min-w-0 flex-1 items-center gap-2">
+                                            @if (! empty($row['flag']))
+                                                <span aria-hidden="true" class="shrink-0 text-sm leading-none">{{ $row['flag'] }}</span>
+                                            @endif
+                                            <span class="min-w-0 truncate font-medium text-slate-800 dark:text-slate-100" title="{{ $row['hover_title'] }}">{{ $row['name'] }}</span>
+                                            <span class="shrink-0 text-[10px] font-mono text-slate-400 dark:text-slate-500">{{ $row['country'] }}</span>
+                                        </span>
+
+                                        <div class="hidden w-40 items-center gap-2 sm:flex md:w-56">
+                                            <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                                                <div class="h-full rounded-full {{ $i === 0 ? 'bg-indigo-600' : 'bg-indigo-400/80 dark:bg-indigo-500/70' }}" style="width: {{ $row['width_pct'] }}%" role="progressbar" aria-valuenow="{{ $row['share_pct'] }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ $row['name'] }} share of clicks: {{ $row['share_pct'] }}%"></div>
+                                            </div>
+                                        </div>
+
+                                        <span class="w-12 shrink-0 text-right font-semibold tabular-nums text-slate-600 dark:text-slate-300">{{ $row['share_pct'] }}%</span>
+                                        <span class="w-16 shrink-0 text-right tabular-nums text-slate-900 dark:text-slate-100">{{ number_format($row['clicks']) }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        </div>
+                        <p class="mt-2 text-[10px] text-slate-400 dark:text-slate-500">Hover a row for impressions and average position.</p>
+                    @endif
+                </section>
+                @php $sectionHtml['country'] = ob_get_clean(); @endphp
 
                 @php ob_start(); @endphp
                 @if ($benchmarkNav)
