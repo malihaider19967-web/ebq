@@ -26,7 +26,7 @@
 
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-7" role="tablist" aria-label="Insight categories">
             @foreach ($tabs as $t)
-                @php($active = $tab === $t['key'])
+                @php $active = $tab === $t['key']; @endphp
                 <button type="button" wire:click="setTab('{{ $t['key'] }}')"
                     role="tab"
                     aria-selected="{{ $active ? 'true' : 'false' }}"

@@ -28,8 +28,10 @@
                         {{ number_format($row['clicks']) }}
                     </span>
                     <span class="col-span-1 text-right">
-                        @php($dir = $row['change']['direction'] ?? 'flat')
-                        @php($pct = $row['change']['change_percent'] ?? null)
+                        @php
+                            $dir = $row['change']['direction'] ?? 'flat';
+                            $pct = $row['change']['change_percent'] ?? null;
+                        @endphp
                         @if ($dir === 'up')
                             <span class="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">+{{ $pct }}%</span>
                         @elseif ($dir === 'down')
