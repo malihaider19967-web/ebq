@@ -291,6 +291,7 @@
                                     </button>
                                 </th>
                                 <th class="px-4 py-3 text-left">GSC (30d)</th>
+                                <th class="px-4 py-3 text-left" title="Monthly search volume · CPC · competition (Keywords Everywhere, global)">Volume</th>
                                 <th class="px-4 py-3 text-left">
                                     <button wire:click="sort('last_checked_at')" class="inline-flex items-center gap-1 hover:text-slate-700 dark:hover:text-slate-200">
                                         Last check
@@ -375,6 +376,28 @@
                                             </div>
                                         @else
                                             <span class="text-[10px] text-slate-400">No GSC match</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-4 py-3">
+                                        @php($ke = ($keMetrics ?? [])[\App\Models\KeywordMetric::hashKeyword((string) $kw->keyword)] ?? null)
+                                        @if ($ke && $ke->search_volume !== null)
+                                            <div class="text-[11px]" title="Updated {{ $ke->fetched_at->diffForHumans() }}">
+                                                <div class="flex items-baseline gap-1.5">
+                                                    <span class="tabular-nums font-semibold text-slate-800 dark:text-slate-200">{{ number_format($ke->search_volume) }}</span>
+                                                    <span class="text-[10px] text-slate-400">/mo</span>
+                                                </div>
+                                                <div class="mt-0.5 flex flex-wrap items-center gap-x-2 text-[10px] text-slate-400">
+                                                    @if ($ke->cpc !== null)
+                                                        <span>CPC {{ $ke->currency ?: 'USD' }} {{ number_format((float) $ke->cpc, 2) }}</span>
+                                                    @endif
+                                                    @if ($ke->competition !== null)
+                                                        <span>·</span>
+                                                        <span>Comp {{ number_format((float) $ke->competition * 100, 0) }}%</span>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @else
+                                            <span class="text-[10px] text-slate-400" title="Will populate on the next background fetch">—</span>
                                         @endif
                                     </td>
                                     <td class="px-4 py-3 text-slate-600 dark:text-slate-400">

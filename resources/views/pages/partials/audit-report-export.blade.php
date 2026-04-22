@@ -268,6 +268,17 @@
                 @endif
 
                 @if (! empty($keywordData['target_keywords']))
+                    @php
+                        $_exportTargetQueries = collect($keywordData['target_keywords'])->pluck('query')->map(fn ($q) => (string) $q)->values()->all();
+                        $_exportTargetKe = $_exportTargetQueries === []
+                            ? []
+                            : \App\Models\KeywordMetric::query()
+                                ->whereIn('keyword_hash', array_unique(array_map(fn ($q) => \App\Models\KeywordMetric::hashKeyword($q), $_exportTargetQueries)))
+                                ->where('country', 'global')
+                                ->get()
+                                ->keyBy('keyword_hash')
+                                ->all();
+                    @endphp
                     <h3 style="margin-top: 14px;">Target keywords from Search Console ({{ count($keywordData['target_keywords']) }})</h3>
                     <table style="width: 100%; border-collapse: collapse; font-size: 11px;">
                         <thead>
@@ -276,15 +287,18 @@
                                 <th style="text-align: right; padding: 4px 6px;">Clicks</th>
                                 <th style="text-align: right; padding: 4px 6px;">Impr.</th>
                                 <th style="text-align: right; padding: 4px 6px;">Pos</th>
+                                <th style="text-align: right; padding: 4px 6px;">Vol/mo</th>
                             </tr>
                         </thead>
                         <tbody>
                             @foreach ($keywordData['target_keywords'] as $t)
+                                @php $_exportKe = $_exportTargetKe[\App\Models\KeywordMetric::hashKeyword((string) $t['query'])] ?? null; @endphp
                                 <tr style="border-top: 1px solid #e2e8f0;">
                                     <td style="padding: 4px 6px;">{{ $t['query'] }}</td>
                                     <td style="padding: 4px 6px; text-align: right;">{{ number_format($t['clicks']) }}</td>
                                     <td style="padding: 4px 6px; text-align: right;">{{ number_format($t['impressions']) }}</td>
                                     <td style="padding: 4px 6px; text-align: right;">{{ number_format($t['position'], 1) }}</td>
+                                    <td style="padding: 4px 6px; text-align: right;">{{ ($_exportKe && $_exportKe->search_volume !== null) ? number_format($_exportKe->search_volume) : '—' }}</td>
                                 </tr>
                             @endforeach
                         </tbody>

@@ -2,8 +2,10 @@
 
 namespace App\Livewire\Keywords;
 
+use App\Models\KeywordMetric;
 use App\Models\RankTrackingKeyword;
 use App\Models\SearchConsoleData;
+use App\Services\KeywordMetricsService;
 use App\Services\ReportDataService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -125,6 +127,20 @@ class KeywordsTable extends Component
             );
         }
 
-        return view('livewire.keywords.keywords-table', compact('rows', 'cannibalized', 'tracked'));
+        $keMetrics = [];
+        if ($rows instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $rows->isNotEmpty()) {
+            $queries = $rows->getCollection()
+                ->pluck('query')
+                ->map(fn ($q) => (string) $q)
+                ->filter()
+                ->unique()
+                ->values()
+                ->all();
+            if ($queries !== []) {
+                $keMetrics = app(KeywordMetricsService::class)->metricsOrQueue($queries, 'global');
+            }
+        }
+
+        return view('livewire.keywords.keywords-table', compact('rows', 'cannibalized', 'tracked', 'keMetrics'));
     }
 }

@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Listeners\RecordGrowthReportSent;
+use App\Models\RankTrackingKeyword;
 use App\Models\Website;
+use App\Observers\RankTrackingKeywordObserver;
 use App\Policies\WebsitePolicy;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -29,6 +31,8 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::policy(Website::class, WebsitePolicy::class);
+
+        RankTrackingKeyword::observe(RankTrackingKeywordObserver::class);
 
         Event::listen(MessageSent::class, RecordGrowthReportSent::class);
 

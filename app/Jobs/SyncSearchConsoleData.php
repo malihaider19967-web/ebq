@@ -2,6 +2,8 @@
 
 namespace App\Jobs;
 
+use App\Models\KeywordMetric;
+use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Services\Google\SearchConsoleService;
 use App\Support\UrlNormalizer;
@@ -52,6 +54,57 @@ class SyncSearchConsoleData implements ShouldQueue
         }
 
         Website::whereKey($this->websiteId)->update(['last_search_console_sync_at' => now()]);
+
+        $this->queueKeywordMetricsRefresh();
+    }
+
+    /**
+     * After a GSC upsert, queue Keywords Everywhere lookups for queries that
+     * cleared the 100-impression gate in the sync window and aren't already
+     * fresh in the keyword_metrics cache. Budget-safe (no lookups if the API
+     * key is unconfigured — the job no-ops via the client).
+     */
+    private function queueKeywordMetricsRefresh(): void
+    {
+        $since = Carbon::now()->subDays($this->days)->toDateString();
+
+        $candidates = SearchConsoleData::query()
+            ->where('website_id', $this->websiteId)
+            ->whereDate('date', '>=', $since)
+            ->where('query', '!=', '')
+            ->selectRaw('query, SUM(impressions) as total_impressions')
+            ->groupBy('query')
+            ->havingRaw('SUM(impressions) >= ?', [100])
+            ->orderByDesc('total_impressions')
+            ->limit(500)
+            ->pluck('query')
+            ->all();
+
+        if ($candidates === []) {
+            return;
+        }
+
+        $freshHashes = array_flip(KeywordMetric::query()
+            ->whereIn('keyword_hash', array_map(fn ($k) => KeywordMetric::hashKeyword((string) $k), $candidates))
+            ->where('country', 'global')
+            ->where('expires_at', '>', now())
+            ->pluck('keyword_hash')
+            ->all());
+
+        $needed = [];
+        foreach ($candidates as $kw) {
+            if (! isset($freshHashes[KeywordMetric::hashKeyword((string) $kw)])) {
+                $needed[] = (string) $kw;
+            }
+        }
+
+        if ($needed === []) {
+            return;
+        }
+
+        foreach (array_chunk($needed, 100) as $chunk) {
+            FetchKeywordMetricsJob::dispatch(array_values($chunk), 'global');
+        }
     }
 
     private function upsertRows(array $rows): void

@@ -6,6 +6,7 @@ use App\Jobs\TrackKeywordRankJob;
 use App\Models\RankTrackingKeyword;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
+use App\Services\KeywordMetricsService;
 use App\Services\SerpFeatureRiskService;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
@@ -307,6 +308,14 @@ class RankTrackingManager extends Component
             $serpRisk = app(SerpFeatureRiskService::class)->riskMapForWebsite($this->websiteId);
         }
 
+        $keMetrics = [];
+        if ($rows instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $rows->isNotEmpty()) {
+            $keywordList = $rows->getCollection()->pluck('keyword')->map(fn ($k) => (string) $k)->unique()->values()->all();
+            if ($keywordList !== []) {
+                $keMetrics = app(KeywordMetricsService::class)->metricsOrQueue($keywordList, 'global');
+            }
+        }
+
         return view('livewire.rank-tracking.rank-tracking-manager', [
             'rows' => $rows,
             'stats' => $stats,
@@ -314,6 +323,7 @@ class RankTrackingManager extends Component
             'serpRisk' => $serpRisk,
             'countries' => $this->countries(),
             'languages' => $this->languages(),
+            'keMetrics' => $keMetrics,
         ]);
     }
 

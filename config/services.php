@@ -52,4 +52,10 @@ return [
         'timeout' => (int) env('LIGHTHOUSE_TIMEOUT_S', 90),
     ],
 
+    'keywords_everywhere' => [
+        'key' => env('KEYWORDS_EVERYWHERE_API_KEY'),
+        'base_url' => env('KEYWORDS_EVERYWHERE_BASE_URL', 'https://api.keywordseverywhere.com'),
+        'fresh_days' => (int) env('KEYWORDS_EVERYWHERE_FRESH_DAYS', 30),
+    ],
+
 ];

@@ -52,6 +52,7 @@
                             <x-sort-header column="impressions" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Impressions</x-sort-header>
                             <x-sort-header column="ctr" :sortBy="$sortBy" :sortDir="$sortDir" align="right">CTR</x-sort-header>
                             <x-sort-header column="position" :sortBy="$sortBy" :sortDir="$sortDir" align="right">Position</x-sort-header>
+                            <th class="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" title="Monthly search volume (Keywords Everywhere, global)">Volume</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -81,6 +82,14 @@
                                         'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' => $row->position > 10 && $row->position <= 20,
                                         'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' => $row->position > 20,
                                     ])>{{ number_format($row->position, 1) }}</span>
+                                </td>
+                                <td class="whitespace-nowrap px-4 py-2.5 text-right tabular-nums text-slate-700 dark:text-slate-300">
+                                    @php($ke = ($keMetrics ?? [])[\App\Models\KeywordMetric::hashKeyword((string) $row->query)] ?? null)
+                                    @if ($ke && $ke->search_volume !== null)
+                                        <span title="Updated {{ $ke->fetched_at->diffForHumans() }}@if ($ke->cpc !== null) · CPC {{ $ke->currency ?: 'USD' }} {{ number_format((float) $ke->cpc, 2) }}@endif">{{ number_format($ke->search_volume) }}</span>
+                                    @else
+                                        <span class="text-slate-400">—</span>
+                                    @endif
                                 </td>
                             </tr>
                         @endforeach

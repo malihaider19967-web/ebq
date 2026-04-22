@@ -414,7 +414,18 @@
                                     <svg class="h-3 w-3 transition-transform group-open/kw:rotate-180" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
                                 </summary>
                                 <div class="max-h-72 overflow-auto border-t border-slate-200 dark:border-slate-700">
-                                    @php $foundSet = collect($cov['missing'] ?? [])->pluck('query')->map(fn ($q) => mb_strtolower($q))->flip(); @endphp
+                                    @php
+                                        $foundSet = collect($cov['missing'] ?? [])->pluck('query')->map(fn ($q) => mb_strtolower($q))->flip();
+                                        $_targetQueries = collect($keywordData['target_keywords'])->pluck('query')->map(fn ($q) => (string) $q)->values()->all();
+                                        $_targetKe = $_targetQueries === []
+                                            ? []
+                                            : \App\Models\KeywordMetric::query()
+                                                ->whereIn('keyword_hash', array_unique(array_map(fn ($q) => \App\Models\KeywordMetric::hashKeyword($q), $_targetQueries)))
+                                                ->where('country', 'global')
+                                                ->get()
+                                                ->keyBy('keyword_hash')
+                                                ->all();
+                                    @endphp
                                     <table class="w-full text-xs">
                                         <thead>
                                             <tr class="sticky top-0 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:bg-slate-800/80 dark:text-slate-400">
@@ -422,17 +433,28 @@
                                                 <th class="px-3 py-1.5 text-right">Clicks</th>
                                                 <th class="px-3 py-1.5 text-right">Impr.</th>
                                                 <th class="px-3 py-1.5 text-right">Pos</th>
+                                                <th class="px-3 py-1.5 text-right" title="Monthly search volume (Keywords Everywhere)">Vol</th>
                                                 <th class="px-3 py-1.5 text-center">In body</th>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                             @foreach ($keywordData['target_keywords'] as $t)
-                                                @php $missing = isset($foundSet[mb_strtolower($t['query'])]); @endphp
+                                                @php
+                                                    $missing = isset($foundSet[mb_strtolower($t['query'])]);
+                                                    $_ke = $_targetKe[\App\Models\KeywordMetric::hashKeyword((string) $t['query'])] ?? null;
+                                                @endphp
                                                 <tr>
                                                     <td class="px-3 py-1.5 text-slate-800 dark:text-slate-100">{{ $t['query'] }}</td>
                                                     <td class="px-3 py-1.5 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ number_format($t['clicks']) }}</td>
                                                     <td class="px-3 py-1.5 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ number_format($t['impressions']) }}</td>
                                                     <td class="px-3 py-1.5 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ number_format($t['position'], 1) }}</td>
+                                                    <td class="px-3 py-1.5 text-right tabular-nums text-slate-600 dark:text-slate-300">
+                                                        @if ($_ke && $_ke->search_volume !== null)
+                                                            <span title="Updated {{ $_ke->fetched_at->diffForHumans() }}">{{ number_format($_ke->search_volume) }}</span>
+                                                        @else
+                                                            <span class="text-slate-400">—</span>
+                                                        @endif
+                                                    </td>
                                                     <td class="px-3 py-1.5 text-center">
                                                         @if ($missing)
                                                             <span class="inline-flex rounded-full bg-rose-100 px-1.5 py-px text-[9px] font-bold text-rose-700 dark:bg-rose-500/10 dark:text-rose-400">NO</span>

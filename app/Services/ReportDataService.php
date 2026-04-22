@@ -619,7 +619,7 @@ class ReportDataService
 
         usort($out, fn ($a, $b) => $b['total_impressions'] <=> $a['total_impressions']);
 
-        return array_slice($out, 0, $limit);
+        return $this->attachKeywordMetrics(array_slice($out, 0, $limit), 'query');
     }
 
     /**
@@ -632,7 +632,7 @@ class ReportDataService
     {
         [$start, $end] = $this->resolveRange($startDate, $endDate, 28);
 
-        return SearchConsoleData::query()
+        $list = SearchConsoleData::query()
             ->where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
             ->where('query', '!=', '')
@@ -663,6 +663,51 @@ class ReportDataService
             ->take($limit)
             ->values()
             ->toArray();
+
+        return $this->attachKeywordMetrics($list, 'query');
+    }
+
+    /**
+     * Attach cached Keywords Everywhere metrics (search_volume, cpc, competition)
+     * onto a list of rows. Pure DB lookup — never calls the API. Rows without
+     * cached metrics get null fields so UI rendering is uniform.
+     *
+     * @param  array<int, array<string, mixed>>  $rows
+     * @return array<int, array<string, mixed>>
+     */
+    private function attachKeywordMetrics(array $rows, string $queryKey): array
+    {
+        if ($rows === []) {
+            return $rows;
+        }
+
+        $keywords = [];
+        foreach ($rows as $r) {
+            $kw = isset($r[$queryKey]) ? (string) $r[$queryKey] : '';
+            if ($kw !== '') {
+                $keywords[] = $kw;
+            }
+        }
+        if ($keywords === []) {
+            return $rows;
+        }
+
+        $metrics = \App\Models\KeywordMetric::query()
+            ->whereIn('keyword_hash', array_unique(array_map(fn ($k) => \App\Models\KeywordMetric::hashKeyword($k), $keywords)))
+            ->where('country', 'global')
+            ->get()
+            ->keyBy('keyword_hash');
+
+        foreach ($rows as $i => $r) {
+            $kw = isset($r[$queryKey]) ? (string) $r[$queryKey] : '';
+            $hit = $kw !== '' ? ($metrics[\App\Models\KeywordMetric::hashKeyword($kw)] ?? null) : null;
+            $rows[$i]['search_volume'] = $hit?->search_volume;
+            $rows[$i]['cpc'] = $hit?->cpc;
+            $rows[$i]['cpc_currency'] = $hit?->currency;
+            $rows[$i]['competition'] = $hit?->competition;
+        }
+
+        return $rows;
     }
 
     /**
