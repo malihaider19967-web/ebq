@@ -11,14 +11,17 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Validator;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 
 class CustomAudit extends Component
 {
     public int $websiteId = 0;
 
+    #[Url(as: 'pageUrl')]
     public string $pageUrl = '';
 
+    #[Url(as: 'targetKeyword')]
     public string $targetKeyword = '';
 
     public ?string $message = null;

@@ -380,11 +380,19 @@
                                                 ${{ number_format($row['upside_value'], 0) }}
                                             </td>
                                             <td class="py-2">
-                                                @if (! empty($row['current_page']))
-                                                    <a href="{{ route('pages.show', ['id' => urlencode($row['current_page'])]) }}" wire:navigate class="font-semibold text-indigo-600 hover:underline dark:text-indigo-400">Audit current page →</a>
-                                                @else
-                                                    <a href="{{ route('custom-audit.index') }}?keyword={{ urlencode($row['keyword']) }}" wire:navigate class="font-semibold text-indigo-600 hover:underline dark:text-indigo-400">Start new audit →</a>
-                                                @endif
+                                                @php
+                                                    $_auditParams = ['targetKeyword' => $row['keyword']];
+                                                    if (! empty($row['current_page'])) {
+                                                        $_auditParams['pageUrl'] = $row['current_page'];
+                                                    }
+                                                @endphp
+                                                <a href="{{ route('custom-audit.index') }}?{{ http_build_query($_auditParams) }}" wire:navigate class="font-semibold text-indigo-600 hover:underline dark:text-indigo-400">
+                                                    @if (! empty($row['current_page']))
+                                                        Audit current page →
+                                                    @else
+                                                        Start new audit →
+                                                    @endif
+                                                </a>
                                             </td>
                                         </tr>
                                     @endforeach

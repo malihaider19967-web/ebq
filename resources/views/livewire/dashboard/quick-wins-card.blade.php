@@ -17,24 +17,35 @@
 
             <ul class="mt-4 space-y-2.5">
                 @foreach ($rows as $row)
-                    <li class="flex items-center justify-between gap-3 text-xs">
-                        <div class="min-w-0 flex-1">
-                            <div class="truncate font-semibold text-slate-900 dark:text-slate-100" title="{{ $row['keyword'] }}">{{ $row['keyword'] }}</div>
-                            <div class="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
-                                {{ number_format($row['search_volume']) }}/mo
-                                @if ($row['current_position'] !== null)
-                                    · currently <span class="font-medium">#{{ $row['current_position'] }}</span>
-                                @else
-                                    · <span class="font-medium">unranked</span>
-                                @endif
-                                @if ($row['competition'] !== null)
-                                    · comp {{ number_format($row['competition'] * 100, 0) }}%
-                                @endif
+                    @php
+                        $_auditParams = ['targetKeyword' => $row['keyword']];
+                        if (! empty($row['current_page'])) {
+                            $_auditParams['pageUrl'] = $row['current_page'];
+                        }
+                        $_auditUrl = route('custom-audit.index').'?'.http_build_query($_auditParams);
+                    @endphp
+                    <li>
+                        <a href="{{ $_auditUrl }}" wire:navigate
+                           class="flex items-center justify-between gap-3 rounded-md px-1 py-1 text-xs transition hover:bg-white/60 dark:hover:bg-slate-800/40"
+                           title="Open a custom audit with this keyword pre-filled">
+                            <div class="min-w-0 flex-1">
+                                <div class="truncate font-semibold text-slate-900 dark:text-slate-100">{{ $row['keyword'] }}</div>
+                                <div class="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
+                                    {{ number_format($row['search_volume']) }}/mo
+                                    @if ($row['current_position'] !== null)
+                                        · currently <span class="font-medium">#{{ $row['current_position'] }}</span>
+                                    @else
+                                        · <span class="font-medium">unranked</span>
+                                    @endif
+                                    @if ($row['competition'] !== null)
+                                        · comp {{ number_format($row['competition'] * 100, 0) }}%
+                                    @endif
+                                </div>
                             </div>
-                        </div>
-                        <span class="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold tabular-nums text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
-                            +${{ number_format($row['upside_value'], 0) }}/mo
-                        </span>
+                            <span class="shrink-0 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold tabular-nums text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300">
+                                +${{ number_format($row['upside_value'], 0) }}/mo
+                            </span>
+                        </a>
                     </li>
                 @endforeach
             </ul>
