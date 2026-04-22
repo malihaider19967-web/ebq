@@ -8,6 +8,7 @@ use App\Models\Website;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -21,6 +22,9 @@ class PagesTable extends Component
     public string $sortDir = 'desc';
     public bool $onlyFailingWithTraffic = false;
 
+    #[Url(as: 'country', history: true)]
+    public string $country = '';
+
     public function mount(): void
     {
         $this->websiteId = (int) session('current_website_id', 0);
@@ -30,6 +34,14 @@ class PagesTable extends Component
     public function switchWebsite(int $websiteId): void
     {
         $this->websiteId = $websiteId;
+        $this->country = '';
+        $this->resetPage();
+    }
+
+    #[On('country-changed')]
+    public function onCountryChanged(string $country): void
+    {
+        $this->country = $country;
         $this->resetPage();
     }
 
@@ -89,6 +101,7 @@ class PagesTable extends Component
                 })
                 ->where('search_console_data.website_id', $this->websiteId)
                 ->when($gscKeywordWindowFrom, fn ($q) => $q->whereDate('search_console_data.date', '>=', $gscKeywordWindowFrom))
+                ->when($this->country !== '', fn ($q) => $q->where('search_console_data.country', strtoupper($this->country)))
                 ->when($this->search, fn ($q) => $q->where('search_console_data.page', 'like', "%{$this->search}%"))
                 ->when($this->onlyFailingWithTraffic, function ($q): void {
                     $q->whereNotNull('page_indexing_statuses.google_verdict')

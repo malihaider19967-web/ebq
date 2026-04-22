@@ -8,7 +8,18 @@
             <livewire:dashboard.sync-and-report-panel />
         </div>
         <livewire:dashboard.kpi-cards />
+        <div class="flex items-center justify-between gap-3">
+            <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Action insights') }}</h2>
+            <livewire:dashboard.country-filter />
+        </div>
         <livewire:dashboard.insight-cards />
-        <livewire:dashboard.traffic-chart />
+        <div class="grid gap-5 lg:grid-cols-3">
+            <div class="lg:col-span-2">
+                <livewire:dashboard.traffic-chart />
+            </div>
+            <div class="lg:col-span-1">
+                <livewire:dashboard.top-countries-card />
+            </div>
+        </div>
     </div>
 </x-layouts.app>

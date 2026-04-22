@@ -540,7 +540,7 @@ class ReportDataService
      *
      * @return array<int, array{query: string, primary_page: string, total_clicks: int, total_impressions: int, competing_pages: list<array{page: string, clicks: int, impressions: int, share: float, position: float}>}>
      */
-    public function cannibalizationReport(int $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50): array
+    public function cannibalizationReport(int $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50, ?string $country = null): array
     {
         [$start, $end] = $this->resolveRange($startDate, $endDate, 28);
 
@@ -549,6 +549,7 @@ class ReportDataService
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
             ->where('query', '!=', '')
             ->where('page', '!=', '')
+            ->when($this->normalizeCountry($country), fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('query, page, SUM(clicks) as total_clicks, SUM(impressions) as total_impressions, AVG(position) as avg_position')
             ->groupBy('query', 'page')
             ->get();
@@ -612,7 +613,7 @@ class ReportDataService
      *
      * @return array<int, array{query: string, impressions: int, clicks: int, ctr: float, position: float, score: float}>
      */
-    public function strikingDistance(int $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50): array
+    public function strikingDistance(int $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50, ?string $country = null): array
     {
         [$start, $end] = $this->resolveRange($startDate, $endDate, 28);
 
@@ -620,6 +621,7 @@ class ReportDataService
             ->where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
             ->where('query', '!=', '')
+            ->when($this->normalizeCountry($country), fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('query, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as avg_position')
             ->groupBy('query')
             ->get()
@@ -655,7 +657,7 @@ class ReportDataService
      *
      * @return array{pages: array<int, array<string, mixed>>, has_yoy_history: bool}
      */
-    public function contentDecay(int $websiteId, int $limit = 25): array
+    public function contentDecay(int $websiteId, int $limit = 25, ?string $country = null): array
     {
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz)->endOfDay();
@@ -664,9 +666,11 @@ class ReportDataService
         $prevStart = $prevEnd->copy()->subDays(27)->startOfDay();
         $yoyEnd = $end->copy()->subYear()->endOfDay();
         $yoyStart = $start->copy()->subYear()->startOfDay();
+        $country = $this->normalizeCountry($country);
 
         $earliest = SearchConsoleData::query()
             ->where('website_id', $websiteId)
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->min('date');
         $hasYoy = $earliest && Carbon::parse($earliest)->lte($yoyStart);
 
@@ -674,6 +678,7 @@ class ReportDataService
             ->where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
             ->where('page', '!=', '')
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('page, SUM(clicks) as clicks, SUM(impressions) as impressions')
             ->groupBy('page')
             ->get()
@@ -683,6 +688,7 @@ class ReportDataService
             ->where('website_id', $websiteId)
             ->whereBetween('date', [$prevStart->toDateString(), $prevEnd->toDateString()])
             ->whereIn('page', $current->keys()->all())
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('page, SUM(clicks) as clicks, SUM(impressions) as impressions')
             ->groupBy('page')
             ->get()
@@ -693,6 +699,7 @@ class ReportDataService
                 ->where('website_id', $websiteId)
                 ->whereBetween('date', [$yoyStart->toDateString(), $yoyEnd->toDateString()])
                 ->whereIn('page', $current->keys()->all())
+                ->when($country, fn ($q, $c) => $q->where('country', $c))
                 ->selectRaw('page, SUM(clicks) as clicks, SUM(impressions) as impressions')
                 ->groupBy('page')
                 ->get()
@@ -753,11 +760,12 @@ class ReportDataService
      *
      * @return array<int, array{page: string, verdict: string, coverage_state: string, indexing_state: string, last_crawl_at: ?string, recent_clicks: int, recent_impressions: int}>
      */
-    public function indexingFailsWithTraffic(int $websiteId, int $windowDays = 14, int $limit = 50): array
+    public function indexingFailsWithTraffic(int $websiteId, int $windowDays = 14, int $limit = 50, ?string $country = null): array
     {
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz)->endOfDay();
         $start = $end->copy()->subDays($windowDays - 1)->startOfDay();
+        $country = $this->normalizeCountry($country);
 
         $failing = PageIndexingStatus::query()
             ->where('website_id', $websiteId)
@@ -774,6 +782,7 @@ class ReportDataService
             ->where('website_id', $websiteId)
             ->whereIn('page', $pages)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->when($country, fn ($q, $c) => $q->where('country', $c))
             ->selectRaw('page, SUM(clicks) as clicks, SUM(impressions) as impressions')
             ->groupBy('page')
             ->get()
@@ -807,14 +816,81 @@ class ReportDataService
      *
      * @return array{cannibalizations: int, striking_distance: int, indexing_fails_with_traffic: int, content_decay: int}
      */
-    public function insightCounts(int $websiteId): array
+    public function insightCounts(int $websiteId, ?string $country = null): array
     {
+        $country = $this->normalizeCountry($country);
+
         return [
-            'cannibalizations' => count($this->cannibalizationReport($websiteId)),
-            'striking_distance' => count($this->strikingDistance($websiteId)),
-            'indexing_fails_with_traffic' => count($this->indexingFailsWithTraffic($websiteId)),
-            'content_decay' => count($this->contentDecay($websiteId)['pages']),
+            'cannibalizations' => count($this->cannibalizationReport($websiteId, null, null, 50, $country)),
+            'striking_distance' => count($this->strikingDistance($websiteId, null, null, 50, $country)),
+            'indexing_fails_with_traffic' => count($this->indexingFailsWithTraffic($websiteId, 14, 50, $country)),
+            'content_decay' => count($this->contentDecay($websiteId, 25, $country)['pages']),
         ];
+    }
+
+    /**
+     * Top N countries by clicks for the last 30 days vs the preceding 30 days,
+     * with a delta. Used by the Dashboard's TopCountriesCard and the
+     * growth-email "Top countries" section.
+     *
+     * @return array<int, array{country: string, clicks: int, prev_clicks: int, change: array<string, mixed>}>
+     */
+    public function topCountriesTrend(int $websiteId, int $limit = 10): array
+    {
+        $tz = config('app.timezone');
+        $end = Carbon::yesterday($tz)->endOfDay();
+        $start = $end->copy()->subDays(29)->startOfDay();
+        $prevEnd = $start->copy()->subDay()->endOfDay();
+        $prevStart = $prevEnd->copy()->subDays(29)->startOfDay();
+
+        $current = SearchConsoleData::query()
+            ->where('website_id', $websiteId)
+            ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
+            ->where('country', '!=', '')
+            ->selectRaw('country, SUM(clicks) as clicks, SUM(impressions) as impressions')
+            ->groupBy('country')
+            ->orderByDesc('clicks')
+            ->limit($limit)
+            ->get();
+
+        if ($current->isEmpty()) {
+            return [];
+        }
+
+        $countries = $current->pluck('country')->all();
+        $previous = SearchConsoleData::query()
+            ->where('website_id', $websiteId)
+            ->whereBetween('date', [$prevStart->toDateString(), $prevEnd->toDateString()])
+            ->whereIn('country', $countries)
+            ->selectRaw('country, SUM(clicks) as clicks')
+            ->groupBy('country')
+            ->pluck('clicks', 'country');
+
+        return $current->map(function ($row) use ($previous) {
+            $clicks = (int) $row->clicks;
+            $prev = (int) ($previous[$row->country] ?? 0);
+
+            return [
+                'country' => (string) $row->country,
+                'clicks' => $clicks,
+                'impressions' => (int) $row->impressions,
+                'prev_clicks' => $prev,
+                'change' => $this->calcChange($clicks, $prev, true),
+            ];
+        })->values()->all();
+    }
+
+    private function normalizeCountry(?string $country): ?string
+    {
+        if ($country === null) {
+            return null;
+        }
+        $country = strtoupper(trim($country));
+        if ($country === '' || $country === 'ALL') {
+            return null;
+        }
+
+        return $country;
     }
 
     /**

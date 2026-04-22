@@ -15,6 +15,7 @@
             </select>
             <input wire:model.live="from" type="date" class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
             <input wire:model.live="to" type="date" class="h-8 rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+            <livewire:dashboard.country-filter />
         </div>
 
         <div class="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5 dark:border-slate-700 dark:bg-slate-800">

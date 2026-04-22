@@ -191,6 +191,7 @@ class PluginInsightResolver
             'striking_distance' => $striking,
             'tracked_keyword' => $trackedPayload,
             'audit' => $auditPayload,
+            'country_breakdown' => $this->countryBreakdown($website, $normalized, null, 5)['by_country'],
         ];
     }
 
@@ -373,6 +374,54 @@ class PluginInsightResolver
             'query' => $q,
             'checked_at' => $snapshot->checked_at?->toIso8601String(),
             'results' => $results,
+        ];
+    }
+
+    /**
+     * Per-country breakdown for a single post URL (optionally filtered to a
+     * specific query). Used by the Gutenberg panel's "Per-country breakdown"
+     * section and by the meta box's "Top 3 countries" block.
+     *
+     * @return array{url: string, query: ?string, by_country: list<array{country: string, clicks: int, impressions: int, ctr: float|null, position: float|null}>}
+     */
+    public function countryBreakdown(Website $website, string $canonicalUrl, ?string $query = null, int $limit = 10): array
+    {
+        $normalized = trim($canonicalUrl);
+        if ($normalized === '' || ! $website->isAuditUrlForThisSite($normalized)) {
+            return ['url' => $normalized, 'query' => $query, 'by_country' => []];
+        }
+
+        $tz = config('app.timezone');
+        $end = Carbon::yesterday($tz)->endOfDay();
+        $start = $end->copy()->subDays(29)->startOfDay();
+
+        $q = $query !== null ? trim($query) : null;
+
+        $rows = SearchConsoleData::query()
+            ->where('website_id', $website->id)
+            ->where('page', $normalized)
+            ->whereDate('date', '>=', $start->toDateString())
+            ->whereDate('date', '<=', $end->toDateString())
+            ->where('country', '!=', '')
+            ->when($q !== null && $q !== '', fn ($builder) => $builder->whereRaw('LOWER(`query`) = ?', [mb_strtolower($q)]))
+            ->selectRaw('country, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(ctr) as ctr, AVG(position) as position')
+            ->groupBy('country')
+            ->orderByDesc('clicks')
+            ->limit($limit)
+            ->get();
+
+        $out = $rows->map(fn ($r) => [
+            'country' => (string) $r->country,
+            'clicks' => (int) $r->clicks,
+            'impressions' => (int) $r->impressions,
+            'ctr' => $r->ctr !== null ? round((float) $r->ctr * 100, 2) : null,
+            'position' => $r->position !== null ? round((float) $r->position, 1) : null,
+        ])->values()->all();
+
+        return [
+            'url' => $normalized,
+            'query' => $q,
+            'by_country' => $out,
         ];
     }
 }

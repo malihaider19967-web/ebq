@@ -287,6 +287,7 @@ class RankTrackingManager extends Component
                     ->where('website_id', $this->websiteId)
                     ->whereDate('date', '>=', $since)
                     ->whereIn(DB::raw('LOWER(`query`)'), $keywords)
+                    ->when($this->filterCountry !== '', fn ($q) => $q->where('country', strtoupper($this->filterCountry)))
                     ->selectRaw('LOWER(`query`) as q, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position')
                     ->groupBy('q')
                     ->get();

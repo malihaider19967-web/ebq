@@ -17,6 +17,9 @@ class InsightsPanel extends Component
     #[Url(as: 'insight', history: true)]
     public string $tab = 'cannibalization';
 
+    #[Url(as: 'country', history: true)]
+    public string $country = '';
+
     public function mount(): void
     {
         $this->websiteId = (int) session('current_website_id', 0);
@@ -26,6 +29,13 @@ class InsightsPanel extends Component
     public function switchWebsite(int $websiteId): void
     {
         $this->websiteId = $websiteId;
+        $this->country = '';
+    }
+
+    #[On('country-changed')]
+    public function onCountryChanged(string $country): void
+    {
+        $this->country = $country;
     }
 
     public function setTab(string $tab): void
@@ -42,8 +52,10 @@ class InsightsPanel extends Component
         $hasAccess = $this->websiteId > 0 && $user?->canViewWebsiteId($this->websiteId);
 
         $service = app(ReportDataService::class);
+        $country = $this->country !== '' ? $this->country : null;
+
         $counts = $hasAccess
-            ? $service->insightCounts($this->websiteId)
+            ? $service->insightCounts($this->websiteId, $country)
             : ['cannibalizations' => 0, 'striking_distance' => 0, 'indexing_fails_with_traffic' => 0, 'content_decay' => 0];
 
         $data = [
@@ -57,10 +69,11 @@ class InsightsPanel extends Component
 
         if ($hasAccess) {
             $data[$this->tab] = match ($this->tab) {
-                'cannibalization' => $service->cannibalizationReport($this->websiteId),
-                'striking_distance' => $service->strikingDistance($this->websiteId),
-                'content_decay' => $service->contentDecay($this->websiteId),
-                'indexing_fails' => $service->indexingFailsWithTraffic($this->websiteId),
+                'cannibalization' => $service->cannibalizationReport($this->websiteId, null, null, 50, $country),
+                'striking_distance' => $service->strikingDistance($this->websiteId, null, null, 50, $country),
+                'content_decay' => $service->contentDecay($this->websiteId, 25, $country),
+                'indexing_fails' => $service->indexingFailsWithTraffic($this->websiteId, 14, 50, $country),
+                // Audit + backlink reports aren't country-segmented today — they stay aggregate.
                 'audit_performance' => app(AuditPerformanceService::class)->underperformingPages($this->websiteId),
                 'backlink_impact' => app(BacklinkImpactService::class)->impactByTargetPage($this->websiteId),
             };
@@ -70,6 +83,7 @@ class InsightsPanel extends Component
             'counts' => $counts,
             'data' => $data,
             'hasAccess' => $hasAccess,
+            'country' => $this->country,
         ]);
     }
 }

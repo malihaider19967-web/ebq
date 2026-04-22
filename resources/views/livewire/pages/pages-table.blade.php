@@ -10,6 +10,7 @@
                 <input type="checkbox" wire:model.live="onlyFailingWithTraffic" class="h-3 w-3 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-700" />
                 <span>Only indexing-fails with traffic</span>
             </label>
+            <livewire:dashboard.country-filter />
         </div>
         @if (! empty($gscKeywordLookbackDays))
             <p class="mt-2 text-[11px] text-slate-500 dark:text-slate-400">Clicks, impressions, and averages use Search Console data from the last <span class="font-semibold text-slate-700 dark:text-slate-300">{{ (int) $gscKeywordLookbackDays }}</span> days (same window as page detail and Settings → Reports).</p>

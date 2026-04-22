@@ -8,6 +8,7 @@ use App\Services\ReportDataService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -24,6 +25,9 @@ class KeywordsTable extends Component
     public ?string $from = null;
     public ?string $to = null;
 
+    #[Url(as: 'country', history: true)]
+    public string $country = '';
+
     public function mount(): void
     {
         $this->websiteId = (int) session('current_website_id', 0);
@@ -33,6 +37,14 @@ class KeywordsTable extends Component
     public function switchWebsite(int $websiteId): void
     {
         $this->websiteId = $websiteId;
+        $this->country = '';
+        $this->resetPage();
+    }
+
+    #[On('country-changed')]
+    public function onCountryChanged(string $country): void
+    {
+        $this->country = $country;
         $this->resetPage();
     }
 
@@ -72,7 +84,8 @@ class KeywordsTable extends Component
                 ->where('website_id', $this->websiteId)
                 ->forDateRange($this->from, $this->to)
                 ->when($this->search, fn ($q) => $q->where('query', 'like', "%{$this->search}%"))
-                ->when($this->device, fn ($q) => $q->where('device', $this->device));
+                ->when($this->device, fn ($q) => $q->where('device', $this->device))
+                ->when($this->country !== '', fn ($q) => $q->where('country', strtoupper($this->country)));
 
             if ($this->view === 'daily') {
                 $rows = (clone $base)
@@ -100,7 +113,7 @@ class KeywordsTable extends Component
             $cannibalized = array_flip(
                 array_map(
                     fn (array $r) => mb_strtolower((string) $r['query']),
-                    app(ReportDataService::class)->cannibalizationReport($this->websiteId, null, null, 500),
+                    app(ReportDataService::class)->cannibalizationReport($this->websiteId, null, null, 500, $this->country !== '' ? strtoupper($this->country) : null),
                 )
             );
             $tracked = array_flip(
