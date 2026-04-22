@@ -135,45 +135,66 @@ class KeywordMetricsService
         $fetchedAt = Carbon::now();
         $expiresAt = $fetchedAt->copy()->addDays($freshDays);
 
-        $written = 0;
+        // Index the API response by the lowercase-trimmed keyword so we can
+        // pair each input against whatever KE returned — even when the API
+        // normalizes or drops a keyword. Critical: we always write under the
+        // hash of OUR input keyword (not KE's returned string), otherwise
+        // skip-fresh logic in the command/observer never matches on re-run.
+        $responseIndex = [];
         foreach ($response['data'] as $row) {
             if (! is_array($row) || empty($row['keyword']) || ! is_string($row['keyword'])) {
                 continue;
             }
+            $responseIndex[mb_strtolower(trim($row['keyword']))] = $row;
+        }
 
-            $keyword = trim($row['keyword']);
-            if ($keyword === '') {
-                continue;
-            }
+        $written = 0;
+        foreach ($cleaned as $inputKeyword) {
+            $key = mb_strtolower($inputKeyword);
+            $row = $responseIndex[$key] ?? null;
 
+            $vol = null;
             $cpcValue = null;
             $currency = null;
-            if (isset($row['cpc']) && is_array($row['cpc'])) {
-                if (isset($row['cpc']['value']) && is_numeric($row['cpc']['value'])) {
-                    $cpcValue = (float) $row['cpc']['value'];
-                }
-                if (isset($row['cpc']['currency']) && is_string($row['cpc']['currency'])) {
-                    $currency = strtoupper(trim($row['cpc']['currency'])) ?: null;
-                }
-            }
-
+            $competition = null;
             $trend = null;
-            if (isset($row['trend']) && is_array($row['trend'])) {
-                $trend = array_values(array_filter($row['trend'], 'is_array'));
+
+            if ($row !== null) {
+                if (isset($row['vol']) && is_numeric($row['vol'])) {
+                    $vol = (int) $row['vol'];
+                }
+                if (isset($row['cpc']) && is_array($row['cpc'])) {
+                    if (isset($row['cpc']['value']) && is_numeric($row['cpc']['value'])) {
+                        $cpcValue = (float) $row['cpc']['value'];
+                    }
+                    if (isset($row['cpc']['currency']) && is_string($row['cpc']['currency'])) {
+                        $currency = strtoupper(trim($row['cpc']['currency'])) ?: null;
+                    }
+                }
+                if (isset($row['competition']) && is_numeric($row['competition'])) {
+                    $competition = (float) $row['competition'];
+                }
+                if (isset($row['trend']) && is_array($row['trend'])) {
+                    $trend = array_values(array_filter($row['trend'], 'is_array'));
+                }
             }
 
+            // Write a row even when KE didn't return data for this input —
+            // otherwise long-tail keywords KE doesn't know about would burn
+            // credits on every scan. An empty row with fresh `expires_at` is
+            // a "we asked, KE has nothing" cache entry.
             KeywordMetric::updateOrCreate(
                 [
-                    'keyword_hash' => KeywordMetric::hashKeyword($keyword),
+                    'keyword_hash' => KeywordMetric::hashKeyword($inputKeyword),
                     'country' => $country,
                     'data_source' => 'gkp',
                 ],
                 [
-                    'keyword' => $keyword,
-                    'search_volume' => isset($row['vol']) && is_numeric($row['vol']) ? (int) $row['vol'] : null,
+                    'keyword' => $inputKeyword,
+                    'search_volume' => $vol,
                     'cpc' => $cpcValue,
                     'currency' => $currency,
-                    'competition' => isset($row['competition']) && is_numeric($row['competition']) ? (float) $row['competition'] : null,
+                    'competition' => $competition,
                     'trend_12m' => $trend,
                     'fetched_at' => $fetchedAt,
                     'expires_at' => $expiresAt,
@@ -185,6 +206,10 @@ class KeywordMetricsService
         Log::info('KeywordMetricsService.refresh: done', [
             'requested' => count($cleaned),
             'written' => $written,
+            'matched_in_response' => count(array_intersect_key(
+                array_flip(array_map('mb_strtolower', $cleaned)),
+                $responseIndex
+            )),
             'credits_remaining' => $response['credits'] ?? null,
         ]);
 

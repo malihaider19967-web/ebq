@@ -127,6 +127,30 @@ class KeywordMetricsServiceTest extends TestCase
         $this->assertSame(1, KeywordMetric::where('keyword_hash', KeywordMetric::hashKeyword('repeat'))->count());
     }
 
+    public function test_keywords_missing_from_response_still_get_placeholder_rows(): void
+    {
+        // KE normalizes / drops long-tail/Unicode queries — the response may
+        // not include every keyword we asked about. We must still write a
+        // placeholder for each input so repeat fetches skip them as fresh.
+        Http::fake([
+            '*keywordseverywhere.com*' => Http::response([
+                'data' => [
+                    ['keyword' => 'known term', 'vol' => 5400, 'cpc' => ['value' => 1.2, 'currency' => 'USD'], 'competition' => 0.4],
+                ],
+                'credits' => 0,
+            ], 200),
+        ]);
+
+        $written = app(KeywordMetricsService::class)->refresh(['known term', 'weird @@@ unicode term'], 'global');
+
+        $this->assertSame(2, $written);
+
+        $miss = KeywordMetric::where('keyword_hash', KeywordMetric::hashKeyword('weird @@@ unicode term'))->first();
+        $this->assertNotNull($miss);
+        $this->assertNull($miss->search_volume);
+        $this->assertTrue($miss->isFresh(), 'placeholder row must be fresh so next scan skips it');
+    }
+
     public function test_missing_api_key_short_circuits_cleanly(): void
     {
         config(['services.keywords_everywhere.key' => '']);
