@@ -78,12 +78,21 @@ class PageAuditDetail extends Component
         $totalImpr = array_sum(array_map(fn ($r) => (int) $r['impressions'], $rows));
         $maxClicks = max(1, (int) (collect($rows)->max('clicks') ?? 0));
 
-        $rows = array_map(fn ($r) => $r + [
-            'name' => \App\Support\Countries::name((string) $r['country']),
-            'flag' => \App\Support\Countries::flag((string) $r['country']),
-            'width_pct' => max(2, (int) round(((int) $r['clicks'] / $maxClicks) * 100)),
-            'share_pct' => $totalClicks > 0 ? round(((int) $r['clicks'] / $totalClicks) * 100, 1) : 0.0,
-        ], $rows);
+        $rows = array_map(function ($r) use ($totalClicks, $maxClicks) {
+            $name = \App\Support\Countries::name((string) $r['country']);
+            $title = $name.' · '.number_format((int) $r['impressions']).' impressions';
+            if ($r['position'] !== null) {
+                $title .= ' · avg position '.$r['position'];
+            }
+
+            return $r + [
+                'name' => $name,
+                'flag' => \App\Support\Countries::flag((string) $r['country']),
+                'width_pct' => max(2, (int) round(((int) $r['clicks'] / $maxClicks) * 100)),
+                'share_pct' => $totalClicks > 0 ? round(((int) $r['clicks'] / $totalClicks) * 100, 1) : 0.0,
+                'hover_title' => $title,
+            ];
+        }, $rows);
 
         return view('livewire.pages.page-audit-detail', [
             'trackedRankings' => $this->trackedRankingsForAudit(),

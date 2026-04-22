@@ -173,67 +173,75 @@
         </section>
     @endif
 
-    <section class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <div class="flex items-center justify-between gap-3 border-b border-slate-200 px-5 py-3 dark:border-slate-800">
-            <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
-                    <span class="inline-flex h-5 items-center gap-1 rounded-full bg-indigo-600 px-2 text-[10px] font-semibold uppercase tracking-wider text-white">GSC traffic</span>
-                    <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">By country</h2>
-                    @if (! empty($countryBreakdown))
-                        <span class="text-[10px] text-slate-400">· top {{ $countryTotals['markets'] }}</span>
+    <section class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <details class="group">
+            <summary class="flex cursor-pointer list-none items-center gap-3 px-5 py-3 transition hover:bg-slate-50 dark:hover:bg-slate-800/40 [&::-webkit-details-marker]:hidden">
+                <svg class="h-3.5 w-3.5 shrink-0 text-slate-400 transition-transform group-open:rotate-90" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+
+                <div class="min-w-0 flex-1">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="inline-flex h-5 items-center gap-1 rounded-full bg-indigo-600 px-2 text-[10px] font-semibold uppercase tracking-wider text-white">GSC traffic</span>
+                        <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">By country</h2>
+                        <span class="text-[11px] text-slate-400 dark:text-slate-500">· last 30 days</span>
+                    </div>
+
+                    @if (empty($countryBreakdown))
+                        <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">No Search Console country data yet for this page.</p>
+                    @else
+                        @php($primary = $countryBreakdown[0])
+                        <p class="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                            <span>{{ $countryTotals['markets'] }} {{ \Illuminate\Support\Str::plural('market', $countryTotals['markets']) }}</span>
+                            <span aria-hidden="true" class="text-slate-300 dark:text-slate-600">·</span>
+                            <span><span class="font-semibold text-slate-700 dark:text-slate-200">{{ number_format($countryTotals['clicks']) }}</span> clicks</span>
+                            <span aria-hidden="true" class="text-slate-300 dark:text-slate-600">·</span>
+                            <span>
+                                top:
+                                @if (! empty($primary['flag']))
+                                    <span aria-hidden="true">{{ $primary['flag'] }}</span>
+                                @endif
+                                <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $primary['name'] }}</span>
+                                <span class="text-slate-400 dark:text-slate-500">({{ $primary['share_pct'] }}%)</span>
+                            </span>
+                        </p>
                     @endif
                 </div>
-                <p class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">Where this page earns clicks in the last 30 days.</p>
-            </div>
-            @if (! empty($countryBreakdown))
-                <div class="hidden shrink-0 text-right sm:block">
-                    <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">Total</div>
-                    <div class="text-sm font-semibold tabular-nums text-slate-900 dark:text-slate-100">{{ number_format($countryTotals['clicks']) }} <span class="text-[10px] font-medium text-slate-500 dark:text-slate-400">clicks</span></div>
-                </div>
-            @endif
-        </div>
 
-        @if (empty($countryBreakdown))
-            <div class="px-5 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
-                No Search Console country data for this page in the last 30 days.
-            </div>
-        @else
-            <div class="hidden grid-cols-[1fr,2fr,auto,auto,auto] gap-x-4 border-b border-slate-100 px-5 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:border-slate-800 dark:text-slate-500 sm:grid">
-                <span>Market</span>
-                <span>Share of clicks</span>
-                <span class="text-right">Clicks</span>
-                <span class="text-right">Impr</span>
-                <span class="text-right">Pos</span>
-            </div>
-            <ul class="divide-y divide-slate-100 dark:divide-slate-800">
-                @foreach ($countryBreakdown as $row)
-                    <li class="grid grid-cols-[1fr,auto] items-center gap-x-4 gap-y-2 px-5 py-2.5 transition hover:bg-slate-50 dark:hover:bg-slate-800/40 sm:grid-cols-[1fr,2fr,auto,auto,auto]">
-                        <span class="flex min-w-0 items-center gap-2">
-                            @if (! empty($row['flag']))
-                                <span aria-hidden="true" class="text-sm leading-none">{{ $row['flag'] }}</span>
-                            @endif
-                            <span class="min-w-0 truncate text-xs font-medium text-slate-800 dark:text-slate-100" title="{{ $row['name'] }}">{{ $row['name'] }}</span>
-                            <span class="shrink-0 text-[10px] font-mono text-slate-400 dark:text-slate-500">{{ $row['country'] }}</span>
-                        </span>
-                        <div class="col-span-2 flex items-center gap-2 sm:col-span-1">
-                            <div class="h-2 flex-1 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                                <div class="h-full rounded-full bg-indigo-500" style="width: {{ $row['width_pct'] }}%" role="progressbar" aria-valuenow="{{ $row['share_pct'] }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ $row['name'] }} share of clicks: {{ $row['share_pct'] }}%"></div>
-                            </div>
-                            <span class="w-10 shrink-0 text-right text-[10px] font-semibold tabular-nums text-slate-600 dark:text-slate-400">{{ $row['share_pct'] }}%</span>
-                        </div>
-                        <span class="text-right text-xs font-semibold tabular-nums text-slate-800 dark:text-slate-100">{{ number_format($row['clicks']) }}</span>
-                        <span class="text-right text-xs tabular-nums text-slate-500 dark:text-slate-400">{{ number_format($row['impressions']) }}</span>
-                        <span class="text-right text-xs tabular-nums text-slate-500 dark:text-slate-400">
-                            @if ($row['position'] !== null)
-                                {{ $row['position'] }}
-                            @else
-                                —
-                            @endif
-                        </span>
-                    </li>
-                @endforeach
-            </ul>
-        @endif
+                @unless (empty($countryBreakdown))
+                    <span class="hidden shrink-0 text-[11px] font-medium text-slate-400 group-open:sm:hidden sm:inline dark:text-slate-500">Show breakdown</span>
+                    <span class="hidden shrink-0 text-[11px] font-medium text-slate-400 group-open:sm:inline dark:text-slate-500">Hide</span>
+                @endunless
+            </summary>
+
+            @unless (empty($countryBreakdown))
+                <div class="border-t border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/50">
+                    <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                        @foreach ($countryBreakdown as $i => $row)
+                            <li class="flex items-center gap-3 px-5 py-2.5 text-xs">
+                                <span class="w-4 shrink-0 text-right text-[10px] font-mono text-slate-400 dark:text-slate-500">{{ $i + 1 }}</span>
+
+                                <span class="flex min-w-0 flex-1 items-center gap-2">
+                                    @if (! empty($row['flag']))
+                                        <span aria-hidden="true" class="shrink-0 text-sm leading-none">{{ $row['flag'] }}</span>
+                                    @endif
+                                    <span class="min-w-0 truncate font-medium text-slate-800 dark:text-slate-100" title="{{ $row['hover_title'] }}">{{ $row['name'] }}</span>
+                                    <span class="shrink-0 text-[10px] font-mono text-slate-400 dark:text-slate-500">{{ $row['country'] }}</span>
+                                </span>
+
+                                <div class="hidden w-40 items-center gap-2 sm:flex md:w-56">
+                                    <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                                        <div class="h-full rounded-full {{ $i === 0 ? 'bg-indigo-600' : 'bg-indigo-400/80 dark:bg-indigo-500/70' }}" style="width: {{ $row['width_pct'] }}%" role="progressbar" aria-valuenow="{{ $row['share_pct'] }}" aria-valuemin="0" aria-valuemax="100" aria-label="{{ $row['name'] }} share of clicks: {{ $row['share_pct'] }}%"></div>
+                                    </div>
+                                </div>
+
+                                <span class="w-12 shrink-0 text-right font-semibold tabular-nums text-slate-600 dark:text-slate-300">{{ $row['share_pct'] }}%</span>
+                                <span class="w-16 shrink-0 text-right tabular-nums text-slate-900 dark:text-slate-100">{{ number_format($row['clicks']) }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                    <p class="px-5 py-2 text-[10px] text-slate-400 dark:text-slate-500">Hover a row for impressions and average position.</p>
+                </div>
+            @endunless
+        </details>
     </section>
 
     @include('livewire.pages.partials.audit-report', ['auditReport' => $pageAuditReport, 'openAuditSummary' => true])
