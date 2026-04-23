@@ -1125,10 +1125,20 @@ class ReportDataService
         foreach ($candidates as $m) {
             $keyLower = mb_strtolower((string) $m->keyword);
             $match = $gsc->get($keyLower);
-            $bestPos = $match ? (float) $match->best_position : null;
 
-            // Keep only rows where we don't rank OR rank outside top 10.
-            if ($bestPos !== null && $bestPos <= 10.0) {
+            // The keyword_metrics cache is shared across every website (one
+            // KE fetch serves all tenants). Without this gate, queries that
+            // matter to OTHER sites' niches would surface as "quick wins"
+            // here. Only suggest keywords this website has at least some
+            // GSC presence on.
+            if ($match === null) {
+                continue;
+            }
+
+            $bestPos = (float) $match->best_position;
+
+            // Already winning — not a quick-win.
+            if ($bestPos <= 10.0) {
                 continue;
             }
 

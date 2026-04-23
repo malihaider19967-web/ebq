@@ -54,11 +54,15 @@ class ReportDataServiceQuickWinsTest extends TestCase
 
     public function test_quick_wins_excludes_high_competition_keywords(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-04-22 09:00:00', config('app.timezone')));
         $user = User::factory()->create();
         $website = Website::factory()->create(['user_id' => $user->id]);
 
         $this->seedMetric('low-comp kw', 1500, 0.3, 2.0);
         $this->seedMetric('high-comp kw', 3000, 0.85, 2.0);
+        // Both keywords have GSC presence on this site (page-2 ranks).
+        $this->seedGsc($website->id, 'low-comp kw', 'https://example.com/a', 14.0);
+        $this->seedGsc($website->id, 'high-comp kw', 'https://example.com/b', 14.0);
 
         $out = app(ReportDataService::class)->quickWins($website->id, 20);
 
@@ -68,11 +72,14 @@ class ReportDataServiceQuickWinsTest extends TestCase
 
     public function test_quick_wins_excludes_low_volume_keywords(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-04-22 09:00:00', config('app.timezone')));
         $user = User::factory()->create();
         $website = Website::factory()->create(['user_id' => $user->id]);
 
         $this->seedMetric('above threshold', 600, 0.2, 2.0);
         $this->seedMetric('below threshold', 200, 0.2, 2.0);
+        $this->seedGsc($website->id, 'above threshold', 'https://example.com/a', 14.0);
+        $this->seedGsc($website->id, 'below threshold', 'https://example.com/b', 14.0);
 
         $out = app(ReportDataService::class)->quickWins($website->id, 20);
 
@@ -89,14 +96,31 @@ class ReportDataServiceQuickWinsTest extends TestCase
         $this->seedMetric('already ranked', 1000, 0.2, 2.0);
         $this->seedGsc($website->id, 'already ranked', 'https://example.com/ranked', 4.0);
 
-        $this->seedMetric('not ranked', 1000, 0.2, 2.0);
-        // No GSC rows for 'not ranked' — should surface.
-
         $out = app(ReportDataService::class)->quickWins($website->id, 20);
 
-        $this->assertCount(1, $out);
-        $this->assertSame('not ranked', $out[0]['keyword']);
-        $this->assertNull($out[0]['current_position']);
+        $this->assertEmpty($out, 'A keyword the site already ranks top-10 for is not a quick win.');
+    }
+
+    public function test_quick_wins_excludes_keywords_with_no_gsc_presence_on_this_site(): void
+    {
+        // keyword_metrics is a global cache — every site shares it. Without
+        // the GSC-presence gate, this test would surface "other site's data"
+        // because the metric row has volume but the current site has no
+        // signal at all that this query is relevant.
+        Carbon::setTestNow(Carbon::parse('2026-04-22 09:00:00', config('app.timezone')));
+        $user = User::factory()->create();
+        $website = Website::factory()->create(['user_id' => $user->id]);
+        $otherSite = Website::factory()->create(['user_id' => $user->id]);
+
+        // Metric exists in the shared cache (probably populated by another site's sync).
+        $this->seedMetric('foreign keyword', 5000, 0.2, 3.0);
+        // The OTHER site has GSC presence on it…
+        $this->seedGsc($otherSite->id, 'foreign keyword', 'https://other.example/page', 12.0);
+
+        // …but our current website has no signal for it. Don't suggest it.
+        $out = app(ReportDataService::class)->quickWins($website->id, 20);
+
+        $this->assertEmpty($out);
     }
 
     public function test_quick_wins_includes_keywords_ranking_outside_top_10(): void
@@ -118,6 +142,7 @@ class ReportDataServiceQuickWinsTest extends TestCase
 
     public function test_quick_wins_sorts_by_upside_value_desc(): void
     {
+        Carbon::setTestNow(Carbon::parse('2026-04-22 09:00:00', config('app.timezone')));
         $user = User::factory()->create();
         $website = Website::factory()->create(['user_id' => $user->id]);
 
@@ -125,6 +150,9 @@ class ReportDataServiceQuickWinsTest extends TestCase
         $this->seedMetric('big upside', 5000, 0.2, 8.0);
         // Smaller-value keyword
         $this->seedMetric('small upside', 600, 0.2, 1.0);
+        // Both must have GSC presence on the current site to qualify.
+        $this->seedGsc($website->id, 'big upside', 'https://example.com/big', 14.0);
+        $this->seedGsc($website->id, 'small upside', 'https://example.com/small', 14.0);
 
         $out = app(ReportDataService::class)->quickWins($website->id, 20);
 
