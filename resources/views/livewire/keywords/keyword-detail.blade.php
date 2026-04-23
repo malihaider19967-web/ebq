@@ -39,7 +39,7 @@
                 </button>
             @endif
 
-            @php($_primaryPage = $top_pages[0]['page'] ?? null)
+            @php $_primaryPage = $top_pages[0]['page'] ?? null; @endphp
             <a href="{{ route('custom-audit.index') }}?{{ http_build_query(array_filter(['targetKeyword' => $query, 'pageUrl' => $_primaryPage])) }}"
                class="inline-flex h-9 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
                 Run custom audit
@@ -66,7 +66,7 @@
                 <div class="mt-2 flex items-baseline gap-2">
                     @if ($metric && $metric->search_volume !== null)
                         <span class="text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ number_format($metric->search_volume) }}</span>
-                        @php($_trend = $metric->trend_class)
+                        @php $_trend = $metric->trend_class; @endphp
                         @if ($_trend === 'rising')
                             <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400" title="Trend: rising over last 6 months">↑ rising</span>
                         @elseif ($_trend === 'falling')
@@ -103,7 +103,7 @@
                 <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Competition</p>
                 <div class="mt-2">
                     @if ($metric && $metric->competition !== null)
-                        @php($_comp = round((float) $metric->competition * 100))
+                        @php $_comp = round((float) $metric->competition * 100); @endphp
                         <span class="text-2xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{{ $_comp }}%</span>
                         <div class="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                             <div class="h-full rounded-full {{ $_comp <= 40 ? 'bg-emerald-500' : ($_comp <= 70 ? 'bg-amber-500' : 'bg-rose-500') }}" style="width: {{ max(2, $_comp) }}%"></div>
@@ -420,7 +420,7 @@
                         </div>
                         <ul class="flex flex-wrap gap-1.5 p-4">
                             @foreach ($related_searches as $r)
-                                @php($_rq = $r['query'] ?? ($r['q'] ?? ''))
+                                @php $_rq = $r['query'] ?? ($r['q'] ?? ''); @endphp
                                 @if ($_rq !== '')
                                     <li>
                                         <a href="{{ route('keywords.show', ['query' => rawurlencode($_rq)]) }}" wire:navigate
