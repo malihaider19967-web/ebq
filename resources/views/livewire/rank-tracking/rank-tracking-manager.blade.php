@@ -90,13 +90,149 @@
                     </button>
                 @endif
             </div>
-            <button wire:click="toggleForm" type="button"
-                class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700">
-                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                {{ $showForm ? 'Close form' : 'Add keyword' }}
-            </button>
+            <div class="flex shrink-0 items-center gap-2">
+                <button wire:click="toggleBulkAdd" type="button"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                    title="Pull keywords your site already ranks for from Google Search Console">
+                    <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9h16.5m-16.5 6.75h16.5"/></svg>
+                    {{ $showBulkAdd ? 'Close' : 'Bulk add from GSC' }}
+                </button>
+                <button wire:click="toggleForm" type="button"
+                    class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700">
+                    <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    {{ $showForm ? 'Close form' : 'Add keyword' }}
+                </button>
+            </div>
         </div>
     </div>
+
+    {{-- Bulk add panel --}}
+    @if ($showBulkAdd)
+        <div class="rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 shadow-sm dark:border-indigo-900/40 dark:bg-indigo-500/5">
+            <div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Bulk add from Search Console</h3>
+                    <p class="mt-0.5 text-[11px] leading-relaxed text-slate-600 dark:text-slate-400">
+                        Pull your historically-performing organic queries (filtered by country and ranking) and start tracking them with one click. Already-tracked keywords are skipped.
+                    </p>
+                </div>
+                @if ($bulkStatus)
+                    <span class="rounded-md bg-emerald-100 px-2 py-1 text-[11px] font-medium text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">{{ $bulkStatus }}</span>
+                @endif
+            </div>
+
+            {{-- Filters --}}
+            <div class="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                <div>
+                    <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Country</label>
+                    <select wire:model.live="bulkCountry" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                        @foreach (\App\Models\SearchConsoleData::query()->where('website_id', $websiteId)->where('country', '!=', '')->selectRaw('country, SUM(clicks) as clicks')->groupBy('country')->orderByDesc('clicks')->limit(50)->pluck('country') as $cc)
+                            <option value="{{ $cc }}">{{ \App\Support\Countries::flag((string) $cc) }} {{ \App\Support\Countries::name((string) $cc) }} ({{ $cc }})</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Language</label>
+                    <select wire:model.live="bulkLanguage" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                        @foreach ($languages as $code => $label)
+                            <option value="{{ $code }}">{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Device</label>
+                    <select wire:model.live="bulkDevice" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                        <option value="desktop">Desktop</option>
+                        <option value="mobile">Mobile</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Lookback (days)</label>
+                    <input type="number" min="7" max="365" wire:model.live.debounce.500ms="bulkLookbackDays" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs tabular-nums shadow-sm dark:border-slate-700 dark:bg-slate-800" />
+                </div>
+                <div>
+                    <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Min impressions</label>
+                    <input type="number" min="1" wire:model.live.debounce.500ms="bulkMinImpressions" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs tabular-nums shadow-sm dark:border-slate-700 dark:bg-slate-800" />
+                </div>
+                <div>
+                    <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Max position</label>
+                    <input type="number" min="1" max="100" wire:model.live.debounce.500ms="bulkMaxPosition" class="h-8 w-full rounded-md border border-slate-200 bg-white px-2 text-xs tabular-nums shadow-sm dark:border-slate-700 dark:bg-slate-800" />
+                </div>
+            </div>
+
+            {{-- Candidates --}}
+            @php($_candidates = $this->bulkCandidates())
+            <div class="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
+                @if (empty($_candidates))
+                    <div class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                        No candidates match the current filters. Loosen the impressions / position thresholds, or pick a different country.
+                    </div>
+                @else
+                    <div class="flex items-center justify-between border-b border-slate-200 bg-slate-50 px-4 py-2 text-[11px] dark:border-slate-700 dark:bg-slate-800/60">
+                        <span class="font-semibold text-slate-700 dark:text-slate-300">
+                            {{ count($_candidates) }} candidate{{ count($_candidates) === 1 ? '' : 's' }}
+                            <span class="ml-1 font-normal text-slate-400">· not yet tracked</span>
+                        </span>
+                        <div class="flex items-center gap-3">
+                            <button wire:click="bulkSelectAll(true)" type="button" class="text-indigo-600 hover:underline dark:text-indigo-400">Select all</button>
+                            <button wire:click="bulkSelectAll(false)" type="button" class="text-slate-500 hover:underline dark:text-slate-400">Clear</button>
+                        </div>
+                    </div>
+                    <div class="max-h-80 overflow-y-auto">
+                        <table class="w-full text-xs">
+                            <thead class="sticky top-0 border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:bg-slate-800/80 dark:text-slate-400">
+                                <tr>
+                                    <th class="w-8 px-3 py-2"></th>
+                                    <th class="px-3 py-2 text-left">Keyword</th>
+                                    <th class="px-3 py-2 text-right">Impr.</th>
+                                    <th class="px-3 py-2 text-right">Clicks</th>
+                                    <th class="px-3 py-2 text-right">CTR</th>
+                                    <th class="px-3 py-2 text-right">Avg pos</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
+                                @foreach ($_candidates as $cand)
+                                    <tr class="transition hover:bg-slate-50 dark:hover:bg-slate-800/40">
+                                        <td class="px-3 py-2">
+                                            <input type="checkbox" wire:model.live="bulkSelected" value="{{ $cand['query'] }}" class="h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 dark:border-slate-600 dark:bg-slate-700" />
+                                        </td>
+                                        <td class="px-3 py-2 font-medium text-slate-800 dark:text-slate-100">{{ $cand['query'] }}</td>
+                                        <td class="px-3 py-2 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ number_format($cand['impressions']) }}</td>
+                                        <td class="px-3 py-2 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ number_format($cand['clicks']) }}</td>
+                                        <td class="px-3 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400">{{ $cand['ctr'] }}%</td>
+                                        <td class="px-3 py-2 text-right">
+                                            <span @class([
+                                                'inline-flex rounded-full px-1.5 py-px text-[10px] font-semibold tabular-nums',
+                                                'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $cand['position'] <= 3,
+                                                'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400' => $cand['position'] > 3 && $cand['position'] <= 10,
+                                                'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' => $cand['position'] > 10 && $cand['position'] <= 20,
+                                                'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300' => $cand['position'] > 20,
+                                            ])>{{ $cand['position'] }}</span>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+            </div>
+
+            <div class="mt-3 flex flex-wrap items-center justify-between gap-3">
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">
+                    {{ count($bulkSelected) }} selected · queued for an immediate first SERP check on add
+                </p>
+                <div class="flex items-center gap-2">
+                    <button wire:click="toggleBulkAdd" type="button" class="h-8 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">Cancel</button>
+                    <button wire:click="bulkAddSelected" wire:loading.attr="disabled" type="button"
+                        @disabled(count($bulkSelected) === 0)
+                        class="inline-flex h-8 items-center gap-1.5 rounded-md bg-indigo-600 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">
+                        <span wire:loading.remove wire:target="bulkAddSelected">Add {{ count($bulkSelected) }} keyword{{ count($bulkSelected) === 1 ? '' : 's' }}</span>
+                        <span wire:loading wire:target="bulkAddSelected">Adding…</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 
     {{-- Add form --}}
     @if ($showForm)

@@ -48,6 +48,20 @@ class RankTrackingManager extends Component
     public string $newNotes = '';
     public int $newIntervalHours = 12;
 
+    // Bulk-add panel state — populated from existing GSC traffic so users can
+    // import their best-performing organic queries with one click.
+    public bool $showBulkAdd = false;
+    public string $bulkCountry = 'US';                  // GSC alpha-3 (uppercased) — set on first open
+    public string $bulkLanguage = 'en';
+    public string $bulkDevice = 'desktop';
+    public int $bulkLookbackDays = 90;
+    public int $bulkMinImpressions = 100;
+    public int $bulkMaxPosition = 30;                   // 1..100 — only queries we already rank for
+    public int $bulkLimit = 50;
+    /** @var array<int, string> */
+    public array $bulkSelected = [];                    // chosen keyword strings
+    public string $bulkStatus = '';                     // success/error message after submit
+
     public function mount(): void
     {
         $this->websiteId = (int) session('current_website_id', 0);
@@ -76,6 +90,198 @@ class RankTrackingManager extends Component
     public function toggleForm(): void
     {
         $this->showForm = ! $this->showForm;
+    }
+
+    /**
+     * Open / close the bulk-add panel. On open, seed the country dropdown
+     * with the website's top-traffic country (so the typical workflow doesn't
+     * need any input).
+     */
+    public function toggleBulkAdd(): void
+    {
+        $this->showBulkAdd = ! $this->showBulkAdd;
+        $this->bulkStatus = '';
+
+        if ($this->showBulkAdd && $this->websiteId > 0) {
+            $top = SearchConsoleData::query()
+                ->where('website_id', $this->websiteId)
+                ->where('country', '!=', '')
+                ->selectRaw('country, SUM(clicks) as clicks')
+                ->groupBy('country')
+                ->orderByDesc('clicks')
+                ->limit(1)
+                ->value('country');
+            if (is_string($top) && $top !== '') {
+                $this->bulkCountry = strtoupper($top);
+            }
+        }
+    }
+
+    public function updatedBulkCountry(): void { $this->bulkSelected = []; }
+    public function updatedBulkMinImpressions(): void { $this->bulkSelected = []; }
+    public function updatedBulkMaxPosition(): void { $this->bulkSelected = []; }
+    public function updatedBulkLookbackDays(): void { $this->bulkSelected = []; }
+    public function updatedBulkLimit(): void { $this->bulkSelected = []; }
+
+    /**
+     * Mark every visible candidate as selected (or clear them all).
+     */
+    public function bulkSelectAll(bool $select): void
+    {
+        if (! $select) {
+            $this->bulkSelected = [];
+
+            return;
+        }
+        $this->bulkSelected = array_values(array_map(fn (array $r) => (string) $r['query'], $this->bulkCandidates()));
+    }
+
+    /**
+     * Candidate keywords pulled from this website's own GSC history.
+     * Filters: country, ≥ min impressions, best position ≤ maxPosition.
+     * Excludes anything already tracked.
+     *
+     * @return list<array{query: string, impressions: int, clicks: int, position: float, ctr: float}>
+     */
+    public function bulkCandidates(): array
+    {
+        if ($this->websiteId <= 0 || ! Auth::user()?->canViewWebsiteId($this->websiteId)) {
+            return [];
+        }
+
+        $country = strtoupper(trim($this->bulkCountry));
+        $since = Carbon::now()->subDays(max(7, min(365, $this->bulkLookbackDays)))->toDateString();
+        $minImpr = max(1, $this->bulkMinImpressions);
+        $maxPos = max(1, min(100, $this->bulkMaxPosition));
+        $limit = max(1, min(500, $this->bulkLimit));
+
+        $rows = SearchConsoleData::query()
+            ->where('website_id', $this->websiteId)
+            ->whereDate('date', '>=', $since)
+            ->where('query', '!=', '')
+            ->when($country !== '', fn ($q) => $q->where('country', $country))
+            ->selectRaw('query, SUM(impressions) as impressions, SUM(clicks) as clicks, AVG(position) as position, AVG(ctr) as ctr')
+            ->groupBy('query')
+            ->havingRaw('SUM(impressions) >= ?', [$minImpr])
+            ->havingRaw('AVG(position) <= ?', [$maxPos])
+            ->orderByDesc('impressions')
+            ->limit($limit * 2)  // overshoot, then prune already-tracked
+            ->get();
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        // Skip keywords already tracked for this website + country + device.
+        $tracked = RankTrackingKeyword::query()
+            ->where('website_id', $this->websiteId)
+            ->where('country', strtolower($country))
+            ->where('device', $this->bulkDevice)
+            ->whereIn(DB::raw('LOWER(keyword)'), $rows->pluck('query')->map(fn ($q) => mb_strtolower((string) $q))->all())
+            ->pluck('keyword')
+            ->map(fn ($k) => mb_strtolower((string) $k))
+            ->flip();
+
+        $out = [];
+        foreach ($rows as $r) {
+            $kw = (string) $r->query;
+            if (isset($tracked[mb_strtolower($kw)])) {
+                continue;
+            }
+            $out[] = [
+                'query' => $kw,
+                'impressions' => (int) $r->impressions,
+                'clicks' => (int) $r->clicks,
+                'position' => round((float) $r->position, 1),
+                'ctr' => round((float) $r->ctr * 100, 2),
+            ];
+            if (count($out) >= $limit) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Create RankTrackingKeyword rows for every selected candidate. Inherits
+     * the bulk-panel locale settings; queues the first SERP check immediately.
+     */
+    public function bulkAddSelected(): void
+    {
+        $user = Auth::user();
+        if (! $user || $this->websiteId <= 0 || ! $user->canViewWebsiteId($this->websiteId)) {
+            $this->bulkStatus = 'Pick a website first.';
+
+            return;
+        }
+
+        $picked = array_values(array_filter(array_unique(array_map('strval', $this->bulkSelected)), fn ($s) => trim($s) !== ''));
+        if ($picked === []) {
+            $this->bulkStatus = 'No keywords selected.';
+
+            return;
+        }
+
+        $website = Website::find($this->websiteId);
+        $domain = $website && (string) $website->domain !== '' ? (string) $website->domain : $this->newTargetDomain;
+        if ($domain === '') {
+            $this->bulkStatus = 'Set a target domain on the website first.';
+
+            return;
+        }
+
+        $country = strtolower(trim($this->bulkCountry)) ?: 'us';
+        $language = strtolower(trim($this->bulkLanguage)) ?: 'en';
+        $device = in_array($this->bulkDevice, ['desktop', 'mobile'], true) ? $this->bulkDevice : 'desktop';
+
+        $created = 0;
+        $skipped = 0;
+        foreach ($picked as $kw) {
+            $kw = trim($kw);
+            if ($kw === '') {
+                continue;
+            }
+
+            $row = RankTrackingKeyword::updateOrCreate(
+                [
+                    'website_id' => $this->websiteId,
+                    'keyword_hash' => RankTrackingKeyword::hashKeyword($kw),
+                    'search_engine' => 'google',
+                    'search_type' => 'organic',
+                    'country' => $country,
+                    'language' => $language,
+                    'device' => $device,
+                    'location' => null,
+                ],
+                [
+                    'user_id' => $user->id,
+                    'keyword' => $kw,
+                    'target_domain' => $domain,
+                    'depth' => 100,
+                    'autocorrect' => true,
+                    'safe_search' => false,
+                    'check_interval_hours' => 12,
+                    'is_active' => true,
+                    'next_check_at' => Carbon::now(),
+                ]
+            );
+
+            if ($row->wasRecentlyCreated) {
+                TrackKeywordRankJob::dispatch($row->id, true);
+                $created++;
+            } else {
+                $skipped++;
+            }
+        }
+
+        $this->bulkSelected = [];
+        $this->bulkStatus = sprintf(
+            '%d keyword(s) added.%s',
+            $created,
+            $skipped > 0 ? " {$skipped} were already tracked and skipped." : ''
+        );
+        session()->flash('rank_tracking_status', $this->bulkStatus);
     }
 
     public function sort(string $column): void
