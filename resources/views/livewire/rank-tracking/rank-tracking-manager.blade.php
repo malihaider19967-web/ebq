@@ -161,7 +161,7 @@
             </div>
 
             {{-- Candidates --}}
-            @php($_candidates = $this->bulkCandidates())
+            @php $_candidates = $this->bulkCandidates(); @endphp
             <div class="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900">
                 @if (empty($_candidates))
                     <div class="px-4 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
