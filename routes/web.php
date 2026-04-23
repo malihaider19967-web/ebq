@@ -24,6 +24,9 @@ Route::middleware(['web', 'auth'])->group(function (): void {
 Route::middleware(['auth', 'onboarded'])->group(function () {
     Route::view('/dashboard', 'dashboard')->middleware('feature:dashboard')->name('dashboard');
     Route::view('/keywords', 'keywords.index')->middleware('feature:keywords')->name('keywords.index');
+    Route::get('/keywords/{query}', fn (string $query) => view('keywords.show', ['query' => $query]))
+        ->middleware('feature:keywords')
+        ->name('keywords.show')->where('query', '.*');
     Route::view('/rank-tracking', 'rank-tracking.index')->middleware('feature:rank_tracking')->name('rank-tracking.index');
     Route::get('/rank-tracking/{keywordId}', fn (int $keywordId) => view('rank-tracking.show', ['keywordId' => $keywordId]))
         ->whereNumber('keywordId')

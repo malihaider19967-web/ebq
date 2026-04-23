@@ -63,7 +63,7 @@
                                     <td class="whitespace-nowrap px-4 py-2.5 text-slate-500 dark:text-slate-400">{{ format_user_date($row->date instanceof \Carbon\CarbonInterface ? $row->date->toDateString() : (is_string($row->date) ? $row->date : ''), 'M d, Y') ?: $row->date }}</td>
                                 @endif
                                 <td class="whitespace-nowrap px-4 py-2.5 font-medium text-slate-900 dark:text-slate-100">
-                                    {{ $row->query }}
+                                    <a href="{{ route('keywords.show', ['query' => rawurlencode((string) $row->query)]) }}" wire:navigate class="text-indigo-600 hover:underline dark:text-indigo-400">{{ $row->query }}</a>
                                     @php $qKey = mb_strtolower((string) $row->query); @endphp
                                     @if (isset($cannibalized[$qKey]))
                                         <span class="ml-1.5 inline-flex items-center rounded-full bg-amber-50 px-1.5 py-px text-[10px] font-semibold text-amber-700 dark:bg-amber-500/15 dark:text-amber-400" title="Multiple pages rank for this query">cannibalized</span>
