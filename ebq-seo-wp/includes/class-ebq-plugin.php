@@ -35,6 +35,8 @@ final class EBQ_Plugin
         (new EBQ_Sitemap())->register();
         (new EBQ_Seo_Panel())->register();
         (new EBQ_Seo_Fields_Meta_Box())->register();
+        (new EBQ_Breadcrumbs())->register();
+        (new EBQ_Analysis_Cache())->register();
 
         // v2.1 Redirects
         (new EBQ_Redirects())->register();

@@ -7,9 +7,8 @@
  *   - `lastmod` = post_modified_gmt.
  *   - Auto-adds <sitemap> hint to robots.txt via EBQ_Robots_Txt if installed.
  *
- * Taxonomy sitemaps are intentionally deferred to a follow-up — they rarely
- * move the needle vs post sitemaps and add meaningful complexity. If a user
- * wants them we can add a filter-extension point.
+ * Taxonomy sitemaps: public taxonomies, one subsitemap per taxonomy (paged).
+ * Filter `ebq_sitemap_taxonomies` to narrow which taxonomies are included.
  */
 
 if (! defined('ABSPATH')) {
@@ -38,18 +37,31 @@ final class EBQ_Sitemap
     {
         add_rewrite_rule('^ebq-sitemap\.xml$', 'index.php?ebq_sitemap=index', 'top');
         add_rewrite_rule('^ebq-sitemap-([a-z0-9_-]+)-(\d+)\.xml$', 'index.php?ebq_sitemap=$matches[1]&ebq_sitemap_page=$matches[2]', 'top');
+        add_rewrite_rule('^ebq-sitemap-tax-([a-z0-9_-]+)-(\d+)\.xml$', 'index.php?ebq_tax_sitemap=$matches[1]&ebq_tax_sitemap_page=$matches[2]', 'top');
     }
 
     public function register_query_vars(array $vars): array
     {
         $vars[] = 'ebq_sitemap';
         $vars[] = 'ebq_sitemap_page';
+        $vars[] = 'ebq_tax_sitemap';
+        $vars[] = 'ebq_tax_sitemap_page';
 
         return $vars;
     }
 
     public function maybe_serve(): void
     {
+        $tax = (string) get_query_var('ebq_tax_sitemap');
+        if ($tax !== '') {
+            nocache_headers();
+            header('Content-Type: application/xml; charset=UTF-8');
+            header('X-Robots-Tag: noindex, follow');
+            $page = max(1, (int) get_query_var('ebq_tax_sitemap_page'));
+            $this->render_tax_urlset($tax, $page);
+            exit;
+        }
+
         $which = (string) get_query_var('ebq_sitemap');
         if ($which === '') {
             return;
@@ -81,6 +93,20 @@ final class EBQ_Sitemap
                 $entries[] = [
                     'loc' => home_url("/ebq-sitemap-{$type}-{$p}.xml"),
                     'lastmod' => $this->latest_modified_for_type($type),
+                ];
+            }
+        }
+
+        foreach ($this->indexed_taxonomies() as $taxonomy) {
+            $count = $this->count_terms_for_taxonomy($taxonomy);
+            if ($count === 0) {
+                continue;
+            }
+            $pages = (int) ceil($count / self::POSTS_PER_PAGE);
+            for ($p = 1; $p <= $pages; $p++) {
+                $entries[] = [
+                    'loc' => home_url("/ebq-sitemap-tax-{$taxonomy}-{$p}.xml"),
+                    'lastmod' => '',
                 ];
             }
         }
@@ -148,6 +174,48 @@ final class EBQ_Sitemap
         echo "</urlset>\n";
     }
 
+    private function render_tax_urlset(string $taxonomy, int $page): void
+    {
+        if (! taxonomy_exists($taxonomy) || ! in_array($taxonomy, $this->indexed_taxonomies(), true)) {
+            status_header(404);
+
+            return;
+        }
+
+        $offset = ($page - 1) * self::POSTS_PER_PAGE;
+        $terms = get_terms([
+            'taxonomy' => $taxonomy,
+            'hide_empty' => true,
+            'number' => self::POSTS_PER_PAGE,
+            'offset' => $offset,
+            'orderby' => 'count',
+            'order' => 'DESC',
+        ]);
+
+        if (is_wp_error($terms)) {
+            status_header(404);
+
+            return;
+        }
+
+        echo '<?xml version="1.0" encoding="UTF-8"?>'."\n";
+        echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'."\n";
+        foreach ($terms as $term) {
+            if (! $term instanceof WP_Term) {
+                continue;
+            }
+            $link = get_term_link($term);
+            if (is_wp_error($link)) {
+                continue;
+            }
+            $loc = (string) $link;
+            echo "  <url>\n";
+            echo '    <loc>'.esc_url($loc)."</loc>\n";
+            echo "  </url>\n";
+        }
+        echo "</urlset>\n";
+    }
+
     /**
      * @return list<string>
      */
@@ -159,6 +227,28 @@ final class EBQ_Sitemap
         }
 
         return array_values(array_unique($types));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function indexed_taxonomies(): array
+    {
+        $taxonomies = array_keys(get_taxonomies([
+            'public' => true,
+        ], 'names'));
+
+        return array_values(array_unique(apply_filters('ebq_sitemap_taxonomies', $taxonomies)));
+    }
+
+    private function count_terms_for_taxonomy(string $taxonomy): int
+    {
+        $n = wp_count_terms([
+            'taxonomy' => $taxonomy,
+            'hide_empty' => true,
+        ]);
+
+        return is_wp_error($n) ? 0 : (int) $n;
     }
 
     private function count_for_type(string $type): int

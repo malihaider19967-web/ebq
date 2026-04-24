@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\PageAuditReport;
+use App\Models\PageIndexingStatus;
 use App\Models\RankTrackingKeyword;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
@@ -156,6 +157,7 @@ class PluginInsightResolver
             $mobile = is_array($cwv['mobile'] ?? null) ? $cwv['mobile'] : [];
             $desktop = is_array($cwv['desktop'] ?? null) ? $cwv['desktop'] : [];
             $auditPayload = [
+                'report_id' => $audit->id,
                 'audited_at' => $audit->audited_at?->toIso8601String(),
                 'performance_score_mobile' => isset($mobile['performance_score']) ? (int) $mobile['performance_score'] : null,
                 'performance_score_desktop' => isset($desktop['performance_score']) ? (int) $desktop['performance_score'] : null,
@@ -163,6 +165,24 @@ class PluginInsightResolver
                 'cls_mobile' => isset($mobile['cls']) ? (float) $mobile['cls'] : null,
             ];
         }
+
+        $indexingRow = PageIndexingStatus::query()
+            ->where('website_id', $website->id)
+            ->where('page', $normalized)
+            ->orderByDesc('last_google_status_checked_at')
+            ->first();
+
+        $indexingPayload = null;
+        if ($indexingRow) {
+            $indexingPayload = [
+                'verdict' => $indexingRow->google_verdict,
+                'coverage_state' => $indexingRow->google_coverage_state,
+                'last_crawl_at' => $indexingRow->google_last_crawl_at?->toIso8601String(),
+                'checked_at' => $indexingRow->last_google_status_checked_at?->toIso8601String(),
+            ];
+        }
+
+        $primaryQuery = isset($topQueries[0]['query']) ? (string) $topQueries[0]['query'] : null;
 
         return [
             'ok' => true,
@@ -181,7 +201,9 @@ class PluginInsightResolver
                 ],
                 'click_series_90d' => $clickSeries,
                 'top_queries_30d' => $topQueries,
+                'primary_query' => $primaryQuery,
             ],
+            'indexing' => $indexingPayload,
             'flags' => [
                 'cannibalized' => ! empty($cannibalization),
                 'striking_distance' => ! empty($striking),

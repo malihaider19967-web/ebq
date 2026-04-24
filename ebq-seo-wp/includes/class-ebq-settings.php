@@ -13,6 +13,25 @@ final class EBQ_Settings
     {
         add_action('admin_menu', [$this, 'add_menu']);
         add_action('admin_post_ebq_save_api_base', [$this, 'save_api_base']);
+        add_action('admin_post_ebq_save_seo_globals', [$this, 'save_seo_globals']);
+    }
+
+    public function save_seo_globals(): void
+    {
+        if (! current_user_can('manage_options')) {
+            wp_die(esc_html__('You do not have permission to change this.', 'ebq-seo'), '', ['response' => 403]);
+        }
+        check_admin_referer('ebq_save_seo_globals');
+
+        $sep = isset($_POST['ebq_title_sep']) ? sanitize_text_field((string) wp_unslash($_POST['ebq_title_sep'])) : '';
+        if ($sep === '') {
+            delete_option(EBQ_Title_Template::OPTION_SEP);
+        } else {
+            update_option(EBQ_Title_Template::OPTION_SEP, mb_substr($sep, 0, 12));
+        }
+
+        wp_safe_redirect(admin_url('options-general.php?page=ebq-seo&ebq_status=seo_globals_saved'));
+        exit;
     }
 
     public function save_api_base(): void
@@ -200,6 +219,28 @@ final class EBQ_Settings
                 <?php endif; ?>
             </div>
 
+            <div style="max-width:560px;background:#fff;border:1px solid #c3c4c7;border-radius:8px;padding:16px 20px;margin-top:16px;">
+                <p style="margin:0 0 2px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#64748b;"><?php esc_html_e('SEO title separator', 'ebq-seo'); ?></p>
+                <p style="margin:0 0 12px;font-size:12px;color:#475569;">
+                    <?php esc_html_e('Used between %%title%% and %%sitename%% in the SEO title field (Gutenberg + front output).', 'ebq-seo'); ?>
+                </p>
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <input type="hidden" name="action" value="ebq_save_seo_globals">
+                    <?php wp_nonce_field('ebq_save_seo_globals'); ?>
+                    <input type="text" name="ebq_title_sep" maxlength="12"
+                        value="<?php echo esc_attr((string) (get_option(EBQ_Title_Template::OPTION_SEP, '') ?: EBQ_Title_Template::default_sep())); ?>"
+                        class="regular-text" style="max-width:120px;" />
+                    <button type="submit" class="button"><?php esc_html_e('Save', 'ebq-seo'); ?></button>
+                </form>
+            </div>
+
+            <div style="max-width:560px;background:#fff;border:1px solid #c3c4c7;border-radius:8px;padding:16px 20px;margin-top:16px;">
+                <p style="margin:0 0 2px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:#64748b;"><?php esc_html_e('Yoast / Rank Math coexistence', 'ebq-seo'); ?></p>
+                <p style="margin:0;font-size:12px;color:#475569;">
+                    <?php esc_html_e('If another SEO plugin is active, EBQ stops outputting duplicate &lt;title&gt;, meta description, canonical, robots, Open Graph, Twitter, JSON-LD, and XML sitemap. The editor sidebar, post list columns, dashboard widget, redirects, and OAuth connect keep working.', 'ebq-seo'); ?>
+                </p>
+            </div>
+
             <?php // API base URL override — for connecting to a local/staging EBQ instance ?>
             <?php
                 $override = (string) get_option('ebq_api_base_override', '');
@@ -288,6 +329,7 @@ final class EBQ_Settings
             'state_mismatch' => ['error', __('Connection rejected — the returned state did not match what this site issued. Try again.', 'ebq-seo')],
             'bad_token' => ['error', __('EBQ sent back an empty or invalid token. Try again.', 'ebq-seo')],
             'api_base_saved' => ['success', __('EBQ workspace URL saved. Version cache cleared.', 'ebq-seo')],
+            'seo_globals_saved' => ['success', __('SEO title settings saved.', 'ebq-seo')],
         ];
         if (! isset($map[$status])) {
             return;

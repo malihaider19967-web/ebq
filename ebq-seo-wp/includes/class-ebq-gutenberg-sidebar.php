@@ -44,6 +44,13 @@ final class EBQ_Gutenberg_Sidebar
             true
         );
 
+        wp_localize_script('ebq-seo-sidebar', 'ebqSeoPublic', [
+            'appBase' => EBQ_Api_Client::base_url(),
+            'homeUrl' => home_url('/'),
+            'siteName' => get_bloginfo('name'),
+            'titleSep' => EBQ_Title_Template::get_sep(),
+        ]);
+
         wp_set_script_translations('ebq-seo-sidebar', 'ebq-seo');
     }
 }

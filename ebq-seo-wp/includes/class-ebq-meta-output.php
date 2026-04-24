@@ -48,9 +48,10 @@ final class EBQ_Meta_Output
         if (! is_singular()) {
             return $title;
         }
-        $custom = EBQ_Meta_Fields::get((int) get_queried_object_id(), '_ebq_title', '');
+        $post_id = (int) get_queried_object_id();
+        $custom = EBQ_Meta_Fields::get($post_id, '_ebq_title', '');
         if ($custom !== '') {
-            return wp_strip_all_tags($custom);
+            return EBQ_Title_Template::resolve((string) $custom, $post_id);
         }
 
         return $title;
@@ -61,9 +62,10 @@ final class EBQ_Meta_Output
         if (! is_singular()) {
             return $parts;
         }
-        $custom = EBQ_Meta_Fields::get((int) get_queried_object_id(), '_ebq_title', '');
+        $post_id = (int) get_queried_object_id();
+        $custom = EBQ_Meta_Fields::get($post_id, '_ebq_title', '');
         if ($custom !== '') {
-            $parts['title'] = wp_strip_all_tags($custom);
+            $parts['title'] = EBQ_Title_Template::resolve((string) $custom, $post_id);
         }
 
         return $parts;

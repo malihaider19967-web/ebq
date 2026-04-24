@@ -56,6 +56,8 @@ class InsightsPayloadTest extends TestCase
         $this->assertSame(50, $response->json('gsc.totals_30d.clicks'));
         $this->assertSame(2000, $response->json('gsc.totals_30d.impressions'));
         $this->assertNotEmpty($response->json('gsc.top_queries_30d'));
+        $this->assertSame('sample query', $response->json('gsc.primary_query'));
+        $this->assertNull($response->json('indexing'));
     }
 
     public function test_show_post_rejects_url_not_belonging_to_website(): void

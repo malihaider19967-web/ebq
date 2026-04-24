@@ -1,35 +1,94 @@
-YOAST SEO PREMIUM - FEATURES BY MENU ITEM (NON-AI)
+Building a comprehensive SEO plugin like Yoast requires a sophisticated interplay between a **User Interface** (where data is collected) and a **Data Engine** (which processes and outputs that data to the frontend/search engines).
 
-[GENERAL]
-- SEO Workouts: Access step-by-step routines (like the Orphaned Content or Cornerstone workouts) to improve site structure.
-- Yoast Academy: Full access to all premium SEO training courses directly from the dashboard.
-- 24/7 Support: Direct link to the premium support team for email or chat assistance.
+To ensure your AI generator doesn't miss anything, use this prompt. It is structured to define the **Input Fields** (Post Meta), the **Processing Logic** (Calculations), and the **Output** (Frontend tags).
 
-[SETTINGS]
-- Site Structure / Cornerstone Content: Mark and manage your most important articles for stricter optimization checks.
-- Internal Linking: Toggle and configure the internal linking suggestion engine.
-- Social Previews: Enable visual preview tools for Facebook, X (Twitter), and LinkedIn.
+---
 
-[REDIRECTIONS]
-- Automatic 301 Redirects: Automatically catches URL changes or deletions and prompts for a destination.
-- Manual Redirect Manager: Create, edit, and delete 301 (Permanent) and 302 (Temporary) redirects.
-- Regex Redirects: Support for complex URL pattern redirects using Regular Expressions.
-- CSV Export/Import: Bulk manage your redirects using spreadsheet files.
+## The Master Prompt: SEO Plugin Technical Blueprint
 
-[POST/PAGE EDITOR - SEO SIDEBAR]
-- Multiple Focus Keyphrases: Add up to 5 keywords or synonyms for a single post.
-- Synonyms & Related Keyphrases: Analysis that checks if you've included natural variations of your topic.
-- Word Form Recognition: Analysis that understands plurals and different verb tenses of your keyword.
-- Real-time Internal Linking Suggestions: A sidebar list of relevant internal posts to link to while writing.
-- Social Tab: Manually set unique images, titles, and descriptions for social media platforms.
+### **Objective**
+Create a WordPress SEO plugin that mimics the core architecture of Yoast SEO. The plugin must include an admin "Meta Box" on the post/page editor, a background processing engine for content analysis, and a frontend hook to output SEO tags in the `<head>` of the website.
 
-[EXTENSIONS / ADD-ONS]
-- Local SEO: Manage business address, opening hours, and Google Maps schema.
-- Video SEO: Configuration for video sitemaps and rich result appearance.
-- News SEO: Settings for the News XML sitemap and Google News inclusion.
-- WooCommerce SEO: Enhanced shop-specific SEO controls and breadcrumb settings.
+---
 
-[TOOLS]
-- Orphaned Content Filter: Identify and fix posts that have no internal links pointing to them.
-- File Editor: Edit your robots.txt and .htaccess files safely (Ads removed in Premium).
-- Zapier Integration: Connect your SEO data to automated workflows.
+### **Section 1: Post Editor Input Fields (The Meta Box)**
+The AI must generate a custom Meta Box for Posts/Pages with the following specific input fields:
+
+* **Field: Focus Keyphrase**
+    * *Input:* Text string.
+    * *Purpose:* The central keyword for analysis.
+* **Field: SEO Title**
+    * *Input:* Text (with support for variables like `%%title%%`, `%%sep%%`, `%%sitename%%`).
+    * *Default:* `[Post Title] [Separator] [Site Name]`.
+* **Field: Slug**
+    * *Input:* Text (URL-friendly string).
+* **Field: Meta Description**
+    * *Input:* Textarea (character limit: ~155-160).
+* **Field: Canonical URL**
+    * *Input:* URL string (overrides the default post URL).
+* **Field: Robots Settings**
+    * *Input:* Checkbox/Toggle for "Noindex" and "Nofollow".
+
+---
+
+### **Section 2: The Real-Time Analysis Engine (Processing Logic)**
+The plugin must analyze content in real-time as the user types. The logic must check:
+
+* **Keyword Density:** Calculate the percentage of (Focus Keyphrase count / Total Word count).
+* **Keyphrase Placement:**
+    * Is the keyphrase in the **SEO Title**?
+    * Is it in the **Meta Description**?
+    * Is it in the **first paragraph** of the content?
+    * Is it in at least one **Subheading (H2/H3)**?
+    * Is it in the **URL Slug**?
+* **Content Length:** Count total words (Minimum target: 300 words).
+* **Image SEO:** Check if the `alt` tags of images in the content contain the Focus Keyphrase.
+* **Link Analysis:** Check for the presence of at least one **Internal Link** and one **External Link**.
+
+
+
+---
+
+### **Section 3: Readability Analysis (Input/Output)**
+* **Flesch Reading Ease:** Use an algorithm to calculate a score based on average sentence length and average syllables per word.
+* **Sentence Length:** Flag sentences over 20 words.
+* **Passive Voice:** Detect passive voice (Target: < 10% of sentences).
+* **Transition Words:** Check if at least 30% of sentences contain transition words (e.g., "however," "because").
+
+---
+
+### **Section 4: Technical Frontend Outputs (The `<head>` hooks)**
+The plugin must hook into `wp_head` to output the following HTML tags dynamically:
+
+| Tag Type | Output Logic / Source |
+| :--- | :--- |
+| **Title Tag** | Output `<title>...</title>` using the SEO Title field or template. |
+| **Meta Description** | Output `<meta name="description" content="...">`. |
+| **Robots Tag** | Output `<meta name="robots" content="noindex, follow">` based on checkboxes. |
+| **Canonical** | Output `<link rel="canonical" href="..." />`. |
+| **Open Graph** | Output `og:title`, `og:description`, `og:image`, and `og:type`. |
+| **Twitter Cards** | Output `twitter:card`, `twitter:title`, and `twitter:description`. |
+
+---
+
+### **Section 5: Global Technical Features**
+* **XML Sitemap Generator:**
+    * *Logic:* Automatically generate a `sitemap_index.xml` file.
+    * *Output:* List all public post types (Posts, Pages) and categories. Include `<lastmod>` tags.
+* **Schema.org JSON-LD:**
+    * *Output:* Automatically inject a JSON-LD script into the footer.
+    * *Details:* Define `@context`, `@type` (Article or WebPage), `headline`, `author`, and `publisher` (Organization).
+* **Breadcrumbs:**
+    * *Logic:* Provide a PHP function/Shortcode to output a hierarchical navigation trail with Schema markup.
+
+---
+
+### **Section 6: Database & Performance**
+* **Storage:** Store post-specific metadata in the `wp_postmeta` table.
+* **Optimization:** Use the "Indexables" concept (a custom database table) to store processed SEO data for faster querying, so the site doesn't have to calculate SEO scores on every page load.
+
+---
+
+## Implementation status (EBQ repo)
+
+See [plugin-roadmap.md](plugin-roadmap.md) for what is implemented in `ebq-seo-wp`, how it maps to this blueprint, and how it connects to the EBQ Laravel insights API.

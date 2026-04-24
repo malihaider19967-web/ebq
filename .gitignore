@@ -13,6 +13,7 @@
 /.zed
 /auth.json
 /node_modules
+/ebq-seo-wp/node_modules
 /public/hot
 /public/storage
 /storage/*.key

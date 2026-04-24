@@ -65,7 +65,16 @@ final class EBQ_Seo_Fields_Meta_Box
                     <label for="ebq_title"><?php esc_html_e('SEO title', 'ebq-seo'); ?></label>
                     <input type="text" id="ebq_title" name="ebq_title" maxlength="120"
                         value="<?php echo esc_attr((string) $g('_ebq_title')); ?>" />
-                    <p class="ebq-note"><?php esc_html_e('Shown in Google as the blue link. Keep under ~60 characters.', 'ebq-seo'); ?></p>
+                    <p class="ebq-note"><?php esc_html_e('Shown in Google as the blue link. Keep under ~60 characters. Variables:', 'ebq-seo'); ?>
+                        <code>%%title%%</code> <code>%%sep%%</code> <code>%%sitename%%</code>
+                    </p>
+                </div>
+
+                <div style="margin-top:12px;">
+                    <label for="ebq_slug_hint"><?php esc_html_e('URL slug (SEO)', 'ebq-seo'); ?></label>
+                    <input type="text" id="ebq_slug_hint" readonly class="large-text" style="background:#f8fafc;"
+                        value="<?php echo esc_attr((string) $post->post_name); ?>" />
+                    <p class="ebq-note"><?php esc_html_e('Edit the permalink slug in the post sidebar under Permalink.', 'ebq-seo'); ?></p>
                 </div>
 
                 <div style="margin-top:12px;">
@@ -93,6 +102,14 @@ final class EBQ_Seo_Fields_Meta_Box
                         <strong><?php esc_html_e('nofollow', 'ebq-seo'); ?></strong>
                         <span class="ebq-note"><?php esc_html_e('Tell search engines not to follow links.', 'ebq-seo'); ?></span>
                     </label>
+                </div>
+
+                <div style="margin-top:12px;">
+                    <label for="ebq_robots_advanced"><?php esc_html_e('Advanced robots (comma-separated)', 'ebq-seo'); ?></label>
+                    <input type="text" id="ebq_robots_advanced" name="ebq_robots_advanced" class="large-text"
+                        placeholder="noarchive, nosnippet"
+                        value="<?php echo esc_attr((string) $g('_ebq_robots_advanced')); ?>" />
+                    <p class="ebq-note"><?php esc_html_e('Appended to the robots meta after index/noindex and follow/nofollow.', 'ebq-seo'); ?></p>
                 </div>
 
                 <div style="margin-top:12px;">
@@ -197,6 +214,13 @@ final class EBQ_Seo_Fields_Meta_Box
         foreach ($booleans as $meta_key => $post_key) {
             $value = ! empty($_POST[$post_key]);
             update_post_meta($post_id, $meta_key, $value ? '1' : '');
+        }
+
+        $adv = isset($_POST['ebq_robots_advanced']) ? sanitize_text_field((string) wp_unslash($_POST['ebq_robots_advanced'])) : '';
+        if ($adv === '') {
+            delete_post_meta($post_id, '_ebq_robots_advanced');
+        } else {
+            update_post_meta($post_id, '_ebq_robots_advanced', mb_substr($adv, 0, 200));
         }
 
         unset($post);

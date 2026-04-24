@@ -62,7 +62,10 @@ final class EBQ_Social_Output
     {
         $post_id = is_singular() ? (int) get_queried_object_id() : 0;
 
-        $seo_title = $post_id > 0 ? (string) EBQ_Meta_Fields::get($post_id, '_ebq_title', '') : '';
+        $seo_title_raw = $post_id > 0 ? (string) EBQ_Meta_Fields::get($post_id, '_ebq_title', '') : '';
+        $seo_title = $post_id > 0 && $seo_title_raw !== ''
+            ? EBQ_Title_Template::resolve($seo_title_raw, $post_id)
+            : '';
         $fallback_title = $post_id > 0 ? (string) get_the_title($post_id) : (string) get_bloginfo('name');
         $og_title_override = $post_id > 0 ? (string) EBQ_Meta_Fields::get($post_id, '_ebq_og_title', '') : '';
         $og_title = $og_title_override !== '' ? $og_title_override : ($seo_title !== '' ? $seo_title : $fallback_title);
@@ -81,9 +84,17 @@ final class EBQ_Social_Output
         $tw_desc_override = $post_id > 0 ? (string) EBQ_Meta_Fields::get($post_id, '_ebq_twitter_description', '') : '';
         $tw_image_override = $post_id > 0 ? (string) EBQ_Meta_Fields::get($post_id, '_ebq_twitter_image', '') : '';
 
+        $canonical = $post_id > 0 ? (string) EBQ_Meta_Fields::get($post_id, '_ebq_canonical', '') : '';
+        if ($canonical === '' && $post_id > 0) {
+            $canonical = (string) get_permalink($post_id);
+        }
+        if ($canonical === '') {
+            $canonical = (string) home_url('/');
+        }
+
         return [
             'post_id' => $post_id,
-            'canonical' => $post_id > 0 ? (string) get_permalink($post_id) : (string) home_url('/'),
+            'canonical' => $canonical,
             'og_title' => $og_title,
             'og_description' => $og_description,
             'og_image' => $og_image,
