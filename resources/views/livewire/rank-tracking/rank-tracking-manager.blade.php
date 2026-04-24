@@ -444,7 +444,7 @@
                                     <td class="px-4 py-3">
                                         <a href="{{ route('rank-tracking.show', $kw->id) }}" wire:navigate
                                             class="block font-semibold text-slate-900 hover:text-indigo-600 dark:text-slate-100 dark:hover:text-indigo-400">
-                                            {{ $kw->keyword }}
+                                            {{ $kw->keyword }}<x-keyword-language :language="($detectedLanguages ?? [])[mb_strtolower(trim((string) $kw->keyword))] ?? null" />
                                         </a>
                                         <div class="mt-0.5 flex flex-wrap items-center gap-1.5">
                                             <span class="rounded bg-slate-100 px-1.5 py-px text-[9px] font-semibold uppercase tracking-wide text-slate-600 dark:bg-slate-800 dark:text-slate-300">{{ $kw->search_type }}</span>

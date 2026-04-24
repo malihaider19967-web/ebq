@@ -128,6 +128,7 @@ class KeywordsTable extends Component
         }
 
         $keMetrics = [];
+        $languages = [];
         if ($rows instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $rows->isNotEmpty()) {
             $queries = $rows->getCollection()
                 ->pluck('query')
@@ -138,9 +139,10 @@ class KeywordsTable extends Component
                 ->all();
             if ($queries !== []) {
                 $keMetrics = app(KeywordMetricsService::class)->metricsOrQueue($queries, 'global');
+                $languages = app(\App\Services\LanguageDetectorService::class)->detectMany($queries);
             }
         }
 
-        return view('livewire.keywords.keywords-table', compact('rows', 'cannibalized', 'tracked', 'keMetrics'));
+        return view('livewire.keywords.keywords-table', compact('rows', 'cannibalized', 'tracked', 'keMetrics', 'languages'));
     }
 }

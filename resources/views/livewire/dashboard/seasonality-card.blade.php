@@ -16,7 +16,7 @@
                 @foreach ($rows as $row)
                     <li class="flex items-center justify-between gap-3 text-xs">
                         <div class="min-w-0 flex-1">
-                            <div class="truncate font-semibold text-slate-900 dark:text-slate-100" title="{{ $row['keyword'] }}">{{ $row['keyword'] }}</div>
+                            <div class="truncate font-semibold text-slate-900 dark:text-slate-100" title="{{ $row['keyword'] }}">{{ $row['keyword'] }}<x-keyword-language :language="$row['language'] ?? null" /></div>
                             <div class="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
                                 peaks in <span class="font-medium text-amber-700 dark:text-amber-400">{{ $row['peak_month_name'] }}</span>
                                 @if ($row['search_volume'] !== null)

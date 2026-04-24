@@ -775,9 +775,12 @@ class ReportDataService
             ->get()
             ->keyBy('keyword_hash');
 
+        $detector = app(\App\Services\LanguageDetectorService::class);
+
         foreach ($rows as $i => $r) {
             $kw = isset($r[$queryKey]) ? (string) $r[$queryKey] : '';
             $hit = $kw !== '' ? ($metrics[\App\Models\KeywordMetric::hashKeyword($kw)] ?? null) : null;
+            $rows[$i]['language'] = $kw !== '' ? $detector->detect($kw) : null;
             $rows[$i]['search_volume'] = $hit?->search_volume;
             $rows[$i]['cpc'] = $hit?->cpc;
             $rows[$i]['cpc_currency'] = $hit?->currency;
@@ -1154,6 +1157,7 @@ class ReportDataService
 
             $out[] = [
                 'keyword' => (string) $m->keyword,
+                'language' => app(\App\Services\LanguageDetectorService::class)->detect((string) $m->keyword),
                 'search_volume' => (int) $m->search_volume,
                 'cpc' => $m->cpc !== null ? (float) $m->cpc : null,
                 'competition' => $m->competition !== null ? (float) $m->competition : null,

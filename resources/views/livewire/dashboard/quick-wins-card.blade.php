@@ -29,7 +29,7 @@
                            class="flex items-center justify-between gap-3 rounded-md px-1 py-1 text-xs transition hover:bg-white/60 dark:hover:bg-slate-800/40"
                            title="Open a custom audit with this keyword pre-filled">
                             <div class="min-w-0 flex-1">
-                                <div class="truncate font-semibold text-slate-900 dark:text-slate-100">{{ $row['keyword'] }}</div>
+                                <div class="truncate font-semibold text-slate-900 dark:text-slate-100">{{ $row['keyword'] }}<x-keyword-language :language="$row['language'] ?? null" /></div>
                                 <div class="mt-0.5 text-[10px] text-slate-500 dark:text-slate-400">
                                     {{ number_format($row['search_volume']) }}/mo
                                     @if ($row['current_position'] !== null)

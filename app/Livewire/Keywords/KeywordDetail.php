@@ -127,9 +127,11 @@ class KeywordDetail extends Component
                 'current_value' => null,
                 'upside_value' => null,
             ],
+            'language' => null,
         ];
 
         if ($hasAccess && $this->query !== '') {
+            $data['language'] = app(\App\Services\LanguageDetectorService::class)->detect($this->query);
             $data['metric'] = app(KeywordMetricsService::class)->metricsFor($this->query, 'global');
             $data['gsc_totals'] = $this->gscTotals();
             $data['gsc_daily'] = $this->gscDaily();

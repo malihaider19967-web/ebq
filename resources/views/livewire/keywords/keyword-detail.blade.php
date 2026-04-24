@@ -9,6 +9,10 @@
             </a>
             <div class="mt-2 flex flex-wrap items-center gap-2">
                 <h1 class="min-w-0 text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">{{ $query ?: '—' }}</h1>
+                @if (filled($language ?? null))
+                    <span class="inline-flex rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-600 ring-1 ring-slate-200 dark:bg-slate-700 dark:text-slate-300 dark:ring-slate-600"
+                          title="Detected language">{{ strtoupper($language) }}</span>
+                @endif
                 @if ($flags['striking_distance'])
                     <span class="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-semibold text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-500/10 dark:text-indigo-400 dark:ring-indigo-900/40">Striking distance</span>
                 @endif

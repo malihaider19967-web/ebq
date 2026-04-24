@@ -504,7 +504,7 @@
                     <tbody>
                         @foreach ($insights['striking_distance'] as $row)
                             <tr>
-                                <td>{{ \Illuminate\Support\Str::limit($row['query'], 60) }}</td>
+                                <td>{{ \Illuminate\Support\Str::limit($row['query'], 60) }}@if (filled($row['language'] ?? null)) <span style="color:#94a3b8;font-size:10px;">[{{ strtoupper($row['language']) }}]</span>@endif</td>
                                 <td class="right">{{ $row['position'] }}</td>
                                 <td class="right">{{ number_format($row['impressions']) }}</td>
                                 <td class="right">{{ $row['ctr'] }}%</td>
@@ -521,7 +521,7 @@
                     <tbody>
                         @foreach ($insights['cannibalization'] as $row)
                             <tr>
-                                <td>{{ \Illuminate\Support\Str::limit($row['query'], 40) }}</td>
+                                <td>{{ \Illuminate\Support\Str::limit($row['query'], 40) }}@if (filled($row['language'] ?? null)) <span style="color:#94a3b8;font-size:10px;">[{{ strtoupper($row['language']) }}]</span>@endif</td>
                                 <td>{{ \Illuminate\Support\Str::limit($row['primary_page'], 45) }}</td>
                                 <td class="right">{{ $row['page_count'] }}</td>
                                 <td class="right">{{ number_format($row['total_impressions']) }}</td>

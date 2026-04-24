@@ -102,6 +102,7 @@ class SeasonalityCard extends Component
 
             $out[] = [
                 'keyword' => $m->keyword,
+                'language' => app(\App\Services\LanguageDetectorService::class)->detect((string) $m->keyword),
                 'peak_month' => $peak,
                 'peak_month_name' => Carbon::create(null, $peak, 1)->format('F'),
                 'months_until' => $monthsUntil,

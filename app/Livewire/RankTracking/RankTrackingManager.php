@@ -515,10 +515,12 @@ class RankTrackingManager extends Component
         }
 
         $keMetrics = [];
+        $detectedLanguages = [];
         if ($rows instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $rows->isNotEmpty()) {
             $keywordList = $rows->getCollection()->pluck('keyword')->map(fn ($k) => (string) $k)->unique()->values()->all();
             if ($keywordList !== []) {
                 $keMetrics = app(KeywordMetricsService::class)->metricsOrQueue($keywordList, 'global');
+                $detectedLanguages = app(\App\Services\LanguageDetectorService::class)->detectMany($keywordList);
             }
         }
 
@@ -530,6 +532,7 @@ class RankTrackingManager extends Component
             'countries' => $this->countries(),
             'languages' => $this->languages(),
             'keMetrics' => $keMetrics,
+            'detectedLanguages' => $detectedLanguages,
         ]);
     }
 

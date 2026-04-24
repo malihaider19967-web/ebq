@@ -23,6 +23,8 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         require_once base_path('app/Support/helpers.php');
+
+        $this->app->singleton(\App\Services\LanguageDetectorService::class);
     }
 
     /**

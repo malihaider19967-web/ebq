@@ -74,7 +74,15 @@
       "Bash(xargs cat *)",
       "Bash(xargs head *)",
       "Bash(xargs wc *)",
-      "Bash(xargs tail *)"
+      "Bash(xargs tail *)",
+      "Bash(composer require *)",
+      "Bash(composer dump-autoload *)",
+      "PowerShell(composer dump-autoload *)",
+      "Bash(grep -n 'row\\\\['\\\\''query'\\\\''\\\\]\\\\|row\\\\['\\\\''keyword'\\\\''\\\\]\\\\|$kw\\\\|query }}' /c/Users/malih/Desktop/ebq/resources/views/emails/growth-report.blade.php)",
+      "Bash(grep -rln '$keyword\\\\|->keyword' /c/Users/malih/Desktop/ebq/resources/views/livewire/rank-tracking/)",
+      "Bash(grep -n '->keyword\\\\|$keyword\\\\|['\\\\''keyword'\\\\'']' /c/Users/malih/Desktop/ebq/resources/views/livewire/rank-tracking/rank-tracking-manager.blade.php)",
+      "Bash(grep -n 'compact\\\\|return view\\\\|$rows\\\\|serpRisk\\\\|keMetrics' /c/Users/malih/Desktop/ebq/app/Livewire/RankTracking/RankTrackingManager.php)",
+      "PowerShell(composer *)"
     ]
   }
 }

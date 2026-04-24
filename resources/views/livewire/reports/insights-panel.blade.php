@@ -95,7 +95,7 @@
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                     @foreach ($data['cannibalization'] as $row)
                                         <tr>
-                                            <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['query'] }}</td>
+                                            <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['query'] }}<x-keyword-language :language="$row['language'] ?? null" /></td>
                                             <td class="py-2 pr-3 max-w-[280px] truncate text-slate-600 dark:text-slate-300" title="{{ $row['primary_page'] }}">{{ $row['primary_page'] }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ $row['page_count'] }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['total_clicks']) }}</td>
@@ -134,6 +134,7 @@
                                 <thead class="border-b border-slate-200 text-[11px] uppercase tracking-wider text-slate-500 dark:border-slate-700 dark:text-slate-400">
                                     <tr>
                                         <th scope="col" class="py-2 pr-3 font-semibold">Query</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold">Volume/mo</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Position</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Impressions</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Clicks</th>
@@ -144,7 +145,14 @@
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                     @foreach ($data['striking_distance'] as $row)
                                         <tr>
-                                            <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['query'] }}</td>
+                                            <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['query'] }}<x-keyword-language :language="$row['language'] ?? null" /></td>
+                                            <td class="py-2 pr-3 text-right tabular-nums">
+                                                @if ($row['search_volume'] !== null)
+                                                    {{ number_format($row['search_volume']) }}
+                                                @else
+                                                    <span class="text-slate-400">—</span>
+                                                @endif
+                                            </td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ $row['position'] }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['impressions']) }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['clicks']) }}</td>
@@ -360,7 +368,7 @@
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                     @foreach ($data['quick_wins'] as $row)
                                         <tr>
-                                            <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['keyword'] }}</td>
+                                            <td class="py-2 pr-3 font-medium text-slate-800 dark:text-slate-200">{{ $row['keyword'] }}<x-keyword-language :language="$row['language'] ?? null" /></td>
                                             <td class="py-2 pr-3 text-right tabular-nums">{{ number_format($row['search_volume']) }}</td>
                                             <td class="py-2 pr-3 text-right tabular-nums hidden md:table-cell">
                                                 @if ($row['competition'] !== null)
