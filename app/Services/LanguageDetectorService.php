@@ -32,18 +32,28 @@ class LanguageDetectorService
     private const MIN_MARGIN = 0.03;
 
     /**
-     * Function words that almost never appear in short non-English queries.
-     * Their presence is a stronger signal than patrickschur's n-gram scores,
-     * which routinely mis-rank short SEO queries (e.g. "how to cook pasta"
-     * scoring Spanish above English).
+     * Per-language word signals. On short queries, patrickschur's n-gram
+     * scores are routinely within a percentage point of each other (e.g.
+     * `generador de nombres de free fire` scores es:0.494 da:0.493), so
+     * a word-count vote beats the raw detector on these inputs. Each list
+     * is intentionally a mix of function and high-frequency content words
+     * distinctive enough to the language to be a reliable signal in a
+     * short SEO query.
+     *
+     * @var array<string, list<string>>
      */
-    private const ENGLISH_FUNCTION_WORDS = [
-        'the', 'and', 'for', 'with', 'how', 'what', 'why', 'when', 'where',
-        'is', 'are', 'to', 'of', 'in', 'on', 'vs', 'best', 'top', 'near',
+    private const FASTPATH_WORDS = [
+        'en' => ['the', 'and', 'for', 'with', 'how', 'what', 'why', 'when', 'where', 'is', 'are', 'to', 'of', 'on', 'vs', 'best', 'top', 'near', 'near me'],
+        'es' => ['que', 'con', 'para', 'como', 'una', 'por', 'del', 'sin', 'pero', 'mejor', 'mejores', 'nombres', 'generador', 'gratis', 'comprar', 'donde', 'cuando', 'los', 'las', 'el', 'ella', 'esto', 'mas', 'sobre'],
+        'pt' => ['nao', 'voce', 'muito', 'melhor', 'pelo', 'pela', 'tambem', 'estao', 'sao', 'ate', 'obrigado', 'voces'],
+        'fr' => ['les', 'des', 'une', 'est', 'avec', 'pour', 'sans', 'comment', 'pourquoi', 'meilleur', 'chez', 'ceci', 'cela', 'mais', 'aussi'],
+        'de' => ['der', 'die', 'das', 'den', 'und', 'oder', 'ist', 'sind', 'wie', 'was', 'warum', 'mit', 'ohne', 'fur', 'bei', 'beste', 'ein', 'eine', 'auch', 'nicht', 'kaufen'],
+        'it' => ['gli', 'della', 'delle', 'sono', 'come', 'perche', 'migliore', 'anche', 'questo', 'quello', 'cosa', 'molto'],
+        'nl' => ['het', 'een', 'voor', 'maar', 'niet', 'ook', 'hoe', 'wat', 'waar', 'beste', 'kopen'],
     ];
 
     /** Cache key prefix — bump the version to invalidate prior detections. */
-    private const CACHE_VERSION = 'v4';
+    private const CACHE_VERSION = 'v5';
 
     private ?Language $detector = null;
 
@@ -94,8 +104,8 @@ class LanguageDetectorService
             return null;
         }
 
-        if ($this->looksLikeEnglish($text)) {
-            return 'en';
+        if ($fast = $this->fastPathLanguage($text)) {
+            return $fast;
         }
 
         $result = $this->getDetector()->detect($text)->close();
@@ -114,18 +124,51 @@ class LanguageDetectorService
         return preg_replace('/[-_].*$/', '', $code) ?? $code;
     }
 
-    private function looksLikeEnglish(string $text): bool
+    /**
+     * Count word-signal hits per language and pick the clear winner.
+     * Returns null on ties or zero hits — the n-gram detector handles the rest.
+     * Accent-insensitive so queries like "perché" match the Italian "perche" entry.
+     */
+    private function fastPathLanguage(string $text): ?string
     {
-        if (! preg_match('/^[\x00-\x7F]+$/', $text)) {
-            return false;
-        }
-        $words = preg_split('/[^a-z]+/', $text) ?: [];
-        foreach ($words as $w) {
-            if (in_array($w, self::ENGLISH_FUNCTION_WORDS, true)) {
-                return true;
+        $folded = $this->foldAccents(mb_strtolower($text));
+        $words = preg_split('/[^a-z]+/', $folded) ?: [];
+        $words = array_values(array_filter($words, fn ($w) => $w !== ''));
+
+        $counts = [];
+        foreach (self::FASTPATH_WORDS as $lang => $list) {
+            $n = 0;
+            foreach ($words as $w) {
+                if (in_array($w, $list, true)) {
+                    $n++;
+                }
+            }
+            if ($n > 0) {
+                $counts[$lang] = $n;
             }
         }
-        return false;
+        if ($counts === []) {
+            return null;
+        }
+
+        arsort($counts);
+        $codes = array_keys($counts);
+        $top = $counts[$codes[0]];
+        $second = $counts[$codes[1] ?? ''] ?? 0;
+        return $top > $second ? $codes[0] : null;
+    }
+
+    private function foldAccents(string $text): string
+    {
+        $map = [
+            'á' => 'a', 'à' => 'a', 'â' => 'a', 'ä' => 'a', 'ã' => 'a', 'å' => 'a',
+            'é' => 'e', 'è' => 'e', 'ê' => 'e', 'ë' => 'e',
+            'í' => 'i', 'ì' => 'i', 'î' => 'i', 'ï' => 'i',
+            'ó' => 'o', 'ò' => 'o', 'ô' => 'o', 'ö' => 'o', 'õ' => 'o',
+            'ú' => 'u', 'ù' => 'u', 'û' => 'u', 'ü' => 'u',
+            'ñ' => 'n', 'ç' => 'c', 'ß' => 'ss',
+        ];
+        return strtr($text, $map);
     }
 
     private function getDetector(): Language
