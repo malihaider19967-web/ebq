@@ -69,4 +69,8 @@ return [
         'fresh_days' => (int) env('COMPETITOR_BACKLINKS_FRESH_DAYS', 30),
     ],
 
+    'language_detection' => [
+        'enabled' => filter_var(env('LANGUAGE_DETECTION_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
+    ],
+
 ];

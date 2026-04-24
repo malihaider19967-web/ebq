@@ -62,6 +62,10 @@ class LanguageDetectorService
 
     public function detect(?string $text): ?string
     {
+        if (! config('services.language_detection.enabled', true)) {
+            return null;
+        }
+
         $text = trim((string) $text);
         if ($text === '') {
             return null;
