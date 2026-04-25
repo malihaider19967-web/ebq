@@ -15,7 +15,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'landing')->name('landing');
 Route::view('/features', 'features')->name('features');
-Route::view('/guide', 'guide')->name('guide');
+Route::view('/guide', 'guide')->middleware('auth')->name('guide');
 
 // Always-fresh download of the latest packaged WP plugin — bypasses public/ caching.
 Route::get('/wordpress/plugin.zip', WordPressPluginDownloadController::class)->name('wordpress.plugin.download');
