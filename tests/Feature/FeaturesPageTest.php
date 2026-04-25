@@ -72,18 +72,9 @@ class FeaturesPageTest extends TestCase
         $this->assertStringContainsString('/wordpress/plugin.zip', (string) $response->json('download_url'));
     }
 
-    public function test_plugin_download_route_serves_fresh_zip_with_no_cache_headers(): void
+    // TEMP: plugin downloads are disabled — restore the original assertions when re-enabling.
+    public function test_plugin_download_route_is_temporarily_disabled(): void
     {
-        $response = $this->get(route('wordpress.plugin.download'));
-
-        $response->assertOk()
-            ->assertHeader('Content-Type', 'application/zip');
-
-        $this->assertStringContainsString('no-store', (string) $response->headers->get('Cache-Control'));
-        $this->assertStringContainsString('must-revalidate', (string) $response->headers->get('Cache-Control'));
-
-        $disposition = $response->headers->get('Content-Disposition');
-        $this->assertStringContainsString('attachment', (string) $disposition);
-        $this->assertMatchesRegularExpression('/ebq-seo-\d{8}-\d{6}\.zip/', (string) $disposition);
+        $this->get(route('wordpress.plugin.download'))->assertStatus(503);
     }
 }

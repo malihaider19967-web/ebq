@@ -37,6 +37,9 @@ class WordPressPluginDownloadController extends Controller
      */
     public function __invoke(PluginReleaseResolver $resolver): BinaryFileResponse|Response
     {
+        // TEMP: plugin downloads disabled — remove the next line to re-enable.
+        abort(503, 'Plugin downloads are temporarily unavailable.');
+
         $channel = request()->query('channel', 'stable');
         $channel = in_array($channel, ['stable', 'beta'], true) ? $channel : 'stable';
 
