@@ -38,6 +38,12 @@ class PluginInsightResolver
             ];
         }
 
+        // GSC stores URLs as Google indexed them; WP's get_permalink() returns
+        // whatever the install thinks is canonical. Match against the full set
+        // of trailing-slash / www / scheme variants so a `https://x.com/post/`
+        // permalink still matches a `https://x.com/post` row in GSC.
+        $variants = $this->pageVariants($normalized);
+
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz)->endOfDay();
         $start30 = $end->copy()->subDays(29)->startOfDay();
@@ -45,7 +51,7 @@ class PluginInsightResolver
 
         $gscTotals30 = SearchConsoleData::query()
             ->where('website_id', $website->id)
-            ->where('page', $normalized)
+            ->whereIn('page', $variants)
             ->whereDate('date', '>=', $start30->toDateString())
             ->whereDate('date', '<=', $end->toDateString())
             ->selectRaw('SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position, AVG(ctr) as ctr')
@@ -53,7 +59,7 @@ class PluginInsightResolver
 
         $gscTotals90 = SearchConsoleData::query()
             ->where('website_id', $website->id)
-            ->where('page', $normalized)
+            ->whereIn('page', $variants)
             ->whereDate('date', '>=', $start90->toDateString())
             ->whereDate('date', '<=', $end->toDateString())
             ->selectRaw('SUM(clicks) as clicks, SUM(impressions) as impressions')
@@ -61,7 +67,7 @@ class PluginInsightResolver
 
         $clickSeries = SearchConsoleData::query()
             ->where('website_id', $website->id)
-            ->where('page', $normalized)
+            ->whereIn('page', $variants)
             ->whereDate('date', '>=', $start90->toDateString())
             ->whereDate('date', '<=', $end->toDateString())
             ->selectRaw('DATE(date) as d, SUM(clicks) as c')
@@ -73,7 +79,7 @@ class PluginInsightResolver
 
         $topQueries = SearchConsoleData::query()
             ->where('website_id', $website->id)
-            ->where('page', $normalized)
+            ->whereIn('page', $variants)
             ->whereDate('date', '>=', $start30->toDateString())
             ->whereDate('date', '<=', $end->toDateString())
             ->selectRaw('query, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position')
@@ -122,9 +128,9 @@ class PluginInsightResolver
             $trackedKeyword = RankTrackingKeyword::query()
                 ->where('website_id', $website->id)
                 ->where('is_active', true)
-                ->where(function ($q) use ($normalized): void {
-                    $q->where('target_url', $normalized)
-                        ->orWhere('current_url', $normalized);
+                ->where(function ($q) use ($variants): void {
+                    $q->whereIn('target_url', $variants)
+                        ->orWhereIn('current_url', $variants);
                 })
                 ->first();
         }
@@ -145,9 +151,10 @@ class PluginInsightResolver
             ];
         }
 
+        $variantHashes = array_map(static fn (string $v) => hash('sha256', $v), $variants);
         $audit = PageAuditReport::query()
             ->where('website_id', $website->id)
-            ->where('page_hash', hash('sha256', $normalized))
+            ->whereIn('page_hash', $variantHashes)
             ->latest('audited_at')
             ->first();
 
@@ -168,7 +175,7 @@ class PluginInsightResolver
 
         $indexingRow = PageIndexingStatus::query()
             ->where('website_id', $website->id)
-            ->where('page', $normalized)
+            ->whereIn('page', $variants)
             ->orderByDesc('last_google_status_checked_at')
             ->first();
 
@@ -295,13 +302,15 @@ class PluginInsightResolver
             return [];
         }
 
+        $variants = $this->pageVariants($normalized);
+
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz)->endOfDay();
         $start = $end->copy()->subDays(89)->startOfDay();
 
         $rows = SearchConsoleData::query()
             ->where('website_id', $website->id)
-            ->where('page', $normalized)
+            ->whereIn('page', $variants)
             ->whereDate('date', '>=', $start->toDateString())
             ->whereDate('date', '<=', $end->toDateString())
             ->where('query', '!=', '')
@@ -397,6 +406,195 @@ class PluginInsightResolver
             'checked_at' => $snapshot->checked_at?->toIso8601String(),
             'results' => $results,
         ];
+    }
+
+    /**
+     * Suggest other URLs on this website worth linking *to* from the post
+     * being edited. Uses a much stronger signal than Yoast's word-overlap
+     * approach: actual Search Console performance.
+     *
+     * Algorithm:
+     *   1. Tokenise the focus keyword (or title fallback) into significant
+     *      words (>=3 chars, no stopwords).
+     *   2. Find SearchConsoleData rows on this website, last 90 days, where
+     *      `page` is not the current URL AND any token appears in `query`.
+     *   3. Group by (page, query); score each row as
+     *         impressions/100 + matched_tokens * 5 + (20 - position).
+     *   4. Per page, keep the highest-scoring query.
+     *   5. Return top N pages.
+     *
+     * Returns each suggestion with the matching query so the plugin can
+     * render "Ranks #4 for 'best running shoes' (1.2k impr/mo)".
+     *
+     * @return list<array{url: string, top_query: string, position: ?float, impressions: int, clicks: int, score: float, match_type: string}>
+     */
+    public function internalLinkSuggestions(
+        Website $website,
+        string $canonicalUrl,
+        ?string $focusKeyword = null,
+        ?string $postTitle = null,
+        int $limit = 8,
+    ): array {
+        $normalized = trim($canonicalUrl);
+        if ($normalized === '' || ! $website->isAuditUrlForThisSite($normalized)) {
+            return [];
+        }
+
+        $sourceText = trim((string) ($focusKeyword ?: $postTitle ?: ''));
+        if ($sourceText === '') {
+            return [];
+        }
+        $matchType = ($focusKeyword !== null && trim($focusKeyword) !== '') ? 'focus_keyword' : 'title_overlap';
+
+        $tokens = $this->significantTokens($sourceText);
+        if (empty($tokens)) {
+            return [];
+        }
+
+        $tz = config('app.timezone');
+        $end = Carbon::yesterday($tz)->endOfDay();
+        $start = $end->copy()->subDays(89)->startOfDay();
+
+        $variants = $this->pageVariants($normalized);
+
+        $query = SearchConsoleData::query()
+            ->where('website_id', $website->id)
+            ->whereDate('date', '>=', $start->toDateString())
+            ->whereDate('date', '<=', $end->toDateString())
+            ->whereNotIn('page', $variants)
+            ->whereNotNull('page')
+            ->where('page', '!=', '')
+            ->where('query', '!=', '')
+            ->where(function ($w) use ($tokens) {
+                foreach ($tokens as $tok) {
+                    $w->orWhere('query', 'LIKE', '%'.$tok.'%');
+                }
+            })
+            ->selectRaw('page, query, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position')
+            ->groupBy('page', 'query')
+            ->orderByDesc('impressions')
+            ->limit(200);
+
+        $rows = $query->get();
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        // Keep the highest-scoring (page, query) per page.
+        $perPage = [];
+        foreach ($rows as $r) {
+            $page = (string) $r->page;
+            $q = mb_strtolower((string) $r->query);
+            $matched = 0;
+            foreach ($tokens as $tok) {
+                if (str_contains($q, $tok)) {
+                    $matched++;
+                }
+            }
+            if ($matched === 0) {
+                continue;
+            }
+
+            $impressions = (int) $r->impressions;
+            $clicks = (int) $r->clicks;
+            $position = $r->position !== null ? round((float) $r->position, 1) : null;
+
+            $score = ($impressions / 100)
+                + ($matched * 5)
+                + ($position !== null ? max(0, 20 - $position) : 0);
+
+            if (! isset($perPage[$page]) || $perPage[$page]['score'] < $score) {
+                $perPage[$page] = [
+                    'url' => $page,
+                    'top_query' => (string) $r->query,
+                    'position' => $position,
+                    'impressions' => $impressions,
+                    'clicks' => $clicks,
+                    'score' => round($score, 2),
+                    'match_type' => $matchType,
+                ];
+            }
+        }
+
+        usort($perPage, fn ($a, $b) => $b['score'] <=> $a['score']);
+
+        return array_slice(array_values($perPage), 0, $limit);
+    }
+
+    /**
+     * All reasonable variants of a page URL, used to bridge mismatches
+     * between WP's `get_permalink()` (whatever the install thinks is canonical)
+     * and what Google Search Console actually stored.
+     *
+     * Generates the cross-product of {trailing slash on/off} × {www on/off} ×
+     * {http, https}, keeping the original URL first. Up to 12 variants.
+     *
+     * @return list<string>
+     */
+    private function pageVariants(string $url): array
+    {
+        $parts = parse_url($url);
+        if (! is_array($parts) || empty($parts['host'])) {
+            return [$url];
+        }
+        $host = strtolower((string) $parts['host']);
+        $hostNoWww = preg_replace('/^www\./', '', $host) ?: $host;
+        $hostWww = 'www.'.$hostNoWww;
+        $path = (string) ($parts['path'] ?? '/');
+        if ($path === '') {
+            $path = '/';
+        }
+        $pathNoSlash = ($path !== '/' && substr($path, -1) === '/') ? rtrim($path, '/') : $path;
+        $pathSlash = ($path === '/' || substr($path, -1) === '/') ? $path : $path.'/';
+        $query = ! empty($parts['query']) ? '?'.$parts['query'] : '';
+
+        $hosts = [$hostNoWww, $hostWww];
+        $schemes = ['https', 'http'];
+        $paths = [$pathNoSlash, $pathSlash];
+
+        $variants = [$url];
+        foreach ($schemes as $scheme) {
+            foreach ($hosts as $h) {
+                foreach ($paths as $p) {
+                    $variants[] = $scheme.'://'.$h.$p.$query;
+                }
+            }
+        }
+
+        return array_values(array_unique($variants));
+    }
+
+    /**
+     * Lowercase, drop stopwords, keep tokens >= 3 chars. Returns up to 6 of
+     * the longest matches (longer tokens carry more signal).
+     *
+     * @return list<string>
+     */
+    private function significantTokens(string $text): array
+    {
+        static $stop = [
+            'the','a','an','and','or','but','of','to','for','in','on','at','by','it','its',
+            'as','is','be','are','was','were','this','that','these','those','with','from',
+            'what','how','why','when','who','where','which','i','you','we','they','my',
+            'your','our','their','can','will','do','does','did','have','has','had','not',
+            'no','yes','if','so','than','then','just','about','into','out','up','down',
+            'over','under','again','more','most','some','any','all','each','every','one',
+        ];
+
+        $lower = mb_strtolower($text);
+        // Replace anything not letter/number/space with space, collapse spaces.
+        $lower = preg_replace('/[^\p{L}\p{N}\s]+/u', ' ', $lower);
+        $parts = preg_split('/\s+/u', trim($lower));
+        $out = [];
+        foreach ($parts as $p) {
+            if (mb_strlen($p) < 3) continue;
+            if (in_array($p, $stop, true)) continue;
+            $out[] = $p;
+        }
+
+        usort($out, fn ($a, $b) => mb_strlen($b) <=> mb_strlen($a));
+
+        return array_values(array_unique(array_slice($out, 0, 6)));
     }
 
     /**

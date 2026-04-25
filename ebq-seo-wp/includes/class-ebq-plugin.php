@@ -25,6 +25,7 @@ final class EBQ_Plugin
         (new EBQ_Post_Column())->register();
         (new EBQ_Dashboard_Widget())->register();
         (new EBQ_Gutenberg_Sidebar())->register();
+        (new EBQ_Block_Editor_Seo_Metabox())->register();
         (new EBQ_Meta_Box())->register();
 
         // v2 Yoast-replacement surface
@@ -33,7 +34,6 @@ final class EBQ_Plugin
         (new EBQ_Social_Output())->register();
         (new EBQ_Schema_Output())->register();
         (new EBQ_Sitemap())->register();
-        (new EBQ_Seo_Panel())->register();
         (new EBQ_Seo_Fields_Meta_Box())->register();
         (new EBQ_Breadcrumbs())->register();
         (new EBQ_Analysis_Cache())->register();

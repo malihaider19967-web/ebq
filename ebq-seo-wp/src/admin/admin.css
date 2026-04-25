@@ -1,0 +1,312 @@
+@import "../tokens.css";
+
+/* ─── EBQ admin pages — settings, post column, dashboard widget,
+ *     classic-editor side meta box. Lives under .ebq-admin so the
+ *     shared `.ebq-root` token block doesn't collide.
+ * ─────────────────────────────────────────────────────────────── */
+
+.ebq-admin {
+	font-family: var(--ebq-font);
+	color: var(--ebq-text);
+	font-size: var(--ebq-fz-base);
+}
+
+/* Apply tokens to .ebq-admin too. */
+.ebq-admin {
+	--ebq-bg: #ffffff; --ebq-bg-subtle: #fafbfc; --ebq-bg-muted: #f5f7fa; --ebq-bg-emboss: #f1f5f9;
+	--ebq-border: #e5e7eb; --ebq-border-soft: #eef0f3; --ebq-border-strong: #cbd5e1;
+	--ebq-text: #0f172a; --ebq-text-muted: #475569; --ebq-text-soft: #64748b; --ebq-text-faint: #94a3b8;
+	--ebq-accent: #5b3df5; --ebq-accent-hover: #4c2bd0; --ebq-accent-soft: #ede9fe; --ebq-accent-foam: #f5f3ff; --ebq-accent-ring: rgba(91, 61, 245, .22);
+	--ebq-good: #16a34a; --ebq-good-soft: #dcfce7; --ebq-good-text: #166534;
+	--ebq-warn: #d97706; --ebq-warn-soft: #fef3c7; --ebq-warn-text: #92400e;
+	--ebq-bad:  #dc2626; --ebq-bad-soft:  #fee2e2; --ebq-bad-text:  #991b1b;
+	--ebq-r-2: 6px; --ebq-r-3: 8px; --ebq-r-4: 12px; --ebq-r-pill: 999px;
+	--ebq-sh-1: 0 1px 2px rgba(15, 23, 42, .04);
+	--ebq-sh-2: 0 1px 3px rgba(15, 23, 42, .06), 0 1px 2px rgba(15, 23, 42, .04);
+}
+
+/* ─── Settings page hero ─────────────────────────────────────── */
+
+.ebq-admin__page { max-width: 920px; }
+
+.ebq-admin__hero {
+	display: flex;
+	gap: 16px;
+	align-items: center;
+	padding: 22px 24px;
+	margin: 16px 0 20px;
+	background: linear-gradient(135deg, var(--ebq-accent) 0%, #7c4dff 60%, #b66dff 100%);
+	color: #fff;
+	border-radius: 14px;
+	box-shadow: 0 12px 32px rgba(91, 61, 245, .28);
+}
+.ebq-admin__hero-mark {
+	width: 48px; height: 48px;
+	border-radius: 12px;
+	display: grid; place-items: center;
+	background: rgba(255, 255, 255, .15);
+	font-weight: 700; font-size: 22px;
+}
+.ebq-admin__hero h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -.01em; color: #fff; }
+.ebq-admin__hero p { margin: 2px 0 0; font-size: 13px; opacity: .9; max-width: 60ch; }
+.ebq-admin__hero-version {
+	margin-left: auto;
+	padding: 5px 11px;
+	background: rgba(255, 255, 255, .15);
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: .05em;
+}
+
+/* ─── Cards ───────────────────────────────────────────────────── */
+
+.ebq-card {
+	background: var(--ebq-bg);
+	border: 1px solid var(--ebq-border);
+	border-radius: var(--ebq-r-3);
+	box-shadow: var(--ebq-sh-1);
+	padding: 18px 20px;
+	margin: 12px 0;
+}
+.ebq-card__eyebrow {
+	margin: 0;
+	font-size: 11px;
+	font-weight: 600;
+	letter-spacing: .08em;
+	text-transform: uppercase;
+	color: var(--ebq-text-soft);
+}
+.ebq-card__title { margin: 4px 0 4px; font-size: 17px; font-weight: 600; color: var(--ebq-text); }
+.ebq-card__lead  { margin: 0 0 14px; font-size: 13px; color: var(--ebq-text-muted); line-height: 1.5; }
+.ebq-card--accent { border-color: transparent; background: linear-gradient(180deg, var(--ebq-accent-foam), #fff); }
+
+.ebq-card-row {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	align-items: center;
+	gap: 14px;
+}
+
+/* ─── Status pill in cards ───────────────────────────────────── */
+
+.ebq-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 3px 10px;
+	border-radius: 999px;
+	font-size: 11px;
+	font-weight: 600;
+	background: var(--ebq-bg-muted);
+	color: var(--ebq-text-muted);
+}
+.ebq-pill--good { background: var(--ebq-good-soft); color: var(--ebq-good-text); }
+.ebq-pill--warn { background: var(--ebq-warn-soft); color: var(--ebq-warn-text); }
+.ebq-pill--bad  { background: var(--ebq-bad-soft);  color: var(--ebq-bad-text); }
+.ebq-pill--accent { background: var(--ebq-accent-soft); color: var(--ebq-accent-hover); }
+
+.ebq-pill__dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .7; }
+
+/* ─── Buttons ────────────────────────────────────────────────── */
+
+.ebq-admin .ebq-btn,
+.ebq-admin a.ebq-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 9px 16px;
+	font: inherit;
+	font-size: 13px;
+	font-weight: 600;
+	border-radius: 6px;
+	border: 1px solid transparent;
+	cursor: pointer;
+	text-decoration: none;
+	transition: background var(--ebq-dur-fast) var(--ebq-ease), transform var(--ebq-dur-fast) var(--ebq-ease);
+}
+.ebq-admin .ebq-btn:active { transform: translateY(1px); }
+.ebq-admin .ebq-btn--primary { background: var(--ebq-accent); color: #fff; }
+.ebq-admin .ebq-btn--primary:hover { background: var(--ebq-accent-hover); color: #fff; }
+.ebq-admin .ebq-btn--ghost { background: #fff; color: var(--ebq-text); border-color: var(--ebq-border-strong); }
+.ebq-admin .ebq-btn--ghost:hover { background: var(--ebq-bg-muted); }
+.ebq-admin .ebq-btn--lg { padding: 12px 20px; font-size: 14px; border-radius: 8px; }
+
+/* ─── Form fields ─────────────────────────────────────────────── */
+
+.ebq-form-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ebq-input {
+	font: inherit;
+	font-size: 13px;
+	padding: 8px 12px;
+	border: 1px solid var(--ebq-border-strong);
+	border-radius: 6px;
+	color: var(--ebq-text);
+	background: #fff;
+	transition: border-color var(--ebq-dur-fast) var(--ebq-ease), box-shadow var(--ebq-dur-fast) var(--ebq-ease);
+	min-width: 0;
+}
+.ebq-input:hover { border-color: var(--ebq-text-soft); }
+.ebq-input:focus { outline: none; border-color: var(--ebq-accent); box-shadow: 0 0 0 3px var(--ebq-accent-ring); }
+.ebq-input--code { font-family: var(--ebq-font-mono, ui-monospace, monospace); font-size: 12px; flex: 1; }
+
+/* ─── Diagnostics block ──────────────────────────────────────── */
+
+.ebq-diag {
+	margin: 8px 0 0;
+	padding: 12px;
+	background: var(--ebq-bg-emboss);
+	border-radius: 6px;
+	font-family: var(--ebq-font-mono, ui-monospace, monospace);
+	font-size: 11px;
+	white-space: pre-wrap;
+	word-break: break-all;
+	color: var(--ebq-text-muted);
+}
+.ebq-diag-summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--ebq-text-soft); }
+
+/* ─── Notice banner ──────────────────────────────────────────── */
+
+.ebq-notice {
+	display: flex;
+	align-items: flex-start;
+	gap: 12px;
+	padding: 12px 14px;
+	border-radius: 8px;
+	font-size: 13px;
+	background: var(--ebq-bg-subtle);
+	border: 1px solid var(--ebq-border);
+	margin: 12px 0;
+}
+.ebq-notice--good { background: var(--ebq-good-soft); border-color: transparent; color: var(--ebq-good-text); }
+.ebq-notice--warn { background: var(--ebq-warn-soft); border-color: transparent; color: var(--ebq-warn-text); }
+.ebq-notice--bad  { background: var(--ebq-bad-soft);  border-color: transparent; color: var(--ebq-bad-text); }
+
+.ebq-notice__icon { font-weight: 700; flex-shrink: 0; }
+
+/* ─── Two-column key/value rows for "connected" card ─────────── */
+
+.ebq-kv {
+	display: grid;
+	grid-template-columns: max-content minmax(0, 1fr);
+	gap: 6px 14px;
+	margin: 12px 0 0;
+	font-size: 12px;
+}
+.ebq-kv dt { color: var(--ebq-text-soft); }
+.ebq-kv dd { margin: 0; color: var(--ebq-text); font-variant-numeric: tabular-nums; word-break: break-all; }
+
+/* ─── Post column ────────────────────────────────────────────── */
+
+.column-ebq { width: 200px; }
+.ebq-col-cell { font-size: 12px; line-height: 1.4; min-height: 36px; }
+.ebq-col-cell .ebq-col-row { display: flex; align-items: center; gap: 6px; }
+.ebq-col-cell .ebq-col-rank {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 1px 8px;
+	border-radius: 999px;
+	background: var(--ebq-bg-muted);
+	color: var(--ebq-text);
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+}
+.ebq-col-cell .ebq-col-rank--top10 { background: var(--ebq-good-soft); color: var(--ebq-good-text); }
+.ebq-col-cell .ebq-col-rank--page1 { background: var(--ebq-accent-soft); color: var(--ebq-accent-hover); }
+.ebq-col-cell .ebq-col-rank--striking { background: var(--ebq-warn-soft); color: var(--ebq-warn-text); }
+.ebq-col-cell .ebq-col-rank--deep { background: var(--ebq-bg-emboss); color: var(--ebq-text-soft); }
+.ebq-col-cell .ebq-col-meta { color: var(--ebq-text-soft); font-size: 11px; }
+.ebq-col-cell .ebq-col-flags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.ebq-col-cell .ebq-col-flag {
+	font-size: 10px; padding: 1px 6px; border-radius: 999px;
+	background: var(--ebq-bg-emboss); color: var(--ebq-text-muted);
+}
+.ebq-col-cell .ebq-col-flag--bad  { background: var(--ebq-bad-soft);  color: var(--ebq-bad-text); }
+.ebq-col-cell .ebq-col-flag--warn { background: var(--ebq-warn-soft); color: var(--ebq-warn-text); }
+
+.ebq-col-skeleton { display: inline-block; width: 100%; }
+.ebq-col-shimmer {
+	display: block;
+	height: 10px;
+	border-radius: 4px;
+	background: linear-gradient(90deg, #f1f5f9, #e2e8f0, #f1f5f9);
+	background-size: 200% 100%;
+	animation: ebq-shimmer 1.4s linear infinite;
+}
+@keyframes ebq-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+/* ─── Dashboard widget ───────────────────────────────────────── */
+
+.ebq-widget-meta {
+	margin: 0 0 10px;
+	font-size: 11px;
+	color: var(--ebq-text-soft);
+	display: flex; align-items: center; gap: 8px;
+}
+.ebq-widget-meta__pill {
+	display: inline-flex; align-items: center; gap: 6px;
+	padding: 1px 9px;
+	background: var(--ebq-accent-soft);
+	color: var(--ebq-accent-hover);
+	border-radius: 999px;
+	font-weight: 600;
+	font-size: 11px;
+}
+
+.ebq-widget-grid {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 10px;
+}
+
+.ebq-widget-card {
+	display: block;
+	padding: 14px;
+	background: #fff;
+	border: 1px solid var(--ebq-border);
+	border-radius: 8px;
+	text-decoration: none;
+	color: inherit;
+	transition: border-color var(--ebq-dur-fast) var(--ebq-ease), transform var(--ebq-dur-fast) var(--ebq-ease);
+}
+.ebq-widget-card:hover {
+	border-color: var(--ebq-accent);
+	box-shadow: 0 0 0 3px var(--ebq-accent-ring);
+	color: inherit;
+}
+.ebq-widget-card__label { margin: 0; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: var(--ebq-text-soft); font-weight: 600; }
+.ebq-widget-card__value { margin: 6px 0 0; font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1; }
+.ebq-widget-card__value--bad  { color: var(--ebq-bad); }
+.ebq-widget-card__value--warn { color: var(--ebq-warn); }
+.ebq-widget-card__value--good { color: var(--ebq-good); }
+.ebq-widget-card__hint { margin: 6px 0 0; font-size: 11px; color: var(--ebq-text-soft); }
+
+.ebq-widget-skeleton { opacity: .65; pointer-events: none; }
+.ebq-widget-card-skeleton {
+	padding: 14px; border: 1px solid var(--ebq-border); border-radius: 8px; background: #fff;
+}
+.ebq-widget-card-skeleton .ebq-shimmer {
+	display: block;
+	border-radius: 4px;
+	background: linear-gradient(90deg, #f1f5f9, #e2e8f0, #f1f5f9);
+	background-size: 200% 100%;
+	animation: ebq-shimmer 1.4s linear infinite;
+}
+
+.ebq-widget-cta {
+	display: block; margin-top: 10px; text-align: center;
+	padding: 8px 12px; border-radius: 6px;
+	background: var(--ebq-accent); color: #fff;
+	font-size: 12px; font-weight: 600; text-decoration: none;
+}
+.ebq-widget-cta:hover { background: var(--ebq-accent-hover); color: #fff; }
+
+/* ─── Side meta box (classic editor) ─────────────────────────── */
+
+.ebq-mb { font-size: 12px; line-height: 1.45; }
+.ebq-mb-loader { color: var(--ebq-text-soft); }
+.ebq-mb__row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--ebq-border-soft); }
+.ebq-mb__row:last-child { border-bottom: 0; }
+.ebq-mb__label { color: var(--ebq-text-soft); flex: 1; }
+.ebq-mb__value { font-weight: 600; color: var(--ebq-text); font-variant-numeric: tabular-nums; }

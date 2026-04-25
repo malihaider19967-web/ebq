@@ -1,0 +1,97 @@
+/* Design tokens — single source of truth for the EBQ SEO sidebar.
+ * All colors / radii / spacing live here so the surface stays coherent.
+ *
+ * Density target: WordPress admin / Linear / Notion. Compact, dense,
+ * tools-not-marketing. Default font ~12px. Hit areas ~28px tall. */
+
+.ebq-root {
+	/* Surfaces */
+	--ebq-bg:           #ffffff;
+	--ebq-bg-subtle:    #fafbfc;
+	--ebq-bg-muted:     #f5f7fa;
+	--ebq-bg-emboss:    #f1f5f9;
+	--ebq-overlay:      rgba(15, 23, 42, .55);
+
+	/* Borders */
+	--ebq-border:       #e5e7eb;
+	--ebq-border-soft:  #eef0f3;
+	--ebq-border-strong:#cbd5e1;
+
+	/* Text */
+	--ebq-text:         #0f172a;
+	--ebq-text-muted:   #475569;
+	--ebq-text-soft:    #64748b;
+	--ebq-text-faint:   #94a3b8;
+
+	/* Brand accent */
+	--ebq-accent:       #5b3df5;
+	--ebq-accent-hover: #4c2bd0;
+	--ebq-accent-soft:  #ede9fe;
+	--ebq-accent-foam:  #f5f3ff;
+	--ebq-accent-ring:  rgba(91, 61, 245, .22);
+
+	/* Status */
+	--ebq-good:         #16a34a;
+	--ebq-good-soft:    #dcfce7;
+	--ebq-good-text:    #166534;
+	--ebq-warn:         #d97706;
+	--ebq-warn-soft:    #fef3c7;
+	--ebq-warn-text:    #92400e;
+	--ebq-bad:          #dc2626;
+	--ebq-bad-soft:     #fee2e2;
+	--ebq-bad-text:     #991b1b;
+
+	/* Search-result blue (Google-style links) */
+	--ebq-link:         #1a0dab;
+	--ebq-link-visited: #681da8;
+
+	/* Spacing scale — compact admin density */
+	--ebq-space-1:  3px;
+	--ebq-space-2:  6px;
+	--ebq-space-3:  8px;
+	--ebq-space-4:  12px;
+	--ebq-space-5:  16px;
+	--ebq-space-6:  20px;
+	--ebq-space-8:  28px;
+	--ebq-space-10: 36px;
+
+	/* Radii — tighter, less marketing-y */
+	--ebq-r-1:    3px;
+	--ebq-r-2:    4px;
+	--ebq-r-3:    6px;
+	--ebq-r-4:    8px;
+	--ebq-r-pill: 999px;
+
+	/* Heights for interactive surfaces — keeps controls visually equal */
+	--ebq-h-control: 28px;
+	--ebq-h-input:   30px;
+	--ebq-h-tab:     32px;
+
+	/* Shadows */
+	--ebq-sh-1: 0 1px 1px rgba(15, 23, 42, .035);
+	--ebq-sh-2: 0 1px 2px rgba(15, 23, 42, .06);
+	--ebq-sh-3: 0 4px 10px rgba(15, 23, 42, .07);
+	--ebq-sh-pop: 0 8px 22px rgba(15, 23, 42, .11);
+
+	/* Typography */
+	--ebq-font: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, "Helvetica Neue", Arial, sans-serif;
+	--ebq-font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+	--ebq-font-serp: arial, sans-serif;
+
+	--ebq-fz-xs:   10px;
+	--ebq-fz-sm:   11px;
+	--ebq-fz-base: 12px;
+	--ebq-fz-md:   13px;
+	--ebq-fz-lg:   15px;
+	--ebq-fz-xl:   17px;
+	--ebq-fz-2xl:  20px;
+
+	--ebq-lh-tight:   1.2;
+	--ebq-lh-snug:    1.35;
+	--ebq-lh-relaxed: 1.5;
+
+	/* Motion */
+	--ebq-dur-fast: 100ms;
+	--ebq-dur:      150ms;
+	--ebq-ease:     cubic-bezier(.2, .7, .3, 1);
+}

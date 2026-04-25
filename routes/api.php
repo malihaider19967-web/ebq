@@ -15,6 +15,9 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/posts/{externalPostId}/serp-preview', [PluginInsightsController::class, 'serpPreview'])
             ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
             ->name('api.v1.posts.serp-preview');
+        Route::get('/posts/{externalPostId}/internal-link-suggestions', [PluginInsightsController::class, 'internalLinkSuggestions'])
+            ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
+            ->name('api.v1.posts.internal-link-suggestions');
         Route::get('/posts', [PluginInsightsController::class, 'indexPosts'])
             ->name('api.v1.posts.index');
         Route::get('/dashboard', [PluginInsightsController::class, 'dashboard'])

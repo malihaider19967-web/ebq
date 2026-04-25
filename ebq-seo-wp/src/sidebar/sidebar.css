@@ -1,0 +1,1027 @@
+@import "../tokens.css";
+
+/* ─────────────────────────────────────────────────────────────────
+ * EBQ SEO sidebar — scoped under .ebq-root so we never bleed into
+ * Gutenberg styles. All component classes are prefixed `ebq-`.
+ * ───────────────────────────────────────────────────────────── */
+
+.ebq-root,
+.ebq-root * {
+	box-sizing: border-box;
+}
+
+.ebq-root {
+	font-family: var(--ebq-font);
+	font-size: var(--ebq-fz-base);
+	color: var(--ebq-text);
+	line-height: var(--ebq-lh-snug);
+	background: var(--ebq-bg);
+}
+
+/* Universal focus-visible — every interactive element gets a clear ring.
+ * Component-level rules can still override (e.g. tabs with insets). */
+.ebq-root :focus { outline: none; }
+.ebq-root :focus-visible {
+	outline: 2px solid var(--ebq-accent);
+	outline-offset: 2px;
+	border-radius: 3px;
+}
+
+/* Respect user's motion preference — kill animations and tame transitions. */
+@media (prefers-reduced-motion: reduce) {
+	.ebq-root *,
+	.ebq-root *::before,
+	.ebq-root *::after {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+	}
+}
+
+/* Score chip button reset — wraps the chip so it's keyboard-actionable. */
+.ebq-score-chip-btn {
+	background: none;
+	border: 0;
+	padding: 0;
+	cursor: pointer;
+	font: inherit;
+}
+.ebq-score-chip-btn:focus-visible {
+	outline: 2px solid var(--ebq-accent);
+	outline-offset: 3px;
+	border-radius: var(--ebq-r-pill);
+}
+
+/* Plugin Sidebar fills the panel — give it a quiet base. */
+.ebq-sidebar-frame {
+	padding: 0;
+	background: var(--ebq-bg);
+}
+
+/* Metabox mount: collapse internal padding so it nests cleanly. */
+.ebq-metabox-mount .ebq-root {
+	padding: 0;
+}
+
+/* Classic-editor mount: the WP postbox already provides outer padding,
+ * so trim our own and tighten the header. Wider canvas → cap the body
+ * width so cards don't stretch absurdly on a 1920px screen. */
+#ebq-classic-root.ebq-classic-mount .ebq-root .ebq-header {
+	margin: -12px -12px 0;
+	border-radius: 0;
+	padding: 10px 12px;
+}
+#ebq-classic-root.ebq-classic-mount .ebq-root .ebq-tabs {
+	margin: 0 -12px;
+	padding-left: 6px;
+	padding-right: 6px;
+	background: var(--ebq-bg);
+}
+#ebq-classic-root.ebq-classic-mount .ebq-root .ebq-body {
+	padding: 12px 0 0;
+	max-width: 760px;
+}
+
+/* ─── Sticky topbar (header + tabs travel together) ──────────── */
+
+.ebq-topbar {
+	position: sticky;
+	top: 0;
+	z-index: 6;
+	background: var(--ebq-bg);
+}
+
+/* Tabs become flush with the header rather than offset, since we already
+ * scope tabs as `position: sticky; top: 0;` — that becomes redundant inside
+ * the sticky topbar but harmless. */
+
+/* ─── Header ─────────────────────────────────────────────────── */
+
+.ebq-header {
+	display: flex;
+	align-items: center;
+	gap: var(--ebq-space-3);
+	padding: 10px var(--ebq-space-4);
+	border-bottom: 1px solid var(--ebq-border);
+	background: linear-gradient(180deg, var(--ebq-accent-foam), var(--ebq-bg));
+}
+
+.ebq-header__mark {
+	width: 22px;
+	height: 22px;
+	border-radius: var(--ebq-r-2);
+	display: grid;
+	place-items: center;
+	background: var(--ebq-accent);
+	color: #fff;
+	font-weight: 700;
+	font-size: var(--ebq-fz-base);
+	letter-spacing: -.02em;
+	box-shadow: 0 2px 6px rgba(91, 61, 245, .3);
+}
+
+.ebq-header__text {
+	flex: 1;
+	min-width: 0;
+}
+
+.ebq-header__title {
+	margin: 0;
+	font-size: var(--ebq-fz-md);
+	font-weight: 600;
+	color: var(--ebq-text);
+	letter-spacing: -.005em;
+	line-height: 1.2;
+}
+
+.ebq-header__sub {
+	margin: 1px 0 0;
+	font-size: var(--ebq-fz-xs);
+	color: var(--ebq-text-soft);
+	line-height: 1.3;
+}
+
+/* Overall score chip in header */
+.ebq-score-chip {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 2px 8px 2px 6px;
+	border-radius: var(--ebq-r-pill);
+	font-size: var(--ebq-fz-sm);
+	font-weight: 600;
+	background: var(--ebq-bg-muted);
+	color: var(--ebq-text);
+	border: 1px solid var(--ebq-border);
+	white-space: nowrap;
+	height: 20px;
+}
+
+.ebq-score-chip__dot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--ebq-text-faint);
+}
+
+.ebq-score-chip--good { background: var(--ebq-good-soft); color: var(--ebq-good-text); border-color: transparent; }
+.ebq-score-chip--good .ebq-score-chip__dot { background: var(--ebq-good); }
+.ebq-score-chip--warn { background: var(--ebq-warn-soft); color: var(--ebq-warn-text); border-color: transparent; }
+.ebq-score-chip--warn .ebq-score-chip__dot { background: var(--ebq-warn); }
+.ebq-score-chip--bad  { background: var(--ebq-bad-soft);  color: var(--ebq-bad-text);  border-color: transparent; }
+.ebq-score-chip--bad  .ebq-score-chip__dot { background: var(--ebq-bad); }
+
+/* ─── Tab bar ────────────────────────────────────────────────── */
+
+.ebq-tabs {
+	display: flex;
+	align-items: stretch;
+	gap: 0;
+	padding: 0 var(--ebq-space-3);
+	border-bottom: 1px solid var(--ebq-border);
+	background: var(--ebq-bg);
+	position: sticky;
+	top: 0;
+	z-index: 5;
+	overflow-x: auto;
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+}
+.ebq-tabs::-webkit-scrollbar { display: none; }
+
+.ebq-tab {
+	flex: 0 0 auto;
+	min-width: 0;
+	background: transparent;
+	border: 0;
+	padding: 0 10px;
+	height: var(--ebq-h-tab);
+	font: inherit;
+	font-size: var(--ebq-fz-sm);
+	font-weight: 500;
+	color: var(--ebq-text-soft);
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 5px;
+	position: relative;
+	white-space: nowrap;
+	transition: color var(--ebq-dur-fast) var(--ebq-ease);
+}
+
+.ebq-tab svg { width: 13px; height: 13px; flex-shrink: 0; opacity: .85; }
+
+.ebq-tab:hover { color: var(--ebq-text); }
+.ebq-tab:focus-visible { outline: 2px solid var(--ebq-accent); outline-offset: -3px; border-radius: 3px; }
+
+.ebq-tab__label { overflow: hidden; text-overflow: ellipsis; }
+
+/* Narrow surface (sidebar < ~360px or any cramped width):
+ *   - hide labels in tabs that aren't active to fit more icons
+ *   - active tab keeps its label so the user knows where they are
+ * Effect feels closer to native iOS/Android tab patterns. */
+@container (max-width: 360px) {
+	.ebq-tab:not(.is-active) .ebq-tab__label { display: none; }
+}
+/* Container queries fallback: in the right-rail PluginSidebar, the panel
+ * is typically ~280–360px. Apply the same compaction unconditionally for
+ * the sidebar mount via the wrapping class. */
+.ebq-sidebar-frame .ebq-tabs .ebq-tab:not(.is-active) .ebq-tab__label { display: none; }
+
+.ebq-tab.is-active {
+	color: var(--ebq-accent);
+	font-weight: 600;
+}
+.ebq-tab.is-active svg { opacity: 1; }
+
+.ebq-tab.is-active::after {
+	content: "";
+	position: absolute;
+	left: 6px; right: 6px; bottom: -1px;
+	height: 2px;
+	background: var(--ebq-accent);
+	border-radius: 2px 2px 0 0;
+}
+
+.ebq-tab__dot {
+	width: 5px; height: 5px; border-radius: 50%;
+	background: var(--ebq-text-faint);
+}
+.ebq-tab__dot--good { background: var(--ebq-good); }
+.ebq-tab__dot--warn { background: var(--ebq-warn); }
+.ebq-tab__dot--bad  { background: var(--ebq-bad); }
+
+/* ─── Tab body ────────────────────────────────────────────────── */
+
+.ebq-body {
+	padding: var(--ebq-space-4);
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+}
+
+/* ─── Section card ────────────────────────────────────────────── */
+
+.ebq-section {
+	background: var(--ebq-bg);
+	border: 1px solid var(--ebq-border);
+	border-radius: var(--ebq-r-3);
+	overflow: hidden;
+	box-shadow: var(--ebq-sh-1);
+}
+
+.ebq-section__head {
+	display: flex;
+	align-items: center;
+	gap: var(--ebq-space-2);
+	padding: 7px 10px;
+	background: var(--ebq-bg-subtle);
+	border-bottom: 1px solid var(--ebq-border-soft);
+	min-height: 30px;
+}
+
+.ebq-section--plain .ebq-section__head {
+	background: var(--ebq-bg);
+	border-bottom-color: var(--ebq-border-soft);
+}
+
+.ebq-section__icon {
+	width: 12px; height: 12px;
+	color: var(--ebq-text-soft);
+	flex-shrink: 0;
+}
+
+.ebq-section__title {
+	margin: 0;
+	font-size: 10px;
+	font-weight: 600;
+	color: var(--ebq-text-muted);
+	text-transform: uppercase;
+	letter-spacing: .06em;
+	flex: 1;
+	min-width: 0;
+}
+
+.ebq-section__aside { font-size: var(--ebq-fz-xs); color: var(--ebq-text-soft); }
+
+.ebq-section__body {
+	padding: 10px 12px 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+
+.ebq-section--flush .ebq-section__body { padding: 0; }
+
+/* ─── Field primitives ────────────────────────────────────────── */
+
+.ebq-field { display: flex; flex-direction: column; gap: 4px; }
+
+.ebq-label {
+	font-size: var(--ebq-fz-sm);
+	font-weight: 600;
+	color: var(--ebq-text);
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: var(--ebq-space-2);
+}
+
+.ebq-label__hint { font-weight: 400; color: var(--ebq-text-soft); font-variant-numeric: tabular-nums; font-size: var(--ebq-fz-xs); }
+
+.ebq-input,
+.ebq-textarea {
+	width: 100%;
+	font: inherit;
+	font-size: var(--ebq-fz-base);
+	color: var(--ebq-text);
+	padding: 5px 9px;
+	background: var(--ebq-bg);
+	border: 1px solid var(--ebq-border-strong);
+	border-radius: var(--ebq-r-2);
+	box-shadow: 0 1px 0 rgba(15, 23, 42, .02) inset;
+	transition: border-color var(--ebq-dur-fast) var(--ebq-ease), box-shadow var(--ebq-dur-fast) var(--ebq-ease);
+	height: var(--ebq-h-input);
+	line-height: 1.4;
+}
+.ebq-textarea {
+	min-height: 60px;
+	height: auto;
+	resize: vertical;
+	line-height: 1.45;
+	padding: 6px 9px;
+}
+
+.ebq-input::placeholder,
+.ebq-textarea::placeholder { color: var(--ebq-text-faint); }
+
+.ebq-input:hover,
+.ebq-textarea:hover { border-color: var(--ebq-text-soft); }
+
+.ebq-input:focus,
+.ebq-textarea:focus {
+	outline: none;
+	border-color: var(--ebq-accent);
+	box-shadow: 0 0 0 3px var(--ebq-accent-ring);
+}
+
+.ebq-help {
+	font-size: var(--ebq-fz-xs);
+	color: var(--ebq-text-soft);
+	line-height: 1.45;
+	margin: 0;
+}
+
+.ebq-help code {
+	background: var(--ebq-bg-muted);
+	padding: 0 4px;
+	border-radius: 3px;
+	font-size: 10px;
+	font-family: var(--ebq-font-mono);
+	color: var(--ebq-text-muted);
+}
+
+/* ─── Toggle ────────────────────────────────────────────────── */
+
+.ebq-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: var(--ebq-space-2);
+	cursor: pointer;
+	user-select: none;
+}
+
+.ebq-toggle__track {
+	width: 26px;
+	height: 14px;
+	background: var(--ebq-border-strong);
+	border-radius: var(--ebq-r-pill);
+	position: relative;
+	transition: background var(--ebq-dur) var(--ebq-ease);
+	flex-shrink: 0;
+}
+.ebq-toggle__thumb {
+	position: absolute;
+	top: 2px; left: 2px;
+	width: 10px; height: 10px;
+	border-radius: 50%;
+	background: #fff;
+	box-shadow: 0 1px 2px rgba(0,0,0,.2);
+	transition: transform var(--ebq-dur) var(--ebq-ease);
+}
+.ebq-toggle.is-on .ebq-toggle__track { background: var(--ebq-accent); }
+.ebq-toggle.is-on .ebq-toggle__thumb { transform: translateX(12px); }
+
+.ebq-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.ebq-toggle:focus-within .ebq-toggle__track { box-shadow: 0 0 0 3px var(--ebq-accent-ring); }
+
+.ebq-toggle__label { font-size: var(--ebq-fz-sm); color: var(--ebq-text); }
+
+.ebq-toggle-row {
+	display: flex;
+	gap: var(--ebq-space-5);
+	flex-wrap: wrap;
+}
+
+/* ─── Char gauge ─────────────────────────────────────────────── */
+
+.ebq-gauge {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+.ebq-gauge__bar {
+	height: 4px;
+	background: var(--ebq-bg-emboss);
+	border-radius: var(--ebq-r-pill);
+	overflow: hidden;
+}
+.ebq-gauge__fill {
+	height: 100%;
+	border-radius: inherit;
+	transition: width var(--ebq-dur) var(--ebq-ease), background var(--ebq-dur-fast) var(--ebq-ease);
+}
+.ebq-gauge__fill--good { background: var(--ebq-good); }
+.ebq-gauge__fill--warn { background: var(--ebq-warn); }
+.ebq-gauge__fill--bad  { background: var(--ebq-bad); }
+.ebq-gauge__meta {
+	display: flex;
+	justify-content: space-between;
+	font-size: var(--ebq-fz-xs);
+	color: var(--ebq-text-soft);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ─── Snippet (SERP) preview ──────────────────────────────────── */
+
+.ebq-snippet {
+	font-family: var(--ebq-font-serp);
+	background: #fff;
+	border: 1px solid var(--ebq-border);
+	border-radius: var(--ebq-r-3);
+	padding: 10px 12px;
+	box-shadow: var(--ebq-sh-1);
+}
+
+.ebq-snippet__breadcrumbs {
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	color: #5f6368;
+	font-size: 11px;
+	line-height: 1.3;
+}
+.ebq-snippet__favicon {
+	width: 14px; height: 14px;
+	border-radius: 50%;
+	background: var(--ebq-accent-soft);
+	color: var(--ebq-accent);
+	display: grid;
+	place-items: center;
+	font-size: 9px;
+	font-weight: 700;
+}
+.ebq-snippet__site { color: #202124; font-weight: 500; }
+.ebq-snippet__sep { color: #9aa0a6; }
+
+.ebq-snippet__title {
+	margin: 4px 0 2px;
+	font-size: 16px;
+	line-height: 1.3;
+	font-weight: 400;
+	color: var(--ebq-link);
+	text-decoration: none;
+}
+.ebq-snippet__desc {
+	margin: 0;
+	font-size: 12px;
+	line-height: 1.5;
+	color: #4d5156;
+}
+
+.ebq-snippet--mobile .ebq-snippet__title { font-size: 14px; }
+
+/* ─── Social cards ────────────────────────────────────────────── */
+
+.ebq-social {
+	border: 1px solid var(--ebq-border);
+	border-radius: var(--ebq-r-3);
+	overflow: hidden;
+	background: #fff;
+	box-shadow: var(--ebq-sh-1);
+}
+
+.ebq-social__media {
+	background: linear-gradient(135deg, #e2e8f0, #f1f5f9);
+	background-size: cover;
+	background-position: center;
+	height: 100px;
+	display: grid;
+	place-items: center;
+	color: var(--ebq-text-faint);
+	font-size: var(--ebq-fz-xs);
+	letter-spacing: .04em;
+	text-transform: uppercase;
+}
+
+.ebq-social__body {
+	padding: 8px 10px 10px;
+}
+
+.ebq-social__domain {
+	font-size: 10px;
+	color: #65676b;
+	text-transform: uppercase;
+	letter-spacing: .04em;
+}
+
+.ebq-social__title {
+	margin: 3px 0;
+	font-size: 13px;
+	line-height: 1.3;
+	font-weight: 600;
+	color: #1c1e21;
+}
+
+.ebq-social__desc {
+	margin: 0;
+	font-size: 11px;
+	color: #65676b;
+	line-height: 1.4;
+}
+
+.ebq-social--twitter { border-radius: 12px; }
+.ebq-social--twitter .ebq-social__media { height: 150px; }
+.ebq-social--twitter .ebq-social__title { color: #0f1419; }
+
+/* ─── Score badge / big number ────────────────────────────────── */
+
+.ebq-scorebadge {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 8px 12px;
+	border-radius: var(--ebq-r-3);
+	background: var(--ebq-bg-subtle);
+	border: 1px solid var(--ebq-border-soft);
+}
+
+.ebq-scorebadge__ring {
+	--p: 0;
+	--col: var(--ebq-text-faint);
+	width: 36px; height: 36px;
+	border-radius: 50%;
+	background:
+		conic-gradient(var(--col) calc(var(--p) * 1%), var(--ebq-bg-emboss) 0);
+	display: grid;
+	place-items: center;
+	flex-shrink: 0;
+	position: relative;
+}
+.ebq-scorebadge__ring::after {
+	content: "";
+	position: absolute;
+	inset: 3px;
+	background: var(--ebq-bg-subtle);
+	border-radius: 50%;
+}
+.ebq-scorebadge__num {
+	position: relative;
+	font-size: var(--ebq-fz-base);
+	font-weight: 700;
+	color: var(--ebq-text);
+	font-variant-numeric: tabular-nums;
+}
+.ebq-scorebadge__main { flex: 1; min-width: 0; }
+.ebq-scorebadge__label {
+	font-size: 9px;
+	color: var(--ebq-text-soft);
+	text-transform: uppercase;
+	letter-spacing: .08em;
+	margin: 0;
+	font-weight: 600;
+}
+.ebq-scorebadge__caption {
+	margin: 1px 0 0;
+	font-size: var(--ebq-fz-md);
+	color: var(--ebq-text);
+	font-weight: 600;
+	line-height: 1.2;
+}
+
+/* ─── Assessment list ─────────────────────────────────────────── */
+
+.ebq-checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+.ebq-check {
+	display: grid;
+	grid-template-columns: 14px 1fr;
+	gap: 8px;
+	align-items: flex-start;
+	padding: 5px 4px;
+	border-radius: var(--ebq-r-2);
+	transition: background var(--ebq-dur-fast) var(--ebq-ease);
+}
+.ebq-check:hover { background: var(--ebq-bg-subtle); }
+
+.ebq-check__icon {
+	width: 12px; height: 12px;
+	border-radius: 50%;
+	display: grid;
+	place-items: center;
+	margin-top: 2px;
+	flex-shrink: 0;
+	color: #fff;
+}
+.ebq-check__icon--good { background: var(--ebq-good); }
+.ebq-check__icon--warn { background: var(--ebq-warn); }
+.ebq-check__icon--bad  { background: var(--ebq-bad); }
+.ebq-check__icon--mute { background: var(--ebq-text-faint); }
+
+.ebq-check__icon svg { width: 8px; height: 8px; }
+
+.ebq-check__text {
+	font-size: var(--ebq-fz-base);
+	color: var(--ebq-text);
+	line-height: 1.4;
+}
+.ebq-check__hint { color: var(--ebq-text-soft); font-size: var(--ebq-fz-xs); margin-top: 1px; line-height: 1.4; }
+
+/* ─── Suggestion buttons (focus keyphrase from GSC) ───────────── */
+
+.ebq-suggestions {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+
+.ebq-suggestion {
+	width: 100%;
+	display: grid;
+	grid-template-columns: 1fr auto auto;
+	align-items: center;
+	gap: 8px;
+	background: var(--ebq-bg);
+	border: 1px solid var(--ebq-border);
+	border-radius: var(--ebq-r-2);
+	padding: 5px 9px;
+	font: inherit;
+	text-align: left;
+	cursor: pointer;
+	min-height: 28px;
+	transition: border-color var(--ebq-dur-fast) var(--ebq-ease), background var(--ebq-dur-fast) var(--ebq-ease);
+}
+.ebq-suggestion:hover { border-color: var(--ebq-accent); background: var(--ebq-accent-foam); }
+.ebq-suggestion:focus-visible { outline: 2px solid var(--ebq-accent); outline-offset: 2px; }
+
+.ebq-suggestion__q {
+	font-weight: 600;
+	color: var(--ebq-text);
+	font-size: var(--ebq-fz-sm);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ebq-suggestion__pos {
+	font-size: var(--ebq-fz-xs);
+	color: var(--ebq-text-soft);
+	font-variant-numeric: tabular-nums;
+}
+.ebq-suggestion__impr {
+	font-size: var(--ebq-fz-xs);
+	color: var(--ebq-text-soft);
+	font-variant-numeric: tabular-nums;
+}
+
+/* ─── Stat grid ───────────────────────────────────────────────── */
+
+.ebq-stats {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 6px;
+}
+
+@media (max-width: 320px) {
+	.ebq-stats { grid-template-columns: 1fr; }
+}
+.ebq-stat {
+	background: var(--ebq-bg);
+	border: 1px solid var(--ebq-border);
+	border-radius: var(--ebq-r-2);
+	padding: 7px 10px;
+}
+.ebq-stat__label {
+	margin: 0;
+	font-size: 9px;
+	letter-spacing: .08em;
+	color: var(--ebq-text-soft);
+	text-transform: uppercase;
+	font-weight: 600;
+}
+.ebq-stat__value {
+	margin: 2px 0 0;
+	font-size: 14px;
+	font-weight: 700;
+	color: var(--ebq-text);
+	font-variant-numeric: tabular-nums;
+	line-height: 1.2;
+}
+.ebq-stat__sub {
+	margin: 1px 0 0;
+	font-size: 10px;
+	color: var(--ebq-text-soft);
+	line-height: 1.3;
+}
+.ebq-stat__sub--up   { color: var(--ebq-good-text); }
+.ebq-stat__sub--down { color: var(--ebq-bad-text); }
+
+/* ─── Sparkline ───────────────────────────────────────────────── */
+
+.ebq-spark {
+	display: block;
+	width: 100%;
+	height: 28px;
+}
+.ebq-spark-area { fill: var(--ebq-accent); opacity: .14; }
+.ebq-spark-line { stroke: var(--ebq-accent); stroke-width: 1.6; fill: none; stroke-linecap: round; stroke-linejoin: round; }
+.ebq-spark-dot  { fill: var(--ebq-accent); }
+
+/* ─── Buttons ─────────────────────────────────────────────────── */
+
+.ebq-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	gap: 5px;
+	padding: 0 11px;
+	height: var(--ebq-h-control);
+	font: inherit;
+	font-size: var(--ebq-fz-sm);
+	font-weight: 600;
+	border-radius: var(--ebq-r-2);
+	cursor: pointer;
+	transition: background var(--ebq-dur-fast) var(--ebq-ease), border-color var(--ebq-dur-fast) var(--ebq-ease);
+	text-decoration: none;
+	border: 1px solid transparent;
+	white-space: nowrap;
+	line-height: 1;
+}
+.ebq-btn:active { transform: translateY(0.5px); }
+.ebq-btn:focus-visible { outline: 2px solid var(--ebq-accent); outline-offset: 1px; }
+
+.ebq-btn svg { width: 12px; height: 12px; flex-shrink: 0; }
+
+.ebq-btn--primary { background: var(--ebq-accent); color: #fff; }
+.ebq-btn--primary:hover { background: var(--ebq-accent-hover); color: #fff; }
+
+.ebq-btn--ghost {
+	background: var(--ebq-bg);
+	color: var(--ebq-text);
+	border-color: var(--ebq-border-strong);
+}
+.ebq-btn--ghost:hover { background: var(--ebq-bg-muted); border-color: var(--ebq-text-soft); color: var(--ebq-text); }
+
+.ebq-btn--quiet {
+	background: transparent;
+	color: var(--ebq-text-muted);
+	padding: 0 6px;
+	height: 22px;
+}
+.ebq-btn--quiet:hover { color: var(--ebq-accent); background: var(--ebq-accent-foam); }
+
+.ebq-btn--block { width: 100%; }
+.ebq-btn--sm { height: 24px; padding: 0 8px; font-size: var(--ebq-fz-xs); }
+.ebq-btn--sm svg { width: 11px; height: 11px; }
+
+/* ─── Empty / loading / error ─────────────────────────────────── */
+
+.ebq-empty {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: 6px;
+	padding: 16px 12px;
+	text-align: center;
+	color: var(--ebq-text-soft);
+	background: var(--ebq-bg-subtle);
+	border: 1px dashed var(--ebq-border-strong);
+	border-radius: var(--ebq-r-3);
+}
+.ebq-empty__icon {
+	width: 24px; height: 24px;
+	border-radius: 50%;
+	background: var(--ebq-accent-foam);
+	color: var(--ebq-accent);
+	display: grid; place-items: center;
+}
+.ebq-empty__title { font-size: var(--ebq-fz-sm); font-weight: 600; color: var(--ebq-text); margin: 0; }
+.ebq-empty__sub   { margin: 0; font-size: var(--ebq-fz-xs); }
+
+.ebq-skeleton {
+	height: 11px;
+	border-radius: 3px;
+	background: linear-gradient(90deg, var(--ebq-bg-emboss) 0%, var(--ebq-bg-muted) 50%, var(--ebq-bg-emboss) 100%);
+	background-size: 200% 100%;
+	animation: ebq-shimmer 1.4s linear infinite;
+}
+@keyframes ebq-shimmer {
+	from { background-position: 200% 0; }
+	to   { background-position: -200% 0; }
+}
+
+.ebq-spinner {
+	width: 12px; height: 12px;
+	border-radius: 50%;
+	border: 1.5px solid var(--ebq-border);
+	border-top-color: var(--ebq-accent);
+	animation: ebq-spin .7s linear infinite;
+	display: inline-block;
+}
+@keyframes ebq-spin { to { transform: rotate(360deg); } }
+
+/* ─── Pill / tag ──────────────────────────────────────────────── */
+
+.ebq-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	padding: 1px 6px;
+	border-radius: var(--ebq-r-pill);
+	font-size: 10px;
+	font-weight: 600;
+	background: var(--ebq-bg-muted);
+	color: var(--ebq-text-muted);
+	letter-spacing: .01em;
+	height: 16px;
+}
+.ebq-pill--good { background: var(--ebq-good-soft); color: var(--ebq-good-text); }
+.ebq-pill--warn { background: var(--ebq-warn-soft); color: var(--ebq-warn-text); }
+.ebq-pill--bad  { background: var(--ebq-bad-soft);  color: var(--ebq-bad-text); }
+.ebq-pill--accent { background: var(--ebq-accent-soft); color: var(--ebq-accent-hover); }
+
+/* ─── Inline divider ──────────────────────────────────────────── */
+
+.ebq-divider {
+	height: 1px;
+	background: var(--ebq-border-soft);
+	border: 0;
+	margin: var(--ebq-space-3) 0;
+}
+
+/* ─── Utility ─────────────────────────────────────────────────── */
+
+.ebq-stack { display: flex; flex-direction: column; gap: 8px; }
+.ebq-row   { display: flex; align-items: center; gap: 6px; }
+.ebq-row--between { justify-content: space-between; }
+.ebq-row--wrap { flex-wrap: wrap; }
+.ebq-text-soft  { color: var(--ebq-text-soft); }
+.ebq-text-muted { color: var(--ebq-text-muted); }
+.ebq-text-xs    { font-size: var(--ebq-fz-xs); }
+.ebq-text-sm    { font-size: var(--ebq-fz-sm); }
+.ebq-mt-1 { margin-top: 4px; }
+.ebq-mt-2 { margin-top: 8px; }
+.ebq-mt-3 { margin-top: 12px; }
+.ebq-mt-4 { margin-top: 16px; }
+
+/* ─── Inclusive language cards ────────────────────────────────── */
+
+.ebq-inclusive-card {
+	padding: 8px 10px;
+	border: 1px solid var(--ebq-border);
+	border-radius: var(--ebq-r-3);
+	background: var(--ebq-bg);
+	box-shadow: var(--ebq-sh-1);
+}
+
+.ebq-inclusive-suggestion {
+	display: inline-block;
+	padding: 0 6px;
+	margin-right: 3px;
+	border-radius: var(--ebq-r-pill);
+	background: var(--ebq-accent-foam);
+	color: var(--ebq-accent-hover);
+	font-weight: 500;
+	font-size: var(--ebq-fz-xs);
+}
+
+/* ─── Internal link suggestions ───────────────────────────────── */
+
+.ebq-link-card {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 4px;
+	padding: 8px 10px;
+	border: 1px solid var(--ebq-border);
+	border-radius: var(--ebq-r-3);
+	background: var(--ebq-bg);
+	box-shadow: var(--ebq-sh-1);
+	transition: border-color var(--ebq-dur-fast) var(--ebq-ease), box-shadow var(--ebq-dur-fast) var(--ebq-ease);
+}
+.ebq-link-card:hover { border-color: var(--ebq-accent); box-shadow: 0 0 0 2px var(--ebq-accent-ring); }
+
+.ebq-link-card__title {
+	font-size: var(--ebq-fz-base);
+	font-weight: 600;
+	color: var(--ebq-text);
+	line-height: 1.3;
+	margin: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
+}
+
+.ebq-link-card__url {
+	font-size: var(--ebq-fz-xs);
+	color: var(--ebq-text-soft);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.ebq-link-card__reason {
+	font-size: var(--ebq-fz-xs);
+	color: var(--ebq-text-muted);
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+}
+
+.ebq-link-card__metric-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	padding: 0 6px;
+	background: var(--ebq-accent-foam);
+	color: var(--ebq-accent-hover);
+	border-radius: var(--ebq-r-pill);
+	font-size: 10px;
+	font-weight: 600;
+	font-variant-numeric: tabular-nums;
+	height: 16px;
+}
+
+.ebq-link-card__actions {
+	display: flex;
+	gap: 4px;
+	margin-top: 4px;
+	flex-wrap: wrap;
+}
+
+.ebq-link-card__copied {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: var(--ebq-good-text);
+	font-size: 11px;
+	font-weight: 600;
+	margin-left: 8px;
+	animation: ebq-fade-in 200ms var(--ebq-ease);
+}
+
+@keyframes ebq-fade-in {
+	from { opacity: 0; transform: translateY(-2px); }
+	to   { opacity: 1; transform: none; }
+}
+
+/* ─── Rank badge ──────────────────────────────────────────────── */
+
+.ebq-rank {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 2px 8px 2px 2px;
+	background: var(--ebq-bg);
+	border: 1px solid var(--ebq-border);
+	border-radius: var(--ebq-r-pill);
+	font-size: var(--ebq-fz-sm);
+	height: 22px;
+}
+
+.ebq-rank__num {
+	display: grid;
+	place-items: center;
+	min-width: 22px;
+	height: 18px;
+	padding: 0 5px;
+	border-radius: var(--ebq-r-pill);
+	background: var(--ebq-text);
+	color: #fff;
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	font-size: 11px;
+}
+.ebq-rank--top10 .ebq-rank__num { background: var(--ebq-good); }
+.ebq-rank--page1 .ebq-rank__num { background: var(--ebq-accent); }
+.ebq-rank--striking .ebq-rank__num { background: var(--ebq-warn); }
+.ebq-rank--deep   .ebq-rank__num { background: var(--ebq-text-soft); }
+
+.ebq-rank__delta { font-size: var(--ebq-fz-xs); font-weight: 600; }
+.ebq-rank__delta--up   { color: var(--ebq-good-text); }
+.ebq-rank__delta--down { color: var(--ebq-bad-text); }
+.ebq-rank__delta--flat { color: var(--ebq-text-soft); }

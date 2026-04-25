@@ -129,6 +129,7 @@
                         ['#page-audits', 'Page audits'],
                         ['#keyword-metrics', 'Keyword intelligence'],
                         ['#country-filter', 'Country filter'],
+                        ['#wordpress-plugin', 'WordPress plugin'],
                         ['#glossary', 'Glossary'],
                     ] as [$href, $label])
                         <li>
@@ -160,6 +161,7 @@
                     ['#page-audits', 'Page audits'],
                     ['#keyword-metrics', 'Keyword intelligence'],
                     ['#country-filter', 'Country filter'],
+                    ['#wordpress-plugin', 'WordPress plugin'],
                     ['#glossary', 'Glossary'],
                 ] as [$href, $label])
                     <li><a href="{{ $href }}" class="block rounded px-2 py-1.5 text-slate-600 transition hover:bg-slate-50 hover:text-indigo-700">{{ $label }}</a></li>
@@ -970,9 +972,129 @@
 
             <hr class="my-14 border-slate-200">
 
-            {{-- ============ 11. Glossary ============ --}}
+            {{-- ============ 11. WordPress plugin ============ --}}
+            <section id="wordpress-plugin" class="scroll-mt-24">
+                {!! $sectionHeader('11', 'WordPress plugin guide', 'A customer-first walkthrough of EBQ SEO in WordPress: how to connect, what you will see, and how to use it to publish better pages.') !!}
+
+                <div class="not-prose my-6 rounded-xl border border-indigo-200 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-indigo-700">Start here</p>
+                            <h3 class="mt-1 text-lg font-semibold text-slate-900">Install EBQ SEO and connect in one flow</h3>
+                            <p class="mt-1 text-sm text-slate-600">No API keys to copy. Click Connect, approve in EBQ, and return with data live.</p>
+                        </div>
+                        <a href="{{ route('wordpress.plugin.download') }}" class="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700">
+                            Download plugin
+                        </a>
+                    </div>
+                </div>
+
+                <h3>Quick setup (2 minutes)</h3>
+                <ol>
+                    <li>Install the plugin from <strong>Plugins → Add New → Upload Plugin</strong>.</li>
+                    <li>Activate <strong>EBQ SEO</strong>.</li>
+                    <li>Go to <strong>Settings → EBQ SEO</strong> and click <strong>Connect to EBQ</strong>.</li>
+                    <li>Pick your website in EBQ and approve access.</li>
+                    <li>Return to WordPress and start editing any post to see live SEO guidance.</li>
+                </ol>
+
+                <h3>Plugin visuals you will see</h3>
+                <div class="not-prose my-6 grid gap-4 lg:grid-cols-3">
+                    <figure class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <figcaption class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Screen 1 · Settings → EBQ SEO</figcaption>
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <div class="mb-2 flex items-center justify-between">
+                                <span class="text-xs font-semibold text-slate-900">Connect this site to EBQ</span>
+                                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">Step 1</span>
+                            </div>
+                            <p class="text-[11px] text-slate-600">One click. No token copy/paste.</p>
+                            <button type="button" class="mt-3 w-full rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white">Connect to EBQ</button>
+                        </div>
+                        <p class="mt-3 text-xs text-slate-600">This is where connection starts and where you can refresh data later.</p>
+                    </figure>
+
+                    <figure class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <figcaption class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Screen 2 · Editor sidebar</figcaption>
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs font-semibold text-slate-900">EBQ SEO</span>
+                                <span class="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">Score 72</span>
+                            </div>
+                            <div class="mt-2 grid grid-cols-3 gap-1 text-[10px]">
+                                <span class="rounded bg-white px-2 py-1 text-center font-medium text-slate-700">SEO</span>
+                                <span class="rounded bg-white px-2 py-1 text-center font-medium text-slate-700">Readability</span>
+                                <span class="rounded bg-white px-2 py-1 text-center font-medium text-slate-700">Insights</span>
+                            </div>
+                            <ul class="mt-3 space-y-1 text-[11px] text-slate-600">
+                                <li>• Focus keyphrase check</li>
+                                <li>• Title/meta optimization</li>
+                                <li>• Live content recommendations</li>
+                            </ul>
+                        </div>
+                        <p class="mt-3 text-xs text-slate-600">Writers use this while editing to improve content before publish.</p>
+                    </figure>
+
+                    <figure class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                        <figcaption class="mb-3 text-xs font-semibold uppercase tracking-wider text-slate-500">Screen 3 · WordPress dashboard widget</figcaption>
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <div class="mb-2 text-xs font-semibold text-slate-900">EBQ SEO insights</div>
+                            <div class="grid grid-cols-2 gap-2 text-[10px]">
+                                <div class="rounded bg-white p-2"><p class="text-slate-500">Cannibalizations</p><p class="text-sm font-bold text-rose-600">4</p></div>
+                                <div class="rounded bg-white p-2"><p class="text-slate-500">Striking distance</p><p class="text-sm font-bold text-amber-600">12</p></div>
+                                <div class="rounded bg-white p-2"><p class="text-slate-500">Index fails + traffic</p><p class="text-sm font-bold text-rose-600">2</p></div>
+                                <div class="rounded bg-white p-2"><p class="text-slate-500">Content decay</p><p class="text-sm font-bold text-amber-600">7</p></div>
+                            </div>
+                        </div>
+                        <p class="mt-3 text-xs text-slate-600">A daily snapshot for what to fix first, with links into full EBQ reports.</p>
+                    </figure>
+                </div>
+
+                <h3>What customers can do with the plugin</h3>
+                <div class="not-prose my-6 grid gap-3 sm:grid-cols-2">
+                    @foreach ([
+                        ['Improve content before publishing', 'Use SEO and Readability checks directly in the editor to reduce guesswork.'],
+                        ['Find quick wins faster', 'See striking-distance and cannibalization signals without leaving WordPress.'],
+                        ['Monitor site health from dashboard', 'Track content decay and indexing-risk pages in one widget.'],
+                        ['Control SEO essentials', 'Manage title, meta description, schema, social, canonical, and robots settings per page.'],
+                    ] as [$title, $desc])
+                        <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                            <h4 class="text-sm font-semibold text-slate-900">{{ $title }}</h4>
+                            <p class="mt-1.5 text-xs leading-5 text-slate-600">{{ $desc }}</p>
+                        </div>
+                    @endforeach
+                </div>
+
+                <h3>Before you hit publish</h3>
+                <div class="not-prose my-6 rounded-xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
+                    <ul class="space-y-2 text-sm text-emerald-900">
+                        <li class="flex items-start gap-2"><span class="mt-0.5">✓</span><span>SEO score is healthy for your target keyword.</span></li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5">✓</span><span>Title and description look good in preview and are not too long.</span></li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5">✓</span><span>No major warnings in Insights tab for this page.</span></li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5">✓</span><span>Canonical and robots settings match the page purpose.</span></li>
+                    </ul>
+                </div>
+
+                <h3>Common issues and fixes</h3>
+                <div class="not-prose my-6 grid gap-3 sm:grid-cols-2">
+                    @foreach ([
+                        ['I cannot connect the site', 'Go to Settings → EBQ SEO and retry Connect to EBQ while logged into the correct EBQ account.'],
+                        ['I do not see insights in the editor', 'Open a post with enough search history and confirm the plugin still shows as connected.'],
+                        ['Dashboard numbers look old', 'Use Refresh data in plugin settings, then reload wp-admin.'],
+                        ['A page has SEO warnings', 'Open the sidebar SEO/Readability tabs and apply the top 2-3 suggestions first.'],
+                    ] as [$issue, $fix])
+                        <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                            <h4 class="text-sm font-semibold text-slate-900">{{ $issue }}</h4>
+                            <p class="mt-1.5 text-xs leading-5 text-slate-600">{{ $fix }}</p>
+                        </div>
+                    @endforeach
+                </div>
+            </section>
+
+            <hr class="my-14 border-slate-200">
+
+            {{-- ============ 12. Glossary ============ --}}
             <section id="glossary" class="scroll-mt-24">
-                {!! $sectionHeader('11', 'Glossary', 'Quick definitions for the terms that appear across the app.') !!}
+                {!! $sectionHeader('12', 'Glossary', 'Quick definitions for the terms that appear across the app.') !!}
 
                 <div class="not-prose my-6 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
                     <table class="w-full text-sm">

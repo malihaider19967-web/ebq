@@ -1,7 +1,7 @@
 <?php
 /**
- * Registers the Gutenberg sidebar asset. The React app (src/sidebar/index.js)
- * is built to build/sidebar.js via @wordpress/scripts.
+ * Enqueues the block-editor SEO bundle (src/sidebar/index.js → build/sidebar.js).
+ * The UI mounts into the Yoast-style metabox from EBQ_Block_Editor_Seo_Metabox.
  */
 
 if (! defined('ABSPATH')) {
@@ -36,6 +36,9 @@ final class EBQ_Gutenberg_Sidebar
             $version = $asset['version'] ?? $version;
         }
 
+        // Ensure `core/editor` / post attributes exist before our metabox script runs.
+        $dependencies = array_values(array_unique(array_merge($dependencies, ['wp-edit-post'])));
+
         wp_enqueue_script(
             'ebq-seo-sidebar',
             EBQ_SEO_URL . 'build/sidebar.js',
@@ -43,6 +46,16 @@ final class EBQ_Gutenberg_Sidebar
             $version,
             true
         );
+
+        $css = EBQ_SEO_PATH . 'build/sidebar.css';
+        if (file_exists($css)) {
+            wp_enqueue_style(
+                'ebq-seo-sidebar',
+                EBQ_SEO_URL . 'build/sidebar.css',
+                [],
+                $version
+            );
+        }
 
         wp_localize_script('ebq-seo-sidebar', 'ebqSeoPublic', [
             'appBase' => EBQ_Api_Client::base_url(),

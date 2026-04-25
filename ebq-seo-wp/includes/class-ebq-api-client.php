@@ -78,6 +78,22 @@ final class EBQ_Api_Client
         );
     }
 
+    public function get_internal_link_suggestions(string $post_id, string $url, string $keyword = '', string $title = ''): array
+    {
+        $args = ['url' => $url];
+        if ($keyword !== '') {
+            $args['keyword'] = $keyword;
+        }
+        if ($title !== '') {
+            $args['title'] = $title;
+        }
+
+        return $this->get(
+            sprintf('/api/v1/posts/%s/internal-link-suggestions', rawurlencode($post_id)),
+            $args
+        );
+    }
+
     private function get(string $path, array $query = []): array
     {
         if ($this->token === '') {
@@ -97,7 +113,7 @@ final class EBQ_Api_Client
         }
 
         $response = wp_remote_get($url, [
-            'timeout' => 5,
+            'timeout' => 8,
             'headers' => [
                 'Authorization' => 'Bearer ' . $this->token,
                 'Accept' => 'application/json',
@@ -106,6 +122,7 @@ final class EBQ_Api_Client
         ]);
 
         if (is_wp_error($response)) {
+            // NOT cached — transient errors should not stick.
             return ['ok' => false, 'error' => 'network_error', 'message' => $response->get_error_message()];
         }
 
@@ -114,11 +131,45 @@ final class EBQ_Api_Client
         $decoded = json_decode($body, true);
 
         if ($code >= 400 || ! is_array($decoded)) {
-            return ['ok' => false, 'error' => 'http_' . $code, 'body' => $body];
+            // NOT cached — surfacing errors for retry rather than poisoning.
+            return ['ok' => false, 'error' => 'http_' . $code, 'body' => is_string($body) ? mb_substr($body, 0, 500) : ''];
         }
 
-        set_transient($cache_key, $decoded, 5 * MINUTE_IN_SECONDS);
+        // Successful payload: short cache to keep the editor snappy. We do
+        // NOT cache responses where ok===false (e.g. url_not_for_website),
+        // so a freshly-correct URL or token recovers immediately.
+        if (! (isset($decoded['ok']) && $decoded['ok'] === false)) {
+            set_transient($cache_key, $decoded, 5 * MINUTE_IN_SECONDS);
+        }
 
         return $decoded;
+    }
+
+    /**
+     * Drop every transient this client has set. Called from the settings page
+     * "Refresh data" button so a misconfigured first load can be recovered
+     * without waiting 5 minutes.
+     */
+    public static function clear_response_cache(): int
+    {
+        global $wpdb;
+
+        $like = $wpdb->esc_like('_transient_ebq_api_').'%';
+        $rows = (array) $wpdb->get_col(
+            $wpdb->prepare(
+                "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
+                $like
+            )
+        );
+
+        $count = 0;
+        foreach ($rows as $row) {
+            $key = preg_replace('/^_transient_/', '', (string) $row);
+            if ($key !== '' && delete_transient($key)) {
+                $count++;
+            }
+        }
+
+        return $count;
     }
 }

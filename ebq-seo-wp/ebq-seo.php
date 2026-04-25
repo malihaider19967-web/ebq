@@ -29,6 +29,7 @@ require_once EBQ_SEO_PATH . 'includes/class-ebq-post-column.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-dashboard-widget.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-rest-proxy.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-gutenberg-sidebar.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-block-editor-metabox.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-meta-box.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-updater.php';
 // v2 — Yoast-replacement surface
@@ -38,7 +39,6 @@ require_once EBQ_SEO_PATH . 'includes/class-ebq-meta-output.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-social-output.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-schema-output.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-sitemap.php';
-require_once EBQ_SEO_PATH . 'includes/class-ebq-seo-panel.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-seo-fields-meta-box.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-breadcrumbs.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-analysis-cache.php';

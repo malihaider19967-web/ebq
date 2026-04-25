@@ -1,11 +1,14 @@
 <?php
 /**
- * Editable classic-style meta box that writes the SEO + social fields.
+ * Classic Editor meta box.
  *
- * The block editor's React SEO panel is the fancy UI — this is the reliable,
- * always-visible fallback that works everywhere (Elementor, classic editor,
- * custom admin UIs). Both surfaces persist into the same post-meta keys
- * registered by EBQ_Meta_Fields, so switching editors round-trips cleanly.
+ * Used to be a plain HTML form. Now hosts the same React app as the block
+ * editor sidebar, with an environment flag (window.__EBQ_CLASSIC__) that
+ * switches the React data source from @wordpress/data to a DOM-based store.
+ *
+ * Save path stays form-POST: hidden inputs (rendered below) carry the meta
+ * keys, and the existing save() handler picks them up so existing post data
+ * round-trips cleanly between editors.
  */
 
 if (! defined('ABSPATH')) {
@@ -17,10 +20,31 @@ final class EBQ_Seo_Fields_Meta_Box
     public const NONCE_ACTION = 'ebq_seo_fields_save';
     public const NONCE_FIELD = 'ebq_seo_fields_nonce';
 
+    /** Meta key → form field name (also used by the JS classic adapter). */
+    private const FIELDS = [
+        '_ebq_title'               => 'ebq_title',
+        '_ebq_description'         => 'ebq_description',
+        '_ebq_canonical'           => 'ebq_canonical',
+        '_ebq_robots_noindex'      => 'ebq_robots_noindex',
+        '_ebq_robots_nofollow'     => 'ebq_robots_nofollow',
+        '_ebq_robots_advanced'     => 'ebq_robots_advanced',
+        '_ebq_focus_keyword'       => 'ebq_focus_keyword',
+        '_ebq_og_title'            => 'ebq_og_title',
+        '_ebq_og_description'      => 'ebq_og_description',
+        '_ebq_og_image'            => 'ebq_og_image',
+        '_ebq_twitter_title'       => 'ebq_twitter_title',
+        '_ebq_twitter_description' => 'ebq_twitter_description',
+        '_ebq_twitter_image'       => 'ebq_twitter_image',
+        '_ebq_twitter_card'        => 'ebq_twitter_card',
+        '_ebq_schema_type'         => 'ebq_schema_type',
+        '_ebq_schema_disabled'     => 'ebq_schema_disabled',
+    ];
+
     public function register(): void
     {
         add_action('add_meta_boxes', [$this, 'add_meta_box']);
         add_action('save_post', [$this, 'save'], 10, 2);
+        add_action('admin_enqueue_scripts', [$this, 'enqueue']);
     }
 
     public function add_meta_box(string $post_type): void
@@ -29,9 +53,15 @@ final class EBQ_Seo_Fields_Meta_Box
         if (! in_array($post_type, $supported, true)) {
             return;
         }
+
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+        if ($screen && method_exists($screen, 'is_block_editor') && $screen->is_block_editor()) {
+            return;
+        }
+
         add_meta_box(
             'ebq-seo-fields',
-            __('EBQ SEO (metadata & social)', 'ebq-seo'),
+            __('EBQ SEO', 'ebq-seo'),
             [$this, 'render'],
             $post_type,
             'normal',
@@ -39,127 +69,99 @@ final class EBQ_Seo_Fields_Meta_Box
         );
     }
 
+    public function enqueue(string $hook): void
+    {
+        if (! in_array($hook, ['post.php', 'post-new.php'], true)) {
+            return;
+        }
+        $screen = function_exists('get_current_screen') ? get_current_screen() : null;
+        if (! $screen) {
+            return;
+        }
+        // Only mount on classic-editor screens — block editor has its own bundle.
+        if (method_exists($screen, 'is_block_editor') && $screen->is_block_editor()) {
+            return;
+        }
+
+        $bundle = EBQ_SEO_PATH.'build/classic-editor.js';
+        if (! file_exists($bundle)) {
+            return;
+        }
+
+        $asset_file = EBQ_SEO_PATH.'build/classic-editor.asset.php';
+        $deps = ['wp-element', 'wp-i18n', 'wp-api-fetch', 'wp-dom-ready'];
+        $version = (string) filemtime($bundle);
+        if (file_exists($asset_file)) {
+            $asset = include $asset_file;
+            $deps = $asset['dependencies'] ?? $deps;
+            $version = $asset['version'] ?? $version;
+        }
+
+        wp_enqueue_script('ebq-seo-classic', EBQ_SEO_URL.'build/classic-editor.js', $deps, $version, true);
+        wp_set_script_translations('ebq-seo-classic', 'ebq-seo');
+
+        // CRITICAL: this flag must be set BEFORE the bundle evaluates so the
+        // editor-context dispatcher picks the DOM adapter on first import,
+        // not the @wordpress/data adapter (which would throw on classic
+        // screens since `core/editor` isn't registered there).
+        wp_add_inline_script('ebq-seo-classic', 'window.__EBQ_CLASSIC__ = true;', 'before');
+
+        // Sidebar CSS — same one the block editor uses.
+        $css = EBQ_SEO_PATH.'build/sidebar.css';
+        if (file_exists($css)) {
+            wp_enqueue_style('ebq-seo-classic', EBQ_SEO_URL.'build/sidebar.css', [], (string) filemtime($css));
+        }
+
+        wp_localize_script('ebq-seo-classic', 'ebqSeoPublic', [
+            'appBase'  => EBQ_Api_Client::base_url(),
+            'homeUrl'  => home_url('/'),
+            'siteName' => get_bloginfo('name'),
+            'titleSep' => EBQ_Title_Template::get_sep(),
+        ]);
+    }
+
     public function render(WP_Post $post): void
     {
         wp_nonce_field(self::NONCE_ACTION, self::NONCE_FIELD);
 
-        $g = static fn (string $k, $d = '') => EBQ_Meta_Fields::get($post->ID, $k, $d);
-        ?>
-        <style>
-            .ebq-fields{display:grid;grid-template-columns:1fr;gap:14px;}
-            .ebq-fields label{font-weight:600;font-size:12px;display:block;margin-bottom:4px;}
-            .ebq-fields input[type=text],.ebq-fields input[type=url],.ebq-fields textarea{width:100%;}
-            .ebq-fields textarea{min-height:64px;}
-            .ebq-fields .ebq-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-            .ebq-fields .ebq-note{font-size:11px;color:#64748b;margin-top:4px;}
-            .ebq-fields .ebq-section{border-top:1px solid #e2e8f0;padding-top:12px;margin-top:4px;}
-            .ebq-fields .ebq-section:first-child{border-top:none;padding-top:0;margin-top:0;}
-            .ebq-fields h3{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:#64748b;margin:0 0 8px;}
-            .ebq-fields .ebq-char{font-size:10px;color:#64748b;float:right;}
-        </style>
-        <div class="ebq-fields">
-            <div class="ebq-section">
-                <h3><?php esc_html_e('Search', 'ebq-seo'); ?></h3>
+        // Seed meta values for the JS classic store.
+        $meta_seed = [];
+        foreach (array_keys(self::FIELDS) as $key) {
+            $meta_seed[$key] = EBQ_Meta_Fields::get($post->ID, $key, '');
+        }
 
-                <div>
-                    <label for="ebq_title"><?php esc_html_e('SEO title', 'ebq-seo'); ?></label>
-                    <input type="text" id="ebq_title" name="ebq_title" maxlength="120"
-                        value="<?php echo esc_attr((string) $g('_ebq_title')); ?>" />
-                    <p class="ebq-note"><?php esc_html_e('Shown in Google as the blue link. Keep under ~60 characters. Variables:', 'ebq-seo'); ?>
-                        <code>%%title%%</code> <code>%%sep%%</code> <code>%%sitename%%</code>
-                    </p>
-                </div>
+        // The JS bundle reads window.ebqClassicMeta on first render.
+        printf(
+            '<script>window.ebqClassicMeta = %s;</script>',
+            wp_json_encode($meta_seed, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+        );
 
-                <div style="margin-top:12px;">
-                    <label for="ebq_slug_hint"><?php esc_html_e('URL slug (SEO)', 'ebq-seo'); ?></label>
-                    <input type="text" id="ebq_slug_hint" readonly class="large-text" style="background:#f8fafc;"
-                        value="<?php echo esc_attr((string) $post->post_name); ?>" />
-                    <p class="ebq-note"><?php esc_html_e('Edit the permalink slug in the post sidebar under Permalink.', 'ebq-seo'); ?></p>
-                </div>
+        // React mount point.
+        echo '<div id="ebq-classic-root" class="ebq-classic-mount"></div>';
 
-                <div style="margin-top:12px;">
-                    <label for="ebq_description"><?php esc_html_e('Meta description', 'ebq-seo'); ?></label>
-                    <textarea id="ebq_description" name="ebq_description" maxlength="320"><?php echo esc_textarea((string) $g('_ebq_description')); ?></textarea>
-                    <p class="ebq-note"><?php esc_html_e('Shown under the title in SERPs. Target 140–160 characters.', 'ebq-seo'); ?></p>
-                </div>
+        // No-JS fallback message.
+        echo '<noscript><p style="font-size:12px;color:#64748b;padding:12px;border:1px solid #e2e8f0;border-radius:6px;">';
+        esc_html_e('EBQ SEO needs JavaScript to render the editor panel. Enable JS or use the block editor.', 'ebq-seo');
+        echo '</p></noscript>';
 
-                <div style="margin-top:12px;">
-                    <label for="ebq_canonical"><?php esc_html_e('Canonical URL', 'ebq-seo'); ?></label>
-                    <input type="url" id="ebq_canonical" name="ebq_canonical"
-                        placeholder="<?php echo esc_attr((string) get_permalink($post->ID)); ?>"
-                        value="<?php echo esc_attr((string) $g('_ebq_canonical')); ?>" />
-                    <p class="ebq-note"><?php esc_html_e('Leave blank to use this post\'s permalink.', 'ebq-seo'); ?></p>
-                </div>
-
-                <div class="ebq-row" style="margin-top:12px;">
-                    <label style="font-weight:400;">
-                        <input type="checkbox" name="ebq_robots_noindex" value="1" <?php checked((bool) $g('_ebq_robots_noindex', false)); ?> />
-                        <strong><?php esc_html_e('noindex', 'ebq-seo'); ?></strong>
-                        <span class="ebq-note"><?php esc_html_e('Tell search engines not to index this post.', 'ebq-seo'); ?></span>
-                    </label>
-                    <label style="font-weight:400;">
-                        <input type="checkbox" name="ebq_robots_nofollow" value="1" <?php checked((bool) $g('_ebq_robots_nofollow', false)); ?> />
-                        <strong><?php esc_html_e('nofollow', 'ebq-seo'); ?></strong>
-                        <span class="ebq-note"><?php esc_html_e('Tell search engines not to follow links.', 'ebq-seo'); ?></span>
-                    </label>
-                </div>
-
-                <div style="margin-top:12px;">
-                    <label for="ebq_robots_advanced"><?php esc_html_e('Advanced robots (comma-separated)', 'ebq-seo'); ?></label>
-                    <input type="text" id="ebq_robots_advanced" name="ebq_robots_advanced" class="large-text"
-                        placeholder="noarchive, nosnippet"
-                        value="<?php echo esc_attr((string) $g('_ebq_robots_advanced')); ?>" />
-                    <p class="ebq-note"><?php esc_html_e('Appended to the robots meta after index/noindex and follow/nofollow.', 'ebq-seo'); ?></p>
-                </div>
-
-                <div style="margin-top:12px;">
-                    <label for="ebq_focus_keyword"><?php esc_html_e('Focus keyword', 'ebq-seo'); ?></label>
-                    <input type="text" id="ebq_focus_keyword" name="ebq_focus_keyword"
-                        value="<?php echo esc_attr((string) $g('_ebq_focus_keyword')); ?>" />
-                    <p class="ebq-note"><?php esc_html_e('Optional. In the block editor, this is a dropdown populated with your real GSC queries.', 'ebq-seo'); ?></p>
-                </div>
-            </div>
-
-            <div class="ebq-section">
-                <h3><?php esc_html_e('Social (Open Graph)', 'ebq-seo'); ?></h3>
-
-                <div>
-                    <label for="ebq_og_title"><?php esc_html_e('OG title', 'ebq-seo'); ?></label>
-                    <input type="text" id="ebq_og_title" name="ebq_og_title"
-                        value="<?php echo esc_attr((string) $g('_ebq_og_title')); ?>" />
-                </div>
-                <div style="margin-top:12px;">
-                    <label for="ebq_og_description"><?php esc_html_e('OG description', 'ebq-seo'); ?></label>
-                    <textarea id="ebq_og_description" name="ebq_og_description"><?php echo esc_textarea((string) $g('_ebq_og_description')); ?></textarea>
-                </div>
-                <div style="margin-top:12px;">
-                    <label for="ebq_og_image"><?php esc_html_e('OG image URL', 'ebq-seo'); ?></label>
-                    <input type="url" id="ebq_og_image" name="ebq_og_image"
-                        value="<?php echo esc_attr((string) $g('_ebq_og_image')); ?>" />
-                    <p class="ebq-note"><?php esc_html_e('Leave blank to use the featured image.', 'ebq-seo'); ?></p>
-                </div>
-            </div>
-
-            <div class="ebq-section">
-                <h3><?php esc_html_e('Twitter / X card', 'ebq-seo'); ?></h3>
-
-                <div>
-                    <label for="ebq_twitter_title"><?php esc_html_e('Twitter title', 'ebq-seo'); ?></label>
-                    <input type="text" id="ebq_twitter_title" name="ebq_twitter_title"
-                        value="<?php echo esc_attr((string) $g('_ebq_twitter_title')); ?>" />
-                </div>
-                <div style="margin-top:12px;">
-                    <label for="ebq_twitter_description"><?php esc_html_e('Twitter description', 'ebq-seo'); ?></label>
-                    <textarea id="ebq_twitter_description" name="ebq_twitter_description"><?php echo esc_textarea((string) $g('_ebq_twitter_description')); ?></textarea>
-                </div>
-                <div style="margin-top:12px;">
-                    <label for="ebq_twitter_image"><?php esc_html_e('Twitter image URL', 'ebq-seo'); ?></label>
-                    <input type="url" id="ebq_twitter_image" name="ebq_twitter_image"
-                        value="<?php echo esc_attr((string) $g('_ebq_twitter_image')); ?>" />
-                </div>
-            </div>
-        </div>
-        <?php
+        // Hidden form inputs — the React store updates these on every change,
+        // and the form-POST save handler reads them. Pre-rendered with current
+        // values so a no-JS save is still safe.
+        echo '<div style="display:none" aria-hidden="true">';
+        foreach (self::FIELDS as $meta_key => $field_name) {
+            $value = EBQ_Meta_Fields::get($post->ID, $meta_key, '');
+            $is_textarea = in_array($meta_key, ['_ebq_description', '_ebq_og_description', '_ebq_twitter_description'], true);
+            $is_checkbox_like = in_array($meta_key, ['_ebq_robots_noindex', '_ebq_robots_nofollow', '_ebq_schema_disabled'], true);
+            if ($is_checkbox_like) {
+                $cast = $value ? '1' : '';
+                printf('<input type="hidden" name="%s" value="%s" />', esc_attr($field_name), esc_attr($cast));
+            } elseif ($is_textarea) {
+                printf('<textarea name="%s">%s</textarea>', esc_attr($field_name), esc_textarea((string) $value));
+            } else {
+                printf('<input type="hidden" name="%s" value="%s" />', esc_attr($field_name), esc_attr((string) $value));
+            }
+        }
+        echo '</div>';
     }
 
     public function save(int $post_id, WP_Post $post): void
@@ -182,6 +184,8 @@ final class EBQ_Seo_Fields_Meta_Box
             '_ebq_og_description' => 'ebq_og_description',
             '_ebq_twitter_title' => 'ebq_twitter_title',
             '_ebq_twitter_description' => 'ebq_twitter_description',
+            '_ebq_twitter_card' => 'ebq_twitter_card',
+            '_ebq_schema_type' => 'ebq_schema_type',
         ];
         $urls = [
             '_ebq_canonical' => 'ebq_canonical',
@@ -191,6 +195,7 @@ final class EBQ_Seo_Fields_Meta_Box
         $booleans = [
             '_ebq_robots_noindex' => 'ebq_robots_noindex',
             '_ebq_robots_nofollow' => 'ebq_robots_nofollow',
+            '_ebq_schema_disabled' => 'ebq_schema_disabled',
         ];
 
         foreach ($simple as $meta_key => $post_key) {

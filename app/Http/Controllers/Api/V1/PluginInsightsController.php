@@ -77,10 +77,53 @@ class PluginInsightsController extends Controller
         $website = $this->resolveWebsite($request);
         $url = (string) $request->query('url', '');
 
+        $diagnostic = null;
+        $suggestions = [];
+
+        if ($url === '') {
+            $diagnostic = 'missing_url';
+        } elseif (! $website->isAuditUrlForThisSite($url)) {
+            $diagnostic = 'url_not_for_website';
+        } else {
+            $suggestions = $this->resolver->focusKeywordSuggestions($website, $url);
+            if (empty($suggestions)) {
+                $diagnostic = 'no_gsc_data';
+            }
+        }
+
         return response()->json([
             'external_post_id' => $externalPostId,
             'url' => $url,
-            'suggestions' => $this->resolver->focusKeywordSuggestions($website, $url),
+            'website_domain' => $website->domain,
+            'suggestions' => $suggestions,
+            'diagnostic' => $diagnostic,
+        ]);
+    }
+
+    /**
+     * Internal-link suggestions: other URLs on this website worth linking
+     * *to* from the post being edited. Ranked by Search Console performance,
+     * not just word similarity.
+     *   GET /api/v1/posts/{externalPostId}/internal-link-suggestions?url=...&keyword=...&title=...
+     */
+    public function internalLinkSuggestions(Request $request, string $externalPostId): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        $url = (string) $request->query('url', '');
+        $keyword = (string) $request->query('keyword', '');
+        $title = (string) $request->query('title', '');
+
+        $suggestions = $this->resolver->internalLinkSuggestions(
+            $website,
+            $url,
+            $keyword !== '' ? $keyword : null,
+            $title !== '' ? $title : null,
+        );
+
+        return response()->json([
+            'external_post_id' => $externalPostId,
+            'url' => $url,
+            'suggestions' => $suggestions,
         ]);
     }
 

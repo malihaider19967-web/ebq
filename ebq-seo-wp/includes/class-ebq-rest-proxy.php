@@ -52,6 +52,15 @@ final class EBQ_Rest_Proxy
             ],
         ]);
 
+        register_rest_route('ebq/v1', '/internal-link-suggestions/(?P<id>\d+)', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'internal_link_suggestions'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+            ],
+        ]);
+
         register_rest_route('ebq/v1', '/post-insights-html/(?P<id>\d+)', [
             'methods' => 'GET',
             'permission_callback' => [$this, 'can_edit'],
@@ -127,6 +136,58 @@ final class EBQ_Rest_Proxy
             EBQ_Plugin::api_client()->get_serp_preview((string) $post_id, $query),
             200
         );
+    }
+
+    public function internal_link_suggestions(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $url = get_permalink($post_id);
+        if (! $url) {
+            return new WP_REST_Response(['ok' => false, 'error' => 'post_not_found'], 404);
+        }
+
+        $keyword = (string) get_post_meta($post_id, '_ebq_focus_keyword', true);
+        $title   = (string) get_the_title($post_id);
+
+        $payload = EBQ_Plugin::api_client()->get_internal_link_suggestions((string) $post_id, $url, $keyword, $title);
+        if (! is_array($payload) || ($payload['ok'] ?? null) === false) {
+            return new WP_REST_Response($payload, 200);
+        }
+
+        // Decorate each suggestion with the WP-side post title (Laravel only
+        // knows the URL).
+        $suggestions = isset($payload['suggestions']) && is_array($payload['suggestions']) ? $payload['suggestions'] : [];
+        foreach ($suggestions as &$row) {
+            if (! is_array($row) || empty($row['url'])) {
+                continue;
+            }
+            $row['title'] = $this->resolve_title_from_url((string) $row['url']);
+        }
+        unset($row);
+        $payload['suggestions'] = $suggestions;
+
+        return new WP_REST_Response($payload, 200);
+    }
+
+    private function resolve_title_from_url(string $url): string
+    {
+        $resolved_id = url_to_postid($url);
+        if ($resolved_id > 0) {
+            $title = (string) get_the_title($resolved_id);
+            if ($title !== '') {
+                return $title;
+            }
+        }
+
+        // Fallback: derive a friendly label from the path.
+        $path = parse_url($url, PHP_URL_PATH);
+        if (! is_string($path) || $path === '') {
+            return $url;
+        }
+        $segments = array_values(array_filter(explode('/', $path)));
+        $last = $segments ? end($segments) : '';
+
+        return $last !== '' ? str_replace(['-', '_'], ' ', urldecode((string) $last)) : $url;
     }
 
     public function post_insights_html(WP_REST_Request $request): WP_REST_Response

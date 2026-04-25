@@ -1,22 +1,26 @@
 <?php
 /**
- * JSON-LD structured-data emitter.
+ * JSON-LD structured data emitter.
  *
- * Emits a single `<script type="application/ld+json">@graph</script>` per
- * page containing:
- *   • WebSite + Organization (site-wide, always)
- *   • WebPage (every page)
- *   • BreadcrumbList (built from WP's ancestors / category / archive)
- *   • Article (singular posts) OR Product (singular WooCommerce products)
- *     — override per-post via `_ebq_schema_type`, disable via
- *     `_ebq_schema_disabled`.
+ * Emits a single `<script type="application/ld+json">@graph</script>` per page
+ * containing the pieces below, each gated by an `is_needed()` check so the
+ * graph is only as wide as the current request. Mirrors the modular layout of
+ * Yoast's `src/generators/schema/` without the full DI container — one method
+ * per piece, aggregated by `output()`.
  *
- * Detects FAQ and HowTo blocks in post content and injects the matching
- * FAQPage / HowTo schema automatically.
+ *   • WebSite         — site identity + sitelinks search box (every request)
+ *   • Organization    — publisher (every request)
+ *   • Person          — author Person node (singular posts)
+ *   • PrimaryImage    — ImageObject for the post's featured image
+ *   • WebPage         — page node (every request)
+ *   • BreadcrumbList  — Home › ancestors › current (singular and term archives)
+ *   • Article         — singular posts (default; switchable via meta override)
+ *   • Product         — singular WooCommerce products
+ *   • FAQPage         — auto from FAQ blocks (Yoast / generic / Stackable)
+ *   • HowTo           — auto from HowTo blocks
  *
- * Coexistence: if another SEO plugin is active we skip, to avoid duplicate
- * JSON-LD graphs. The Yoast/Rank Math/AIOSEO importer will migrate users so
- * they can uninstall the incumbent.
+ * Coexistence: stays silent when another major SEO plugin is active, so a site
+ * never ends up with two graphs.
  */
 
 if (! defined('ABSPATH')) {
@@ -25,6 +29,21 @@ if (! defined('ABSPATH')) {
 
 final class EBQ_Schema_Output
 {
+    /** Block names we recognise as FAQ pieces. */
+    private const FAQ_BLOCKS = [
+        'yoast/faq-block',
+        'rank-math/faq-block',
+        'ugb/faq',
+        'ebq/faq',
+    ];
+
+    /** Block names we recognise as HowTo pieces. */
+    private const HOWTO_BLOCKS = [
+        'yoast/how-to-block',
+        'rank-math/howto-block',
+        'ebq/howto',
+    ];
+
     public function register(): void
     {
         if (EBQ_Meta_Output::another_seo_plugin_is_active()) {
@@ -46,12 +65,22 @@ final class EBQ_Schema_Output
         $graph[] = $this->organization_node();
         $graph[] = $this->webpage_node($post_id);
 
+        $primaryImage = $this->primary_image_node($post_id);
+        if ($primaryImage !== null) {
+            $graph[] = $primaryImage;
+        }
+
         $breadcrumbs = $this->breadcrumb_node($post_id);
         if ($breadcrumbs !== null) {
             $graph[] = $breadcrumbs;
         }
 
         if ($post_id > 0) {
+            $author = $this->person_node($post_id);
+            if ($author !== null) {
+                $graph[] = $author;
+            }
+
             $override = (string) EBQ_Meta_Fields::get($post_id, '_ebq_schema_type', '');
             $type = $override !== '' ? $override : $this->detect_type($post_id);
             $node = $this->primary_node($post_id, $type);
@@ -66,26 +95,30 @@ final class EBQ_Schema_Output
 
         $doc = [
             '@context' => 'https://schema.org',
-            '@graph' => array_values(array_filter($graph)),
+            '@graph'   => array_values(array_filter($graph)),
         ];
 
-        echo "<script type=\"application/ld+json\">".wp_json_encode($doc, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)."</script>\n";
+        echo "<script type=\"application/ld+json\">".wp_json_encode($doc, JSON_UNESCAPED_UNICODE)."</script>\n";
     }
+
+    /* ─── Pieces ─────────────────────────────────────────────────── */
 
     private function website_node(): array
     {
         $home = home_url('/');
 
         return [
-            '@type' => 'WebSite',
-            '@id' => $home.'#website',
-            'url' => $home,
-            'name' => (string) get_bloginfo('name'),
-            'description' => (string) get_bloginfo('description'),
+            '@type'           => 'WebSite',
+            '@id'             => $home.'#website',
+            'url'             => $home,
+            'name'            => (string) get_bloginfo('name'),
+            'description'     => (string) get_bloginfo('description'),
+            'inLanguage'      => str_replace('_', '-', (string) get_locale()),
+            'publisher'       => ['@id' => $home.'#organization'],
             'potentialAction' => [
-                '@type' => 'SearchAction',
-                'target' => [
-                    '@type' => 'EntryPoint',
+                '@type'       => 'SearchAction',
+                'target'      => [
+                    '@type'       => 'EntryPoint',
                     'urlTemplate' => $home.'?s={search_term_string}',
                 ],
                 'query-input' => 'required name=search_term_string',
@@ -98,16 +131,88 @@ final class EBQ_Schema_Output
         $home = home_url('/');
         $node = [
             '@type' => 'Organization',
-            '@id' => $home.'#organization',
-            'url' => $home,
-            'name' => (string) get_bloginfo('name'),
+            '@id'   => $home.'#organization',
+            'url'   => $home,
+            'name'  => (string) get_bloginfo('name'),
         ];
         $icon = get_site_icon_url();
         if ($icon) {
             $node['logo'] = [
-                '@type' => 'ImageObject',
-                'url' => $icon,
+                '@type'      => 'ImageObject',
+                '@id'        => $home.'#logo',
+                'url'        => $icon,
+                'contentUrl' => $icon,
             ];
+            $node['image'] = ['@id' => $home.'#logo'];
+        }
+
+        return $node;
+    }
+
+    private function person_node(int $post_id): ?array
+    {
+        $author_id = (int) get_post_field('post_author', $post_id);
+        if ($author_id <= 0) {
+            return null;
+        }
+        $name = trim((string) get_the_author_meta('display_name', $author_id));
+        if ($name === '') {
+            return null;
+        }
+
+        $home = home_url('/');
+        $node = [
+            '@type' => 'Person',
+            '@id'   => $home.'#/schema/person/'.md5((string) $author_id),
+            'name'  => $name,
+            'url'   => (string) get_author_posts_url($author_id),
+        ];
+
+        $description = trim((string) get_the_author_meta('description', $author_id));
+        if ($description !== '') {
+            $node['description'] = $description;
+        }
+
+        $avatar = get_avatar_url($author_id, ['size' => 192]);
+        if ($avatar) {
+            $node['image'] = [
+                '@type'      => 'ImageObject',
+                '@id'        => $home.'#/schema/person/image/'.md5((string) $author_id),
+                'url'        => $avatar,
+                'contentUrl' => $avatar,
+                'caption'    => $name,
+            ];
+        }
+
+        return $node;
+    }
+
+    private function primary_image_node(int $post_id): ?array
+    {
+        if ($post_id <= 0 || ! has_post_thumbnail($post_id)) {
+            return null;
+        }
+        $thumbnail_id = (int) get_post_thumbnail_id($post_id);
+        $url = (string) wp_get_attachment_image_url($thumbnail_id, 'full');
+        if ($url === '') {
+            return null;
+        }
+        $meta = wp_get_attachment_metadata($thumbnail_id);
+        $page_url = (string) get_permalink($post_id);
+
+        $node = [
+            '@type'      => 'ImageObject',
+            '@id'        => $page_url.'#primaryimage',
+            'url'        => $url,
+            'contentUrl' => $url,
+        ];
+        if (is_array($meta)) {
+            if (! empty($meta['width']))  $node['width']  = (int) $meta['width'];
+            if (! empty($meta['height'])) $node['height'] = (int) $meta['height'];
+        }
+        $caption = (string) wp_get_attachment_caption($thumbnail_id);
+        if ($caption !== '') {
+            $node['caption'] = $caption;
         }
 
         return $node;
@@ -117,14 +222,26 @@ final class EBQ_Schema_Output
     {
         $url = $post_id > 0 ? (string) get_permalink($post_id) : (string) home_url(add_query_arg(null, null));
 
-        return [
-            '@type' => 'WebPage',
-            '@id' => $url.'#webpage',
-            'url' => $url,
-            'name' => wp_get_document_title(),
-            'isPartOf' => ['@id' => home_url('/').'#website'],
+        $node = [
+            '@type'      => 'WebPage',
+            '@id'        => $url.'#webpage',
+            'url'        => $url,
+            'name'       => wp_get_document_title(),
+            'isPartOf'   => ['@id' => home_url('/').'#website'],
             'inLanguage' => str_replace('_', '-', (string) get_locale()),
         ];
+
+        if ($post_id > 0) {
+            if (has_post_thumbnail($post_id)) {
+                $node['primaryImageOfPage'] = ['@id' => $url.'#primaryimage'];
+                $node['thumbnailUrl'] = (string) get_the_post_thumbnail_url($post_id, 'full');
+            }
+            $node['datePublished'] = (string) get_the_date('c', $post_id);
+            $node['dateModified']  = (string) get_the_modified_date('c', $post_id);
+            $node['breadcrumb']    = ['@id' => home_url('/').'#breadcrumbs-'.$post_id];
+        }
+
+        return $node;
     }
 
     private function breadcrumb_node(int $post_id): ?array
@@ -133,36 +250,35 @@ final class EBQ_Schema_Output
         $position = 1;
 
         $items[] = [
-            '@type' => 'ListItem',
+            '@type'    => 'ListItem',
             'position' => $position++,
-            'name' => __('Home', 'ebq-seo'),
-            'item' => home_url('/'),
+            'name'     => __('Home', 'ebq-seo'),
+            'item'     => home_url('/'),
         ];
 
         if ($post_id > 0) {
             $ancestors = array_reverse((array) get_post_ancestors($post_id));
             foreach ($ancestors as $ancestor_id) {
                 $items[] = [
-                    '@type' => 'ListItem',
+                    '@type'    => 'ListItem',
                     'position' => $position++,
-                    'name' => (string) get_the_title($ancestor_id),
-                    'item' => (string) get_permalink($ancestor_id),
+                    'name'     => (string) get_the_title($ancestor_id),
+                    'item'     => (string) get_permalink($ancestor_id),
                 ];
             }
             $items[] = [
-                '@type' => 'ListItem',
+                '@type'    => 'ListItem',
                 'position' => $position++,
-                'name' => (string) get_the_title($post_id),
-                'item' => (string) get_permalink($post_id),
+                'name'     => (string) get_the_title($post_id),
             ];
         } elseif (is_category() || is_tag() || is_tax()) {
             $term = get_queried_object();
             if ($term instanceof WP_Term) {
                 $items[] = [
-                    '@type' => 'ListItem',
+                    '@type'    => 'ListItem',
                     'position' => $position++,
-                    'name' => $term->name,
-                    'item' => (string) get_term_link($term),
+                    'name'     => $term->name,
+                    'item'     => (string) get_term_link($term),
                 ];
             }
         } else {
@@ -170,8 +286,8 @@ final class EBQ_Schema_Output
         }
 
         return [
-            '@type' => 'BreadcrumbList',
-            '@id' => home_url('/').'#breadcrumbs-'.($post_id > 0 ? $post_id : 'home'),
+            '@type'           => 'BreadcrumbList',
+            '@id'             => home_url('/').'#breadcrumbs-'.($post_id > 0 ? $post_id : 'home'),
             'itemListElement' => $items,
         ];
     }
@@ -191,64 +307,101 @@ final class EBQ_Schema_Output
     private function primary_node(int $post_id, string $type): ?array
     {
         $url = (string) get_permalink($post_id);
+
         if ($type === 'Product' && function_exists('wc_get_product')) {
             $product = wc_get_product($post_id);
             if (! $product) {
                 return null;
             }
-
-            return [
-                '@type' => 'Product',
-                '@id' => $url.'#product',
-                'name' => (string) $product->get_name(),
+            $node = [
+                '@type'       => 'Product',
+                '@id'         => $url.'#product',
+                'name'        => (string) $product->get_name(),
                 'description' => wp_strip_all_tags((string) ($product->get_short_description() ?: $product->get_description())),
-                'image' => $product->get_image_id() ? (string) wp_get_attachment_url($product->get_image_id()) : null,
-                'sku' => (string) $product->get_sku(),
-                'offers' => [
-                    '@type' => 'Offer',
-                    'price' => (string) $product->get_price(),
-                    'priceCurrency' => get_woocommerce_currency(),
-                    'availability' => $product->is_in_stock() ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
-                    'url' => $url,
-                ],
+                'sku'         => (string) $product->get_sku(),
+                'mainEntityOfPage' => ['@id' => $url.'#webpage'],
             ];
+            if (has_post_thumbnail($post_id)) {
+                $node['image'] = ['@id' => $url.'#primaryimage'];
+            }
+            $price = $product->get_price();
+            if ($price !== '' && function_exists('get_woocommerce_currency')) {
+                $node['offers'] = [
+                    '@type'         => 'Offer',
+                    'price'         => (string) $price,
+                    'priceCurrency' => get_woocommerce_currency(),
+                    'availability'  => $product->is_in_stock() ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+                    'url'           => $url,
+                ];
+            }
+
+            return $node;
         }
 
         if ($type === 'WebPage') {
             return null; // already emitted
         }
 
-        // Article default.
-        $image = has_post_thumbnail($post_id) ? (string) get_the_post_thumbnail_url($post_id, 'full') : '';
         $author_id = (int) get_post_field('post_author', $post_id);
-        $author_name = (string) get_the_author_meta('display_name', $author_id);
 
         $node = [
-            '@type' => 'Article',
-            '@id' => $url.'#article',
-            'isPartOf' => ['@id' => $url.'#webpage'],
-            'mainEntityOfPage' => ['@id' => $url.'#webpage'],
-            'headline' => (string) get_the_title($post_id),
-            'datePublished' => (string) get_the_date('c', $post_id),
-            'dateModified' => (string) get_the_modified_date('c', $post_id),
-            'author' => [
-                '@type' => 'Person',
-                'name' => $author_name ?: (string) get_bloginfo('name'),
-            ],
-            'publisher' => ['@id' => home_url('/').'#organization'],
+            '@type'           => $type === 'Article' ? 'Article' : $type,
+            '@id'             => $url.'#article',
+            'isPartOf'        => ['@id' => $url.'#webpage'],
+            'mainEntityOfPage'=> ['@id' => $url.'#webpage'],
+            'headline'        => (string) get_the_title($post_id),
+            'datePublished'   => (string) get_the_date('c', $post_id),
+            'dateModified'    => (string) get_the_modified_date('c', $post_id),
+            'author'          => ['@id' => home_url('/').'#/schema/person/'.md5((string) $author_id)],
+            'publisher'       => ['@id' => home_url('/').'#organization'],
         ];
-        if ($image !== '') {
-            $node['image'] = $image;
+
+        if (has_post_thumbnail($post_id)) {
+            $node['image']     = ['@id' => $url.'#primaryimage'];
+            $node['thumbnailUrl'] = (string) get_the_post_thumbnail_url($post_id, 'full');
         }
-        $description = EBQ_Meta_Fields::get($post_id, '_ebq_description', '');
+
+        $description = (string) EBQ_Meta_Fields::get($post_id, '_ebq_description', '');
         if ($description !== '') {
-            $node['description'] = (string) $description;
+            $node['description'] = $description;
         }
+
+        // Word count from raw content.
+        $words = str_word_count(wp_strip_all_tags((string) get_post_field('post_content', $post_id)));
+        if ($words > 0) {
+            $node['wordCount'] = $words;
+        }
+
+        // Primary category → articleSection.
+        $section = $this->primary_section($post_id);
+        if ($section !== '') {
+            $node['articleSection'] = $section;
+        }
+
+        $node['inLanguage'] = str_replace('_', '-', (string) get_locale());
 
         return $node;
     }
 
+    private function primary_section(int $post_id): string
+    {
+        $cats = get_the_category($post_id);
+        if (! is_array($cats) || empty($cats)) {
+            return '';
+        }
+        $primary = $cats[0];
+        if ($primary instanceof WP_Term) {
+            return (string) $primary->name;
+        }
+
+        return '';
+    }
+
     /**
+     * Walk the post's blocks and assemble FAQ + HowTo nodes from recognised
+     * block names. Uses an exact-match allowlist (FAQ_BLOCKS / HOWTO_BLOCKS)
+     * to avoid false positives like a "faq-button" widget.
+     *
      * @return list<array<string, mixed>>
      */
     private function block_driven_nodes(int $post_id): array
@@ -262,24 +415,27 @@ final class EBQ_Schema_Output
             return [];
         }
 
-        $out = [];
         $faq_items = [];
         $howto_steps = [];
 
         $walk = function (array $blocks) use (&$walk, &$faq_items, &$howto_steps): void {
             foreach ($blocks as $block) {
                 $name = (string) ($block['blockName'] ?? '');
-                if ($name === 'core/details' || $name === 'core/group') {
-                    // common wrappers; recurse inner
+
+                if (in_array($name, self::FAQ_BLOCKS, true)) {
+                    $entries = $this->faq_entries_from_block($block);
+                    foreach ($entries as $entry) {
+                        $faq_items[] = $entry;
+                    }
                 }
-                if (strpos($name, 'faq') !== false) {
-                    $inner = wp_strip_all_tags((string) ($block['innerHTML'] ?? ''));
-                    $faq_items[] = ['@type' => 'Question', 'name' => mb_substr($inner, 0, 140), 'acceptedAnswer' => ['@type' => 'Answer', 'text' => $inner]];
+
+                if (in_array($name, self::HOWTO_BLOCKS, true)) {
+                    $steps = $this->howto_steps_from_block($block);
+                    foreach ($steps as $step) {
+                        $howto_steps[] = $step;
+                    }
                 }
-                if (strpos($name, 'howto') !== false || strpos($name, 'how-to') !== false) {
-                    $inner = wp_strip_all_tags((string) ($block['innerHTML'] ?? ''));
-                    $howto_steps[] = ['@type' => 'HowToStep', 'text' => $inner];
-                }
+
                 if (! empty($block['innerBlocks']) && is_array($block['innerBlocks'])) {
                     $walk($block['innerBlocks']);
                 }
@@ -287,22 +443,109 @@ final class EBQ_Schema_Output
         };
         $walk($blocks);
 
+        $out = [];
+
         if (! empty($faq_items)) {
             $out[] = [
-                '@type' => 'FAQPage',
-                '@id' => (string) get_permalink($post_id).'#faq',
+                '@type'      => 'FAQPage',
+                '@id'        => (string) get_permalink($post_id).'#faq',
                 'mainEntity' => $faq_items,
             ];
         }
+
         if (! empty($howto_steps)) {
             $out[] = [
                 '@type' => 'HowTo',
-                '@id' => (string) get_permalink($post_id).'#howto',
-                'name' => (string) get_the_title($post_id),
-                'step' => $howto_steps,
+                '@id'   => (string) get_permalink($post_id).'#howto',
+                'name'  => (string) get_the_title($post_id),
+                'step'  => $howto_steps,
             ];
         }
 
         return $out;
+    }
+
+    /**
+     * @param  array<string, mixed>  $block
+     * @return list<array<string, mixed>>
+     */
+    private function faq_entries_from_block(array $block): array
+    {
+        $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
+
+        // Yoast/Rank Math style: attrs.questions = [{question, answer}, ...]
+        $questions = $attrs['questions'] ?? null;
+        if (is_array($questions)) {
+            $out = [];
+            foreach ($questions as $q) {
+                if (! is_array($q)) continue;
+                $question = trim((string) ($q['question'] ?? $q['title'] ?? ''));
+                $answer   = trim((string) ($q['answer']   ?? $q['content'] ?? ''));
+                if ($question === '' || $answer === '') continue;
+                $out[] = [
+                    '@type'          => 'Question',
+                    'name'           => wp_strip_all_tags($question),
+                    'acceptedAnswer' => [
+                        '@type' => 'Answer',
+                        'text'  => wp_strip_all_tags($answer),
+                    ],
+                ];
+            }
+            if (! empty($out)) {
+                return $out;
+            }
+        }
+
+        // Fallback: parse innerHTML for question/answer halves.
+        $html = (string) ($block['innerHTML'] ?? '');
+        if ($html === '') {
+            return [];
+        }
+        $stripped = wp_strip_all_tags($html);
+        if ($stripped === '') {
+            return [];
+        }
+
+        return [[
+            '@type'          => 'Question',
+            'name'           => mb_substr($stripped, 0, 140),
+            'acceptedAnswer' => ['@type' => 'Answer', 'text' => $stripped],
+        ]];
+    }
+
+    /**
+     * @param  array<string, mixed>  $block
+     * @return list<array<string, mixed>>
+     */
+    private function howto_steps_from_block(array $block): array
+    {
+        $attrs = is_array($block['attrs'] ?? null) ? $block['attrs'] : [];
+
+        $steps = $attrs['steps'] ?? $attrs['items'] ?? null;
+        if (is_array($steps)) {
+            $out = [];
+            foreach ($steps as $step) {
+                if (! is_array($step)) continue;
+                $name = trim((string) ($step['name'] ?? $step['title'] ?? ''));
+                $text = trim((string) ($step['text'] ?? $step['description'] ?? $step['content'] ?? $name));
+                if ($text === '') continue;
+                $node = ['@type' => 'HowToStep', 'text' => wp_strip_all_tags($text)];
+                if ($name !== '' && $name !== $text) {
+                    $node['name'] = wp_strip_all_tags($name);
+                }
+                $out[] = $node;
+            }
+            if (! empty($out)) {
+                return $out;
+            }
+        }
+
+        $html = (string) ($block['innerHTML'] ?? '');
+        $stripped = wp_strip_all_tags($html);
+        if ($stripped === '') {
+            return [];
+        }
+
+        return [['@type' => 'HowToStep', 'text' => $stripped]];
     }
 }
