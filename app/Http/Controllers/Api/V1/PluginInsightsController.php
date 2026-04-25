@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Website;
+use App\Services\LiveSeoScoreService;
 use App\Services\PluginInsightResolver;
 use App\Services\ReportDataService;
+use App\Services\TopicalGapService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -253,6 +255,62 @@ class PluginInsightsController extends Controller
         return response()->json([
             'external_post_id' => $externalPostId,
         ] + $this->resolver->serpPreview($website, $query));
+    }
+
+    /**
+     * Live SEO score (the EBQ-side counterpart to the editor's local
+     * self-check). Composite of GSC rank + CTR + audit + cannibalization
+     * + coverage breadth — see LiveSeoScoreService for the formula.
+     *   GET /api/v1/posts/{externalPostId}/seo-score?url=...&focus_keyword=...
+     */
+    public function seoScore(Request $request, string $externalPostId, LiveSeoScoreService $service): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        $url = (string) $request->query('url', '');
+        $kw  = (string) $request->query('focus_keyword', '');
+
+        $payload = $service->score($website, $url, $kw !== '' ? $kw : null);
+        return response()->json([
+            'external_post_id' => $externalPostId,
+            'url' => $url,
+            'focus_keyword' => $kw,
+            'live' => $payload,
+        ]);
+    }
+
+    /**
+     * Topical-coverage gap analysis. Top-5 SERP via Serper + Mistral
+     * extracts subtopics on both sides and returns missing ones.
+     * Heavy operation — cached 7 days inside the service.
+     *   POST /api/v1/posts/{externalPostId}/topical-gaps
+     *   body: { url, focus_keyword, content }
+     */
+    public function topicalGaps(Request $request, string $externalPostId, TopicalGapService $service): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+
+        $data = $request->validate([
+            'url' => 'required|string|max:2048',
+            'focus_keyword' => 'required|string|min:2|max:200',
+            'content' => 'required|string|min:200|max:120000',
+            'country' => 'nullable|string|size:2',
+            'language' => 'nullable|string|min:2|max:10',
+        ]);
+
+        $payload = $service->analyze(
+            $website,
+            (string) $data['focus_keyword'],
+            (string) $data['content'],
+            isset($data['country']) ? (string) $data['country'] : null,
+            isset($data['language']) ? (string) $data['language'] : null,
+        );
+
+        return response()->json([
+            'external_post_id' => $externalPostId,
+            'url' => (string) $data['url'],
+            'focus_keyword' => (string) $data['focus_keyword'],
+            'gaps' => $payload,
+        ]);
     }
 
     /**

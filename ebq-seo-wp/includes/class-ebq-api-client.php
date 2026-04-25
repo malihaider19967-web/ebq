@@ -91,6 +91,44 @@ final class EBQ_Api_Client
         );
     }
 
+    /**
+     * Live SEO score — EBQ-side composite from real GSC data + audit
+     * signals. Renders alongside the editor's local self-check.
+     */
+    public function get_seo_score(string $post_id, string $url, string $focus_keyword = ''): array
+    {
+        $args = ['url' => $url];
+        if ($focus_keyword !== '') {
+            $args['focus_keyword'] = $focus_keyword;
+        }
+        return $this->get(
+            sprintf('/api/v1/posts/%s/seo-score', rawurlencode($post_id)),
+            $args
+        );
+    }
+
+    /**
+     * Topical-coverage gap analysis. Sends the post body so EBQ can
+     * compare what the user wrote against what the top SERP results
+     * cover. POST (not GET) because content can be large.
+     */
+    public function get_topical_gaps(string $post_id, string $url, string $focus_keyword, string $content, string $country = '', string $language = ''): array
+    {
+        $body = [
+            'url' => $url,
+            'focus_keyword' => $focus_keyword,
+            'content' => $content,
+        ];
+        if ($country !== '')  $body['country'] = $country;
+        if ($language !== '') $body['language'] = $language;
+
+        return $this->request(
+            'POST',
+            sprintf('/api/v1/posts/%s/topical-gaps', rawurlencode($post_id)),
+            $body
+        );
+    }
+
     public function get_internal_link_suggestions(string $post_id, string $url, string $keyword = '', string $title = ''): array
     {
         $args = ['url' => $url];

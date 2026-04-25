@@ -25,6 +25,17 @@ class AppServiceProvider extends ServiceProvider
         require_once base_path('app/Support/helpers.php');
 
         $this->app->singleton(\App\Services\LanguageDetectorService::class);
+
+        // LLM client — bind the interface to Mistral by default. Per-task
+        // services that want a different provider for a specific endpoint
+        // (e.g. Claude for copywriting in Phase 2) can take a concrete
+        // class via constructor injection instead of the interface.
+        $this->app->bind(\App\Services\Llm\LlmClient::class, function () {
+            return new \App\Services\Llm\MistralClient(
+                (string) config('services.mistral.key', ''),
+                (string) config('services.mistral.model', 'mistral-small-latest'),
+            );
+        });
     }
 
     /**

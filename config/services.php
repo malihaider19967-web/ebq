@@ -80,4 +80,14 @@ return [
         'enabled' => filter_var(env('LANGUAGE_DETECTION_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
     ],
 
+    'mistral' => [
+        'key' => env('MISTRAL_API_KEY'),
+        // Default to small-latest (currently Mistral Small 3.2). Per-task
+        // overrides happen at the call site via $options['model'].
+        'model' => env('MISTRAL_MODEL', 'mistral-small-latest'),
+        // Per-1M-token pricing for cost telemetry.
+        'cost_per_million_input_usd' => (float) env('MISTRAL_INPUT_USD_PER_M', 0.10),
+        'cost_per_million_output_usd' => (float) env('MISTRAL_OUTPUT_USD_PER_M', 0.30),
+    ],
+
 ];

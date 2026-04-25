@@ -71,6 +71,24 @@ final class EBQ_Rest_Proxy
             ],
         ]);
 
+        register_rest_route('ebq/v1', '/seo-score/(?P<id>\d+)', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'seo_score'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+            ],
+        ]);
+
+        register_rest_route('ebq/v1', '/topical-gaps/(?P<id>\d+)', [
+            'methods' => 'POST',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'topical_gaps'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+            ],
+        ]);
+
         register_rest_route('ebq/v1', '/post-insights-html/(?P<id>\d+)', [
             'methods' => 'GET',
             'permission_callback' => [$this, 'can_edit'],
@@ -284,6 +302,66 @@ final class EBQ_Rest_Proxy
             EBQ_Plugin::api_client()->get_related_keywords((string) $post_id, $keyword, $url),
             200
         );
+    }
+
+    /**
+     * Live EBQ-side SEO score for the post URL. Optional focus keyword
+     * pulled from post meta (the user's saved focus) so the score is
+     * computed against the same keyword the editor sidebar shows.
+     */
+    public function seo_score(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $url = get_permalink($post_id);
+        if (! $url) {
+            return new WP_REST_Response(['ok' => false, 'error' => 'post_not_found'], 404);
+        }
+
+        // Allow query-param override; otherwise use the post's saved
+        // focus keyword so the live score matches what the user is
+        // actively optimizing for.
+        $focus = (string) ($request->get_param('focus_keyword') ?: get_post_meta($post_id, '_ebq_focus_keyword', true));
+
+        $response = new WP_REST_Response(
+            EBQ_Plugin::api_client()->get_seo_score((string) $post_id, $url, $focus),
+            200
+        );
+        // Same no-cache headers HQ uses — live score must never be cached.
+        $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0, private');
+        return $response;
+    }
+
+    /**
+     * Topical gap analysis. Sends post content to EBQ which scrapes
+     * top-5 competitors and asks Mistral to extract subtopics. The
+     * 7-day cache lives on the EBQ side; here we just proxy.
+     */
+    public function topical_gaps(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $url = get_permalink($post_id);
+        if (! $url) {
+            return new WP_REST_Response(['ok' => false, 'error' => 'post_not_found'], 404);
+        }
+
+        $body = $request->get_json_params();
+        if (! is_array($body)) $body = $request->get_params();
+
+        $focus = trim((string) ($body['focus_keyword'] ?? get_post_meta($post_id, '_ebq_focus_keyword', true)));
+        $content = (string) ($body['content'] ?? '');
+        if ($focus === '' || $content === '') {
+            return new WP_REST_Response(['ok' => false, 'error' => 'missing_focus_or_content'], 400);
+        }
+
+        $country  = (string) ($body['country']  ?? '');
+        $language = (string) ($body['language'] ?? '');
+
+        $response = new WP_REST_Response(
+            EBQ_Plugin::api_client()->get_topical_gaps((string) $post_id, $url, $focus, $content, $country, $language),
+            200
+        );
+        $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0, private');
+        return $response;
     }
 
     public function internal_link_suggestions(WP_REST_Request $request): WP_REST_Response

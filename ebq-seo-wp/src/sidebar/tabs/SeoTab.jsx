@@ -13,6 +13,8 @@ import TopicalCoverage from '../components/TopicalCoverage';
 import KeywordDensity from '../components/KeywordDensity';
 import Modal from '../components/Modal';
 import TrackKeywordButton from '../components/TrackKeywordButton';
+import LiveSeoScore from '../components/LiveSeoScore';
+import TopicalGaps from '../components/TopicalGaps';
 
 import { useEditorContext, usePostMeta, resolveTitleTemplate, publicConfig } from '../hooks/useEditorContext';
 import useDebounced from '../hooks/useDebounced';
@@ -120,11 +122,18 @@ export default function SeoTab() {
 					? analysis.scoreLabel
 					: __('No focus keyphrase set — add one above to start scoring.', 'ebq-seo');
 				return (
-					<ScoreBadge
-						score={score}
-						label={__('SEO score', 'ebq-seo')}
-						caption={caption}
-					/>
+					<div className="ebq-score-stack">
+						<ScoreBadge
+							score={score}
+							label={__('Self-check (offline)', 'ebq-seo')}
+							caption={caption}
+						/>
+						<LiveSeoScore
+							postId={ctx.postId}
+							focusKeyword={focusKeyword}
+							isConnected={cfg.isConnected}
+						/>
+					</div>
 				);
 			})()}
 
@@ -192,6 +201,13 @@ export default function SeoTab() {
 				postTitle={ctx.postTitle}
 				seoTitle={effectiveTitle}
 				content={debouncedContent}
+			/>
+
+			<TopicalGaps
+				postId={ctx.postId}
+				focusKeyword={focusKeyword}
+				content={debouncedContent}
+				isConnected={cfg.isConnected}
 			/>
 
 			<Section

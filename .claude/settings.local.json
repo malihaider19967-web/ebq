@@ -109,7 +109,12 @@
       "Bash(php -l ebq-seo-wp/includes/class-ebq-seo-fields-meta-box.php)",
       "Bash(php -l ebq-seo-wp/includes/class-ebq-meta-fields.php)",
       "Bash(php -l ebq-seo-wp/includes/class-ebq-redirects-admin.php)",
-      "Bash(php -l ebq-seo-wp/includes/class-ebq-redirects-importer.php)"
+      "Bash(php -l ebq-seo-wp/includes/class-ebq-redirects-importer.php)",
+      "Bash(php -l app/Services/Llm/LlmClient.php)",
+      "Bash(php -l app/Services/Llm/MistralClient.php)",
+      "Bash(php -l app/Services/LiveSeoScoreService.php)",
+      "Bash(php -l app/Services/TopicalGapService.php)",
+      "Bash(php -l app/Http/Controllers/Api/V1/PluginInsightsController.php)"
     ]
   }
 }

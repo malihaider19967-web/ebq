@@ -23,6 +23,12 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/posts/{externalPostId}/related-keywords', [PluginInsightsController::class, 'relatedKeywords'])
             ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
             ->name('api.v1.posts.related-keywords');
+        Route::get('/posts/{externalPostId}/seo-score', [PluginInsightsController::class, 'seoScore'])
+            ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
+            ->name('api.v1.posts.seo-score');
+        Route::post('/posts/{externalPostId}/topical-gaps', [PluginInsightsController::class, 'topicalGaps'])
+            ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
+            ->name('api.v1.posts.topical-gaps');
         Route::get('/posts', [PluginInsightsController::class, 'indexPosts'])
             ->name('api.v1.posts.index');
         Route::get('/dashboard', [PluginInsightsController::class, 'dashboard'])
