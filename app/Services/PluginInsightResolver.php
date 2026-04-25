@@ -529,6 +529,12 @@ class PluginInsightResolver
      *
      * @return list<string>
      */
+    /** Public probe used only by the controller's diagnostic block. */
+    public function __publicPageVariants(string $url): array
+    {
+        return $this->pageVariants($url);
+    }
+
     private function pageVariants(string $url): array
     {
         $parts = parse_url($url);
@@ -542,19 +548,32 @@ class PluginInsightResolver
         if ($path === '') {
             $path = '/';
         }
-        $pathNoSlash = ($path !== '/' && substr($path, -1) === '/') ? rtrim($path, '/') : $path;
-        $pathSlash = ($path === '/' || substr($path, -1) === '/') ? $path : $path.'/';
+
+        // Important: for root path we need BOTH `/` and `` (empty) so
+        // `https://example.com` and `https://example.com/` both appear in
+        // the variant set. The previous logic only ever emitted `/` for
+        // root, so the normalizer's no-trailing-slash storage form (e.g.
+        // `https://example.com`) was never matched on the homepage.
+        if ($path === '/') {
+            $paths = ['', '/'];
+        } else {
+            $pathNoSlash = rtrim($path, '/');
+            $paths = [$pathNoSlash, $pathNoSlash.'/'];
+        }
         $query = ! empty($parts['query']) ? '?'.$parts['query'] : '';
 
         $hosts = [$hostNoWww, $hostWww];
         $schemes = ['https', 'http'];
-        $paths = [$pathNoSlash, $pathSlash];
 
-        $variants = [$url];
+        // Include the original URL plus its lowercased twin — UrlNormalizer
+        // lowercases the whole URL on insert, so even an uppercase slug
+        // (e.g. `/My-Post/`) needs the lowercase variant to hit storage.
+        $variants = [$url, mb_strtolower($url)];
         foreach ($schemes as $scheme) {
             foreach ($hosts as $h) {
                 foreach ($paths as $p) {
                     $variants[] = $scheme.'://'.$h.$p.$query;
+                    $variants[] = mb_strtolower($scheme.'://'.$h.$p.$query);
                 }
             }
         }

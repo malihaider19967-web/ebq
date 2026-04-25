@@ -135,10 +135,22 @@ final class EBQ_Api_Client
             return ['ok' => false, 'error' => 'http_' . $code, 'body' => is_string($body) ? mb_substr($body, 0, 500) : ''];
         }
 
-        // Successful payload: short cache to keep the editor snappy. We do
-        // NOT cache responses where ok===false (e.g. url_not_for_website),
-        // so a freshly-correct URL or token recovers immediately.
-        if (! (isset($decoded['ok']) && $decoded['ok'] === false)) {
+        // Cache only useful, complete responses. Never cache:
+        //   - Explicit failures (`ok: false`)
+        //   - Responses carrying a `diagnostic` flag (means the upstream
+        //     hit an empty / mismatched state we may resolve next call)
+        //   - Empty `suggestions` arrays (lets retries work without waiting
+        //     5 minutes for the cache to expire)
+        $shouldCache = true;
+        if (isset($decoded['ok']) && $decoded['ok'] === false) {
+            $shouldCache = false;
+        } elseif (isset($decoded['diagnostic']) && $decoded['diagnostic'] !== null && $decoded['diagnostic'] !== '') {
+            $shouldCache = false;
+        } elseif (array_key_exists('suggestions', $decoded) && empty($decoded['suggestions'])) {
+            $shouldCache = false;
+        }
+
+        if ($shouldCache) {
             set_transient($cache_key, $decoded, 5 * MINUTE_IN_SECONDS);
         }
 

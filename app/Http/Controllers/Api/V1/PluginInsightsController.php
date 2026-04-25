@@ -77,9 +77,13 @@ class PluginInsightsController extends Controller
         $website = $this->resolveWebsite($request);
         $url = (string) $request->query('url', '');
 
+        // Bumped manually each time we change focus-keyword-suggestions code,
+        // so the editor can show "is the new code live?" in the diagnostic.
+        $codeVersion = 'fks-2026-04-25-c';
+
         $diagnostic = null;
         $suggestions = [];
-        $debug = [];
+        $debug = ['code_version' => $codeVersion];
 
         if ($url === '') {
             $diagnostic = 'missing_url';
@@ -89,6 +93,25 @@ class PluginInsightsController extends Controller
             $suggestions = $this->resolver->focusKeywordSuggestions($website, $url);
             if (empty($suggestions)) {
                 $diagnostic = 'no_gsc_data';
+
+                // Probe the same shape the resolver uses, so we can see in
+                // the editor whether: the variants are right, the whereIn
+                // ought to match, and the LIKE fallback is doing anything.
+                $variants = $this->resolver->__publicPageVariants($url);
+                $strictMatchCount = \App\Models\SearchConsoleData::query()
+                    ->where('website_id', $website->id)
+                    ->whereIn('page', $variants)
+                    ->where('query', '!=', '')
+                    ->count();
+                $strictDistinctPages = \App\Models\SearchConsoleData::query()
+                    ->where('website_id', $website->id)
+                    ->whereIn('page', $variants)
+                    ->select('page')->distinct()->limit(5)
+                    ->pluck('page')->all();
+
+                $debug['tried_variants'] = $variants;
+                $debug['strict_match_rows'] = (int) $strictMatchCount;
+                $debug['strict_match_pages'] = $strictDistinctPages;
 
                 // When empty, give the editor enough context to explain WHY:
                 // is GSC syncing at all? does this URL exist in GSC under a
@@ -135,13 +158,13 @@ class PluginInsightsController extends Controller
                         ->pluck('page')->all();
                 }
 
-                $debug = [
+                $debug = array_merge($debug, [
                     'gsc_rows_total_all_time' => (int) $totalRows,
                     'gsc_last_sync_date'      => $latestSync ? (string) $latestSync : null,
                     'queried_url'             => $url,
                     'queried_path'            => $path,
                     'similar_urls_in_gsc'     => $similar,
-                ];
+                ]);
             }
         }
 

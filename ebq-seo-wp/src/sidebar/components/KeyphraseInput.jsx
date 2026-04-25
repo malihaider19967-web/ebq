@@ -40,47 +40,80 @@ function Diagnostics({ debug }) {
 	const last = debug.gsc_last_sync_date;
 	const queried = debug.queried_url;
 	const similar = Array.isArray(debug.similar_urls_in_gsc) ? debug.similar_urls_in_gsc : [];
+	const variants = Array.isArray(debug.tried_variants) ? debug.tried_variants : [];
+	const strictRows = debug.strict_match_rows;
+	const strictPages = Array.isArray(debug.strict_match_pages) ? debug.strict_match_pages : [];
+	const codeVersion = debug.code_version || '?';
+
+	const dtStyle = { color: 'var(--ebq-text-soft)' };
+	const ddStyle = { margin: 0, wordBreak: 'break-all' };
 
 	return (
-		<details style={{ marginTop: 8, width: '100%', textAlign: 'left' }}>
+		<details style={{ marginTop: 8, width: '100%', textAlign: 'left' }} open>
 			<summary style={{
 				cursor: 'pointer', fontSize: 10, color: 'var(--ebq-text-soft)',
 				textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600,
 			}}>
 				{__('Why is this empty?', 'ebq-seo')}
 			</summary>
-			<div style={{ marginTop: 6, padding: 8, background: 'var(--ebq-bg-emboss)', borderRadius: 4, fontSize: 11, color: 'var(--ebq-text-muted)' }}>
+			<div style={{ marginTop: 6, padding: 8, background: 'var(--ebq-bg-emboss)', borderRadius: 4, fontSize: 11, color: 'var(--ebq-text-muted)', lineHeight: 1.4 }}>
 				<dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '2px 8px' }}>
-					<dt style={{ color: 'var(--ebq-text-soft)' }}>{__('Site GSC rows', 'ebq-seo')}</dt>
-					<dd style={{ margin: 0, fontVariantNumeric: 'tabular-nums' }}>
+					<dt style={dtStyle}>{__('Backend code', 'ebq-seo')}</dt>
+					<dd style={ddStyle}><code style={{ fontSize: 10 }}>{codeVersion}</code></dd>
+
+					<dt style={dtStyle}>{__('Site GSC rows', 'ebq-seo')}</dt>
+					<dd style={{ ...ddStyle, fontVariantNumeric: 'tabular-nums' }}>
 						{total != null ? Number(total).toLocaleString() : '—'}
-						{total === 0 ? ' ' + __('(GSC may not be connected to your EBQ workspace yet)', 'ebq-seo') : ''}
+						{total === 0 ? ' ' + __('(GSC may not be connected yet)', 'ebq-seo') : ''}
 					</dd>
 
-					<dt style={{ color: 'var(--ebq-text-soft)' }}>{__('Last sync', 'ebq-seo')}</dt>
-					<dd style={{ margin: 0 }}>{last || __('never', 'ebq-seo')}</dd>
+					<dt style={dtStyle}>{__('Last sync date', 'ebq-seo')}</dt>
+					<dd style={ddStyle}>{last || __('never', 'ebq-seo')}</dd>
 
-					<dt style={{ color: 'var(--ebq-text-soft)' }}>{__('We queried', 'ebq-seo')}</dt>
-					<dd style={{ margin: 0, wordBreak: 'break-all' }}>{queried || '—'}</dd>
+					<dt style={dtStyle}>{__('We queried', 'ebq-seo')}</dt>
+					<dd style={ddStyle}>{queried || '—'}</dd>
+
+					{strictRows != null ? (
+						<>
+							<dt style={dtStyle}>{__('Direct match rows', 'ebq-seo')}</dt>
+							<dd style={{ ...ddStyle, fontVariantNumeric: 'tabular-nums', fontWeight: 600,
+								color: strictRows > 0 ? 'var(--ebq-good-text)' : 'var(--ebq-bad-text)' }}>
+								{strictRows}
+							</dd>
+						</>
+					) : null}
 				</dl>
+
+				{strictRows === 0 && strictPages.length === 0 && variants.length > 0 ? (
+					<>
+						<p style={{ margin: '8px 0 3px', fontSize: 10, color: 'var(--ebq-text-soft)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600 }}>
+							{__('Variants we tried', 'ebq-seo')}
+						</p>
+						<ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+							{variants.map((u) => (
+								<li key={u} style={{ wordBreak: 'break-all', padding: '1px 0', fontSize: 11, fontFamily: 'var(--ebq-font-mono)' }}>{u}</li>
+							))}
+						</ul>
+					</>
+				) : null}
 
 				{similar.length > 0 ? (
 					<>
-						<p style={{ margin: '8px 0 4px', fontSize: 10, color: 'var(--ebq-text-soft)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600 }}>
+						<p style={{ margin: '8px 0 3px', fontSize: 10, color: 'var(--ebq-text-soft)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600 }}>
 							{__('Similar URLs in GSC', 'ebq-seo')}
 						</p>
 						<ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
 							{similar.map((u) => (
-								<li key={u} style={{ wordBreak: 'break-all', padding: '2px 0', fontSize: 11 }}>{u}</li>
+								<li key={u} style={{ wordBreak: 'break-all', padding: '1px 0', fontSize: 11, fontFamily: 'var(--ebq-font-mono)' }}>{u}</li>
 							))}
 						</ul>
 						<p style={{ margin: '8px 0 0', fontSize: 11, lineHeight: 1.45 }}>
-							{__('If your post URL doesn\'t exactly match what GSC indexed, the canonical or permalink may differ.', 'ebq-seo')}
+							{__('Compare these to the URL above. If they differ, the canonical or permalink doesn\'t match what Google indexed.', 'ebq-seo')}
 						</p>
 					</>
-				) : total > 0 ? (
+				) : strictRows === 0 && total > 0 ? (
 					<p style={{ margin: '8px 0 0', fontSize: 11, lineHeight: 1.45 }}>
-						{__('GSC has data for this site but nothing matching this URL. The post may be too new for impressions, or its URL differs from what Google indexed.', 'ebq-seo')}
+						{__('GSC has data for this site but nothing matched the URL we tried. Either the canonical / permalink differs from what Google indexed, or backend code is stale (clear PHP opcache and the WP transient cache).', 'ebq-seo')}
 					</p>
 				) : null}
 			</div>
