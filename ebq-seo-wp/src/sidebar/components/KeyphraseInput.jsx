@@ -29,6 +29,65 @@ const DIAG_MESSAGES = {
 	},
 };
 
+/**
+ * Expandable details block that turns the empty state into a real debugging
+ * surface: shows what URL was queried, what GSC has for the site overall,
+ * and a few similar URLs in case the post lives under a different shape.
+ */
+function Diagnostics({ debug }) {
+	if (!debug || typeof debug !== 'object') return null;
+	const total = debug.gsc_rows_total_all_time;
+	const last = debug.gsc_last_sync_date;
+	const queried = debug.queried_url;
+	const similar = Array.isArray(debug.similar_urls_in_gsc) ? debug.similar_urls_in_gsc : [];
+
+	return (
+		<details style={{ marginTop: 8, width: '100%', textAlign: 'left' }}>
+			<summary style={{
+				cursor: 'pointer', fontSize: 10, color: 'var(--ebq-text-soft)',
+				textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600,
+			}}>
+				{__('Why is this empty?', 'ebq-seo')}
+			</summary>
+			<div style={{ marginTop: 6, padding: 8, background: 'var(--ebq-bg-emboss)', borderRadius: 4, fontSize: 11, color: 'var(--ebq-text-muted)' }}>
+				<dl style={{ margin: 0, display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '2px 8px' }}>
+					<dt style={{ color: 'var(--ebq-text-soft)' }}>{__('Site GSC rows', 'ebq-seo')}</dt>
+					<dd style={{ margin: 0, fontVariantNumeric: 'tabular-nums' }}>
+						{total != null ? Number(total).toLocaleString() : '—'}
+						{total === 0 ? ' ' + __('(GSC may not be connected to your EBQ workspace yet)', 'ebq-seo') : ''}
+					</dd>
+
+					<dt style={{ color: 'var(--ebq-text-soft)' }}>{__('Last sync', 'ebq-seo')}</dt>
+					<dd style={{ margin: 0 }}>{last || __('never', 'ebq-seo')}</dd>
+
+					<dt style={{ color: 'var(--ebq-text-soft)' }}>{__('We queried', 'ebq-seo')}</dt>
+					<dd style={{ margin: 0, wordBreak: 'break-all' }}>{queried || '—'}</dd>
+				</dl>
+
+				{similar.length > 0 ? (
+					<>
+						<p style={{ margin: '8px 0 4px', fontSize: 10, color: 'var(--ebq-text-soft)', textTransform: 'uppercase', letterSpacing: '.06em', fontWeight: 600 }}>
+							{__('Similar URLs in GSC', 'ebq-seo')}
+						</p>
+						<ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
+							{similar.map((u) => (
+								<li key={u} style={{ wordBreak: 'break-all', padding: '2px 0', fontSize: 11 }}>{u}</li>
+							))}
+						</ul>
+						<p style={{ margin: '8px 0 0', fontSize: 11, lineHeight: 1.45 }}>
+							{__('If your post URL doesn\'t exactly match what GSC indexed, the canonical or permalink may differ.', 'ebq-seo')}
+						</p>
+					</>
+				) : total > 0 ? (
+					<p style={{ margin: '8px 0 0', fontSize: 11, lineHeight: 1.45 }}>
+						{__('GSC has data for this site but nothing matching this URL. The post may be too new for impressions, or its URL differs from what Google indexed.', 'ebq-seo')}
+					</p>
+				) : null}
+			</div>
+		</details>
+	);
+}
+
 export default function KeyphraseInput({ postId, value, onChange }) {
 	const [state, setState] = useState(() => {
 		const cached = cache.get(postId);
@@ -48,17 +107,18 @@ export default function KeyphraseInput({ postId, value, onChange }) {
 			.then((data) => {
 				if (cancelled) return;
 				if (data && data.ok === false) {
-					setState({ loading: false, suggestions: [], diagnostic: data.error || 'fetch_failed' });
+					setState({ loading: false, suggestions: [], diagnostic: data.error || 'fetch_failed', debug: null });
 					return;
 				}
 				const list = (data && data.suggestions) || [];
 				const diagnostic = (data && data.diagnostic) || null;
-				cache.set(postId, { suggestions: list, diagnostic });
-				setState({ loading: false, suggestions: list, diagnostic });
+				const debug = (data && data.debug) || null;
+				cache.set(postId, { suggestions: list, diagnostic, debug });
+				setState({ loading: false, suggestions: list, diagnostic, debug });
 			})
 			.catch(() => {
 				if (!cancelled) {
-					setState({ loading: false, suggestions: [], diagnostic: 'fetch_failed' });
+					setState({ loading: false, suggestions: [], diagnostic: 'fetch_failed', debug: null });
 				}
 			});
 
@@ -111,6 +171,7 @@ export default function KeyphraseInput({ postId, value, onChange }) {
 					<Button variant="ghost" size="sm" onClick={refresh}>
 						<IconRefresh /> {__('Retry', 'ebq-seo')}
 					</Button>
+					<Diagnostics debug={state.debug} />
 				</EmptyState>
 			) : (
 				<ul className="ebq-suggestions">

@@ -78,8 +78,34 @@ class WordPressPluginSourceService
             throw new InvalidArgumentException("Could not find EBQ_SEO_VERSION define in ebq-seo.php.");
         }
 
-        if (file_put_contents($path, $updated) === false) {
-            throw new InvalidArgumentException('Failed to write ebq-seo.php.');
+        if (! is_writable($path)) {
+            throw new InvalidArgumentException(
+                'Cannot write plugin main file (not writable by this PHP process): '.$path.'. '.
+                $this->filesystemPermissionHint($path)
+            );
         }
+
+        $written = @file_put_contents($path, $updated);
+        if ($written === false) {
+            $extra = '';
+            $err = error_get_last();
+            if (is_array($err) && isset($err['message']) && str_contains((string) $err['message'], 'Permission denied')) {
+                $extra = ' '.$this->filesystemPermissionHint($path);
+            }
+
+            throw new InvalidArgumentException('Failed to write '.$path.'.'.$extra);
+        }
+    }
+
+    private function filesystemPermissionHint(string $path): string
+    {
+        $dir = dirname($path);
+        $user = function_exists('posix_geteuid') && function_exists('posix_getpwuid') ? (posix_getpwuid(posix_geteuid())['name'] ?? null) : null;
+        $who = $user ? 'Current process user: '.$user.'. ' : '';
+
+        return $who.
+            'Fix ownership/ACL so the web/PHP user can write `ebq-seo-wp/ebq-seo.php` and `public/downloads/` '.
+            '(example on Debian/Ubuntu: `sudo chown -R www-data:www-data '.$dir.'` if PHP-FPM runs as www-data). '.
+            'Alternatively, apply the version over SSH as the deploy user: `cd '.base_path().' && php artisan ebq:apply-plugin-version <version> --package`.';
     }
 }
