@@ -119,12 +119,16 @@ class KeywordsEverywhereClient
                     $credits = (int) $json['credits'];
                 }
 
+                // KE bills 1 credit per keyword in the request — even keywords
+                // they have no data for. So `count($chunk)` is the correct
+                // unit count regardless of how many rows came back in `data`.
                 app(ClientActivityLogger::class)->log(
                     'api_usage.keywords_everywhere',
                     userId: $ownerUserId ?? Auth::id(),
                     websiteId: $websiteId,
                     provider: 'keywords_everywhere',
                     meta: [
+                        'operation' => 'search_volume_lookup',
                         'keyword_count' => count($chunk),
                         'credits_remaining' => $credits,
                         'country' => $country,

@@ -279,8 +279,18 @@
                         @forelse ($recent as $r)
                             @php
                                 $detail = '';
+                                $opTag = '';
                                 if (is_array($r->meta)) {
+                                    if (! empty($r->meta['operation'])) {
+                                        // Friendlier labels in the feed.
+                                        $opLabels = [
+                                            'search_volume_lookup' => 'Search volume',
+                                            'backlinks_for_domain' => 'Backlinks',
+                                        ];
+                                        $opTag = $opLabels[$r->meta['operation']] ?? $r->meta['operation'];
+                                    }
                                     if (! empty($r->meta['query'])) $detail = '"' . $r->meta['query'] . '"';
+                                    elseif (! empty($r->meta['domain'])) $detail = $r->meta['domain'];
                                     elseif (! empty($r->meta['keyword_count'])) $detail = $r->meta['keyword_count'] . ' kw';
                                 }
                             @endphp
@@ -294,7 +304,12 @@
                                 <td class="px-3 py-2 text-xs">{{ $r->user?->email ?? '—' }}</td>
                                 <td class="px-3 py-2 text-xs">{{ $r->website?->domain ?? '—' }}</td>
                                 <td class="px-3 py-2 text-right font-mono text-xs tabular-nums">{{ $r->units_consumed ?? '—' }}</td>
-                                <td class="px-3 py-2 text-xs text-slate-500">{{ $detail }}</td>
+                                <td class="px-3 py-2 text-xs text-slate-500">
+                                    @if ($opTag)
+                                        <span class="mr-1 inline-flex rounded border border-slate-200 bg-slate-50 px-1.5 py-px text-[10px] font-semibold text-slate-600">{{ $opTag }}</span>
+                                    @endif
+                                    {{ $detail }}
+                                </td>
                             </tr>
                         @empty
                             <tr><td colspan="6" class="px-3 py-8 text-center text-sm text-slate-400">No calls in this period.</td></tr>
