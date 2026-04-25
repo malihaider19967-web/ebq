@@ -22,3 +22,9 @@ export async function fetchDashboard() {
 export async function fetchInternalLinkSuggestions(postId) {
 	return apiFetch({ path: `/ebq/v1/internal-link-suggestions/${postId}` });
 }
+
+export async function fetchRelatedKeywords(postId, keyword) {
+	return apiFetch({
+		path: `/ebq/v1/related-keywords/${postId}?keyword=${encodeURIComponent(keyword)}`,
+	});
+}

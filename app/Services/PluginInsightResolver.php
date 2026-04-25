@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\KeywordMetric;
 use App\Models\PageAuditReport;
 use App\Models\PageIndexingStatus;
 use App\Models\RankTrackingKeyword;
+use App\Models\RankTrackingSnapshot;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
 use Illuminate\Support\Carbon;
@@ -404,6 +406,198 @@ class PluginInsightResolver
             'checked_at' => $snapshot->checked_at?->toIso8601String(),
             'results' => $results,
         ];
+    }
+
+    /**
+     * Related keyphrase suggestions for the focus keyword — Yoast Premium's
+     * "related keyphrases" without Semrush. Three signal layers, merged and
+     * de-duped, so we don't burn an external credit per writer keystroke:
+     *
+     *   1. Site-wide GSC queries containing the focus tokens, last 90 days
+     *      (filters out the post's own URL so we don't suggest queries it
+     *       already targets).
+     *   2. Related searches + People-Also-Ask harvested from any
+     *      RankTrackingSnapshot the platform has run for matching keywords.
+     *   3. KE search-volume from the local cache (free — no API call).
+     *
+     * Each suggestion ships with `volume`, `clicks`, `impressions`,
+     * `position`, `source` (gsc | related | paa) and `score`.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function relatedKeywords(
+        Website $website,
+        string $focusKeyword,
+        ?string $excludeUrl = null,
+        int $limit = 20,
+    ): array {
+        $focus = trim($focusKeyword);
+        if ($focus === '') {
+            return [];
+        }
+        $tokens = $this->significantTokens($focus);
+        if ($tokens === []) {
+            return [];
+        }
+        $focusLower = mb_strtolower($focus);
+
+        $excludeVariants = $excludeUrl !== null && trim($excludeUrl) !== ''
+            ? $this->pageVariants($excludeUrl)
+            : [];
+
+        $tz = config('app.timezone');
+        $end = Carbon::yesterday($tz)->endOfDay();
+        $start = $end->copy()->subDays(89)->startOfDay();
+
+        // ─── 1. GSC queries on this site that contain the focus tokens ─────
+        $gscRows = SearchConsoleData::query()
+            ->where('website_id', $website->id)
+            ->whereDate('date', '>=', $start->toDateString())
+            ->whereDate('date', '<=', $end->toDateString())
+            ->where('query', '!=', '')
+            ->when($excludeVariants !== [], fn ($q) => $q->whereNotIn('page', $excludeVariants))
+            ->where(function ($w) use ($tokens) {
+                foreach ($tokens as $tok) {
+                    $w->orWhere('query', 'LIKE', '%'.$tok.'%');
+                }
+            })
+            ->selectRaw('query,
+                SUM(clicks) AS clicks,
+                SUM(impressions) AS impressions,
+                AVG(position) AS position')
+            ->groupBy('query')
+            ->orderByDesc('impressions')
+            ->limit(150)
+            ->get();
+
+        $bag = []; // keyword(lower) → row
+
+        foreach ($gscRows as $r) {
+            $kw = trim((string) $r->query);
+            if ($kw === '') continue;
+            $kwLower = mb_strtolower($kw);
+            if ($kwLower === $focusLower) continue; // not "related" to itself
+
+            $matched = 0;
+            foreach ($tokens as $tok) {
+                if (str_contains($kwLower, $tok)) $matched++;
+            }
+            if ($matched === 0) continue;
+
+            $impressions = (int) $r->impressions;
+            $clicks = (int) $r->clicks;
+            $position = $r->position !== null ? round((float) $r->position, 1) : null;
+
+            $bag[$kwLower] = [
+                'keyword' => $kw,
+                'source' => 'gsc',
+                'impressions' => $impressions,
+                'clicks' => $clicks,
+                'position' => $position,
+                'volume' => null,
+                'score' => ($impressions / 100)
+                    + ($matched * 5)
+                    + ($position !== null ? max(0, 20 - $position) : 0),
+            ];
+        }
+
+        // ─── 2. Related searches + PAA from rank-tracker snapshots ─────────
+        // Find tracked keywords that look related (token overlap) and pull
+        // related/PAA arrays from their most-recent snapshot. Caps the join
+        // to 5 tracked keywords so this stays a cheap query.
+        $relatedKeywordIds = RankTrackingKeyword::query()
+            ->where('website_id', $website->id)
+            ->where('is_active', true)
+            ->where(function ($w) use ($tokens) {
+                foreach ($tokens as $tok) {
+                    $w->orWhereRaw('LOWER(keyword) LIKE ?', ['%'.$tok.'%']);
+                }
+            })
+            ->orderByDesc('last_checked_at')
+            ->limit(5)
+            ->pluck('id');
+
+        if ($relatedKeywordIds->isNotEmpty()) {
+            $snapshots = RankTrackingSnapshot::query()
+                ->whereIn('rank_tracking_keyword_id', $relatedKeywordIds)
+                ->where('status', 'ok')
+                ->orderByDesc('checked_at')
+                ->limit(20)
+                ->get(['related_searches', 'people_also_ask']);
+
+            foreach ($snapshots as $snap) {
+                foreach ([
+                    ['related_searches', 'related'],
+                    ['people_also_ask',  'paa'],
+                ] as [$column, $sourceTag]) {
+                    $list = is_array($snap->{$column}) ? $snap->{$column} : [];
+                    foreach ($list as $item) {
+                        $kw = '';
+                        if (is_string($item)) {
+                            $kw = trim($item);
+                        } elseif (is_array($item)) {
+                            $kw = trim((string) ($item['query'] ?? $item['question'] ?? $item['keyword'] ?? ''));
+                        }
+                        if ($kw === '') continue;
+                        $kwLower = mb_strtolower($kw);
+                        if ($kwLower === $focusLower) continue;
+                        if (isset($bag[$kwLower])) continue; // GSC row wins (it has volume/clicks)
+
+                        $matched = 0;
+                        foreach ($tokens as $tok) {
+                            if (str_contains($kwLower, $tok)) $matched++;
+                        }
+
+                        $bag[$kwLower] = [
+                            'keyword' => $kw,
+                            'source' => $sourceTag,
+                            'impressions' => 0,
+                            'clicks' => 0,
+                            'position' => null,
+                            'volume' => null,
+                            'score' => 5 + ($matched * 4),
+                        ];
+                    }
+                }
+            }
+        }
+
+        if ($bag === []) {
+            return [];
+        }
+
+        // ─── 3. Search volume from KE cache (free — no API call) ───────────
+        $hashes = array_map([KeywordMetric::class, 'hashKeyword'], array_keys($bag));
+        $metrics = KeywordMetric::query()
+            ->whereIn('keyword_hash', $hashes)
+            ->where('country', 'global')
+            ->get(['keyword_hash', 'search_volume']);
+        $volumeByHash = $metrics->pluck('search_volume', 'keyword_hash')->all();
+
+        foreach ($bag as $kwLower => &$row) {
+            $hash = KeywordMetric::hashKeyword($kwLower);
+            $vol = $volumeByHash[$hash] ?? null;
+            if ($vol !== null) {
+                $row['volume'] = (int) $vol;
+                // Volume is a strong second-order ranker — boost score so
+                // higher-volume related keywords float to the top.
+                $row['score'] += min(20, $vol > 0 ? log10($vol) * 4 : 0);
+            }
+        }
+        unset($row);
+
+        $out = array_values($bag);
+        usort($out, fn ($a, $b) => $b['score'] <=> $a['score']);
+
+        return array_slice(array_map(static fn (array $r) => [
+            'keyword' => $r['keyword'],
+            'source' => $r['source'],
+            'volume' => $r['volume'],
+            'impressions' => $r['impressions'],
+            'clicks' => $r['clicks'],
+            'position' => $r['position'],
+            'score' => round($r['score'], 1),
+        ], $out), 0, $limit);
     }
 
     /**

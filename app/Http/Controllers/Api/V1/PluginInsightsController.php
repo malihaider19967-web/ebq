@@ -179,6 +179,42 @@ class PluginInsightsController extends Controller
     }
 
     /**
+     * Related keyphrase suggestions for a focus keyword — Yoast-Premium
+     * "related keyphrases" backed by GSC + rank-tracker SERP captures
+     * (no Semrush, no per-keystroke external API spend).
+     *   GET /api/v1/posts/{externalPostId}/related-keywords?keyword=...&url=...
+     */
+    public function relatedKeywords(Request $request, string $externalPostId): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        $keyword = (string) $request->query('keyword', '');
+        $url = (string) $request->query('url', '');
+
+        $diagnostic = null;
+        $suggestions = [];
+
+        if (trim($keyword) === '') {
+            $diagnostic = 'missing_keyword';
+        } else {
+            $suggestions = $this->resolver->relatedKeywords(
+                $website,
+                $keyword,
+                $url !== '' ? $url : null,
+            );
+            if (empty($suggestions)) {
+                $diagnostic = 'no_related_data';
+            }
+        }
+
+        return response()->json([
+            'external_post_id' => $externalPostId,
+            'keyword' => $keyword,
+            'suggestions' => $suggestions,
+            'diagnostic' => $diagnostic,
+        ]);
+    }
+
+    /**
      * Internal-link suggestions: other URLs on this website worth linking
      * *to* from the post being edited. Ranked by Search Console performance,
      * not just word similarity.

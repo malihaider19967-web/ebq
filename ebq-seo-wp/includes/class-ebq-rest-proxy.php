@@ -61,6 +61,16 @@ final class EBQ_Rest_Proxy
             ],
         ]);
 
+        register_rest_route('ebq/v1', '/related-keywords/(?P<id>\d+)', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'related_keywords'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+                'keyword' => ['required' => true],
+            ],
+        ]);
+
         register_rest_route('ebq/v1', '/post-insights-html/(?P<id>\d+)', [
             'methods' => 'GET',
             'permission_callback' => [$this, 'can_edit'],
@@ -134,6 +144,22 @@ final class EBQ_Rest_Proxy
 
         return new WP_REST_Response(
             EBQ_Plugin::api_client()->get_serp_preview((string) $post_id, $query),
+            200
+        );
+    }
+
+    public function related_keywords(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $keyword = trim((string) $request->get_param('keyword'));
+        if ($keyword === '') {
+            return new WP_REST_Response(['ok' => false, 'error' => 'missing_keyword'], 400);
+        }
+
+        $url = (string) get_permalink($post_id);
+
+        return new WP_REST_Response(
+            EBQ_Plugin::api_client()->get_related_keywords((string) $post_id, $keyword, $url),
             200
         );
     }

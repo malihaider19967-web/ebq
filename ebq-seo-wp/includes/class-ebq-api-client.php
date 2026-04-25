@@ -78,6 +78,19 @@ final class EBQ_Api_Client
         );
     }
 
+    public function get_related_keywords(string $post_id, string $keyword, string $url = ''): array
+    {
+        $args = ['keyword' => $keyword];
+        if ($url !== '') {
+            $args['url'] = $url;
+        }
+
+        return $this->get(
+            sprintf('/api/v1/posts/%s/related-keywords', rawurlencode($post_id)),
+            $args
+        );
+    }
+
     public function get_internal_link_suggestions(string $post_id, string $url, string $keyword = '', string $title = ''): array
     {
         $args = ['url' => $url];

@@ -2,6 +2,7 @@ import { __ } from '@wordpress/i18n';
 import { useEffect, useState } from '@wordpress/element';
 import { TextField, EmptyState, Spinner, Button } from './primitives';
 import { IconChart, IconRefresh } from './icons';
+import RelatedKeyphrases from './RelatedKeyphrases';
 import { fetchFocusKeywordSuggestions } from '../api';
 
 const cache = new Map();
@@ -226,6 +227,13 @@ export default function KeyphraseInput({ postId, value, onChange }) {
 					))}
 				</ul>
 			)}
+
+			{value && value.trim().length >= 3 ? (
+				<>
+					<div className="ebq-divider" />
+					<RelatedKeyphrases postId={postId} focusKeyword={value} onChoose={onChange} />
+				</>
+			) : null}
 		</div>
 	);
 }
