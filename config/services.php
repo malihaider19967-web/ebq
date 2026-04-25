@@ -44,6 +44,10 @@ return [
     'serper' => [
         'key' => env('SERPER_API_KEY'),
         'search_url' => env('SERPER_SEARCH_URL', 'https://google.serper.dev/search'),
+        // Per-call cost (USD) — used by the admin "API usage" dashboard
+        // to estimate billable spend per client. Adjust to your contract.
+        // Default reflects Serper's published $0.30/1k credits.
+        'cost_per_call_usd' => (float) env('SERPER_COST_PER_CALL_USD', 0.0003),
     ],
 
     'lighthouse' => [
@@ -56,6 +60,9 @@ return [
         'key' => env('KEYWORDS_EVERYWHERE_API_KEY'),
         'base_url' => env('KEYWORDS_EVERYWHERE_BASE_URL', 'https://api.keywordseverywhere.com'),
         'fresh_days' => (int) env('KEYWORDS_EVERYWHERE_FRESH_DAYS', 30),
+        // Per-keyword cost (USD) — KE bills 1 credit per keyword. Default
+        // reflects the published 100,000-credit pack at $10 = $0.0001/credit.
+        'cost_per_keyword_usd' => (float) env('KEYWORDS_EVERYWHERE_COST_PER_KEYWORD_USD', 0.0001),
         // Competitor-backlinks knobs — all env-overridable so the endpoint or
         // defaults can shift without a code change.
         'backlinks_endpoint' => env('KEYWORDS_EVERYWHERE_BACKLINKS_ENDPOINT', '/v1/get_domain_backlinks'),

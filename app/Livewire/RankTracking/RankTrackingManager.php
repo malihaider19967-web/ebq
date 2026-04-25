@@ -519,7 +519,12 @@ class RankTrackingManager extends Component
         if ($rows instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $rows->isNotEmpty()) {
             $keywordList = $rows->getCollection()->pluck('keyword')->map(fn ($k) => (string) $k)->unique()->values()->all();
             if ($keywordList !== []) {
-                $keMetrics = app(KeywordMetricsService::class)->metricsOrQueue($keywordList, 'global');
+                $keMetrics = app(KeywordMetricsService::class)->metricsOrQueue(
+                    $keywordList,
+                    'global',
+                    websiteId: $this->websiteId ?: null,
+                    ownerUserId: \Illuminate\Support\Facades\Auth::id(),
+                );
                 $detectedLanguages = app(\App\Services\LanguageDetectorService::class)->detectMany($keywordList);
             }
         }

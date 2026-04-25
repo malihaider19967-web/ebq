@@ -25,16 +25,26 @@ class SerperSearchClient
 
     /**
      * Legacy simple search kept for existing callers (page audit etc.).
+     * `$websiteId` / `$ownerUserId` propagate to the activity log so admin
+     * billing can attribute the call.
      *
      * @return array<string, mixed>|null
      */
-    public function search(string $query, int $num = 10, ?string $gl = null, ?string $hl = null): ?array
-    {
+    public function search(
+        string $query,
+        int $num = 10,
+        ?string $gl = null,
+        ?string $hl = null,
+        ?int $websiteId = null,
+        ?int $ownerUserId = null,
+    ): ?array {
         return $this->query([
             'q' => $query,
             'num' => $num,
             'gl' => $gl,
             'hl' => $hl,
+            '__website_id' => $websiteId,
+            '__owner_user_id' => $ownerUserId,
         ]);
     }
 
@@ -147,16 +157,23 @@ class SerperSearchClient
             return null;
         }
 
+        $websiteId = isset($params['__website_id']) ? (int) $params['__website_id'] : null;
+        $ownerUserId = isset($params['__owner_user_id']) ? (int) $params['__owner_user_id'] : null;
+
         app(ClientActivityLogger::class)->log(
             'api_usage.serp_api',
-            userId: Auth::id(),
+            userId: $ownerUserId ?? Auth::id(),
+            websiteId: $websiteId ?: null,
             provider: 'serp_api',
             meta: [
                 'query' => mb_substr($q, 0, 120),
                 'type' => $type,
                 'num' => $body['num'] ?? null,
                 'page' => $body['page'] ?? null,
-            ]
+                'gl' => $body['gl'] ?? null,
+                'device' => $body['device'] ?? null,
+            ],
+            unitsConsumed: 1,
         );
 
         return is_array($json) ? $json : null;

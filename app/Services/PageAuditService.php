@@ -207,6 +207,8 @@ class PageAuditService
                 $serpGlForBenchmark,
                 $pageLocaleResolved['hl'],
                 $pageLocaleResolved['bcp47'],
+                $websiteId,
+                $website->user_id ?? null,
             );
             if ($benchmark !== null) {
                 if (isset($benchmark['your_serp']) && is_array($benchmark['your_serp'])) {
@@ -326,7 +328,7 @@ class PageAuditService
      * @param  array<string, mixed>  $keywordsPayload
      * @return array<string, mixed>|null null when Serper is not configured
      */
-    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch, int $yourWordCount, int $yourImageCount, ?array $yourStack = null, ?string $serpKeywordOverride = null, ?string $serpGl = null, ?string $serpHl = null, ?string $serpBcp47 = null): ?array
+    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch, int $yourWordCount, int $yourImageCount, ?array $yourStack = null, ?string $serpKeywordOverride = null, ?string $serpGl = null, ?string $serpHl = null, ?string $serpBcp47 = null, ?int $websiteId = null, ?int $ownerUserId = null): ?array
     {
         $apiKey = config('services.serper.key');
         if (! is_string($apiKey) || trim($apiKey) === '') {
@@ -377,7 +379,14 @@ class PageAuditService
                 ];
             }
 
-            $payload = app(SerperSearchClient::class)->search($keyword, 20, $effectiveGl, $effectiveHl);
+            $payload = app(SerperSearchClient::class)->search(
+                $keyword,
+                20,
+                $effectiveGl,
+                $effectiveHl,
+                websiteId: $websiteId,
+                ownerUserId: $ownerUserId,
+            );
             if ($payload === null) {
                 return [
                     'keyword' => $keyword,

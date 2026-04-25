@@ -17,12 +17,14 @@ class ClientActivity extends Model
         'type',
         'provider',
         'meta',
+        'units_consumed',
     ];
 
     protected function casts(): array
     {
         return [
             'meta' => 'array',
+            'units_consumed' => 'integer',
         ];
     }
 

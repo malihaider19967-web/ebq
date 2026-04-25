@@ -16,7 +16,8 @@ class ClientActivityLogger
         ?int $websiteId = null,
         ?string $provider = null,
         ?array $meta = null,
-        ?int $actorUserId = null
+        ?int $actorUserId = null,
+        ?int $unitsConsumed = null
     ): void {
         ClientActivity::query()->create([
             'type' => $type,
@@ -25,6 +26,7 @@ class ClientActivityLogger
             'website_id' => $websiteId,
             'provider' => $provider,
             'meta' => $meta,
+            'units_consumed' => $unitsConsumed,
         ]);
     }
 }

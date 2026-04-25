@@ -70,7 +70,7 @@ class KeywordMetricsService
      * @param  list<string>  $keywords
      * @return array<string, KeywordMetric>
      */
-    public function metricsOrQueue(array $keywords, string $country = 'global'): array
+    public function metricsOrQueue(array $keywords, string $country = 'global', ?int $websiteId = null, ?int $ownerUserId = null): array
     {
         $country = $this->normalizeCountry($country);
         $cleaned = $this->uniqueCleaned($keywords);
@@ -91,7 +91,7 @@ class KeywordMetricsService
         }
 
         if ($toFetch !== []) {
-            FetchKeywordMetricsJob::dispatch($toFetch, $country);
+            FetchKeywordMetricsJob::dispatch($toFetch, $country, $websiteId, $ownerUserId);
         }
 
         return $have;
@@ -102,7 +102,7 @@ class KeywordMetricsService
      *
      * @param  list<string>  $keywords
      */
-    public function refresh(array $keywords, string $country = 'global'): int
+    public function refresh(array $keywords, string $country = 'global', ?int $websiteId = null, ?int $ownerUserId = null): int
     {
         $country = $this->normalizeCountry($country);
         $cleaned = $this->uniqueCleaned($keywords);
@@ -114,10 +114,16 @@ class KeywordMetricsService
         Log::info('KeywordMetricsService.refresh: starting', [
             'count' => count($cleaned),
             'country' => $country,
+            'website_id' => $websiteId,
             'sample' => array_slice($cleaned, 0, 3),
         ]);
 
-        $response = $this->client->getKeywordData($cleaned, $country);
+        $response = $this->client->getKeywordData(
+            $cleaned,
+            $country,
+            websiteId: $websiteId,
+            ownerUserId: $ownerUserId,
+        );
         if ($response === null) {
             Log::warning('KeywordMetricsService.refresh: client returned null (check API key + log lines above)');
 

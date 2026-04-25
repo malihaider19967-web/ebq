@@ -28,6 +28,8 @@ class FetchKeywordMetricsJob implements ShouldQueue
     public function __construct(
         public array $keywords,
         public string $country = 'global',
+        public ?int $websiteId = null,
+        public ?int $ownerUserId = null,
     ) {}
 
     public function handle(KeywordMetricsService $service): void
@@ -36,18 +38,19 @@ class FetchKeywordMetricsJob implements ShouldQueue
             return;
         }
 
-        $service->refresh($this->keywords, $this->country);
+        $service->refresh($this->keywords, $this->country, $this->websiteId, $this->ownerUserId);
     }
 
     /**
      * Deduplicate identical batches while they're queued so rapid-fire
-     * dispatches don't stack up.
+     * dispatches don't stack up. Include website_id so two different
+     * websites asking for the same keyword each get their own credit hit.
      */
     public function uniqueId(): string
     {
         sort($this->keywords);
 
-        return hash('sha256', $this->country.'|'.implode("\n", $this->keywords));
+        return hash('sha256', $this->country.'|'.($this->websiteId ?? 0).'|'.implode("\n", $this->keywords));
     }
 
     public function uniqueFor(): int

@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\ClientController as AdminClientController;
 use App\Http\Controllers\Admin\ClientImpersonationController;
 use App\Http\Controllers\Admin\PluginAdoptionController as AdminPluginAdoptionController;
 use App\Http\Controllers\Admin\PluginReleaseController as AdminPluginReleaseController;
+use App\Http\Controllers\Admin\UsageController as AdminUsageController;
 use App\Http\Controllers\WordPressConnectController;
 use App\Http\Controllers\WordPressPluginDownloadController;
 use App\Http\Controllers\WordPressPluginVersionController;
@@ -68,6 +69,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/clients/{user}/impersonate', [ClientImpersonationController::class, 'start'])->name('clients.impersonate');
 
     Route::get('/activities', [AdminActivityController::class, 'index'])->name('activities.index');
+    Route::get('/usage', [AdminUsageController::class, 'index'])->name('usage.index');
     Route::get('/plugin-releases', [AdminPluginReleaseController::class, 'index'])->name('plugin-releases.index');
     Route::post('/plugin-releases', [AdminPluginReleaseController::class, 'store'])->name('plugin-releases.store');
     Route::post('/plugin-releases/{pluginRelease}/publish', [AdminPluginReleaseController::class, 'publish'])->name('plugin-releases.publish');

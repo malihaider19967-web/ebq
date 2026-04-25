@@ -33,11 +33,21 @@ class KeywordsEverywhereClient
      * (missing key, HTTP error, malformed body). Multiple API calls are
      * chunked transparently — return shape aggregates all data rows.
      *
+     * Pass `$websiteId` and `$ownerUserId` so the per-call activity row in
+     * `client_activities` carries the right billing scope. The admin usage
+     * page sums `units_consumed` keyed off these.
+     *
      * @param  list<string>  $keywords
      * @return array{data: list<array<string, mixed>>, credits: ?int}|null
      */
-    public function getKeywordData(array $keywords, string $country = 'global', string $currency = 'usd', string $dataSource = 'gkp'): ?array
-    {
+    public function getKeywordData(
+        array $keywords,
+        string $country = 'global',
+        string $currency = 'usd',
+        string $dataSource = 'gkp',
+        ?int $websiteId = null,
+        ?int $ownerUserId = null,
+    ): ?array {
         $key = config('services.keywords_everywhere.key');
         if (! is_string($key) || trim($key) === '') {
             return null;
@@ -111,12 +121,16 @@ class KeywordsEverywhereClient
 
                 app(ClientActivityLogger::class)->log(
                     'api_usage.keywords_everywhere',
-                    userId: Auth::id(),
+                    userId: $ownerUserId ?? Auth::id(),
+                    websiteId: $websiteId,
                     provider: 'keywords_everywhere',
                     meta: [
                         'keyword_count' => count($chunk),
                         'credits_remaining' => $credits,
-                    ]
+                        'country' => $country,
+                        'data_source' => $dataSource,
+                    ],
+                    unitsConsumed: count($chunk),
                 );
             } catch (\Throwable $e) {
                 Log::warning('KeywordsEverywhere request threw', [

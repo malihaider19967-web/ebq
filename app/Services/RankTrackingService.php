@@ -24,6 +24,10 @@ class RankTrackingService
             'autocorrect' => (bool) $keyword->autocorrect,
             'safe' => (bool) $keyword->safe_search,
             'tbs' => $keyword->tbs,
+            // Billing attribution — picked up by SerperSearchClient::query
+            // and written into client_activities.{user_id, website_id}.
+            '__website_id'    => $keyword->website_id,
+            '__owner_user_id' => $keyword->user_id,
         ];
 
         $json = $this->serper->query($params);

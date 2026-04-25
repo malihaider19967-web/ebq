@@ -138,7 +138,12 @@ class KeywordsTable extends Component
                 ->values()
                 ->all();
             if ($queries !== []) {
-                $keMetrics = app(KeywordMetricsService::class)->metricsOrQueue($queries, 'global');
+                $keMetrics = app(KeywordMetricsService::class)->metricsOrQueue(
+                    $queries,
+                    'global',
+                    websiteId: $this->websiteId ?: null,
+                    ownerUserId: Auth::id(),
+                );
                 $languages = app(\App\Services\LanguageDetectorService::class)->detectMany($queries);
             }
         }
