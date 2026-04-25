@@ -729,6 +729,18 @@ class PluginInsightResolver
         return $this->pageVariants($url);
     }
 
+    /**
+     * Public wrapper around applyPageMatch — used by services that need
+     * the full strict-variants + LIKE-fallback page matcher (covers query
+     * strings, AMP, CDN rewrites, www drift, trailing slash, etc.) on a
+     * SearchConsoleData / PageIndexingStatus query without re-implementing
+     * the helper.
+     */
+    public function __publicApplyPageMatch(\Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder $query, string $url): void
+    {
+        $this->applyPageMatch($query, $url);
+    }
+
     private function pageVariants(string $url): array
     {
         $parts = parse_url($url);

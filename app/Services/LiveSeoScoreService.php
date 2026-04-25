@@ -19,6 +19,14 @@ use Illuminate\Support\Carbon;
  * Google still doesn't rank it; here's why" — that diff is what pulls
  * users back to the EBQ platform when an answer is needed.
  *
+ * URL matching uses `PluginInsightResolver::__publicPageVariants()` so we
+ * match GSC rows regardless of:
+ *   - trailing slash drift  (`/abc/xyz` vs `/abc/xyz/`)
+ *   - www vs apex            (`www.x.com` vs `x.com`)
+ *   - scheme                 (`http://` vs `https://`)
+ *   - case                   (lowercased URLs in storage)
+ * The same matcher handles 12 cross-variants in one indexed `whereIn` lookup.
+ *
  * Pure data composition, no LLM call. Returns:
  *   [
  *     'score' => 0..100,
@@ -30,23 +38,35 @@ use Illuminate\Support\Carbon;
  */
 class LiveSeoScoreService
 {
+    public function __construct(
+        private readonly PluginInsightResolver $resolver,
+    ) {}
+
     public function score(Website $website, string $canonicalUrl, ?string $focusKeyword = null): array
     {
         $url = trim($canonicalUrl);
         if ($url === '' || ! $website->isAuditUrlForThisSite($url)) {
-            return $this->unavailable('url_not_for_website');
+            return $this->unavailable('url_not_for_website', ['url' => $url, 'domain' => $website->domain]);
         }
+
+        // Strict 12-way variant set covering trailing slash / www / scheme
+        // / case. Used standalone for cannibalization (whereNotIn) and the
+        // diagnostic counts. The actual GSC reads use applyPageMatch which
+        // adds a LIKE fallback on top of variants for query strings / AMP /
+        // CDN drift the variant generator can't enumerate exactly.
+        $variants = $this->resolver->__publicPageVariants($url);
 
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz);
         $start30 = $end->copy()->subDays(29);
 
-        // ── GSC totals for the URL (last 30 days)
+        // ── GSC totals for the URL (last 30 days). Match via the resolver's
+        // strict + LIKE matcher so we don't miss query-string / AMP variants.
         $gsc = SearchConsoleData::query()
             ->where('website_id', $website->id)
             ->whereDate('date', '>=', $start30->toDateString())
             ->whereDate('date', '<=', $end->toDateString())
-            ->where('page', $url)
+            ->tap(fn ($q) => $this->resolver->__publicApplyPageMatch($q, $url))
             ->selectRaw('SUM(clicks) AS clicks, SUM(impressions) AS impressions, AVG(position) AS position, AVG(ctr) AS ctr')
             ->first();
 
@@ -56,7 +76,7 @@ class LiveSeoScoreService
         $avgCtr = $gsc && $gsc->ctr !== null ? (float) $gsc->ctr : null;
 
         if ($impressions === 0 && $avgPos === null) {
-            return $this->unavailable('no_gsc_data_for_url');
+            return $this->unavailable('no_gsc_data_for_url', $this->buildDiagnostics($website, $url, $variants));
         }
 
         // ── Focus-keyword rank (when supplied) — gets the heaviest weight.
@@ -66,7 +86,7 @@ class LiveSeoScoreService
                 ->where('website_id', $website->id)
                 ->whereDate('date', '>=', $start30->toDateString())
                 ->whereDate('date', '<=', $end->toDateString())
-                ->where('page', $url)
+                ->tap(fn ($q) => $this->resolver->__publicApplyPageMatch($q, $url))
                 ->whereRaw('LOWER(`query`) = ?', [mb_strtolower($focusKeyword)])
                 ->selectRaw('AVG(position) AS position, SUM(impressions) AS impressions')
                 ->first();
@@ -80,13 +100,15 @@ class LiveSeoScoreService
             ->where('website_id', $website->id)
             ->whereDate('date', '>=', $start30->toDateString())
             ->whereDate('date', '<=', $end->toDateString())
-            ->where('page', $url)
+            ->tap(fn ($q) => $this->resolver->__publicApplyPageMatch($q, $url))
             ->where('query', '!=', '')
             ->where('position', '<=', 100)
             ->distinct('query')
             ->count('query');
 
         // ── Cannibalization — is another URL competing for the same focus keyword?
+        // Strict variants only here (no LIKE) so a query-string twin of OUR URL
+        // doesn't get counted as a competing page.
         $cannibalized = false;
         if ($focusKeyword !== null && $focusKeyword !== '') {
             $competingPages = SearchConsoleData::query()
@@ -94,18 +116,18 @@ class LiveSeoScoreService
                 ->whereDate('date', '>=', $start30->toDateString())
                 ->whereDate('date', '<=', $end->toDateString())
                 ->whereRaw('LOWER(`query`) = ?', [mb_strtolower($focusKeyword)])
-                ->where('page', '!=', $url)
+                ->whereNotIn('page', $variants)
                 ->where('clicks', '>', 0)
                 ->distinct('page')
                 ->count('page');
             $cannibalized = $competingPages > 0;
         }
 
-        // ── Audit / Lighthouse score (latest report).
+        // ── Audit / Lighthouse score (latest report) — match by variant too.
         $auditScore = null;
         $latestAudit = PageAuditReport::query()
             ->where('website_id', $website->id)
-            ->where('audit_url', $url)
+            ->whereIn('audit_url', $variants)
             ->orderByDesc('created_at')
             ->first();
         if ($latestAudit && $latestAudit->lighthouse_performance !== null) {
@@ -220,6 +242,62 @@ class LiveSeoScoreService
     }
 
     /**
+     * When GSC returns nothing for the URL, attach diagnostic counters
+     * to the unavailable response so we can quickly see WHY: did the
+     * site sync at all? Are there any rows for this host? Are there
+     * similar URLs (path LIKE) that suggest a normalization mismatch?
+     * Same shape the focus-keyword-suggestions endpoint already uses.
+     */
+    private function buildDiagnostics(Website $website, string $url, array $variants): array
+    {
+        $totalRows = (int) SearchConsoleData::query()
+            ->where('website_id', $website->id)
+            ->count();
+        $latestSync = SearchConsoleData::query()
+            ->where('website_id', $website->id)
+            ->max('date');
+
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
+        $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?: ''));
+        $hostNoWww = preg_replace('/^www\./', '', $host) ?: $host;
+
+        $similar = [];
+        if ($path !== '/' && $path !== '') {
+            $tail = '%' . addcslashes(rtrim($path, '/'), '\\%_') . '%';
+            $similar = SearchConsoleData::query()
+                ->where('website_id', $website->id)
+                ->where('page', 'LIKE', $tail)
+                ->select('page')->distinct()->limit(5)
+                ->pluck('page')->all();
+        } elseif ($hostNoWww !== '') {
+            $h = addcslashes($hostNoWww, '\\%_');
+            $similar = SearchConsoleData::query()
+                ->where('website_id', $website->id)
+                ->where(function ($q) use ($h) {
+                    $q->where('page', 'LIKE', '%://' . $h)
+                      ->orWhere('page', 'LIKE', '%://' . $h . '/')
+                      ->orWhere('page', 'LIKE', '%://www.' . $h)
+                      ->orWhere('page', 'LIKE', '%://www.' . $h . '/')
+                      ->orWhere('page', 'LIKE', '%://' . $h . '?%')
+                      ->orWhere('page', 'LIKE', '%://' . $h . '/?%')
+                      ->orWhere('page', 'LIKE', '%://www.' . $h . '?%')
+                      ->orWhere('page', 'LIKE', '%://www.' . $h . '/?%');
+                })
+                ->select('page')->distinct()->limit(5)
+                ->pluck('page')->all();
+        }
+
+        return [
+            'queried_url'            => $url,
+            'queried_path'           => $path,
+            'tried_variants'         => $variants,
+            'gsc_rows_total_all_time'=> $totalRows,
+            'gsc_last_sync_date'     => $latestSync ? (string) $latestSync : null,
+            'similar_urls_in_gsc'    => $similar,
+        ];
+    }
+
+    /**
      * Position 1 = 100, position 100 = 0, decaying logarithmically so the
      * 1→3 jump is worth more than 30→50.
      */
@@ -227,7 +305,6 @@ class LiveSeoScoreService
     {
         if ($pos <= 1) return 100;
         if ($pos >= 100) return 0;
-        // Smooth log curve: positions 1..3 ≈ 95, 10 ≈ 70, 30 ≈ 40, 50 ≈ 25, 100 ≈ 0.
         $score = 100 - (log10($pos) / log10(100)) * 100;
         return (int) round(max(0, min(100, $score)));
     }
@@ -287,7 +364,7 @@ class LiveSeoScoreService
         return 'Why low: ' . implode(', ', $reasons) . '.';
     }
 
-    private function unavailable(string $reason): array
+    private function unavailable(string $reason, array $debug = []): array
     {
         return [
             'score' => 0,
@@ -300,6 +377,7 @@ class LiveSeoScoreService
                 default => 'Live score is not available for this post.',
             },
             'reason' => $reason,
+            'debug'  => $debug,
         ];
     }
 }
