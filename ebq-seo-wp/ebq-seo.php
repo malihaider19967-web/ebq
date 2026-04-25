@@ -16,7 +16,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('EBQ_SEO_VERSION', '2.2.1');
+define('EBQ_SEO_VERSION', '2.2.2');
 define('EBQ_SEO_FILE', __FILE__);
 define('EBQ_SEO_PATH', plugin_dir_path(__FILE__));
 define('EBQ_SEO_URL', plugin_dir_url(__FILE__));
