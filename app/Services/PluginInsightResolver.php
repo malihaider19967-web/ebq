@@ -564,32 +564,51 @@ class PluginInsightResolver
 
     /**
      * Apply the page-match clause to a SearchConsoleData (or PageIndexingStatus)
-     * query: tries the 12 cheap exact variants first, then falls back to a
-     * path-suffix LIKE so GSC's stored URL still matches even when query strings,
-     * AMP suffixes, or CDN-rewritten paths differ.
+     * query.
      *
-     * The leading slash in the LIKE pattern anchors the path component, so
-     * `/my-post` only matches `https://x.com/my-post` and `…/blog/my-post`,
-     * never `…/another-my-post`.
+     * Strategy:
+     *   1. Strict — `whereIn` over the 12 cheap variants (cross of
+     *      scheme/www/trailing-slash). Hits an index, fast.
+     *   2. Host-anchored LIKE fallback for the realistic GSC mismatches we
+     *      can't enumerate exactly: query strings, AMP, CDN rewrites,
+     *      Google's normalisation drift.
+     *
+     * The LIKE patterns are anchored on `://host` (and `://www.host`) so they
+     * never spill across websites — `LIKE '%://example.com/post'` cannot
+     * match `evil-example.com` because the `://` is required before the host.
      */
     private function applyPageMatch(\Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder $query, string $url): void
     {
         $variants = $this->pageVariants($url);
-        $path = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
-        $pathNoSlash = $path !== '/' ? rtrim($path, '/') : $path;
-        $pathSlash = $path === '/' ? '/' : ($pathNoSlash.'/');
+        $parts = parse_url($url);
+        $host  = strtolower((string) ($parts['host'] ?? ''));
+        $hostNoWww = preg_replace('/^www\./', '', $host) ?: $host;
+        $path = (string) ($parts['path'] ?? '/');
+        $pathNoSlash = $path === '/' ? '' : rtrim($path, '/');
 
-        $query->where(function ($q) use ($variants, $pathNoSlash, $pathSlash) {
+        $query->where(function ($q) use ($variants, $hostNoWww, $pathNoSlash) {
             $q->whereIn('page', $variants);
 
-            // Suffix-LIKE fallback. Skip for site-root (would match everything).
-            if ($pathNoSlash !== '/' && strlen($pathNoSlash) >= 2) {
-                $likeNo = '%'.addcslashes($pathNoSlash, '\\%_');
-                $likeYes = '%'.addcslashes($pathSlash, '\\%_');
-                $q->orWhere('page', 'LIKE', $likeYes);            // …/path/
-                $q->orWhere('page', 'LIKE', $likeNo);             // …/path
-                $q->orWhere('page', 'LIKE', $likeYes.'?%');       // …/path/?utm_*
-                $q->orWhere('page', 'LIKE', $likeNo.'?%');        // …/path?utm_*
+            if ($hostNoWww === '') {
+                return;
+            }
+
+            // Build `://host` and `://www.host` host fragments.
+            $hostFragments = [
+                '%://'.addcslashes($hostNoWww, '\\%_'),
+                '%://www.'.addcslashes($hostNoWww, '\\%_'),
+            ];
+            $pathPart = $pathNoSlash !== '' ? addcslashes($pathNoSlash, '\\%_') : '';
+
+            foreach ($hostFragments as $hf) {
+                $bare = $hf.$pathPart;          // …host/path  (or …host)
+                $slash = $bare.'/';             // …host/path/ (or …host/)
+                $q->orWhere('page', 'LIKE', $bare)
+                  ->orWhere('page', 'LIKE', $slash)
+                  ->orWhere('page', 'LIKE', $bare.'?%')   // …host/path?utm_*
+                  ->orWhere('page', 'LIKE', $slash.'?%')  // …host/path/?utm_*
+                  ->orWhere('page', 'LIKE', $bare.'#%')   // …host/path#frag
+                  ->orWhere('page', 'LIKE', $slash.'#%'); // …host/path/#frag
             }
         });
     }

@@ -3,7 +3,7 @@
  * Plugin Name:       EBQ SEO
  * Plugin URI:        https://ebq.io/features
  * Description:       The only SEO plugin your WordPress site needs. Real-data focus keyword, live competitor SERP, cannibalization-aware canonical, CWV-gated publish, plus Yoast-parity on-page surface (meta/social/schema/sitemap/canonical/robots). One-click connect to your EBQ workspace.
- * Version:           2.2.1
+ * Version:           2.2.3
  * Requires at least: 6.0
  * Requires PHP:      8.1
  * Author:            EBQ
@@ -16,7 +16,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-define('EBQ_SEO_VERSION', '2.2.2');
+define('EBQ_SEO_VERSION', '2.2.3');
 define('EBQ_SEO_FILE', __FILE__);
 define('EBQ_SEO_PATH', plugin_dir_path(__FILE__));
 define('EBQ_SEO_URL', plugin_dir_url(__FILE__));

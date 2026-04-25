@@ -100,20 +100,40 @@ class PluginInsightsController extends Controller
                     ->where('website_id', $website->id)
                     ->max('date');
 
-                // Show 5 page URLs from GSC whose path overlaps so the user
-                // can spot URL-shape mismatches at a glance.
+                // Show up to 5 GSC URLs the user can compare against.
+                // For non-root paths: anything containing the path.
+                // For root: any URL that looks like a homepage (host with
+                // optional / and optional ?query). Surfacing what GSC
+                // actually has is what makes the empty state debuggable.
                 $path = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
-                $pathTail = $path !== '/' ? '%'.addcslashes(rtrim($path, '/'), '\\%_').'%' : null;
-                $similar = $pathTail
-                    ? \App\Models\SearchConsoleData::query()
+                $host = strtolower((string) (parse_url($url, PHP_URL_HOST) ?: ''));
+                $hostNoWww = preg_replace('/^www\./', '', $host) ?: $host;
+
+                $similar = [];
+                if ($path !== '/' && $path !== '') {
+                    $tail = '%'.addcslashes(rtrim($path, '/'), '\\%_').'%';
+                    $similar = \App\Models\SearchConsoleData::query()
                         ->where('website_id', $website->id)
-                        ->where('page', 'LIKE', $pathTail)
-                        ->select('page')
-                        ->distinct()
-                        ->limit(5)
-                        ->pluck('page')
-                        ->all()
-                    : [];
+                        ->where('page', 'LIKE', $tail)
+                        ->select('page')->distinct()->limit(5)
+                        ->pluck('page')->all();
+                } elseif ($hostNoWww !== '') {
+                    $similar = \App\Models\SearchConsoleData::query()
+                        ->where('website_id', $website->id)
+                        ->where(function ($q) use ($hostNoWww) {
+                            $h = addcslashes($hostNoWww, '\\%_');
+                            $q->where('page', 'LIKE', '%://'.$h)
+                              ->orWhere('page', 'LIKE', '%://'.$h.'/')
+                              ->orWhere('page', 'LIKE', '%://www.'.$h)
+                              ->orWhere('page', 'LIKE', '%://www.'.$h.'/')
+                              ->orWhere('page', 'LIKE', '%://'.$h.'?%')
+                              ->orWhere('page', 'LIKE', '%://'.$h.'/?%')
+                              ->orWhere('page', 'LIKE', '%://www.'.$h.'?%')
+                              ->orWhere('page', 'LIKE', '%://www.'.$h.'/?%');
+                        })
+                        ->select('page')->distinct()->limit(5)
+                        ->pluck('page')->all();
+                }
 
                 $debug = [
                     'gsc_rows_total_all_time' => (int) $totalRows,
