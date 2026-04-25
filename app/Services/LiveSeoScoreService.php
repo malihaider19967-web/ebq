@@ -124,14 +124,25 @@ class LiveSeoScoreService
         }
 
         // ── Audit / Lighthouse score (latest report) — match by variant too.
+        // PageAuditReport stores the URL in `page` and we look it up by
+        // sha256(`page_hash`) for index-friendly matching, mirroring
+        // PluginInsightResolver. The Lighthouse performance score is nested
+        // inside the JSON `result` blob (already on a 0–100 scale).
         $auditScore = null;
+        $variantHashes = array_map(static fn (string $v) => hash('sha256', $v), $variants);
         $latestAudit = PageAuditReport::query()
             ->where('website_id', $website->id)
-            ->whereIn('audit_url', $variants)
-            ->orderByDesc('created_at')
+            ->whereIn('page_hash', $variantHashes)
+            ->latest('audited_at')
             ->first();
-        if ($latestAudit && $latestAudit->lighthouse_performance !== null) {
-            $auditScore = (int) round(((float) $latestAudit->lighthouse_performance) * 100);
+        if ($latestAudit && is_array($latestAudit->result)) {
+            $cwv = $latestAudit->result['core_web_vitals'] ?? [];
+            $mobile = is_array($cwv['mobile'] ?? null) ? $cwv['mobile'] : [];
+            $desktop = is_array($cwv['desktop'] ?? null) ? $cwv['desktop'] : [];
+            $perf = $mobile['performance_score'] ?? $desktop['performance_score'] ?? null;
+            if ($perf !== null) {
+                $auditScore = (int) round((float) $perf);
+            }
         }
 
         // ── Tracked-keyword bonus — explicit tracker entry adds confidence.
