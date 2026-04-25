@@ -12,3 +12,4 @@ Schedule::command('ebq:sync-daily-data')->daily();
 Schedule::command('ebq:detect-traffic-drops')->dailyAt('07:30');
 Schedule::command('ebq:send-reports')->dailyAt('08:00');
 Schedule::command('ebq:track-rankings')->hourly();
+Schedule::command('ebq:publish-scheduled-plugin-releases')->everyMinute();

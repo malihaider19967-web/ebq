@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\PluginInsightsController;
+use App\Http\Controllers\Api\V1\PluginHeartbeatController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -24,5 +25,7 @@ Route::prefix('v1')->group(function (): void {
             ->name('api.v1.dashboard');
         Route::get('/reports/iframe-url', [PluginInsightsController::class, 'iframeUrl'])
             ->name('api.v1.reports.iframe');
+        Route::post('/plugin/heartbeat', PluginHeartbeatController::class)
+            ->name('api.v1.plugin.heartbeat');
     });
 });

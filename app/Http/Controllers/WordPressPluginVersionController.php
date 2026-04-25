@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\PluginReleaseResolver;
 use Illuminate\Http\JsonResponse;
 
 class WordPressPluginVersionController extends Controller
@@ -11,23 +12,31 @@ class WordPressPluginVersionController extends Controller
      * decide whether a newer version is available and to populate the native
      * WordPress update flow.
      */
-    public function __invoke(): JsonResponse
+    public function __invoke(PluginReleaseResolver $resolver): JsonResponse
     {
-        $sourceFile = base_path('ebq-seo-wp/ebq-seo.php');
-        $zipPath = public_path('downloads/ebq-seo.zip');
+        $channel = request()->query('channel', 'stable');
+        $channel = in_array($channel, ['stable', 'beta'], true) ? $channel : 'stable';
 
-        $version = $this->parseVersion($sourceFile);
+        $sourceFile = base_path('ebq-seo-wp/ebq-seo.php');
+        $release = $resolver->latestPublished($channel);
+
+        $version = $release?->version ?: $this->parseVersion($sourceFile);
         $tested = $this->parseHeader($sourceFile, 'Tested up to') ?: '6.7';
         $requiresWp = $this->parseHeader($sourceFile, 'Requires at least') ?: '6.0';
         $requiresPhp = $this->parseHeader($sourceFile, 'Requires PHP') ?: '8.1';
 
-        $packagedAt = is_file($zipPath) ? (int) filemtime($zipPath) : null;
+        $packagedAt = $release?->published_at?->timestamp;
+        if (! $packagedAt) {
+            $zipPath = public_path('downloads/ebq-seo.zip');
+            $packagedAt = is_file($zipPath) ? (int) filemtime($zipPath) : null;
+        }
 
         return response()->json([
             'slug' => 'ebq-seo',
             'name' => 'EBQ SEO',
             'version' => $version,
-            'download_url' => route('wordpress.plugin.download'),
+            'channel' => $channel,
+            'download_url' => route('wordpress.plugin.download', ['channel' => $channel]),
             'packaged_at' => $packagedAt ? date('c', $packagedAt) : null,
             'requires' => [
                 'wp' => $requiresWp,
@@ -36,6 +45,7 @@ class WordPressPluginVersionController extends Controller
             'tested' => $tested,
             'homepage' => url('/features').'#wordpress',
             'changelog_url' => url('/features').'#wordpress',
+            'release_notes' => $release?->release_notes,
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 

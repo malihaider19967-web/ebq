@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\PluginReleaseResolver;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class WordPressPluginDownloadController extends Controller
@@ -13,8 +15,25 @@ class WordPressPluginDownloadController extends Controller
      * Filename includes the file's mtime so the browser treats each re-package
      * as a different download artifact.
      */
-    public function __invoke(): BinaryFileResponse|Response
+    public function __invoke(PluginReleaseResolver $resolver): BinaryFileResponse|Response
     {
+        $channel = request()->query('channel', 'stable');
+        $channel = in_array($channel, ['stable', 'beta'], true) ? $channel : 'stable';
+
+        $release = $resolver->latestPublished($channel);
+        if ($release && Storage::disk('local')->exists($release->zip_path)) {
+            $absolute = Storage::disk('local')->path($release->zip_path);
+            clearstatcache(true, $absolute);
+            $filename = 'ebq-seo-'.$release->version.'-'.$channel.'.zip';
+
+            return response()->download($absolute, $filename, [
+                'Content-Type' => 'application/zip',
+                'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+                'Pragma' => 'no-cache',
+                'Expires' => '0',
+            ]);
+        }
+
         $path = public_path('downloads/ebq-seo.zip');
 
         if (! is_file($path)) {

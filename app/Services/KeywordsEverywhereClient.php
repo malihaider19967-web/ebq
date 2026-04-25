@@ -4,6 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Auth;
 
 /**
  * Thin wrapper around the Keywords Everywhere bulk-metrics endpoint.
@@ -107,6 +108,16 @@ class KeywordsEverywhereClient
                 if (isset($json['credits']) && is_numeric($json['credits'])) {
                     $credits = (int) $json['credits'];
                 }
+
+                app(ClientActivityLogger::class)->log(
+                    'api_usage.keywords_everywhere',
+                    userId: Auth::id(),
+                    provider: 'keywords_everywhere',
+                    meta: [
+                        'keyword_count' => count($chunk),
+                        'credits_remaining' => $credits,
+                    ]
+                );
             } catch (\Throwable $e) {
                 Log::warning('KeywordsEverywhere request threw', [
                     'message' => $e->getMessage(),

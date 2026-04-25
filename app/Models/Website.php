@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\HasApiTokens;
 
@@ -128,6 +129,11 @@ class Website extends Model
     public function customPageAudits(): HasMany
     {
         return $this->hasMany(CustomPageAudit::class);
+    }
+
+    public function pluginInstall(): HasOne
+    {
+        return $this->hasOne(WebsitePluginInstall::class);
     }
 
     /**

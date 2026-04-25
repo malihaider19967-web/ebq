@@ -2,6 +2,11 @@
 
 use App\Http\Controllers\GoogleOAuthController;
 use App\Http\Controllers\PageAuditController;
+use App\Http\Controllers\Admin\ActivityController as AdminActivityController;
+use App\Http\Controllers\Admin\ClientController as AdminClientController;
+use App\Http\Controllers\Admin\ClientImpersonationController;
+use App\Http\Controllers\Admin\PluginAdoptionController as AdminPluginAdoptionController;
+use App\Http\Controllers\Admin\PluginReleaseController as AdminPluginReleaseController;
 use App\Http\Controllers\WordPressConnectController;
 use App\Http\Controllers\WordPressPluginDownloadController;
 use App\Http\Controllers\WordPressPluginVersionController;
@@ -55,3 +60,20 @@ Route::middleware(['auth', 'throttle:oauth'])->group(function () {
     Route::get('/auth/google/redirect', [GoogleOAuthController::class, 'redirect'])->name('google.redirect');
     Route::get('/auth/google/callback', [GoogleOAuthController::class, 'callback'])->name('google.callback');
 });
+
+Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function (): void {
+    Route::get('/clients', [AdminClientController::class, 'index'])->name('clients.index');
+    Route::post('/clients', [AdminClientController::class, 'store'])->name('clients.store');
+    Route::put('/clients/{user}', [AdminClientController::class, 'update'])->name('clients.update');
+    Route::post('/clients/{user}/impersonate', [ClientImpersonationController::class, 'start'])->name('clients.impersonate');
+
+    Route::get('/activities', [AdminActivityController::class, 'index'])->name('activities.index');
+    Route::get('/plugin-releases', [AdminPluginReleaseController::class, 'index'])->name('plugin-releases.index');
+    Route::post('/plugin-releases', [AdminPluginReleaseController::class, 'store'])->name('plugin-releases.store');
+    Route::post('/plugin-releases/{pluginRelease}/publish', [AdminPluginReleaseController::class, 'publish'])->name('plugin-releases.publish');
+    Route::post('/plugin-releases/{pluginRelease}/rollback', [AdminPluginReleaseController::class, 'rollback'])->name('plugin-releases.rollback');
+    Route::delete('/plugin-releases/{pluginRelease}', [AdminPluginReleaseController::class, 'destroy'])->name('plugin-releases.destroy');
+    Route::get('/plugin-adoption', [AdminPluginAdoptionController::class, 'index'])->name('plugin-adoption.index');
+});
+
+Route::middleware('auth')->post('/admin/impersonation/stop', [ClientImpersonationController::class, 'stop'])->name('admin.impersonation.stop');

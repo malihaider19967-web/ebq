@@ -26,6 +26,8 @@ class User extends Authenticatable
         'name',
         'email',
         'timezone',
+        'is_admin',
+        'is_disabled',
         'password',
     ];
 
@@ -49,6 +51,8 @@ class User extends Authenticatable
         return [
             'email_verified_at' => 'datetime',
             'last_growth_report_sent_at' => 'datetime',
+            'is_admin' => 'boolean',
+            'is_disabled' => 'boolean',
             'password' => 'hashed',
         ];
     }

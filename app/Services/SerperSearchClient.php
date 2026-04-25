@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Log;
 
 class SerperSearchClient
@@ -145,6 +146,18 @@ class SerperSearchClient
 
             return null;
         }
+
+        app(ClientActivityLogger::class)->log(
+            'api_usage.serp_api',
+            userId: Auth::id(),
+            provider: 'serp_api',
+            meta: [
+                'query' => mb_substr($q, 0, 120),
+                'type' => $type,
+                'num' => $body['num'] ?? null,
+                'page' => $body['page'] ?? null,
+            ]
+        );
 
         return is_array($json) ? $json : null;
     }

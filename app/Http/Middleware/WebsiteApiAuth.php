@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\Website;
+use App\Services\ClientActivityLogger;
 use Closure;
 use Illuminate\Http\Request;
 use Laravel\Sanctum\PersonalAccessToken;
@@ -48,6 +49,13 @@ class WebsiteApiAuth
 
         $request->attributes->set('api_website', $tokenable);
         $request->attributes->set('api_token', $accessToken);
+        app(ClientActivityLogger::class)->log(
+            'plugin.api_request',
+            userId: (int) $tokenable->user_id,
+            websiteId: (int) $tokenable->id,
+            provider: 'wordpress',
+            meta: ['path' => $request->path(), 'ability' => $ability]
+        );
 
         return $next($request);
     }
