@@ -60,9 +60,13 @@ class CompetitorBacklinkService
      * Queue a background refresh for any domain that isn't already fresh.
      * Safe to call on every audit — it no-ops for cached entries.
      *
+     * `$websiteId` / `$ownerUserId` propagate to the activity log when the
+     * background job ultimately calls KE, so credit usage attributes back
+     * to the right billing scope.
+     *
      * @param  list<string>  $domains
      */
-    public function queueRefresh(array $domains): void
+    public function queueRefresh(array $domains, ?int $websiteId = null, ?int $ownerUserId = null): void
     {
         $toFetch = [];
         foreach ($domains as $d) {
@@ -75,7 +79,7 @@ class CompetitorBacklinkService
 
         $toFetch = array_keys($toFetch);
         if ($toFetch !== []) {
-            FetchCompetitorBacklinks::dispatch($toFetch);
+            FetchCompetitorBacklinks::dispatch($toFetch, $websiteId, $ownerUserId);
         }
     }
 
@@ -83,16 +87,21 @@ class CompetitorBacklinkService
      * Synchronous fetch + upsert for a single domain. Returns the number of
      * rows written. Called by the job and by any CLI-driven refresh.
      */
-    public function refresh(string $domain): int
+    public function refresh(string $domain, ?int $websiteId = null, ?int $ownerUserId = null): int
     {
         $domain = CompetitorBacklink::extractDomain($domain);
         if ($domain === '') {
             return 0;
         }
 
-        Log::info('CompetitorBacklinkService.refresh: starting', ['domain' => $domain]);
+        Log::info('CompetitorBacklinkService.refresh: starting', ['domain' => $domain, 'website_id' => $websiteId]);
 
-        $items = $this->client->backlinksForDomain($domain, $this->limit());
+        $items = $this->client->backlinksForDomain(
+            $domain,
+            $this->limit(),
+            websiteId: $websiteId,
+            ownerUserId: $ownerUserId,
+        );
         if ($items === null) {
             Log::warning('CompetitorBacklinkService.refresh: client returned null', ['domain' => $domain]);
 

@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -22,6 +23,11 @@ use Illuminate\Support\Facades\Log;
  *                url_source, url_target }, ...],
  *     "credits_consumed": 1, "time_taken": 4.9 }
  *
+ * KE charges per keyword (effectively per result row) on this endpoint, so
+ * we trust the `credits_consumed` field the API itself returns and log that
+ * as `units_consumed` on the activity row. Falls back to result-count if
+ * the field is absent in some response shape.
+ *
  * Endpoint + body knobs are env-overridable so we can adapt without a code
  * push. Returns null on any failure — callers log and skip rather than crash.
  */
@@ -32,8 +38,12 @@ class KeywordsEverywhereBacklinkClient
     /**
      * @return list<array<string, mixed>>|null
      */
-    public function backlinksForDomain(string $domain, int $limit = 50): ?array
-    {
+    public function backlinksForDomain(
+        string $domain,
+        int $limit = 50,
+        ?int $websiteId = null,
+        ?int $ownerUserId = null,
+    ): ?array {
         $key = config('services.keywords_everywhere.key');
         if (! is_string($key) || trim($key) === '') {
             Log::warning('KeywordsEverywhereBacklinkClient: missing API key');
@@ -97,10 +107,47 @@ class KeywordsEverywhereBacklinkClient
                 $items = $json;
             }
             if (! is_array($items)) {
-                return [];
+                $items = [];
+            }
+            $items = array_values(array_filter($items, 'is_array'));
+
+            // Trust KE's own credits_consumed field — it accounts for the
+            // per-keyword billing model that this endpoint uses (one credit
+            // per result row). Falls back to result count if missing, then
+            // to 1 (every successful call costs at least one credit).
+            $unitsConsumed = null;
+            if (isset($json['credits_consumed']) && is_numeric($json['credits_consumed'])) {
+                $unitsConsumed = max(0, (int) $json['credits_consumed']);
+            } elseif ($items !== []) {
+                $unitsConsumed = count($items);
+            } else {
+                $unitsConsumed = 1;
             }
 
-            return array_values(array_filter($items, 'is_array'));
+            $creditsRemaining = null;
+            if (isset($json['credits']) && is_numeric($json['credits'])) {
+                $creditsRemaining = (int) $json['credits'];
+            }
+
+            app(ClientActivityLogger::class)->log(
+                'api_usage.keywords_everywhere',
+                userId: $ownerUserId ?? Auth::id(),
+                websiteId: $websiteId,
+                provider: 'keywords_everywhere',
+                meta: [
+                    'operation' => 'backlinks_for_domain',
+                    'domain' => $domain,
+                    'limit' => $limit,
+                    'returned' => count($items),
+                    'credits_consumed' => $unitsConsumed,
+                    'credits_remaining' => $creditsRemaining,
+                    'country' => $country,
+                    'data_source' => $dataSource,
+                ],
+                unitsConsumed: $unitsConsumed,
+            );
+
+            return $items;
         } catch (\Throwable $e) {
             Log::warning('KeywordsEverywhere backlinks request threw', [
                 'domain' => $domain,

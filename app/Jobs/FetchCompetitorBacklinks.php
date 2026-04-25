@@ -15,6 +15,11 @@ use Illuminate\Foundation\Queue\Queueable;
  * Convention: matches TrackKeywordRankJob — tries=2, backoff=30s, 3-minute
  * timeout for the API call chain. Deduped via uniqueId so rapid-fire
  * dispatches for the same set don't stack.
+ *
+ * `$websiteId` + `$ownerUserId` propagate to the activity log so the admin
+ * usage page attributes credits to the right client. uniqueId includes
+ * `$websiteId` so two different websites surfacing the same competitor
+ * domain still each pay the credit (and bill correctly).
  */
 class FetchCompetitorBacklinks implements ShouldQueue
 {
@@ -27,14 +32,17 @@ class FetchCompetitorBacklinks implements ShouldQueue
     /**
      * @param  list<string>  $domains  Normalized competitor domains.
      */
-    public function __construct(public array $domains)
-    {
+    public function __construct(
+        public array $domains,
+        public ?int $websiteId = null,
+        public ?int $ownerUserId = null,
+    ) {
     }
 
     public function handle(CompetitorBacklinkService $service): void
     {
         foreach ($this->domains as $domain) {
-            $service->refresh((string) $domain);
+            $service->refresh((string) $domain, $this->websiteId, $this->ownerUserId);
         }
     }
 
@@ -43,7 +51,7 @@ class FetchCompetitorBacklinks implements ShouldQueue
         $sorted = $this->domains;
         sort($sorted);
 
-        return hash('sha256', implode("\n", $sorted));
+        return hash('sha256', ($this->websiteId ?? 0).'|'.implode("\n", $sorted));
     }
 
     public function uniqueFor(): int

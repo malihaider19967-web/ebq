@@ -4,7 +4,6 @@ namespace App\Livewire\Pages;
 
 use App\Mail\PageAuditReportMail;
 use App\Models\PageAuditReport;
-use App\Models\RankTrackingKeyword;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -79,116 +78,15 @@ class PageAuditDetail extends Component
                 }
             }
             if ($domains !== []) {
-                app(\App\Services\CompetitorBacklinkService::class)->queueRefresh(array_keys($domains));
+                app(\App\Services\CompetitorBacklinkService::class)->queueRefresh(
+                    array_keys($domains),
+                    websiteId: $this->pageAuditReport->website_id,
+                    ownerUserId: \Illuminate\Support\Facades\Auth::id(),
+                );
             }
         }
 
-        return view('livewire.pages.page-audit-detail', [
-            'trackedRankings' => $this->trackedRankingsForAudit(),
-        ]);
-    }
-
-    /**
-     * Gather tracked rank-tracker keywords that match this audited page.
-     *
-     * Primary bucket: keywords whose latest-checked `current_url` resolves to
-     * the same page (host+path). Secondary bucket: other active keywords on
-     * the same site that are currently ranked.
-     *
-     * @return array{on_this_page: list<array<string, mixed>>, on_site: list<array<string, mixed>>}
-     */
-    private function trackedRankingsForAudit(): array
-    {
-        $auditedUrl = (string) $this->pageAuditReport->page;
-        $auditedHost = $this->hostFor($auditedUrl);
-        $auditedPath = $this->pathFor($auditedUrl);
-
-        if ($auditedHost === '') {
-            return ['on_this_page' => [], 'on_site' => []];
-        }
-
-        $keywords = RankTrackingKeyword::query()
-            ->where('website_id', $this->pageAuditReport->website_id)
-            ->where(function ($q) use ($auditedHost) {
-                $q->whereRaw('LOWER(target_domain) = ?', [$auditedHost])
-                    ->orWhereRaw('LOWER(target_domain) = ?', ['www.'.$auditedHost])
-                    ->orWhereRaw('LOWER(target_domain) LIKE ?', ['%'.$auditedHost]);
-            })
-            ->orderByRaw('CASE WHEN current_position IS NULL THEN 1 ELSE 0 END')
-            ->orderBy('current_position')
-            ->limit(100)
-            ->get();
-
-        $onThisPage = [];
-        $onSite = [];
-
-        foreach ($keywords as $kw) {
-            $rankedUrl = (string) ($kw->current_url ?? '');
-            $rankedHost = $this->hostFor($rankedUrl);
-            $rankedPath = $this->pathFor($rankedUrl);
-
-            $entry = [
-                'id' => $kw->id,
-                'keyword' => $kw->keyword,
-                'country' => $kw->country,
-                'language' => $kw->language,
-                'device' => $kw->device,
-                'search_type' => $kw->search_type,
-                'position' => $kw->current_position,
-                'best' => $kw->best_position,
-                'change' => $kw->position_change,
-                'url' => $rankedUrl ?: null,
-                'last_checked_at' => $kw->last_checked_at,
-                'is_active' => (bool) $kw->is_active,
-            ];
-
-            if ($kw->current_position !== null
-                && $rankedHost !== ''
-                && $rankedHost === $auditedHost
-                && $rankedPath === $auditedPath) {
-                $onThisPage[] = $entry;
-            } elseif ($kw->current_position !== null) {
-                $onSite[] = $entry;
-            }
-        }
-
-        return ['on_this_page' => $onThisPage, 'on_site' => $onSite];
-    }
-
-    private function hostFor(string $url): string
-    {
-        $u = trim($url);
-        if ($u === '') {
-            return '';
-        }
-        if (! str_contains($u, '://')) {
-            $u = 'http://'.$u;
-        }
-        $host = parse_url($u, PHP_URL_HOST);
-        if (! is_string($host) || $host === '') {
-            return '';
-        }
-        $host = strtolower($host);
-        if (str_starts_with($host, 'www.')) {
-            $host = substr($host, 4);
-        }
-
-        return $host;
-    }
-
-    private function pathFor(string $url): string
-    {
-        $u = trim($url);
-        if ($u === '') {
-            return '';
-        }
-        if (! str_contains($u, '://')) {
-            $u = 'http://'.$u;
-        }
-        $path = parse_url($u, PHP_URL_PATH);
-        $path = is_string($path) ? rtrim($path, '/') : '';
-
-        return $path === '' ? '/' : $path;
+        return view('livewire.pages.page-audit-detail');
     }
 
     private function setAuditMessage(string $message, string $kind = 'info'): void

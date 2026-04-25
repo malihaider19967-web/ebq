@@ -118,7 +118,16 @@ class RunCustomPageAudit implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        app(CompetitorBacklinkService::class)->queueRefresh(array_keys($domains));
+        // Carry website + audit-trigger user into the activity log so the
+        // admin usage page attributes the KE backlink calls to the right
+        // client (website owner is resolved server-side from website_id).
+        $audit = \App\Models\CustomPageAudit::query()->find($this->auditId);
+
+        app(CompetitorBacklinkService::class)->queueRefresh(
+            array_keys($domains),
+            websiteId: $report->website_id,
+            ownerUserId: $audit?->user_id,
+        );
     }
 
     /**
