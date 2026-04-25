@@ -51,25 +51,25 @@ class PluginInsightResolver
 
         $gscTotals30 = SearchConsoleData::query()
             ->where('website_id', $website->id)
-            ->whereIn('page', $variants)
             ->whereDate('date', '>=', $start30->toDateString())
             ->whereDate('date', '<=', $end->toDateString())
+            ->tap(fn ($q) => $this->applyPageMatch($q, $normalized))
             ->selectRaw('SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position, AVG(ctr) as ctr')
             ->first();
 
         $gscTotals90 = SearchConsoleData::query()
             ->where('website_id', $website->id)
-            ->whereIn('page', $variants)
             ->whereDate('date', '>=', $start90->toDateString())
             ->whereDate('date', '<=', $end->toDateString())
+            ->tap(fn ($q) => $this->applyPageMatch($q, $normalized))
             ->selectRaw('SUM(clicks) as clicks, SUM(impressions) as impressions')
             ->first();
 
         $clickSeries = SearchConsoleData::query()
             ->where('website_id', $website->id)
-            ->whereIn('page', $variants)
             ->whereDate('date', '>=', $start90->toDateString())
             ->whereDate('date', '<=', $end->toDateString())
+            ->tap(fn ($q) => $this->applyPageMatch($q, $normalized))
             ->selectRaw('DATE(date) as d, SUM(clicks) as c')
             ->groupBy('d')
             ->orderBy('d')
@@ -79,9 +79,9 @@ class PluginInsightResolver
 
         $topQueries = SearchConsoleData::query()
             ->where('website_id', $website->id)
-            ->whereIn('page', $variants)
             ->whereDate('date', '>=', $start30->toDateString())
             ->whereDate('date', '<=', $end->toDateString())
+            ->tap(fn ($q) => $this->applyPageMatch($q, $normalized))
             ->selectRaw('query, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position')
             ->where('query', '!=', '')
             ->groupBy('query')
@@ -175,7 +175,7 @@ class PluginInsightResolver
 
         $indexingRow = PageIndexingStatus::query()
             ->where('website_id', $website->id)
-            ->whereIn('page', $variants)
+            ->tap(fn ($q) => $this->applyPageMatch($q, $normalized))
             ->orderByDesc('last_google_status_checked_at')
             ->first();
 
@@ -302,18 +302,16 @@ class PluginInsightResolver
             return [];
         }
 
-        $variants = $this->pageVariants($normalized);
-
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz)->endOfDay();
         $start = $end->copy()->subDays(89)->startOfDay();
 
         $rows = SearchConsoleData::query()
             ->where('website_id', $website->id)
-            ->whereIn('page', $variants)
             ->whereDate('date', '>=', $start->toDateString())
             ->whereDate('date', '<=', $end->toDateString())
             ->where('query', '!=', '')
+            ->tap(fn ($q) => $this->applyPageMatch($q, $normalized))
             ->selectRaw('query, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position, AVG(ctr) as ctr')
             ->groupBy('query')
             ->get();
@@ -562,6 +560,38 @@ class PluginInsightResolver
         }
 
         return array_values(array_unique($variants));
+    }
+
+    /**
+     * Apply the page-match clause to a SearchConsoleData (or PageIndexingStatus)
+     * query: tries the 12 cheap exact variants first, then falls back to a
+     * path-suffix LIKE so GSC's stored URL still matches even when query strings,
+     * AMP suffixes, or CDN-rewritten paths differ.
+     *
+     * The leading slash in the LIKE pattern anchors the path component, so
+     * `/my-post` only matches `https://x.com/my-post` and `…/blog/my-post`,
+     * never `…/another-my-post`.
+     */
+    private function applyPageMatch(\Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder $query, string $url): void
+    {
+        $variants = $this->pageVariants($url);
+        $path = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
+        $pathNoSlash = $path !== '/' ? rtrim($path, '/') : $path;
+        $pathSlash = $path === '/' ? '/' : ($pathNoSlash.'/');
+
+        $query->where(function ($q) use ($variants, $pathNoSlash, $pathSlash) {
+            $q->whereIn('page', $variants);
+
+            // Suffix-LIKE fallback. Skip for site-root (would match everything).
+            if ($pathNoSlash !== '/' && strlen($pathNoSlash) >= 2) {
+                $likeNo = '%'.addcslashes($pathNoSlash, '\\%_');
+                $likeYes = '%'.addcslashes($pathSlash, '\\%_');
+                $q->orWhere('page', 'LIKE', $likeYes);            // …/path/
+                $q->orWhere('page', 'LIKE', $likeNo);             // …/path
+                $q->orWhere('page', 'LIKE', $likeYes.'?%');       // …/path/?utm_*
+                $q->orWhere('page', 'LIKE', $likeNo.'?%');        // …/path?utm_*
+            }
+        });
     }
 
     /**

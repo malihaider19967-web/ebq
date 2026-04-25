@@ -4,9 +4,15 @@ namespace App\Services;
 
 use App\Models\PluginRelease;
 use Illuminate\Database\QueryException;
+use InvalidArgumentException;
+use Illuminate\Support\Facades\Log;
 
 class PluginReleaseResolver
 {
+    public function __construct(
+        private WordPressPluginSourceService $pluginSource,
+    ) {}
+
     public function latestPublished(string $channel = 'stable'): ?PluginRelease
     {
         try {
@@ -36,6 +42,18 @@ class PluginReleaseResolver
                 ->orderBy('id')
                 ->get()
                 ->each(function (PluginRelease $release) use (&$updated): void {
+                    try {
+                        $this->pluginSource->syncVersionAndPackage($release->version);
+                    } catch (InvalidArgumentException $e) {
+                        Log::error('Scheduled plugin release failed to build', [
+                            'release_id' => $release->id,
+                            'version' => $release->version,
+                            'message' => $e->getMessage(),
+                        ]);
+
+                        return;
+                    }
+                    $release->forceFill(['zip_path' => PluginRelease::ZIP_PUBLIC_BUILD])->save();
                     $this->markPublished($release);
                     $updated++;
                 });

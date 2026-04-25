@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\PluginRelease;
 use App\Services\PluginReleaseResolver;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Storage;
@@ -9,6 +10,25 @@ use Symfony\Component\HttpFoundation\BinaryFileResponse;
 
 class WordPressPluginDownloadController extends Controller
 {
+    private function absoluteZipForRelease(?PluginRelease $release): ?string
+    {
+        if ($release === null || $release->zip_path === null || $release->zip_path === '') {
+            return null;
+        }
+
+        if ($release->zip_path === PluginRelease::ZIP_PUBLIC_BUILD) {
+            $path = public_path('downloads/ebq-seo.zip');
+
+            return is_file($path) ? $path : null;
+        }
+
+        if (Storage::disk('local')->exists($release->zip_path)) {
+            return Storage::disk('local')->path($release->zip_path);
+        }
+
+        return null;
+    }
+
     /**
      * Always serves the latest packaged plugin ZIP with aggressive no-cache
      * headers so re-packaging invalidates every downstream cache instantly.
@@ -21,8 +41,8 @@ class WordPressPluginDownloadController extends Controller
         $channel = in_array($channel, ['stable', 'beta'], true) ? $channel : 'stable';
 
         $release = $resolver->latestPublished($channel);
-        if ($release && Storage::disk('local')->exists($release->zip_path)) {
-            $absolute = Storage::disk('local')->path($release->zip_path);
+        $absolute = $this->absoluteZipForRelease($release);
+        if ($release && $absolute !== null) {
             clearstatcache(true, $absolute);
             $filename = 'ebq-seo-'.$release->version.'-'.$channel.'.zip';
 

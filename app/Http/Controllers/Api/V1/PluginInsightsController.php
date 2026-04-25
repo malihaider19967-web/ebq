@@ -79,6 +79,7 @@ class PluginInsightsController extends Controller
 
         $diagnostic = null;
         $suggestions = [];
+        $debug = [];
 
         if ($url === '') {
             $diagnostic = 'missing_url';
@@ -88,6 +89,39 @@ class PluginInsightsController extends Controller
             $suggestions = $this->resolver->focusKeywordSuggestions($website, $url);
             if (empty($suggestions)) {
                 $diagnostic = 'no_gsc_data';
+
+                // When empty, give the editor enough context to explain WHY:
+                // is GSC syncing at all? does this URL exist in GSC under a
+                // different shape? Cheap to compute, very valuable to debug.
+                $totalRows = \App\Models\SearchConsoleData::query()
+                    ->where('website_id', $website->id)
+                    ->count();
+                $latestSync = \App\Models\SearchConsoleData::query()
+                    ->where('website_id', $website->id)
+                    ->max('date');
+
+                // Show 5 page URLs from GSC whose path overlaps so the user
+                // can spot URL-shape mismatches at a glance.
+                $path = (string) (parse_url($url, PHP_URL_PATH) ?: '/');
+                $pathTail = $path !== '/' ? '%'.addcslashes(rtrim($path, '/'), '\\%_').'%' : null;
+                $similar = $pathTail
+                    ? \App\Models\SearchConsoleData::query()
+                        ->where('website_id', $website->id)
+                        ->where('page', 'LIKE', $pathTail)
+                        ->select('page')
+                        ->distinct()
+                        ->limit(5)
+                        ->pluck('page')
+                        ->all()
+                    : [];
+
+                $debug = [
+                    'gsc_rows_total_all_time' => (int) $totalRows,
+                    'gsc_last_sync_date'      => $latestSync ? (string) $latestSync : null,
+                    'queried_url'             => $url,
+                    'queried_path'            => $path,
+                    'similar_urls_in_gsc'     => $similar,
+                ];
             }
         }
 
@@ -97,6 +131,7 @@ class PluginInsightsController extends Controller
             'website_domain' => $website->domain,
             'suggestions' => $suggestions,
             'diagnostic' => $diagnostic,
+            'debug' => $debug,
         ]);
     }
 

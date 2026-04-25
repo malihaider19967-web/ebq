@@ -15,6 +15,9 @@ class PluginRelease extends Model
     public const STATUS_PUBLISHED = 'published';
     public const STATUS_ROLLED_BACK = 'rolled_back';
 
+    /** Zip is produced by `ebq:package-plugin` → public/downloads/ebq-seo.zip (not uploaded). */
+    public const ZIP_PUBLIC_BUILD = '@public';
+
     protected $fillable = [
         'slug',
         'version',
