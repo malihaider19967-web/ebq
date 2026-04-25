@@ -232,9 +232,8 @@
                             <li class="flex gap-3"><span class="mt-1 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-indigo-500"></span><span>One-click challenge-response verification — no credentials in browser JS.</span></li>
                         </ul>
                         <div class="mt-8 flex flex-col gap-3 sm:flex-row">
-                            <a href="{{ plugin_download_url() }}" class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500" download>
-                                <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
-                                Download plugin (ZIP)
+                            <a href="{{ route('login') }}" class="inline-flex items-center justify-center gap-2 rounded-md bg-indigo-600 px-6 py-3 text-sm font-semibold text-white transition hover:bg-indigo-500">
+                                Sign in to download plugin
                             </a>
                             <a href="{{ route('features') }}#wordpress" class="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">See all plugin features</a>
                         </div>

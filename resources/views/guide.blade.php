@@ -983,8 +983,8 @@
                             <h3 class="mt-1 text-lg font-semibold text-slate-900">Install EBQ SEO and connect in one flow</h3>
                             <p class="mt-1 text-sm text-slate-600">No API keys to copy. Click Connect, approve in EBQ, and return with data live.</p>
                         </div>
-                        <a href="{{ route('wordpress.plugin.download') }}" class="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700">
-                            Download plugin
+                        <a href="{{ route('login') }}" class="inline-flex items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700">
+                            Sign in to download
                         </a>
                     </div>
                 </div>

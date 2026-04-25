@@ -28,12 +28,13 @@ class FeaturesPageTest extends TestCase
             ->assertSee(route('features'));
     }
 
-    public function test_landing_advertises_wordpress_plugin_and_download(): void
+    public function test_landing_advertises_wordpress_plugin_behind_sign_in(): void
     {
         $this->get(route('landing'))
             ->assertOk()
             ->assertSee('WordPress plugin')
-            ->assertSee('/wordpress/plugin.zip', escape: false);
+            ->assertSee('Sign in to download plugin')
+            ->assertDontSee('/wordpress/plugin.zip', escape: false);
     }
 
     public function test_features_page_has_wordpress_plugin_section(): void
@@ -41,7 +42,7 @@ class FeaturesPageTest extends TestCase
         $this->get(route('features'))
             ->assertOk()
             ->assertSee('Ship insights where editors already work')
-            ->assertSee('/wordpress/plugin.zip', escape: false);
+            ->assertDontSee('/wordpress/plugin.zip', escape: false);
     }
 
     public function test_plugin_zip_is_publicly_accessible(): void

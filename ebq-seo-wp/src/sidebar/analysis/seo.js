@@ -28,10 +28,14 @@ export function analyzeSeo(input) {
 		metaDescription,
 		slug,
 		focusKeyword,
+		additionalKeywords = [],
 		homeUrl,
 	} = input;
 
 	const focus = (focusKeyword || '').trim();
+	const additional = (Array.isArray(additionalKeywords) ? additionalKeywords : [])
+		.map((s) => String(s || '').trim())
+		.filter(Boolean);
 	const plain = htmlToPlain(serializedContent);
 	const intro = firstParagraph(serializedContent);
 	const headings = extractHeadings(serializedContent);
@@ -207,6 +211,61 @@ export function analyzeSeo(input) {
 		}
 	}
 
+	// ─── Topical coverage (additional keyphrases) ─────────────
+	// Important: the title, H1, slug, and meta description are scored
+	// against the FOCUS keyphrase only. Additional keyphrases share the
+	// body, subheadings, intro paragraphs, and image alts — so we judge
+	// them on those surfaces, not on title/H1.
+	let coveragePct = null;
+	let coverageRows = [];
+	if (additional.length) {
+		const altsText = images.map((i) => i.alt || '').filter(Boolean).join('\n');
+
+		coverageRows = additional.map((kw) => {
+			const inBody = containsPhrase(plain, kw);
+			const inSub = headings.some(
+				(h) => (h.level === 2 || h.level === 3) && containsPhrase(h.text, kw)
+			);
+			const inIntro = containsPhrase(intro, kw);
+			const inAlt = altsText !== '' && containsPhrase(altsText, kw);
+			// Body presence is the gate. Bonuses are intro / subheading / alt.
+			// Body alone → 5 (mediocre). +1 bonus → 7. +2 bonuses → 9.
+			const bonuses = [inSub, inIntro, inAlt].filter(Boolean).length;
+			const score = !inBody ? 0 : bonuses === 0 ? 5 : bonuses === 1 ? 7 : 9;
+			return { kw, inBody, inSub, inIntro, inAlt, score };
+		});
+
+		// First, call out anything not mentioned at all — that's a hard miss.
+		const missing = coverageRows.filter((r) => !r.inBody).map((r) => r.kw);
+		if (missing.length) {
+			const sample = missing.slice(0, 3).map((k) => `"${k}"`).join(', ');
+			const more = missing.length > 3 ? `, +${missing.length - 3} more` : '';
+			out.push(
+				lev(
+					'bad',
+					3,
+					`${missing.length} additional keyphrase${missing.length === 1 ? '' : 's'} not in the content`,
+					`Mention ${sample}${more} somewhere in the body. Title and H1 are reserved for the focus keyphrase.`
+				)
+			);
+		}
+
+		// Then the unified topical-coverage score.
+		const avg = coverageRows.reduce((acc, r) => acc + r.score, 0) / coverageRows.length;
+		coveragePct = Math.round((avg / 9) * 100);
+		const level = avg >= 8 ? 'good' : avg >= 5 ? 'ok' : 'bad';
+		out.push(
+			lev(
+				level,
+				Math.round(avg),
+				`Topical coverage: ${coveragePct}% across ${additional.length} additional keyphrase${additional.length === 1 ? '' : 's'}`,
+				level === 'good'
+					? undefined
+					: 'Aim for each additional keyphrase to appear in the body, ideally in a subheading, intro, or image alt.'
+			)
+		);
+	}
+
 	const score = aggregate(out);
 	const scoreLabel = labelForScore(score);
 
@@ -219,6 +278,8 @@ export function analyzeSeo(input) {
 			links,
 			images: images.length,
 			density: input._density ?? 0,
+			coveragePct,
+			coverageRows,
 		},
 	};
 }

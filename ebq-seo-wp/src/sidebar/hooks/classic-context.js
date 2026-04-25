@@ -270,7 +270,7 @@ export function usePostMeta() {
 
 export function publicConfig() {
 	if (typeof window === 'undefined') {
-		return { sep: '–', siteName: '', appBase: '', homeUrl: '' };
+		return { sep: '–', siteName: '', appBase: '', homeUrl: '', isConnected: true, settingsUrl: '', workspaceDomain: '' };
 	}
 	const cfg = window.ebqSeoPublic || {};
 	return {
@@ -278,6 +278,9 @@ export function publicConfig() {
 		siteName: cfg.siteName || '',
 		appBase: (cfg.appBase || '').replace(/\/$/, ''),
 		homeUrl: cfg.homeUrl || '',
+		isConnected: cfg.isConnected !== false,
+		settingsUrl: cfg.settingsUrl || '',
+		workspaceDomain: cfg.workspaceDomain || '',
 	};
 }
 

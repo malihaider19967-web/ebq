@@ -82,7 +82,8 @@
       "Bash(grep -rln '$keyword\\\\|->keyword' /c/Users/malih/Desktop/ebq/resources/views/livewire/rank-tracking/)",
       "Bash(grep -n '->keyword\\\\|$keyword\\\\|['\\\\''keyword'\\\\'']' /c/Users/malih/Desktop/ebq/resources/views/livewire/rank-tracking/rank-tracking-manager.blade.php)",
       "Bash(grep -n 'compact\\\\|return view\\\\|$rows\\\\|serpRisk\\\\|keMetrics' /c/Users/malih/Desktop/ebq/app/Livewire/RankTracking/RankTrackingManager.php)",
-      "PowerShell(composer *)"
+      "PowerShell(composer *)",
+      "Bash(./vendor/bin/phpunit --filter FeaturesPageTest)"
     ]
   }
 }

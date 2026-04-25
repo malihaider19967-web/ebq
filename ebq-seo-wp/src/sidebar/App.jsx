@@ -57,6 +57,16 @@ export default function App() {
 	const seoTitleRaw = get('_ebq_title', '');
 	const description = get('_ebq_description', '');
 	const focusKw = get('_ebq_focus_keyword', '');
+	const additionalRaw = get('_ebq_additional_keywords', '');
+	const additionalList = useMemo(() => {
+		if (!additionalRaw) return [];
+		try {
+			const parsed = JSON.parse(additionalRaw);
+			return Array.isArray(parsed)
+				? parsed.map((s) => String(s || '').trim()).filter(Boolean)
+				: [];
+		} catch { return []; }
+	}, [additionalRaw]);
 	const titleResolved = useMemo(
 		() => resolveTitleTemplate(seoTitleRaw, { postTitle: ctx.postTitle, sep: cfg.sep, siteName: cfg.siteName }),
 		[seoTitleRaw, ctx.postTitle, cfg.sep, cfg.siteName]
@@ -70,9 +80,10 @@ export default function App() {
 				metaDescription: description,
 				slug: ctx.slug,
 				focusKeyword: focusKw,
+				additionalKeywords: additionalList,
 				homeUrl: cfg.homeUrl,
 			}),
-		[debounced, ctx.postTitle, ctx.slug, titleResolved, description, focusKw, cfg.homeUrl]
+		[debounced, ctx.postTitle, ctx.slug, titleResolved, description, focusKw, additionalList, cfg.homeUrl]
 	);
 
 	const readResult = useMemo(
@@ -123,8 +134,32 @@ export default function App() {
 	const ActiveComponent = (TABS.find((t) => t.id === tab) || TABS[0]).Component;
 	const activePanelId = `ebq-tabpanel-${tab}`;
 
+	const isConnected = cfg.isConnected;
+
 	return (
 		<div className="ebq-root ebq-sidebar-frame">
+			{!isConnected ? (
+				<div className="ebq-connect-banner" role="status">
+					<span className="ebq-connect-banner__icon" aria-hidden>!</span>
+					<div className="ebq-connect-banner__text">
+						<strong>{__('EBQ SEO is not connected', 'ebq-seo')}</strong>
+						<span className="ebq-text-xs ebq-text-soft">
+							{__('Live insights, GSC suggestions, rank tracking, and related-keyphrase data stay empty until you connect this site to your EBQ workspace.', 'ebq-seo')}
+						</span>
+					</div>
+					{cfg.settingsUrl ? (
+						<a
+							className="ebq-btn ebq-btn--primary ebq-btn--sm"
+							href={cfg.settingsUrl}
+							target="_top"
+							rel="noopener"
+						>
+							{__('Connect now', 'ebq-seo')} →
+						</a>
+					) : null}
+				</div>
+			) : null}
+
 			<div className="ebq-topbar">
 			<header className="ebq-header">
 				<div className="ebq-header__mark" aria-hidden>E</div>

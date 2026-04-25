@@ -16,15 +16,43 @@ import {
 
 /* ─── Section card ───────────────────────────────────────────── */
 
-export function Section({ title, icon, aside, children, flush = false, plain = false }) {
+export function Section({ title, icon, aside, children, flush = false, plain = false, collapsible = false, defaultOpen = true }) {
+	const [open, setOpen] = useState(collapsible ? defaultOpen : true);
+	const isCollapsible = !!collapsible;
+	const showBody = !isCollapsible || open;
+
+	const className = `ebq-section${flush ? ' ebq-section--flush' : ''}${plain ? ' ebq-section--plain' : ''}${isCollapsible ? ' ebq-section--collapsible' : ''}${isCollapsible && !open ? ' is-collapsed' : ''}`;
+
+	const head = (
+		<>
+			{icon ? <span className="ebq-section__icon">{icon}</span> : null}
+			<h3 className="ebq-section__title">{title}</h3>
+			{aside ? <span className="ebq-section__aside">{aside}</span> : null}
+			{isCollapsible ? (
+				<span className="ebq-section__chevron" aria-hidden>
+					<svg viewBox="0 0 16 16" width="10" height="10">
+						<path fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M4 6l4 4 4-4" />
+					</svg>
+				</span>
+			) : null}
+		</>
+	);
+
 	return (
-		<section className={`ebq-section${flush ? ' ebq-section--flush' : ''}${plain ? ' ebq-section--plain' : ''}`}>
-			<div className="ebq-section__head">
-				{icon ? <span className="ebq-section__icon">{icon}</span> : null}
-				<h3 className="ebq-section__title">{title}</h3>
-				{aside ? <span className="ebq-section__aside">{aside}</span> : null}
-			</div>
-			<div className="ebq-section__body">{children}</div>
+		<section className={className}>
+			{isCollapsible ? (
+				<button
+					type="button"
+					className="ebq-section__head ebq-section__head--toggle"
+					onClick={() => setOpen((v) => !v)}
+					aria-expanded={open}
+				>
+					{head}
+				</button>
+			) : (
+				<div className="ebq-section__head">{head}</div>
+			)}
+			{showBody ? <div className="ebq-section__body">{children}</div> : null}
 		</section>
 	);
 }

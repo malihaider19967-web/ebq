@@ -24,6 +24,11 @@ final class EBQ_Meta_Fields
         '_ebq_robots_nofollow' => ['type' => 'boolean', 'sanitize' => 'rest_sanitize_boolean'],
         '_ebq_robots_advanced' => ['type' => 'string', 'sanitize' => 'sanitize_text_field'],
         '_ebq_focus_keyword' => ['type' => 'string', 'sanitize' => 'sanitize_text_field'],
+        // JSON-encoded list (max 5) of additional keyphrases the post should
+        // also rank for. Stored as a string so it can ride the existing
+        // register_post_meta string contract; React parses on read, stringifies
+        // on write. Sanitized to a normalized JSON shape on save.
+        '_ebq_additional_keywords' => ['type' => 'string', 'sanitize' => [self::class, 'sanitize_additional_keywords']],
 
         // Social (P2)
         '_ebq_og_title' => ['type' => 'string', 'sanitize' => 'sanitize_text_field'],
@@ -87,5 +92,30 @@ final class EBQ_Meta_Fields
         }
 
         return $value;
+    }
+
+    /**
+     * Normalize the additional-keywords JSON: at most 5 unique non-empty
+     * trimmed strings, each ≤120 chars. Returns a JSON string (or '').
+     */
+    public static function sanitize_additional_keywords($value): string
+    {
+        $decoded = is_string($value) && $value !== '' ? json_decode($value, true) : (is_array($value) ? $value : null);
+        if (! is_array($decoded)) {
+            return '';
+        }
+        $out = [];
+        foreach ($decoded as $kw) {
+            if (! is_string($kw)) continue;
+            $clean = trim(sanitize_text_field($kw));
+            if ($clean === '') continue;
+            $clean = mb_substr($clean, 0, 120);
+            $key = mb_strtolower($clean);
+            if (isset($out[$key])) continue;
+            $out[$key] = $clean;
+            if (count($out) >= 5) break;
+        }
+
+        return $out === [] ? '' : (string) wp_json_encode(array_values($out));
     }
 }
