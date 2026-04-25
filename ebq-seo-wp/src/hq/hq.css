@@ -492,6 +492,13 @@
 .ebq-hq-pos--top10 { background: var(--ebq-hq-accent-soft); color: var(--ebq-hq-accent); }
 .ebq-hq-pos--striking { background: var(--ebq-hq-warn-soft); color: var(--ebq-hq-warn); }
 .ebq-hq-pos--deep { background: var(--ebq-hq-bg); color: var(--ebq-hq-text-soft); }
+.ebq-hq-pos--pending {
+	background: var(--ebq-hq-bg);
+	color: var(--ebq-hq-text-soft);
+	font-size: 10px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
 .ebq-hq-muted { color: var(--ebq-hq-text-mute); }
 
 /* Delta */

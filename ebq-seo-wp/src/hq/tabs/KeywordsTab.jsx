@@ -98,7 +98,9 @@ export default function KeywordsTab() {
 			sortable: true,
 			render: (row) => row.current_position !== null ? (
 				<span className={positionToneCls(row.current_position)}>{Math.round(row.current_position)}</span>
-			) : <span className="ebq-hq-muted">—</span>,
+			) : (
+				<span className="ebq-hq-pos ebq-hq-pos--pending" title={__('Awaiting first SERP check (usually 1–5 min)', 'ebq-seo')}>{__('pending', 'ebq-seo')}</span>
+			),
 		},
 		{
 			key: 'best_position',

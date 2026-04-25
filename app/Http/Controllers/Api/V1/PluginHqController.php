@@ -156,14 +156,19 @@ class PluginHqController extends Controller
             $query->where('keyword', 'LIKE', '%' . addcslashes($search, '\\%_') . '%');
         }
 
-        // current_position can be null when never checked — push nulls to the
-        // bottom regardless of asc/desc so the table is always useful.
+        // current_position can be null when never checked — push nulls AHEAD
+        // of the position list so a freshly-added keyword (which always has
+        // null position until the first cron run) is visible at the top
+        // instead of buried on the last page.
         if ($sort === 'current_position' || $sort === 'best_position' || $sort === 'position_change') {
-            $query->orderByRaw("$sort IS NULL");
+            $query->orderByRaw("$sort IS NULL DESC"); // unchecked keywords first
             $query->orderBy($sort, $dir);
         } else {
             $query->orderBy($sort, $dir);
         }
+        // Always tiebreak on id DESC so the most recently added keyword
+        // surfaces first within any equal-rank group (NULLs especially).
+        $query->orderByDesc('id');
 
         $paginator = $query->paginate($perPage);
 
