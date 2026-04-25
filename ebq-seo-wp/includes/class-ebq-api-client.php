@@ -107,6 +107,43 @@ final class EBQ_Api_Client
         );
     }
 
+    /* ─── EBQ HQ — top-level admin dashboard ─────────────────── */
+
+    public function hq_overview(string $range = '30d'): array
+    {
+        return $this->get('/api/v1/hq/overview', ['range' => $range]);
+    }
+
+    public function hq_performance(string $range = '30d'): array
+    {
+        return $this->get('/api/v1/hq/performance', ['range' => $range]);
+    }
+
+    public function hq_keywords(array $args = []): array
+    {
+        return $this->get('/api/v1/hq/keywords', $args);
+    }
+
+    public function hq_keyword_history(int $id): array
+    {
+        return $this->get(sprintf('/api/v1/hq/keywords/%d/history', $id));
+    }
+
+    public function hq_pages(array $args = []): array
+    {
+        return $this->get('/api/v1/hq/pages', $args);
+    }
+
+    public function hq_index_status(array $args = []): array
+    {
+        return $this->get('/api/v1/hq/index-status', $args);
+    }
+
+    public function hq_insights(string $type, int $limit = 25): array
+    {
+        return $this->get(sprintf('/api/v1/hq/insights/%s', rawurlencode($type)), ['limit' => $limit]);
+    }
+
     private function get(string $path, array $query = []): array
     {
         if ($this->token === '') {

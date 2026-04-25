@@ -81,14 +81,42 @@ final class EBQ_Schema_Output
                 $graph[] = $author;
             }
 
-            $override = (string) EBQ_Meta_Fields::get($post_id, '_ebq_schema_type', '');
-            $type = $override !== '' ? $override : $this->detect_type($post_id);
-            $node = $this->primary_node($post_id, $type);
-            if ($node !== null) {
-                $graph[] = $node;
+            // User-configured schemas (post-meta `_ebq_schemas`). If the user
+            // has set any here, those take precedence over the auto-detected
+            // Article/Product node and over block-driven FAQ/HowTo for the
+            // same type — so we never emit two of the same kind.
+            $user_schemas = $this->user_schemas($post_id);
+            $user_types = [];
+            foreach ($user_schemas as $entry) {
+                $node = EBQ_Schema_Templates::render($entry, $post_id);
+                if ($node !== null) {
+                    $graph[] = $node;
+                    $user_types[(string) ($node['@type'] ?? '')] = true;
+                }
             }
 
+            // Suppress the auto-Article/Product if the user already wrote one.
+            $skip_primary_types = ['Article', 'BlogPosting', 'NewsArticle', 'Product', 'Event', 'Recipe', 'LocalBusiness', 'Restaurant', 'Store', 'ProfessionalService', 'MedicalBusiness', 'JobPosting', 'SoftwareApplication'];
+            $primary_already_user = false;
+            foreach ($skip_primary_types as $t) {
+                if (! empty($user_types[$t])) { $primary_already_user = true; break; }
+            }
+
+            if (! $primary_already_user) {
+                $override = (string) EBQ_Meta_Fields::get($post_id, '_ebq_schema_type', '');
+                $type = $override !== '' ? $override : $this->detect_type($post_id);
+                $node = $this->primary_node($post_id, $type);
+                if ($node !== null) {
+                    $graph[] = $node;
+                }
+            }
+
+            // Block-driven FAQ/HowTo are still emitted, but a user-defined
+            // FAQPage suppresses the block-driven one to avoid duplicates.
             foreach ($this->block_driven_nodes($post_id) as $extra) {
+                $extraType = (string) ($extra['@type'] ?? '');
+                if ($extraType === 'FAQPage' && ! empty($user_types['FAQPage'])) continue;
+                if ($extraType === 'HowTo' && ! empty($user_types['HowTo'])) continue;
                 $graph[] = $extra;
             }
         }
@@ -290,6 +318,31 @@ final class EBQ_Schema_Output
             '@id'             => home_url('/').'#breadcrumbs-'.($post_id > 0 ? $post_id : 'home'),
             'itemListElement' => $items,
         ];
+    }
+
+    /**
+     * Decode the per-post `_ebq_schemas` JSON into an ordered list of entries.
+     * Returns [] for posts with no user-configured schemas (the common case).
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function user_schemas(int $post_id): array
+    {
+        $raw = (string) EBQ_Meta_Fields::get($post_id, '_ebq_schemas', '');
+        if ($raw === '') {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) {
+            return [];
+        }
+        $out = [];
+        foreach ($decoded as $entry) {
+            if (is_array($entry)) {
+                $out[] = $entry;
+            }
+        }
+        return $out;
     }
 
     private function detect_type(int $post_id): string

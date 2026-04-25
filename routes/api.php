@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\PluginHqController;
 use App\Http\Controllers\Api\V1\PluginInsightsController;
 use App\Http\Controllers\Api\V1\PluginHeartbeatController;
 use Illuminate\Support\Facades\Route;
@@ -30,5 +31,20 @@ Route::prefix('v1')->group(function (): void {
             ->name('api.v1.reports.iframe');
         Route::post('/plugin/heartbeat', PluginHeartbeatController::class)
             ->name('api.v1.plugin.heartbeat');
+
+        // EBQ HQ — top-level WP-admin analytics dashboards.
+        Route::prefix('hq')->name('api.v1.hq.')->group(function (): void {
+            Route::get('/overview', [PluginHqController::class, 'overview'])->name('overview');
+            Route::get('/performance', [PluginHqController::class, 'performance'])->name('performance');
+            Route::get('/keywords', [PluginHqController::class, 'keywords'])->name('keywords');
+            Route::get('/keywords/{id}/history', [PluginHqController::class, 'keywordHistory'])
+                ->whereNumber('id')
+                ->name('keywords.history');
+            Route::get('/pages', [PluginHqController::class, 'pages'])->name('pages');
+            Route::get('/index-status', [PluginHqController::class, 'indexStatus'])->name('index-status');
+            Route::get('/insights/{type}', [PluginHqController::class, 'insights'])
+                ->where('type', '[a-z_]+')
+                ->name('insights');
+        });
     });
 });

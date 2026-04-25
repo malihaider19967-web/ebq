@@ -94,11 +94,61 @@ final class EBQ_Rest_Proxy
                 'post_ids' => ['required' => true],
             ],
         ]);
+
+        // EBQ HQ — top-level admin dashboard data. Same auth model as the
+        // other proxy routes; only `manage_options` users see the menu.
+        register_rest_route('ebq/v1', '/hq/overview', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_overview'],
+        ]);
+        register_rest_route('ebq/v1', '/hq/performance', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_performance'],
+        ]);
+        register_rest_route('ebq/v1', '/hq/keywords', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_keywords'],
+        ]);
+        register_rest_route('ebq/v1', '/hq/keywords/(?P<id>\d+)/history', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_keyword_history'],
+            'args' => ['id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0]],
+        ]);
+        register_rest_route('ebq/v1', '/hq/pages', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_pages'],
+        ]);
+        register_rest_route('ebq/v1', '/hq/index-status', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_index_status'],
+        ]);
+        register_rest_route('ebq/v1', '/hq/insights/(?P<type>[a-z_]+)', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_insights'],
+            'args' => ['type' => ['validate_callback' => static fn ($v): bool => is_string($v) && preg_match('/^[a-z_]+$/', $v) === 1]],
+        ]);
+        register_rest_route('ebq/v1', '/hq/iframe-url', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_iframe_url'],
+        ]);
     }
 
     public function can_edit(): bool
     {
         return current_user_can('edit_posts');
+    }
+
+    public function can_view_hq(): bool
+    {
+        return current_user_can('manage_options');
     }
 
     public function post_insights(WP_REST_Request $request): WP_REST_Response
@@ -250,6 +300,72 @@ final class EBQ_Rest_Proxy
             'ok' => true,
             'html' => EBQ_Dashboard_Widget::render_content($data),
         ], 200);
+    }
+
+    /* ─── HQ proxy methods ───────────────────────────────── */
+
+    public function hq_overview(WP_REST_Request $request): WP_REST_Response
+    {
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_overview((string) ($request->get_param('range') ?: '30d')), 200);
+    }
+
+    public function hq_performance(WP_REST_Request $request): WP_REST_Response
+    {
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_performance((string) ($request->get_param('range') ?: '30d')), 200);
+    }
+
+    public function hq_keywords(WP_REST_Request $request): WP_REST_Response
+    {
+        $args = array_filter([
+            'sort' => (string) $request->get_param('sort'),
+            'dir' => (string) $request->get_param('dir'),
+            'page' => (int) ($request->get_param('page') ?: 1),
+            'per_page' => (int) ($request->get_param('per_page') ?: 25),
+            'search' => (string) ($request->get_param('search') ?: ''),
+        ], static fn ($v) => $v !== '' && $v !== 0);
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_keywords($args), 200);
+    }
+
+    public function hq_keyword_history(WP_REST_Request $request): WP_REST_Response
+    {
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_keyword_history((int) $request->get_param('id')), 200);
+    }
+
+    public function hq_pages(WP_REST_Request $request): WP_REST_Response
+    {
+        $args = array_filter([
+            'range' => (string) ($request->get_param('range') ?: '30d'),
+            'sort' => (string) $request->get_param('sort'),
+            'dir' => (string) $request->get_param('dir'),
+            'page' => (int) ($request->get_param('page') ?: 1),
+            'per_page' => (int) ($request->get_param('per_page') ?: 25),
+            'search' => (string) ($request->get_param('search') ?: ''),
+        ], static fn ($v) => $v !== '' && $v !== 0);
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_pages($args), 200);
+    }
+
+    public function hq_index_status(WP_REST_Request $request): WP_REST_Response
+    {
+        $args = array_filter([
+            'status' => (string) ($request->get_param('status') ?: ''),
+            'page' => (int) ($request->get_param('page') ?: 1),
+            'per_page' => (int) ($request->get_param('per_page') ?: 25),
+            'search' => (string) ($request->get_param('search') ?: ''),
+        ], static fn ($v) => $v !== '' && $v !== 0);
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_index_status($args), 200);
+    }
+
+    public function hq_insights(WP_REST_Request $request): WP_REST_Response
+    {
+        $type = (string) $request->get_param('type');
+        $limit = max(5, min(100, (int) ($request->get_param('limit') ?: 25)));
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_insights($type, $limit), 200);
+    }
+
+    public function hq_iframe_url(WP_REST_Request $request): WP_REST_Response
+    {
+        $insight = (string) ($request->get_param('insight') ?: 'cannibalization');
+        return new WP_REST_Response(EBQ_Plugin::api_client()->get_iframe_url($insight), 200);
     }
 
     public function bulk_post_insights(WP_REST_Request $request): WP_REST_Response

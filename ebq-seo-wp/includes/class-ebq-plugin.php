@@ -33,6 +33,8 @@ final class EBQ_Plugin
         (new EBQ_Meta_Output())->register();
         (new EBQ_Social_Output())->register();
         (new EBQ_Schema_Output())->register();
+        (new EBQ_Schema_Shortcode())->register();
+        (new EBQ_Hq_Page())->register();
         (new EBQ_Sitemap())->register();
         (new EBQ_Seo_Fields_Meta_Box())->register();
         (new EBQ_Breadcrumbs())->register();

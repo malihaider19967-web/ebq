@@ -10,5 +10,6 @@ module.exports = {
 		'post-column-hydrate': path.resolve(process.cwd(), 'src', 'admin',   'post-column-hydrate.js'),
 		'dashboard-hydrate':   path.resolve(process.cwd(), 'src', 'admin',   'dashboard-hydrate.js'),
 		'meta-box-hydrate':    path.resolve(process.cwd(), 'src', 'admin',   'meta-box-hydrate.js'),
+		hq:                    path.resolve(process.cwd(), 'src', 'hq',      'index.js'),
 	},
 };

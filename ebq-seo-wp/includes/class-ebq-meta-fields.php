@@ -42,6 +42,10 @@ final class EBQ_Meta_Fields
         // Schema override (P3)
         '_ebq_schema_type' => ['type' => 'string', 'sanitize' => 'sanitize_key'],
         '_ebq_schema_disabled' => ['type' => 'boolean', 'sanitize' => 'rest_sanitize_boolean'],
+        // JSON-encoded list of user-configured schemas. Each item:
+        //   { id, template, type, data: {...field values...}, enabled }
+        // Sanitized through sanitize_schemas() to keep shape + caps tight.
+        '_ebq_schemas' => ['type' => 'string', 'sanitize' => [self::class, 'sanitize_schemas']],
     ];
 
     public function register(): void
@@ -117,5 +121,91 @@ final class EBQ_Meta_Fields
         }
 
         return $out === [] ? '' : (string) wp_json_encode(array_values($out));
+    }
+
+    /**
+     * Normalize the user-configured schemas JSON. Accepts either a JSON string
+     * or a pre-decoded array. Returns a JSON string capped at 20 schemas, each
+     * with a stable id, template id, type, enabled flag, and a string-keyed
+     * data map. Field values are passed through and only normalized for shape;
+     * the renderer is responsible for value-level sanitization on output.
+     */
+    public static function sanitize_schemas($value): string
+    {
+        $decoded = is_string($value) && $value !== '' ? json_decode($value, true) : (is_array($value) ? $value : null);
+        if (! is_array($decoded)) {
+            return '';
+        }
+
+        $out = [];
+        foreach ($decoded as $entry) {
+            if (! is_array($entry)) continue;
+            $template = sanitize_key((string) ($entry['template'] ?? ''));
+            $type = sanitize_text_field((string) ($entry['type'] ?? ''));
+            if ($template === '' || $type === '') continue;
+
+            $id = (string) ($entry['id'] ?? '');
+            $id = preg_replace('/[^A-Za-z0-9_\-]/', '', $id);
+            if ($id === '') {
+                $id = wp_generate_uuid4();
+            }
+
+            $data = is_array($entry['data'] ?? null) ? $entry['data'] : [];
+            $clean_data = [];
+            foreach ($data as $k => $v) {
+                if (! is_string($k) || $k === '') continue;
+                $clean_key = preg_replace('/[^A-Za-z0-9_\-]/', '', $k);
+                if ($clean_key === '') continue;
+                $clean_data[$clean_key] = self::clean_data_value($v);
+            }
+
+            $out[] = [
+                'id' => $id,
+                'template' => $template,
+                'type' => mb_substr($type, 0, 80),
+                'enabled' => array_key_exists('enabled', $entry) ? (bool) $entry['enabled'] : true,
+                'data' => $clean_data,
+            ];
+
+            if (count($out) >= 20) break;
+        }
+
+        return $out === [] ? '' : (string) wp_json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * Recursively normalize a stored value: scalars become trimmed strings (≤2KB),
+     * arrays of scalars/arrays survive (≤50 items deep, ≤2 levels). Output
+     * sanitization (esc_html, esc_url) happens at JSON-LD emit time.
+     */
+    private static function clean_data_value($value, int $depth = 0)
+    {
+        if ($depth > 2) {
+            return null;
+        }
+        if (is_array($value)) {
+            $out = [];
+            foreach ($value as $k => $v) {
+                if (count($out) >= 50) break;
+                $cleanV = self::clean_data_value($v, $depth + 1);
+                if ($cleanV === null) continue;
+                if (is_int($k)) {
+                    $out[] = $cleanV;
+                } else {
+                    $clean_key = preg_replace('/[^A-Za-z0-9_\-]/', '', (string) $k);
+                    if ($clean_key !== '') {
+                        $out[$clean_key] = $cleanV;
+                    }
+                }
+            }
+            return $out;
+        }
+        if (is_bool($value) || is_int($value) || is_float($value)) {
+            return $value;
+        }
+        $str = is_string($value) ? $value : (string) $value;
+        $str = wp_check_invalid_utf8($str);
+        if ($str === '') return '';
+        return mb_substr($str, 0, 2048);
     }
 }

@@ -83,7 +83,26 @@
       "Bash(grep -n '->keyword\\\\|$keyword\\\\|['\\\\''keyword'\\\\'']' /c/Users/malih/Desktop/ebq/resources/views/livewire/rank-tracking/rank-tracking-manager.blade.php)",
       "Bash(grep -n 'compact\\\\|return view\\\\|$rows\\\\|serpRisk\\\\|keMetrics' /c/Users/malih/Desktop/ebq/app/Livewire/RankTracking/RankTrackingManager.php)",
       "PowerShell(composer *)",
-      "Bash(./vendor/bin/phpunit --filter FeaturesPageTest)"
+      "Bash(./vendor/bin/phpunit --filter FeaturesPageTest)",
+      "Bash(git -C \"/c/Users/malih/Desktop/ebq/ebq-seo-wp\" status --short)",
+      "Bash(npm run *)",
+      "Bash(php -l includes/class-ebq-meta-fields.php)",
+      "Bash(php -l includes/class-ebq-schema-variables.php)",
+      "Bash(php -l includes/class-ebq-schema-templates.php)",
+      "Bash(php -l includes/class-ebq-schema-output.php)",
+      "Bash(php -l ebq-seo.php)",
+      "WebFetch(domain:rankmath.com)",
+      "Bash(grep -v \"^Api$\")",
+      "Bash(grep -E \"fillable|protected \\\\\\\\\\\\$\" C:/Users/malih/Desktop/ebq/app/Models/RankTrackingKeyword.php)",
+      "Bash(grep -E \"fillable|protected \\\\\\\\\\\\$\" C:/Users/malih/Desktop/ebq/app/Models/RankTrackingSnapshot.php)",
+      "Bash(grep -E \"fillable|protected \\\\\\\\\\\\$\" C:/Users/malih/Desktop/ebq/app/Models/PageIndexingStatus.php)",
+      "Bash(grep -E \"fillable|protected \\\\\\\\\\\\$\" C:/Users/malih/Desktop/ebq/app/Models/SearchConsoleData.php)",
+      "Bash(php -l app/Http/Controllers/Api/V1/PluginHqController.php)",
+      "Bash(php -l routes/api.php)",
+      "Bash(php -l ebq-seo-wp/includes/class-ebq-api-client.php)",
+      "Bash(php -l ebq-seo-wp/includes/class-ebq-rest-proxy.php)",
+      "Bash(./vendor/bin/phpunit)",
+      "Bash(./vendor/bin/phpunit tests/Feature/Api)"
     ]
   }
 }

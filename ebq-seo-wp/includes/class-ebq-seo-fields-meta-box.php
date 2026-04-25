@@ -38,6 +38,7 @@ final class EBQ_Seo_Fields_Meta_Box
         '_ebq_twitter_card'        => 'ebq_twitter_card',
         '_ebq_schema_type'         => 'ebq_schema_type',
         '_ebq_schema_disabled'     => 'ebq_schema_disabled',
+        '_ebq_schemas'             => 'ebq_schemas',
     ];
 
     public function register(): void
@@ -153,7 +154,7 @@ final class EBQ_Seo_Fields_Meta_Box
         echo '<div style="display:none" aria-hidden="true">';
         foreach (self::FIELDS as $meta_key => $field_name) {
             $value = EBQ_Meta_Fields::get($post->ID, $meta_key, '');
-            $is_textarea = in_array($meta_key, ['_ebq_description', '_ebq_og_description', '_ebq_twitter_description'], true);
+            $is_textarea = in_array($meta_key, ['_ebq_description', '_ebq_og_description', '_ebq_twitter_description', '_ebq_schemas'], true);
             $is_checkbox_like = in_array($meta_key, ['_ebq_robots_noindex', '_ebq_robots_nofollow', '_ebq_schema_disabled'], true);
             if ($is_checkbox_like) {
                 $cast = $value ? '1' : '';
@@ -229,6 +230,18 @@ final class EBQ_Seo_Fields_Meta_Box
             delete_post_meta($post_id, '_ebq_robots_advanced');
         } else {
             update_post_meta($post_id, '_ebq_robots_advanced', mb_substr($adv, 0, 200));
+        }
+
+        // Schemas — JSON blob from a hidden textarea, normalized through the
+        // shared sanitizer so the same shape contract holds for both editors.
+        if (isset($_POST['ebq_schemas'])) {
+            $raw_schemas = (string) wp_unslash($_POST['ebq_schemas']);
+            $clean = EBQ_Meta_Fields::sanitize_schemas($raw_schemas);
+            if ($clean === '') {
+                delete_post_meta($post_id, '_ebq_schemas');
+            } else {
+                update_post_meta($post_id, '_ebq_schemas', $clean);
+            }
         }
 
         unset($post);

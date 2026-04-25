@@ -10,6 +10,7 @@ import InsightsTab from './tabs/InsightsTab';
 import AdvancedTab from './tabs/AdvancedTab';
 import InclusiveTab from './tabs/InclusiveTab';
 import LinksTab from './tabs/LinksTab';
+import SchemaTab from './tabs/SchemaTab';
 
 import { useEditorContext, usePostMeta, resolveTitleTemplate, publicConfig } from './hooks/useEditorContext';
 import useDebounced from './hooks/useDebounced';
@@ -23,6 +24,7 @@ const TABS = [
 	{ id: 'inclusive',   label: __('Inclusive', 'ebq-seo'),   icon: IconSparkle, Component: InclusiveTab },
 	{ id: 'links',       label: __('Links', 'ebq-seo'),       icon: IconChart,   Component: LinksTab },
 	{ id: 'social',      label: __('Social', 'ebq-seo'),      icon: IconShare,   Component: SocialTab },
+	{ id: 'schema',      label: __('Schema', 'ebq-seo'),      icon: IconSliders, Component: SchemaTab },
 	{ id: 'insights',    label: __('Insights', 'ebq-seo'),    icon: IconChart,   Component: InsightsTab },
 	{ id: 'advanced',    label: __('Advanced', 'ebq-seo'),    icon: IconSliders, Component: AdvancedTab },
 ];

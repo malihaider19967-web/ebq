@@ -57,6 +57,7 @@ const META_TO_FIELD = {
 	_ebq_twitter_card:        'ebq_twitter_card',
 	_ebq_schema_type:         'ebq_schema_type',
 	_ebq_schema_disabled:     'ebq_schema_disabled',
+	_ebq_schemas:             'ebq_schemas',
 };
 
 function findInput(metaKey) {
