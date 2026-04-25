@@ -51,6 +51,11 @@ require_once EBQ_SEO_PATH . 'includes/class-ebq-redirects.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-redirects-auto.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-redirects-admin.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-redirects-importer.php';
+// Migration tools (Yoast / Rank Math → EBQ post meta + schemas + breadcrumbs)
+require_once EBQ_SEO_PATH . 'includes/class-ebq-migration.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-migration-yoast.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-migration-rankmath.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-migration-banner.php';
 
 register_activation_hook(__FILE__, static function (): void {
     add_option('ebq_site_token', '');

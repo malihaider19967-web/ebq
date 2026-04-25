@@ -51,7 +51,7 @@ final class EBQ_Redirects_Importer
         }
         check_admin_referer('ebq_redirect_import_yoast');
         $this->import($this->yoast_rules());
-        wp_safe_redirect(admin_url('options-general.php?page='.EBQ_Redirects_Admin::MENU_SLUG.'&ebq_status=imported'));
+        wp_safe_redirect(admin_url('admin.php?page='.EBQ_Redirects_Admin::MENU_SLUG.'&ebq_status=imported'));
         exit;
     }
 
@@ -62,7 +62,7 @@ final class EBQ_Redirects_Importer
         }
         check_admin_referer('ebq_redirect_import_rankmath');
         $this->import($this->rankmath_rules());
-        wp_safe_redirect(admin_url('options-general.php?page='.EBQ_Redirects_Admin::MENU_SLUG.'&ebq_status=imported'));
+        wp_safe_redirect(admin_url('admin.php?page='.EBQ_Redirects_Admin::MENU_SLUG.'&ebq_status=imported'));
         exit;
     }
 

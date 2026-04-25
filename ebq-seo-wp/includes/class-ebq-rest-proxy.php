@@ -186,6 +186,14 @@ final class EBQ_Rest_Proxy
             'permission_callback' => [$this, 'can_edit'],
             'callback' => [$this, 'track_keyword'],
         ]);
+
+        // Migration progress poller — settings card hits this every 2 s
+        // while a background migration is running.
+        register_rest_route('ebq/v1', '/migration/status', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'migration_status'],
+        ]);
     }
 
     public function can_edit(): bool
@@ -527,6 +535,20 @@ final class EBQ_Rest_Proxy
     {
         $insight = (string) ($request->get_param('insight') ?: 'cannibalization');
         return new WP_REST_Response(EBQ_Plugin::api_client()->get_iframe_url($insight), 200);
+    }
+
+    /**
+     * Migration job status. Returns the live transient state for `source`
+     * (yoast | rankmath) so the settings-card progress bar can update
+     * without a full page reload.
+     */
+    public function migration_status(WP_REST_Request $request): WP_REST_Response
+    {
+        $source = sanitize_key((string) ($request->get_param('source') ?? ''));
+        if ($source === '') {
+            return $this->hq_response(['ok' => false, 'error' => 'missing_source'], 400);
+        }
+        return $this->hq_response(EBQ_Migration::get_state($source), 200);
     }
 
     /**

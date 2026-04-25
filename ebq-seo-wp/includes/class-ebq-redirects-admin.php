@@ -14,7 +14,10 @@ final class EBQ_Redirects_Admin
 
     public function register(): void
     {
-        add_action('admin_menu', [$this, 'add_menu']);
+        // Priority 20 so this runs AFTER EBQ_Hq_Page::register_menu adds
+        // the parent top-level menu — otherwise add_submenu_page can't find
+        // the parent slug.
+        add_action('admin_menu', [$this, 'add_menu'], 20);
         add_action('admin_post_ebq_redirect_save', [$this, 'handle_save']);
         add_action('admin_post_ebq_redirect_delete', [$this, 'handle_delete']);
         add_action('admin_post_ebq_redirect_bulk', [$this, 'handle_bulk']);
@@ -22,11 +25,23 @@ final class EBQ_Redirects_Admin
         add_action('admin_post_ebq_redirect_export', [$this, 'handle_export']);
     }
 
+    /**
+     * Settings-page URL — used by every redirect/cancel/save handler. One
+     * place to change it again later. Now lives under the EBQ HQ top-level
+     * menu instead of the WP Settings group.
+     */
+    public static function url(string $extra = ''): string
+    {
+        $base = admin_url('admin.php?page=' . self::MENU_SLUG);
+        return $extra === '' ? $base : ($base . '&' . ltrim($extra, '?&'));
+    }
+
     public function add_menu(): void
     {
-        add_options_page(
+        add_submenu_page(
+            EBQ_Hq_Page::SLUG,
             __('EBQ Redirects', 'ebq-seo'),
-            __('EBQ Redirects', 'ebq-seo'),
+            __('Redirects', 'ebq-seo'),
             'manage_options',
             self::MENU_SLUG,
             [$this, 'render_page']
@@ -44,7 +59,7 @@ final class EBQ_Redirects_Admin
         ?>
         <div class="wrap">
             <h1 class="wp-heading-inline"><?php esc_html_e('EBQ Redirects', 'ebq-seo'); ?></h1>
-            <a href="<?php echo esc_url(admin_url('options-general.php?page='.self::MENU_SLUG.'&edit=new')); ?>" class="page-title-action"><?php esc_html_e('Add new', 'ebq-seo'); ?></a>
+            <a href="<?php echo esc_url(admin_url('admin.php?page='.self::MENU_SLUG.'&edit=new')); ?>" class="page-title-action"><?php esc_html_e('Add new', 'ebq-seo'); ?></a>
             <hr class="wp-header-end" />
 
             <?php $this->render_status_notice($status); ?>
@@ -154,7 +169,7 @@ final class EBQ_Redirects_Admin
 
             <p>
                 <button type="submit" class="button button-primary"><?php esc_html_e('Save redirect', 'ebq-seo'); ?></button>
-                <a href="<?php echo esc_url(admin_url('options-general.php?page='.self::MENU_SLUG)); ?>" class="button"><?php esc_html_e('Cancel', 'ebq-seo'); ?></a>
+                <a href="<?php echo esc_url(admin_url('admin.php?page='.self::MENU_SLUG)); ?>" class="button"><?php esc_html_e('Cancel', 'ebq-seo'); ?></a>
             </p>
         </form>
         <?php
@@ -213,7 +228,7 @@ final class EBQ_Redirects_Admin
                                 <?php echo $row['last_hit'] !== '' ? esc_html((string) $row['last_hit']) : '—'; ?>
                             </td>
                             <td>
-                                <a href="<?php echo esc_url(admin_url('options-general.php?page='.self::MENU_SLUG.'&edit='.$row['id'])); ?>" class="button button-small"><?php esc_html_e('Edit', 'ebq-seo'); ?></a>
+                                <a href="<?php echo esc_url(admin_url('admin.php?page='.self::MENU_SLUG.'&edit='.$row['id'])); ?>" class="button button-small"><?php esc_html_e('Edit', 'ebq-seo'); ?></a>
                                 <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin-post.php?action=ebq_redirect_delete&id='.$row['id']), 'ebq_redirect_delete_'.$row['id'])); ?>"
                                     class="button button-small" onclick="return confirm('<?php echo esc_js(__('Delete this redirect?', 'ebq-seo')); ?>');">
                                     <?php esc_html_e('Delete', 'ebq-seo'); ?>
@@ -283,13 +298,13 @@ final class EBQ_Redirects_Admin
         $notes = isset($_POST['notes']) ? (string) wp_unslash($_POST['notes']) : '';
 
         if ($source === '' || ($target === '' && $type !== EBQ_Redirects::TYPE_410)) {
-            wp_safe_redirect(admin_url('options-general.php?page='.self::MENU_SLUG.'&ebq_status=invalid'));
+            wp_safe_redirect(admin_url('admin.php?page='.self::MENU_SLUG.'&ebq_status=invalid'));
             exit;
         }
         if ($regex) {
             $pattern = '#'.str_replace('#', '\\#', $source).'#i';
             if (@preg_match($pattern, '') === false) {
-                wp_safe_redirect(admin_url('options-general.php?page='.self::MENU_SLUG.'&ebq_status=bad_regex'));
+                wp_safe_redirect(admin_url('admin.php?page='.self::MENU_SLUG.'&ebq_status=bad_regex'));
                 exit;
             }
         }
@@ -302,7 +317,7 @@ final class EBQ_Redirects_Admin
             'notes' => $notes,
         ], $id > 0 ? $id : null);
 
-        wp_safe_redirect(admin_url('options-general.php?page='.self::MENU_SLUG.'&ebq_status=saved'));
+        wp_safe_redirect(admin_url('admin.php?page='.self::MENU_SLUG.'&ebq_status=saved'));
         exit;
     }
 
@@ -314,7 +329,7 @@ final class EBQ_Redirects_Admin
         $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
         check_admin_referer('ebq_redirect_delete_'.$id);
         (new EBQ_Redirects())->delete($id);
-        wp_safe_redirect(admin_url('options-general.php?page='.self::MENU_SLUG.'&ebq_status=deleted'));
+        wp_safe_redirect(admin_url('admin.php?page='.self::MENU_SLUG.'&ebq_status=deleted'));
         exit;
     }
 
@@ -332,10 +347,10 @@ final class EBQ_Redirects_Admin
             foreach ($ids as $id) {
                 $svc->delete((int) $id);
             }
-            wp_safe_redirect(admin_url('options-general.php?page='.self::MENU_SLUG.'&ebq_status=bulk_deleted'));
+            wp_safe_redirect(admin_url('admin.php?page='.self::MENU_SLUG.'&ebq_status=bulk_deleted'));
             exit;
         }
-        wp_safe_redirect(admin_url('options-general.php?page='.self::MENU_SLUG));
+        wp_safe_redirect(admin_url('admin.php?page='.self::MENU_SLUG));
         exit;
     }
 
@@ -347,21 +362,21 @@ final class EBQ_Redirects_Admin
         check_admin_referer('ebq_redirect_import');
 
         if (empty($_FILES['csv']['tmp_name']) || ! is_uploaded_file((string) $_FILES['csv']['tmp_name'])) {
-            wp_safe_redirect(admin_url('options-general.php?page='.self::MENU_SLUG.'&ebq_status=import_failed'));
+            wp_safe_redirect(admin_url('admin.php?page='.self::MENU_SLUG.'&ebq_status=import_failed'));
             exit;
         }
 
         $path = (string) $_FILES['csv']['tmp_name'];
         $handle = @fopen($path, 'r');
         if ($handle === false) {
-            wp_safe_redirect(admin_url('options-general.php?page='.self::MENU_SLUG.'&ebq_status=import_failed'));
+            wp_safe_redirect(admin_url('admin.php?page='.self::MENU_SLUG.'&ebq_status=import_failed'));
             exit;
         }
 
         $header = fgetcsv($handle);
         if (! is_array($header)) {
             fclose($handle);
-            wp_safe_redirect(admin_url('options-general.php?page='.self::MENU_SLUG.'&ebq_status=import_failed'));
+            wp_safe_redirect(admin_url('admin.php?page='.self::MENU_SLUG.'&ebq_status=import_failed'));
             exit;
         }
         $header = array_map(static fn ($h): string => strtolower(trim((string) $h)), $header);
@@ -394,7 +409,7 @@ final class EBQ_Redirects_Admin
         }
         fclose($handle);
 
-        wp_safe_redirect(admin_url('options-general.php?page='.self::MENU_SLUG.'&ebq_status=imported&count='.$count));
+        wp_safe_redirect(admin_url('admin.php?page='.self::MENU_SLUG.'&ebq_status=imported&count='.$count));
         exit;
     }
 

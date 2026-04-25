@@ -45,6 +45,10 @@ final class EBQ_Plugin
         (new EBQ_Redirects_Auto())->register();
         (new EBQ_Redirects_Admin())->register();
         (new EBQ_Redirects_Importer())->register();
+
+        // v2.3 Migration (Yoast / Rank Math → EBQ)
+        (new EBQ_Migration())->register();
+        (new EBQ_Migration_Banner())->register();
     }
 
     public static function api_client(): EBQ_Api_Client
