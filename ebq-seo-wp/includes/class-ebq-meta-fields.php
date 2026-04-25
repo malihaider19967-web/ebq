@@ -46,6 +46,13 @@ final class EBQ_Meta_Fields
         //   { id, template, type, data: {...field values...}, enabled }
         // Sanitized through sanitize_schemas() to keep shape + caps tight.
         '_ebq_schemas' => ['type' => 'string', 'sanitize' => [self::class, 'sanitize_schemas']],
+
+        // Per-post breadcrumb override — JSON shape:
+        //   { mode: 'auto' | 'custom', items: [{ name, url, hidden? }] }
+        // When mode='auto' (or empty), the schema output emits the default
+        // Home → ancestors → current trail. When mode='custom', the items
+        // array fully replaces it.
+        '_ebq_breadcrumbs' => ['type' => 'string', 'sanitize' => [self::class, 'sanitize_breadcrumbs']],
     ];
 
     public function register(): void
@@ -99,8 +106,10 @@ final class EBQ_Meta_Fields
     }
 
     /**
-     * Normalize the additional-keywords JSON: at most 5 unique non-empty
-     * trimmed strings, each ≤120 chars. Returns a JSON string (or '').
+     * Normalize the additional-keywords JSON: unique, non-empty, trimmed
+     * strings, each ≤120 chars. Returns a JSON string (or ''). Soft cap at
+     * 200 entries keeps the payload sane in pathological cases (paste of a
+     * giant CSV) without being a meaningful limit for real users.
      */
     public static function sanitize_additional_keywords($value): string
     {
@@ -117,7 +126,7 @@ final class EBQ_Meta_Fields
             $key = mb_strtolower($clean);
             if (isset($out[$key])) continue;
             $out[$key] = $clean;
-            if (count($out) >= 5) break;
+            if (count($out) >= 200) break;
         }
 
         return $out === [] ? '' : (string) wp_json_encode(array_values($out));
@@ -171,6 +180,47 @@ final class EBQ_Meta_Fields
         }
 
         return $out === [] ? '' : (string) wp_json_encode($out, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    }
+
+    /**
+     * Normalize the per-post breadcrumb override. Accepts JSON or array.
+     * Returns a JSON string (or '') with shape:
+     *   { mode: 'auto'|'custom', items: [{ name, url, hidden }] }
+     * 'auto' (or empty) means "use the auto-generated trail" — we still
+     * keep the items list around so a user can flip back to custom without
+     * losing their work.
+     */
+    public static function sanitize_breadcrumbs($value): string
+    {
+        $decoded = is_string($value) && $value !== '' ? json_decode($value, true) : (is_array($value) ? $value : null);
+        if (! is_array($decoded)) {
+            return '';
+        }
+        $mode = ($decoded['mode'] ?? 'auto') === 'custom' ? 'custom' : 'auto';
+        $items = is_array($decoded['items'] ?? null) ? $decoded['items'] : [];
+
+        $clean = [];
+        foreach ($items as $item) {
+            if (! is_array($item)) continue;
+            $name = trim(sanitize_text_field((string) ($item['name'] ?? '')));
+            $url  = (string) esc_url_raw((string) ($item['url'] ?? ''));
+            if ($name === '' && $url === '') continue;
+            $clean[] = [
+                'name'   => mb_substr($name, 0, 200),
+                'url'    => $url,
+                'hidden' => ! empty($item['hidden']),
+            ];
+            if (count($clean) >= 30) break;
+        }
+
+        if ($mode === 'auto' && empty($clean)) {
+            return '';
+        }
+
+        return (string) wp_json_encode([
+            'mode'  => $mode,
+            'items' => $clean,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     }
 
     /**

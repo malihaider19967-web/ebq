@@ -203,6 +203,12 @@ class PluginHqController extends Controller
                 'position_change' => $k->position_change !== null ? (float) $k->position_change : null,
                 'current_url' => $k->current_url,
                 'last_checked_at' => $k->last_checked_at?->toIso8601String(),
+                // last_status lets the UI distinguish "queued / never checked"
+                // from "checked but not ranking in top N" — both have a null
+                // current_position but mean very different things to the user.
+                'last_status' => (string) ($k->last_status ?? ''),
+                'last_error' => $k->last_error ? mb_substr((string) $k->last_error, 0, 200) : null,
+                'depth' => (int) ($k->depth ?? 100),
                 'gsc_clicks' => $g ? (int) $g->clicks : 0,
                 'gsc_impressions' => $g ? (int) $g->impressions : 0,
                 'gsc_position' => $g ? round((float) $g->position, 2) : null,

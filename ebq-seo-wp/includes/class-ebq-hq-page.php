@@ -24,6 +24,29 @@ final class EBQ_Hq_Page
     {
         add_action('admin_menu', [$this, 'register_menu']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue']);
+        add_action('admin_bar_menu', [$this, 'register_admin_bar'], 80);
+    }
+
+    /**
+     * Global "+ Track keyword" shortcut in the WP admin bar so adding a
+     * keyword is one click from anywhere in the admin (or front-end if
+     * the user is logged in). Lands on the HQ Rank Tracker tab with the
+     * AddKeywordModal pre-opened — empty form for free-typing.
+     */
+    public function register_admin_bar(\WP_Admin_Bar $bar): void
+    {
+        if (! current_user_can('edit_posts') || ! EBQ_Plugin::is_configured()) {
+            return;
+        }
+        $bar->add_node([
+            'id'    => 'ebq-track-keyword',
+            'title' => '<span class="ab-icon dashicons dashicons-search" style="top:3px"></span>'
+                     . esc_html__('Track keyword', 'ebq-seo'),
+            'href'  => add_query_arg(['page' => self::SLUG, 'ebq_track' => '1'], admin_url('admin.php')),
+            'meta'  => [
+                'title' => __('Add a keyword to EBQ Rank Tracker', 'ebq-seo'),
+            ],
+        ]);
     }
 
     public function register_menu(): void
@@ -74,8 +97,8 @@ final class EBQ_Hq_Page
             'siteName'       => get_bloginfo('name'),
             'workspaceDomain' => (string) get_option('ebq_website_domain', ''),
             'isConnected'    => EBQ_Plugin::is_configured(),
-            'settingsUrl'    => admin_url('options-general.php?page=ebq-seo'),
-            'connectUrl'     => admin_url('options-general.php?page=ebq-seo'),
+            'settingsUrl'    => admin_url('admin.php?page=ebq-seo'),
+            'connectUrl'     => admin_url('admin.php?page=ebq-seo'),
             'pluginVersion'  => EBQ_SEO_VERSION,
         ]);
     }

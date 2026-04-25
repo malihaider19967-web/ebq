@@ -229,43 +229,40 @@
 
 .ebq-tab {
 	flex: 0 0 auto;
-	min-width: 0;
+	min-width: 56px;
 	background: transparent;
 	border: 0;
-	padding: 0 10px;
-	height: var(--ebq-h-tab);
+	padding: 6px 10px;
+	height: auto;
+	min-height: var(--ebq-h-tab);
 	font: inherit;
-	font-size: var(--ebq-fz-sm);
-	font-weight: 500;
+	font-size: 10px;
+	font-weight: 600;
+	letter-spacing: 0.02em;
 	color: var(--ebq-text-soft);
 	cursor: pointer;
 	display: inline-flex;
+	flex-direction: column;
 	align-items: center;
 	justify-content: center;
-	gap: 5px;
+	gap: 3px;
 	position: relative;
 	white-space: nowrap;
 	transition: color var(--ebq-dur-fast) var(--ebq-ease);
 }
 
-.ebq-tab svg { width: 13px; height: 13px; flex-shrink: 0; opacity: .85; }
+.ebq-tab svg { width: 16px; height: 16px; flex-shrink: 0; opacity: .85; }
 
 .ebq-tab:hover { color: var(--ebq-text); }
 .ebq-tab:focus-visible { outline: 2px solid var(--ebq-accent); outline-offset: -3px; border-radius: 3px; }
 
-.ebq-tab__label { overflow: hidden; text-overflow: ellipsis; }
-
-/* Narrow surface (sidebar < ~360px or any cramped width):
- *   - hide labels in tabs that aren't active to fit more icons
- *   - active tab keeps its label so the user knows where they are
- * Effect feels closer to native iOS/Android tab patterns. */
-@container (max-width: 360px) {
-	.ebq-tab:not(.is-active) .ebq-tab__label { display: none; }
+.ebq-tab__label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	max-width: 100%;
+	font-size: 10px;
+	line-height: 1.2;
 }
-/* Container queries fallback: in the right-rail PluginSidebar, the panel
- * is typically ~280–360px. Apply the same compaction unconditionally for
- * the sidebar mount via the wrapping class. */
-.ebq-sidebar-frame .ebq-tabs .ebq-tab:not(.is-active) .ebq-tab__label { display: none; }
 
 .ebq-tab.is-active {
 	color: var(--ebq-accent);
@@ -1786,3 +1783,285 @@
 	gap: 4px;
 }
 .ebq-schema-help__shortcodes li { margin: 0; }
+
+/* ─── + Track keyphrase BUTTON (editor sidebar — block + classic) ─ */
+.ebq-track-btn {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 4px 9px 4px 6px;
+	background: #ffffff;
+	border: 1px solid #c7d2fe;
+	border-radius: 6px;
+	color: #4f46e5;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 1.2;
+	cursor: pointer;
+	font-family: inherit;
+	transition: background 0.12s ease, border-color 0.12s ease, color 0.12s ease;
+	white-space: nowrap;
+}
+.ebq-track-btn:hover:not(:disabled) {
+	background: #eef2ff;
+	border-color: #4f46e5;
+	color: #4338ca;
+}
+.ebq-track-btn:focus-visible {
+	outline: 2px solid #c7d2fe;
+	outline-offset: 1px;
+}
+.ebq-track-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.ebq-track-btn__plus {
+	display: inline-grid;
+	place-items: center;
+	width: 16px; height: 16px;
+	border-radius: 4px;
+	background: #eef2ff;
+	color: #4f46e5;
+	font-weight: 800;
+	font-size: 12px;
+	line-height: 1;
+}
+.ebq-track-btn--done {
+	background: #dcfce7;
+	border-color: #86efac;
+	color: #166534;
+	cursor: default;
+}
+.ebq-track-btn--done .ebq-track-btn__plus {
+	background: #16a34a;
+	color: #ffffff;
+}
+.ebq-track-btn--busy { opacity: 0.7; }
+.ebq-track-btn--error {
+	background: #fef2f2;
+	border-color: #fca5a5;
+	color: #b91c1c;
+}
+.ebq-track-btn--error .ebq-track-btn__plus { background: #fee2e2; color: #b91c1c; }
+
+/* ─── + Track keyphrase popover (sidebar + classic editor) ───── */
+.ebq-track-pop {
+	position: fixed;
+	z-index: 999999;
+	min-width: 280px;
+	width: 320px;
+	max-width: calc(100vw - 16px);
+	background: #ffffff;
+	border: 1px solid #e2e8f0;
+	border-radius: 10px;
+	box-shadow: 0 12px 36px rgba(15, 23, 42, .18), 0 2px 6px rgba(15, 23, 42, .08);
+	padding: 12px;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+	font-size: 12px;
+	color: #0f172a;
+}
+.ebq-track-pop__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	margin-bottom: 8px;
+}
+.ebq-track-pop__head strong { font-size: 13px; }
+.ebq-track-pop__close {
+	background: 0;
+	border: 0;
+	font-size: 18px;
+	line-height: 1;
+	color: #64748b;
+	cursor: pointer;
+	padding: 0 4px;
+}
+.ebq-track-pop__close:hover { color: #0f172a; }
+.ebq-track-pop__kw {
+	background: #eef2ff;
+	color: #4f46e5;
+	border-radius: 6px;
+	padding: 6px 10px;
+	font-weight: 600;
+	margin-bottom: 10px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.ebq-track-pop__row {
+	display: grid;
+	grid-template-columns: 80px 1fr;
+	align-items: center;
+	gap: 8px;
+	margin-bottom: 6px;
+}
+.ebq-track-pop__row label {
+	font-size: 11px;
+	font-weight: 600;
+	color: #475569;
+	text-transform: uppercase;
+	letter-spacing: 0.04em;
+}
+.ebq-track-pop__row select {
+	width: 100%;
+	padding: 5px 8px;
+	border: 1px solid #cbd5e1;
+	border-radius: 5px;
+	font-size: 12px;
+	background: #ffffff;
+	color: #0f172a;
+}
+.ebq-track-pop__err {
+	color: #dc2626;
+	background: #fee2e2;
+	padding: 6px 8px;
+	border-radius: 5px;
+	font-size: 11px;
+	margin: 8px 0 0;
+}
+.ebq-track-pop__foot {
+	display: flex;
+	justify-content: flex-end;
+	gap: 6px;
+	margin-top: 12px;
+	padding-top: 10px;
+	border-top: 1px solid #f1f5f9;
+}
+
+/* Schema-disabled warning banner (Schema tab top) */
+.ebq-schema-disabled-banner {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 10px 12px;
+	margin-bottom: 10px;
+	background: var(--ebq-warn-soft);
+	color: var(--ebq-warn-text);
+	border-left: 3px solid var(--ebq-warn);
+	border-radius: 6px;
+	font-size: 12px;
+}
+.ebq-schema-disabled-banner strong { font-weight: 700; }
+.ebq-schema-disabled-banner span { opacity: 0.85; line-height: 1.5; }
+
+/* ─── Breadcrumb builder (Schema tab) ─────────────────────────── */
+.ebq-bc-mode {
+	display: inline-flex;
+	background: var(--ebq-bg);
+	border: 1px solid var(--ebq-border);
+	border-radius: 6px;
+	padding: 2px;
+	gap: 2px;
+	margin-bottom: 12px;
+}
+.ebq-bc-mode__btn {
+	background: transparent;
+	border: 0;
+	padding: 6px 14px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--ebq-text-soft);
+	border-radius: 4px;
+	cursor: pointer;
+}
+.ebq-bc-mode__btn:hover { color: var(--ebq-text); }
+.ebq-bc-mode__btn.is-active {
+	background: var(--ebq-accent);
+	color: #fff;
+}
+.ebq-bc-list {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	margin-bottom: 8px;
+}
+.ebq-bc-row {
+	border: 1px solid var(--ebq-border);
+	border-radius: 8px;
+	padding: 10px;
+	background: var(--ebq-bg);
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+}
+.ebq-bc-row.is-hidden { opacity: 0.55; background: var(--ebq-bg-emboss, var(--ebq-bg-muted)); }
+.ebq-bc-row__head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	justify-content: space-between;
+}
+.ebq-bc-row__num {
+	font-size: 10px;
+	font-weight: 700;
+	color: var(--ebq-text-soft);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+.ebq-bc-row__moves {
+	display: inline-flex;
+	gap: 2px;
+	margin-right: auto;
+	margin-left: 8px;
+}
+.ebq-bc-row__moves button {
+	background: transparent;
+	border: 1px solid var(--ebq-border);
+	border-radius: 4px;
+	width: 22px; height: 22px;
+	font-size: 11px;
+	color: var(--ebq-text-soft);
+	cursor: pointer;
+	padding: 0;
+	line-height: 1;
+}
+.ebq-bc-row__moves button:hover:not(:disabled) { background: var(--ebq-bg-muted); color: var(--ebq-text); }
+.ebq-bc-row__moves button:disabled { opacity: 0.4; cursor: not-allowed; }
+.ebq-bc-row__remove {
+	background: transparent;
+	border: 0;
+	color: var(--ebq-text-soft);
+	cursor: pointer;
+	width: 22px; height: 22px;
+	border-radius: 4px;
+	display: grid;
+	place-items: center;
+}
+.ebq-bc-row__remove:hover { background: var(--ebq-bad-soft); color: var(--ebq-bad); }
+.ebq-bc-row__remove svg { width: 12px; height: 12px; }
+
+.ebq-bc-preview {
+	margin-top: 12px;
+	padding: 10px 12px;
+	background: var(--ebq-bg-muted);
+	border-radius: 6px;
+	font-size: 12px;
+}
+.ebq-bc-preview__label {
+	display: block;
+	font-size: 10px;
+	font-weight: 700;
+	color: var(--ebq-text-soft);
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	margin-bottom: 4px;
+}
+.ebq-bc-preview ol {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+.ebq-bc-preview li {
+	display: inline-flex;
+	align-items: center;
+}
+.ebq-bc-preview a { color: var(--ebq-accent); text-decoration: none; font-weight: 500; }
+.ebq-bc-preview a:hover { text-decoration: underline; }
+.ebq-bc-preview span { color: var(--ebq-text); font-weight: 600; }
+.ebq-bc-preview em {
+	color: var(--ebq-text-faint);
+	font-style: normal;
+	font-weight: 400;
+	margin: 0 4px;
+}

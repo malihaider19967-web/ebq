@@ -7,7 +7,7 @@
  *   2. start_connect() mints a fresh state, stores it, and 302s to
  *      https://ebq.io/wordpress/connect with site_url + redirect + state.
  *   3. User authenticates in EBQ and picks a website.
- *   4. EBQ bounces back to /wp-admin/options-general.php?page=ebq-seo
+ *   4. EBQ bounces back to /wp-admin/admin.php?page=ebq-seo
  *      &ebq_token=...&website_id=...&state=...&ebq_domain=...
  *   5. maybe_catch_callback() validates state on admin_init, persists the
  *      token, and redirects to a clean settings URL.
@@ -97,7 +97,7 @@ final class EBQ_Connect
     public static function disconnect_url(): string
     {
         return wp_nonce_url(
-            admin_url('options-general.php?page=ebq-seo&ebq_disconnect=1'),
+            admin_url('admin.php?page=ebq-seo&ebq_disconnect=1'),
             'ebq_disconnect'
         );
     }
@@ -115,7 +115,7 @@ final class EBQ_Connect
         $state = wp_generate_password(32, false, false);
         update_option('ebq_connect_state', $state);
 
-        $redirect = admin_url('options-general.php?page=ebq-seo');
+        $redirect = admin_url('admin.php?page=ebq-seo');
         $site_url = home_url('/');
 
         $target = add_query_arg(
@@ -143,7 +143,7 @@ final class EBQ_Connect
             update_option('ebq_site_token', '');
             update_option('ebq_website_id', 0);
             update_option('ebq_website_domain', '');
-            wp_safe_redirect(admin_url('options-general.php?page=ebq-seo&ebq_status=disconnected'));
+            wp_safe_redirect(admin_url('admin.php?page=ebq-seo&ebq_status=disconnected'));
             exit;
         }
 
@@ -175,7 +175,7 @@ final class EBQ_Connect
             );
             update_option('ebq_last_connect_error', $summary);
             error_log('EBQ SEO connect failure: '.$summary);
-            wp_safe_redirect(admin_url('options-general.php?page=ebq-seo&ebq_status='.$status));
+            wp_safe_redirect(admin_url('admin.php?page=ebq-seo&ebq_status='.$status));
             exit;
         };
 
@@ -193,7 +193,7 @@ final class EBQ_Connect
         delete_option('ebq_connect_state');
         delete_option('ebq_last_connect_error');
 
-        wp_safe_redirect(admin_url('options-general.php?page=ebq-seo&ebq_status=connected'));
+        wp_safe_redirect(admin_url('admin.php?page=ebq-seo&ebq_status=connected'));
         exit;
     }
 }

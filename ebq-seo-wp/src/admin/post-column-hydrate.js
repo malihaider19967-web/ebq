@@ -77,27 +77,168 @@ function renderEmpty(target, message) {
 
 domReady(() => {
 	const cells = Array.from(document.querySelectorAll('[data-ebq-col][data-post]'));
-	if (!cells.length) return;
+	if (cells.length) {
+		const ids = [...new Set(cells.map((c) => c.dataset.post).filter(Boolean))];
+		if (ids.length) {
+			const params = ids.map((id) => `post_ids[]=${encodeURIComponent(id)}`).join('&');
+			apiFetch({ path: `/ebq/v1/bulk-post-insights?${params}` })
+				.then((res) => {
+					const rows = (res && res.rows) || {};
+					cells.forEach((cell) => {
+						const id = cell.dataset.post;
+						const data = rows[id];
+						if (data && data.ok !== false) {
+							renderCell(cell, data);
+						} else {
+							renderEmpty(cell, __('No data yet', 'ebq-seo'));
+						}
+					});
+				})
+				.catch(() => {
+					cells.forEach((cell) => renderEmpty(cell, __('—', 'ebq-seo')));
+				});
+		}
+	}
 
-	const ids = [...new Set(cells.map((c) => c.dataset.post).filter(Boolean))];
-	if (!ids.length) return;
-
-	const params = ids.map((id) => `post_ids[]=${encodeURIComponent(id)}`).join('&');
-
-	apiFetch({ path: `/ebq/v1/bulk-post-insights?${params}` })
-		.then((res) => {
-			const rows = (res && res.rows) || {};
-			cells.forEach((cell) => {
-				const id = cell.dataset.post;
-				const data = rows[id];
-				if (data && data.ok !== false) {
-					renderCell(cell, data);
-				} else {
-					renderEmpty(cell, __('No data yet', 'ebq-seo'));
-				}
-			});
-		})
-		.catch(() => {
-			cells.forEach((cell) => renderEmpty(cell, __('—', 'ebq-seo')));
-		});
+	// Inline "+ Track keyphrase" handler — opens a vanilla modal with country
+	// / language / device options, POSTs to /ebq/v1/track-keyword on confirm,
+	// and updates the row-action link to "✓ Tracking" on success. The link
+	// keeps a real href to HQ as a no-JS fallback.
+	document.addEventListener('click', (e) => {
+		const link = e.target.closest('a.ebq-row-track');
+		if (!link || link.dataset.busy === '1' || link.dataset.done === '1') return;
+		e.preventDefault();
+		openTrackModal(link);
+	}, true);
 });
+
+function openTrackModal(link) {
+	const keyword = link.dataset.ebqKeyword || '';
+	const targetUrl = link.dataset.ebqTargetUrl || '';
+	if (!keyword) return;
+
+	// Strip any prior modal so repeated clicks don't stack.
+	document.querySelectorAll('.ebq-track-modal').forEach((n) => n.remove());
+
+	const modal = document.createElement('div');
+	modal.className = 'ebq-track-modal';
+	modal.setAttribute('role', 'dialog');
+	modal.setAttribute('aria-modal', 'true');
+	modal.setAttribute('aria-label', __('Track keyphrase', 'ebq-seo'));
+	modal.innerHTML = `
+		<div class="ebq-track-modal__panel" role="document">
+			<header class="ebq-track-modal__head">
+				<h3>${__('Add keyphrase to Rank Tracker', 'ebq-seo')}</h3>
+				<button type="button" class="ebq-track-modal__close" aria-label="${__('Close', 'ebq-seo')}">×</button>
+			</header>
+			<div class="ebq-track-modal__body">
+				<div class="ebq-track-modal__kw">
+					<span class="ebq-track-modal__kw-label">${__('Keyphrase', 'ebq-seo')}</span>
+					<strong></strong>
+				</div>
+				<div class="ebq-track-modal__row">
+					<label>${__('Country', 'ebq-seo')}</label>
+					<select name="country">${countryOptions()}</select>
+				</div>
+				<div class="ebq-track-modal__row">
+					<label>${__('Language', 'ebq-seo')}</label>
+					<select name="language">${languageOptions()}</select>
+				</div>
+				<div class="ebq-track-modal__row">
+					<label>${__('Device', 'ebq-seo')}</label>
+					<select name="device">
+						<option value="desktop">${__('Desktop', 'ebq-seo')}</option>
+						<option value="mobile">${__('Mobile', 'ebq-seo')}</option>
+					</select>
+				</div>
+				<p class="ebq-track-modal__help">${__('First SERP check runs in 1–5 minutes. View results in EBQ HQ → Rank Tracker.', 'ebq-seo')}</p>
+				<div class="ebq-track-modal__err" hidden></div>
+			</div>
+			<footer class="ebq-track-modal__foot">
+				<button type="button" class="ebq-track-modal__btn ebq-track-modal__btn--ghost" data-action="cancel">${__('Cancel', 'ebq-seo')}</button>
+				<button type="button" class="ebq-track-modal__btn ebq-track-modal__btn--primary" data-action="submit">${__('Add to Rank Tracker', 'ebq-seo')}</button>
+			</footer>
+		</div>
+	`;
+	document.body.appendChild(modal);
+
+	// Inject keyword text safely (no innerHTML interpolation).
+	modal.querySelector('.ebq-track-modal__kw strong').textContent = keyword;
+
+	const close = () => {
+		document.removeEventListener('keydown', onKey, true);
+		modal.remove();
+	};
+	const onKey = (e) => { if (e.key === 'Escape') close(); };
+	document.addEventListener('keydown', onKey, true);
+
+	modal.addEventListener('click', (ev) => {
+		if (ev.target === modal) close();
+	});
+	modal.querySelector('.ebq-track-modal__close').addEventListener('click', close);
+	modal.querySelector('[data-action="cancel"]').addEventListener('click', close);
+
+	const submitBtn = modal.querySelector('[data-action="submit"]');
+	const errBox = modal.querySelector('.ebq-track-modal__err');
+
+	submitBtn.addEventListener('click', () => {
+		const data = {
+			keyword,
+			target_url: targetUrl,
+			country: modal.querySelector('select[name="country"]').value,
+			language: modal.querySelector('select[name="language"]').value,
+			device: modal.querySelector('select[name="device"]').value,
+		};
+		submitBtn.disabled = true;
+		submitBtn.textContent = __('Adding…', 'ebq-seo');
+		errBox.hidden = true;
+
+		apiFetch({
+			path: '/ebq/v1/track-keyword',
+			method: 'POST',
+			data,
+		}).then((res) => {
+			if (res && res.ok === false) {
+				errBox.textContent = res.message || res.error || __('Failed', 'ebq-seo');
+				errBox.hidden = false;
+				submitBtn.disabled = false;
+				submitBtn.textContent = __('Retry', 'ebq-seo');
+				return;
+			}
+			// Success: flip the row action link + close modal.
+			link.innerHTML = '<span class="ebq-row-track__plus ebq-row-track__plus--done" aria-hidden="true">✓</span> ' + __('Tracking', 'ebq-seo');
+			link.title = __('Added to Rank Tracker. View in EBQ HQ → Rank Tracker.', 'ebq-seo');
+			link.dataset.done = '1';
+			link.style.pointerEvents = 'none';
+			close();
+		}).catch((err) => {
+			errBox.textContent = (err && err.message) || __('Network error', 'ebq-seo');
+			errBox.hidden = false;
+			submitBtn.disabled = false;
+			submitBtn.textContent = __('Retry', 'ebq-seo');
+		});
+	});
+}
+
+function countryOptions() {
+	const list = [
+		['us','United States'],['gb','United Kingdom'],['in','India'],['ca','Canada'],['au','Australia'],
+		['de','Germany'],['fr','France'],['es','Spain'],['it','Italy'],['nl','Netherlands'],
+		['br','Brazil'],['mx','Mexico'],['jp','Japan'],['kr','South Korea'],['sg','Singapore'],
+		['ae','United Arab Emirates'],['sa','Saudi Arabia'],['pk','Pakistan'],['bd','Bangladesh'],
+		['id','Indonesia'],['tr','Turkey'],['ph','Philippines'],['vn','Vietnam'],['th','Thailand'],
+		['eg','Egypt'],['za','South Africa'],['ng','Nigeria'],['pl','Poland'],['se','Sweden'],['no','Norway'],
+	];
+	return list.map(([c, l]) => `<option value="${c}">${l}</option>`).join('');
+}
+
+function languageOptions() {
+	const list = [
+		['en','English'],['es','Spanish'],['fr','French'],['de','German'],['it','Italian'],
+		['pt','Portuguese'],['nl','Dutch'],['ru','Russian'],['ja','Japanese'],['ko','Korean'],
+		['zh','Chinese'],['ar','Arabic'],['hi','Hindi'],['ur','Urdu'],['tr','Turkish'],
+		['pl','Polish'],['sv','Swedish'],['no','Norwegian'],['da','Danish'],['fi','Finnish'],
+		['th','Thai'],['vi','Vietnamese'],['id','Indonesian'],
+	];
+	return list.map(([c, l]) => `<option value="${c}">${l}</option>`).join('');
+}

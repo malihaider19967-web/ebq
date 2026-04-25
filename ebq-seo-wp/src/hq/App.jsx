@@ -1,7 +1,9 @@
-import { useState, useCallback } from '@wordpress/element';
+import { useState, useCallback, useEffect } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { HQ_CONFIG } from './api';
 import { Button } from './components/primitives';
+import AddKeywordModal from './components/AddKeywordModal';
+import ConnectionGuide from './components/ConnectionGuide';
 
 import OverviewTab from './tabs/OverviewTab';
 import PerformanceTab from './tabs/PerformanceTab';
@@ -23,6 +25,25 @@ const TABS = [
 
 export default function App() {
 	const [tab, setTab] = useState('overview');
+	const [trackSeed, setTrackSeed] = useState(null); // null = closed, string = open with seed
+	const [trackToast, setTrackToast] = useState(null);
+
+	// Deep-link handling: ?ebq_track=... lands users from the admin bar,
+	// post row action, or any external link straight onto Rank Tracker with
+	// the AddKeywordModal pre-seeded. ebq_track=1 means "open empty form".
+	useEffect(() => {
+		const params = new URLSearchParams(window.location.search);
+		const trackParam = params.get('ebq_track');
+		if (trackParam !== null) {
+			setTab('rank_tracker');
+			setTrackSeed(trackParam === '1' || trackParam === '' ? '' : decodeURIComponent(trackParam));
+			// Clean the URL so a refresh doesn't re-open the modal.
+			params.delete('ebq_track');
+			params.delete('ebq_track_url');
+			const next = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+			window.history.replaceState({}, '', next);
+		}
+	}, []);
 
 	if (!HQ_CONFIG.isConnected) {
 		return <NotConnected />;
@@ -67,8 +88,20 @@ export default function App() {
 			</nav>
 
 			<main className="ebq-hq-main">
+				{trackToast ? <div className={`ebq-hq-toast ebq-hq-toast--${trackToast.tone}`} role="status" style={{ marginBottom: 12 }}>{trackToast.msg}</div> : null}
 				<Active />
 			</main>
+
+			<AddKeywordModal
+				open={trackSeed !== null}
+				onClose={() => setTrackSeed(null)}
+				onCreated={() => {
+					setTrackToast({ msg: __('Now tracking — first SERP check queued.', 'ebq-seo'), tone: 'good' });
+					setTimeout(() => setTrackToast(null), 3500);
+				}}
+				defaultDomain={HQ_CONFIG.workspaceDomain}
+				seedKeyword={trackSeed || ''}
+			/>
 		</div>
 	);
 }
@@ -85,13 +118,7 @@ function NotConnected() {
 					</div>
 				</div>
 			</header>
-			<div className="ebq-hq-disconnected">
-				<div className="ebq-hq-disconnected__inner">
-					<h2>{__('Not connected to EBQ', 'ebq-seo')}</h2>
-					<p>{__('EBQ HQ pulls Search Console rankings, page audits, and the full opportunity feed from your EBQ.io workspace. Once you connect, every screen here populates automatically — no extra setup.', 'ebq-seo')}</p>
-					<Button variant="primary" href={HQ_CONFIG.connectUrl}>{__('Connect this site', 'ebq-seo')} →</Button>
-				</div>
-			</div>
+			<ConnectionGuide reason="not_connected" />
 		</div>
 	);
 }

@@ -274,6 +274,17 @@ final class EBQ_Schema_Output
 
     private function breadcrumb_node(int $post_id): ?array
     {
+        // Per-post override wins. Mode='custom' fully replaces the auto trail;
+        // mode='auto' (or empty) falls through to the default Home → ancestors
+        // → current logic. We still skip hidden items and apply position
+        // numbering at output time so the user only worries about the list.
+        if ($post_id > 0) {
+            $custom = $this->custom_breadcrumb_items($post_id);
+            if ($custom !== null) {
+                return $custom;
+            }
+        }
+
         $items = [];
         $position = 1;
 
@@ -317,6 +328,56 @@ final class EBQ_Schema_Output
             '@type'           => 'BreadcrumbList',
             '@id'             => home_url('/').'#breadcrumbs-'.($post_id > 0 ? $post_id : 'home'),
             'itemListElement' => $items,
+        ];
+    }
+
+    /**
+     * Read the per-post `_ebq_breadcrumbs` override and turn it into a
+     * BreadcrumbList node. Returns null when the user has chosen 'auto'
+     * mode or no override is saved — caller falls back to the default
+     * Home → ancestors → current trail.
+     */
+    private function custom_breadcrumb_items(int $post_id): ?array
+    {
+        $raw = (string) EBQ_Meta_Fields::get($post_id, '_ebq_breadcrumbs', '');
+        if ($raw === '') return null;
+        $decoded = json_decode($raw, true);
+        if (! is_array($decoded)) return null;
+        if (($decoded['mode'] ?? 'auto') !== 'custom') return null;
+        $items = is_array($decoded['items'] ?? null) ? $decoded['items'] : [];
+        if (empty($items)) return null;
+
+        $list = [];
+        $position = 1;
+        $url = (string) get_permalink($post_id);
+        $count = count(array_filter($items, fn ($i) => is_array($i) && empty($i['hidden'])));
+        $emitted = 0;
+
+        foreach ($items as $item) {
+            if (! is_array($item) || ! empty($item['hidden'])) continue;
+            $name = trim((string) ($item['name'] ?? ''));
+            if ($name === '') continue;
+            $entry = [
+                '@type'    => 'ListItem',
+                'position' => $position++,
+                'name'     => wp_strip_all_tags($name),
+            ];
+            $emitted++;
+            // Schema spec: the LAST item should NOT carry an `item` URL —
+            // it represents the current page. So we skip URL on the final
+            // entry even if the user supplied one.
+            if (! empty($item['url']) && $emitted < $count) {
+                $entry['item'] = (string) esc_url_raw((string) $item['url']);
+            }
+            $list[] = $entry;
+        }
+
+        if (empty($list)) return null;
+
+        return [
+            '@type'           => 'BreadcrumbList',
+            '@id'             => $url . '#breadcrumbs-' . $post_id,
+            'itemListElement' => $list,
         ];
     }
 

@@ -66,7 +66,7 @@ final class EBQ_Dashboard_Widget
             printf(
                 '<p style="font-size:12px;color:#64748b;">%s <a href="%s">%s</a>.</p>',
                 esc_html__('Connect this site to EBQ to see insights.', 'ebq-seo'),
-                esc_url(admin_url('options-general.php?page=ebq-seo')),
+                esc_url(admin_url('admin.php?page=ebq-seo')),
                 esc_html__('Open settings', 'ebq-seo')
             );
 

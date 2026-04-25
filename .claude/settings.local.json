@@ -103,7 +103,11 @@
       "Bash(php -l ebq-seo-wp/includes/class-ebq-rest-proxy.php)",
       "Bash(./vendor/bin/phpunit)",
       "Bash(./vendor/bin/phpunit tests/Feature/Api)",
-      "Bash(php -l app/Livewire/Reports/InsightsPanel.php)"
+      "Bash(php -l app/Livewire/Reports/InsightsPanel.php)",
+      "Bash(php -l ebq-seo-wp/includes/class-ebq-post-column.php)",
+      "Bash(php -l ebq-seo-wp/includes/class-ebq-hq-page.php)",
+      "Bash(php -l ebq-seo-wp/includes/class-ebq-seo-fields-meta-box.php)",
+      "Bash(php -l ebq-seo-wp/includes/class-ebq-meta-fields.php)"
     ]
   }
 }

@@ -12,6 +12,7 @@ import AdditionalKeyphrases, { parseAdditionalKeywords, stringifyAdditionalKeywo
 import TopicalCoverage from '../components/TopicalCoverage';
 import KeywordDensity from '../components/KeywordDensity';
 import Modal from '../components/Modal';
+import TrackKeywordButton from '../components/TrackKeywordButton';
 
 import { useEditorContext, usePostMeta, resolveTitleTemplate, publicConfig } from '../hooks/useEditorContext';
 import useDebounced from '../hooks/useDebounced';
@@ -74,11 +75,58 @@ export default function SeoTab() {
 
 	return (
 		<div className="ebq-stack">
-			<ScoreBadge
-				score={analysis.score}
-				label={__('SEO score', 'ebq-seo')}
-				caption={analysis.scoreLabel}
-			/>
+			<Section title={__('Focus keyphrase', 'ebq-seo')} icon={<IconChart />}>
+				<KeyphraseInput
+					value={focusKeyword}
+					onChange={(v) => set('_ebq_focus_keyword', v)}
+				/>
+
+				<div className="ebq-row" style={{ marginTop: 6, gap: 6, display: 'flex', flexWrap: 'wrap' }}>
+					<Button
+						variant="ghost"
+						size="sm"
+						onClick={() => setRelatedTarget({ kind: 'focus', keyword: focusKeyword })}
+						disabled={!focusKeyword || focusKeyword.trim().length < 3}
+						aria-haspopup="dialog"
+						aria-expanded={relatedOpen}
+					>
+						<IconSparkle /> {__('Related keyphrases', 'ebq-seo')}
+					</Button>
+					<TrackKeywordButton keyword={focusKeyword} />
+					{!focusKeyword || focusKeyword.trim().length < 3 ? (
+						<span className="ebq-text-xs ebq-text-soft" style={{ marginLeft: 4 }}>
+							{__('Type a focus keyphrase first', 'ebq-seo')}
+						</span>
+					) : null}
+				</div>
+			</Section>
+
+			<Section title={__('Additional keyphrases', 'ebq-seo')} icon={<IconSparkle />}>
+				<AdditionalKeyphrases
+					value={additionalRaw}
+					onChange={(v) => set('_ebq_additional_keywords', v)}
+					relatedAvailable={!!focusKeyword && focusKeyword.trim().length >= 3}
+					onShowRelated={(index) => setRelatedTarget({ kind: 'additional', index, keyword: focusKeyword })}
+				/>
+			</Section>
+
+			{(() => {
+				// No focus keyphrase = no scoring possible — render explicitly as
+				// "bad" (red) so the editor knows the page is not yet SEO-graded
+				// rather than seeing a misleading neutral state.
+				const hasFocus = !!(focusKeyword && focusKeyword.trim());
+				const score = hasFocus ? analysis.score : 0;
+				const caption = hasFocus
+					? analysis.scoreLabel
+					: __('No focus keyphrase set — add one above to start scoring.', 'ebq-seo');
+				return (
+					<ScoreBadge
+						score={score}
+						label={__('SEO score', 'ebq-seo')}
+						caption={caption}
+					/>
+				);
+			})()}
 
 			<Section
 				title={__('Snippet preview', 'ebq-seo')}
@@ -136,40 +184,6 @@ export default function SeoTab() {
 					maxHint={`${descLen} / 155`}
 				/>
 				<CharGauge length={descLen} goodMin={130} goodMax={155} hardMax={170} />
-			</Section>
-
-			<Section title={__('Focus keyphrase', 'ebq-seo')} icon={<IconChart />}>
-				<KeyphraseInput
-					value={focusKeyword}
-					onChange={(v) => set('_ebq_focus_keyword', v)}
-				/>
-
-				<div className="ebq-row" style={{ marginTop: 6 }}>
-					<Button
-						variant="ghost"
-						size="sm"
-						onClick={() => setRelatedTarget({ kind: 'focus', keyword: focusKeyword })}
-						disabled={!focusKeyword || focusKeyword.trim().length < 3}
-						aria-haspopup="dialog"
-						aria-expanded={relatedOpen}
-					>
-						<IconSparkle /> {__('Related keyphrases', 'ebq-seo')}
-					</Button>
-					{!focusKeyword || focusKeyword.trim().length < 3 ? (
-						<span className="ebq-text-xs ebq-text-soft" style={{ marginLeft: 4 }}>
-							{__('Type a focus keyphrase first', 'ebq-seo')}
-						</span>
-					) : null}
-				</div>
-
-				<div className="ebq-divider" />
-
-				<AdditionalKeyphrases
-					value={additionalRaw}
-					onChange={(v) => set('_ebq_additional_keywords', v)}
-					relatedAvailable={!!focusKeyword && focusKeyword.trim().length >= 3}
-					onShowRelated={(index) => setRelatedTarget({ kind: 'additional', index, keyword: focusKeyword })}
-				/>
 			</Section>
 
 			<TopicalCoverage

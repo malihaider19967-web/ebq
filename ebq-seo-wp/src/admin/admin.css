@@ -310,3 +310,268 @@
 .ebq-mb__row:last-child { border-bottom: 0; }
 .ebq-mb__label { color: var(--ebq-text-soft); flex: 1; }
 .ebq-mb__value { font-weight: 600; color: var(--ebq-text); font-variant-numeric: tabular-nums; }
+
+/* ─── Inline "+ Track keyphrase" row action ─────────────────── */
+.row-actions .ebq-row-track {
+	color: var(--ebq-accent) !important;
+	font-weight: 600;
+}
+.row-actions .ebq-row-track:hover { color: var(--ebq-accent-hover) !important; text-decoration: none; }
+.ebq-row-track__plus {
+	display: inline-block;
+	width: 14px;
+	height: 14px;
+	line-height: 14px;
+	text-align: center;
+	border-radius: 3px;
+	background: var(--ebq-accent-soft);
+	color: var(--ebq-accent);
+	font-weight: 700;
+	font-size: 11px;
+	margin-right: 2px;
+	vertical-align: -1px;
+}
+.row-actions .ebq-row-track[data-done="1"] { color: var(--ebq-good) !important; cursor: default; }
+.ebq-row-track[data-done="1"] .ebq-row-track__plus { background: var(--ebq-good-soft); color: var(--ebq-good); }
+.ebq-row-track__plus--bad { background: var(--ebq-bad-soft) !important; color: var(--ebq-bad) !important; }
+.ebq-row-track__plus--done { background: var(--ebq-good-soft) !important; color: var(--ebq-good) !important; }
+
+/* ─── + Track keyphrase modal (vanilla, post-list) ─────────────── */
+.ebq-track-modal {
+	position: fixed;
+	inset: 0;
+	background: rgba(15, 23, 42, .55);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 100000;
+	padding: 24px;
+	animation: ebq-track-modal-in .15s ease-out;
+}
+@keyframes ebq-track-modal-in { from { opacity: 0; } to { opacity: 1; } }
+.ebq-track-modal__panel {
+	background: #ffffff;
+	border-radius: 12px;
+	width: 100%;
+	max-width: 460px;
+	box-shadow: 0 24px 80px rgba(15, 23, 42, .35);
+	overflow: hidden;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+.ebq-track-modal__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 14px 18px;
+	border-bottom: 1px solid #e2e8f0;
+	background: linear-gradient(180deg, #f5f3ff, #ffffff);
+}
+.ebq-track-modal__head h3 { margin: 0; font-size: 15px; font-weight: 700; color: #0f172a; }
+.ebq-track-modal__close {
+	background: 0; border: 0;
+	font-size: 24px; line-height: 1;
+	color: #64748b; cursor: pointer;
+	width: 28px; height: 28px;
+	border-radius: 6px;
+}
+.ebq-track-modal__close:hover { background: #f1f5f9; color: #0f172a; }
+.ebq-track-modal__body { padding: 18px; }
+.ebq-track-modal__kw {
+	display: flex; flex-direction: column; gap: 4px;
+	background: #eef2ff; padding: 10px 12px; border-radius: 8px;
+	margin-bottom: 14px;
+}
+.ebq-track-modal__kw-label {
+	font-size: 10px; font-weight: 700; color: #4f46e5;
+	text-transform: uppercase; letter-spacing: .06em;
+}
+.ebq-track-modal__kw strong {
+	font-size: 14px; color: #312e81; font-weight: 600;
+	overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.ebq-track-modal__row {
+	display: grid; grid-template-columns: 90px 1fr;
+	align-items: center; gap: 10px; margin-bottom: 8px;
+}
+.ebq-track-modal__row label {
+	font-size: 12px; font-weight: 600; color: #475569;
+	text-transform: uppercase; letter-spacing: .04em;
+}
+.ebq-track-modal__row select {
+	width: 100%;
+	padding: 7px 10px;
+	border: 1px solid #cbd5e1;
+	border-radius: 6px;
+	font-size: 13px;
+	background: #ffffff;
+	color: #0f172a;
+}
+.ebq-track-modal__row select:focus {
+	outline: 2px solid #ede9fe;
+	border-color: #5b3df5;
+}
+.ebq-track-modal__help {
+	margin: 12px 0 0;
+	font-size: 11px;
+	color: #64748b;
+	line-height: 1.5;
+}
+.ebq-track-modal__err {
+	margin: 10px 0 0;
+	padding: 8px 10px;
+	border-radius: 6px;
+	background: #fee2e2;
+	color: #991b1b;
+	font-size: 12px;
+}
+.ebq-track-modal__foot {
+	display: flex; justify-content: flex-end; gap: 8px;
+	padding: 12px 18px;
+	background: #fbfcfd;
+	border-top: 1px solid #e2e8f0;
+}
+.ebq-track-modal__btn {
+	padding: 8px 14px;
+	border-radius: 6px;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	border: 1px solid transparent;
+	font-family: inherit;
+}
+.ebq-track-modal__btn--ghost {
+	background: #ffffff;
+	border-color: #cbd5e1;
+	color: #475569;
+}
+.ebq-track-modal__btn--ghost:hover { background: #f1f5f9; }
+.ebq-track-modal__btn--primary {
+	background: #5b3df5;
+	color: #ffffff;
+}
+.ebq-track-modal__btn--primary:hover { background: #4c2bd0; }
+.ebq-track-modal__btn:disabled { opacity: .55; cursor: wait; }
+
+/* Polish the row action label itself — bigger pill, more attention */
+.row-actions .ebq-row-track {
+	color: #5b3df5 !important;
+	font-weight: 700 !important;
+}
+.row-actions .ebq-row-track:hover { color: #4c2bd0 !important; text-decoration: underline; }
+.ebq-row-track__plus {
+	display: inline-grid;
+	place-items: center;
+	width: 16px; height: 16px;
+	border-radius: 4px;
+	background: #ede9fe;
+	color: #5b3df5;
+	font-weight: 800;
+	font-size: 12px;
+	margin-right: 4px;
+	vertical-align: -2px;
+	line-height: 1;
+}
+
+/* ─── EBQ post column: SEO score pill + schema chips ───────────── */
+.ebq-col-cell {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+	min-width: 160px;
+}
+/* Score pills row — SEO + Readability sit side-by-side */
+.ebq-col-scores {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px;
+}
+.ebq-col-score {
+	display: inline-flex;
+	align-items: center;
+	gap: 5px;
+	padding: 2px 9px 2px 2px;
+	border-radius: 999px;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	cursor: help;
+	line-height: 1;
+}
+.ebq-col-score__num {
+	display: inline-grid;
+	place-items: center;
+	width: 20px; height: 20px;
+	border-radius: 50%;
+	font-size: 10px;
+	font-weight: 800;
+	color: #fff;
+	font-variant-numeric: tabular-nums;
+	flex-shrink: 0;
+}
+.ebq-col-score__kind {
+	font-size: 9px;
+	font-weight: 800;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	opacity: .85;
+}
+.ebq-col-score__label { font-weight: 700; }
+.ebq-col-score--good { background: #dcfce7; color: #166534; }
+.ebq-col-score--good .ebq-col-score__num { background: #16a34a; }
+.ebq-col-score--warn { background: #fef3c7; color: #92400e; }
+.ebq-col-score--warn .ebq-col-score__num { background: #d97706; }
+.ebq-col-score--bad  { background: #fee2e2; color: #991b1b; }
+.ebq-col-score--bad  .ebq-col-score__num { background: #dc2626; }
+
+/* Schema row — icon + (chip(s) | "Auto" | "Schema off") */
+.ebq-col-schemas {
+	display: inline-flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 4px;
+	max-width: 260px;
+	padding: 3px 8px 3px 4px;
+	border-radius: 999px;
+	background: #f1f5f9;
+	cursor: help;
+	width: fit-content;
+}
+.ebq-col-schema-icon {
+	display: inline-grid;
+	place-items: center;
+	width: 18px; height: 18px;
+	border-radius: 50%;
+	flex-shrink: 0;
+}
+.ebq-col-schema-icon--off    { background: #fee2e2; color: #b91c1c; }
+.ebq-col-schema-icon--auto   { background: #e0e7ff; color: #4338ca; }
+.ebq-col-schema-icon--custom { background: #ede9fe; color: #5b21b6; }
+.ebq-col-schema-icon svg { display: block; }
+.ebq-col-schema-text {
+	font-size: 10px;
+	font-weight: 700;
+	color: #475569;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+}
+.ebq-col-schemas--off  { background: #fef2f2; }
+.ebq-col-schemas--off .ebq-col-schema-text { color: #991b1b; }
+.ebq-col-schemas--auto { background: #eef2ff; }
+.ebq-col-schemas--auto .ebq-col-schema-text { color: #4338ca; }
+
+.ebq-col-schema {
+	display: inline-block;
+	padding: 1px 7px;
+	border-radius: 4px;
+	background: #ede9fe;
+	color: #5b21b6;
+	font-size: 10px;
+	font-weight: 700;
+	letter-spacing: 0.04em;
+	white-space: nowrap;
+}
+
+/* When the API hydrate block sits BELOW the local signals, give it a hair
+   of separation so the rank pill doesn't visually merge with the schema row. */
+.ebq-col-hydrate { margin-top: 2px; }

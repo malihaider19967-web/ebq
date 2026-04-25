@@ -3,7 +3,8 @@ import { __ } from '@wordpress/i18n';
 import { Section, Button, Toggle, EmptyState } from '../components/primitives';
 import SchemaCatalogModal from '../components/SchemaCatalogModal';
 import SchemaForm from '../components/SchemaForm';
-import { usePostMeta } from '../hooks/useEditorContext';
+import BreadcrumbBuilder from '../components/BreadcrumbBuilder';
+import { useEditorContext, usePostMeta, publicConfig } from '../hooks/useEditorContext';
 import { getTemplate, initialDataForTemplate } from '../schema/templates';
 
 /**
@@ -13,9 +14,21 @@ import { getTemplate, initialDataForTemplate } from '../schema/templates';
  */
 export default function SchemaTab() {
 	const { get, set } = usePostMeta();
+	const ctx = useEditorContext();
+	const cfg = publicConfig();
 
 	const raw = get('_ebq_schemas', '');
 	const schemas = useMemo(() => parseSchemas(raw), [raw]);
+	const schemaDisabled = !!get('_ebq_schema_disabled', false);
+	const breadcrumbsRaw = get('_ebq_breadcrumbs', '');
+
+	// Auto-trail seed — what the server would emit by default for this post.
+	// Last item carries no URL by spec.
+	const breadcrumbDefaults = useMemo(() => {
+		const home = { name: __('Home', 'ebq-seo'), url: cfg.homeUrl || '/' };
+		const current = { name: ctx.postTitle || __('This post', 'ebq-seo'), url: '' };
+		return { items: [home, current] };
+	}, [cfg.homeUrl, ctx.postTitle]);
 
 	const [catalogOpen, setCatalogOpen] = useState(false);
 	const [editing, setEditing] = useState(null); // { mode: 'add'|'edit', template, entry }
@@ -73,9 +86,27 @@ export default function SchemaTab() {
 
 	return (
 		<>
+			{schemaDisabled ? (
+				<div className="ebq-schema-disabled-banner" role="status">
+					<strong>{__('Schema is disabled for this post.', 'ebq-seo')}</strong>
+					<span>{__('No JSON-LD will be emitted on the front-end. Toggle below to re-enable.', 'ebq-seo')}</span>
+				</div>
+			) : null}
+
+			<Section
+				title={__('Schema output', 'ebq-seo')}
+				flush
+			>
+				<Toggle
+					label={__('Disable schema (JSON-LD) for this post entirely', 'ebq-seo')}
+					checked={schemaDisabled}
+					onChange={(v) => set('_ebq_schema_disabled', v)}
+				/>
+			</Section>
+
 			<Section
 				title={__('Schemas on this post', 'ebq-seo')}
-				aside={<Button size="sm" variant="primary" onClick={() => setCatalogOpen(true)}>{__('Add schema', 'ebq-seo')}</Button>}
+				aside={<Button size="sm" variant="primary" onClick={() => setCatalogOpen(true)} disabled={schemaDisabled}>{__('Add schema', 'ebq-seo')}</Button>}
 			>
 				{schemas.length === 0 ? (
 					<EmptyState
@@ -124,6 +155,12 @@ export default function SchemaTab() {
 					</div>
 				)}
 			</Section>
+
+			<BreadcrumbBuilder
+				value={breadcrumbsRaw}
+				onChange={(v) => set('_ebq_breadcrumbs', v)}
+				defaults={breadcrumbDefaults}
+			/>
 
 			<Section title={__('How schemas work', 'ebq-seo')} collapsible defaultOpen={false}>
 				<div className="ebq-schema-help">

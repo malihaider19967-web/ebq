@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback, useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Api } from '../api';
+import { Api, HQ_CONFIG } from '../api';
 import { Card, ErrorState, EmptyState, Pill, Button, SkeletonRows, SourceTag } from '../components/primitives';
+import AddKeywordModal from '../components/AddKeywordModal';
 
 const TYPES = [
 	{ key: 'striking', label: __('Striking distance', 'ebq-seo'), insight: 'striking_distance', desc: __('Keywords ranking position 5–20 — small lift = first-page win.', 'ebq-seo') },
@@ -16,6 +17,8 @@ export default function InsightsTab() {
 	const [data, setData] = useState(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
+	const [trackKeyword, setTrackKeyword] = useState('');
+	const [toast, setToast] = useState(null);
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -37,6 +40,8 @@ export default function InsightsTab() {
 		const res = await Api.iframeUrl(tp?.insight || 'cannibalization');
 		if (res?.url) window.open(res.url, '_blank', 'noopener');
 	}, [type]);
+
+	const onTrack = useCallback((kw) => setTrackKeyword(kw || ''), []);
 
 	const rows = data?.payload?.rows || data?.payload?.pages || [];
 
@@ -62,21 +67,34 @@ export default function InsightsTab() {
 				))}
 			</div>
 
+			{toast ? <div className={`ebq-hq-toast ebq-hq-toast--${toast.tone}`} role="status">{toast.msg}</div> : null}
+
 			<Card title={TYPES.find((t) => t.key === type)?.label}>
 				<p className="ebq-hq-help">{TYPES.find((t) => t.key === type)?.desc}</p>
 				{loading ? <SkeletonRows rows={6} /> : error ? <ErrorState error={error} retry={load} /> : (
 					rows.length === 0 ? (
 						<EmptyState title={__('No items in this category right now', 'ebq-seo')} sub={__('A great problem to have. Check back after the next sync.', 'ebq-seo')} />
 					) : (
-						<InsightTable type={type} rows={rows} />
+						<InsightTable type={type} rows={rows} onTrack={onTrack} />
 					)
 				)}
 			</Card>
+
+			<AddKeywordModal
+				open={!!trackKeyword}
+				onClose={() => setTrackKeyword('')}
+				onCreated={() => {
+					setToast({ msg: __('Now tracking — first SERP check queued.', 'ebq-seo'), tone: 'good' });
+					setTimeout(() => setToast(null), 3500);
+				}}
+				defaultDomain={HQ_CONFIG.workspaceDomain}
+				seedKeyword={trackKeyword}
+			/>
 		</div>
 	);
 }
 
-function InsightTable({ type, rows }) {
+function InsightTable({ type, rows, onTrack }) {
 	const config = useMemo(() => INSIGHT_TABLES[type], [type]);
 	const [sort, setSort] = useState(config?.defaultSort || null);
 	const [dir, setDir] = useState(config?.defaultDir || 'desc');
@@ -119,7 +137,8 @@ function InsightTable({ type, rows }) {
 						const cls = `ebq-hq-table__th${c.align === 'right' ? ' ebq-hq-table__th--right' : ''}${c.sortable !== false ? ' is-sortable' : ''}${isSorted ? ' is-sorted' : ''}`;
 						return (
 							<th key={c.key} className={cls} onClick={c.sortable !== false ? () => onSort(c.key) : undefined}>
-								<span>{c.label}{arrow ? <span className="ebq-hq-table__arrow">{arrow}</span> : null}</span>
+								{c.label}
+								{arrow ? <span className="ebq-hq-table__arrow">{arrow}</span> : null}
 							</th>
 						);
 					})}
@@ -130,7 +149,7 @@ function InsightTable({ type, rows }) {
 					<tr key={i}>
 						{config.columns.map((c) => (
 							<td key={c.key} className={`ebq-hq-table__td${c.align === 'right' ? ' ebq-hq-table__td--right' : ''}`}>
-								{c.render ? c.render(r) : r[c.key]}
+								{c.render ? c.render(r, { onTrack }) : r[c.key]}
 							</td>
 						))}
 					</tr>
@@ -140,11 +159,26 @@ function InsightTable({ type, rows }) {
 	);
 }
 
+function TrackInlineBtn({ keyword, onTrack }) {
+	if (!keyword || !onTrack) return null;
+	return (
+		<button
+			type="button"
+			className="ebq-hq-btn ebq-hq-btn--ghost ebq-hq-btn--sm"
+			style={{ marginLeft: 8, padding: '2px 8px', fontSize: 11 }}
+			onClick={(e) => { e.stopPropagation(); onTrack(keyword); }}
+			title={__('Track this keyword in Rank Tracker', 'ebq-seo')}
+		>
+			+ {__('Track', 'ebq-seo')}
+		</button>
+	);
+}
+
 const INSIGHT_TABLES = {
 	striking: {
 		defaultSort: 'impressions', defaultDir: 'desc',
 		columns: [
-			{ key: 'query', label: __('Query', 'ebq-seo'), sortValue: (r) => (r.query || r.keyword || '').toLowerCase(), render: (r) => <strong>{r.query || r.keyword}</strong> },
+			{ key: 'query', label: __('Query', 'ebq-seo'), sortValue: (r) => (r.query || r.keyword || '').toLowerCase(), render: (r, ctx) => (<><strong>{r.query || r.keyword}</strong><TrackInlineBtn keyword={r.query || r.keyword} onTrack={ctx?.onTrack} /></>) },
 			{ key: 'page', label: __('Page', 'ebq-seo'), sortValue: (r) => (r.page || '').toLowerCase(), render: (r) => <a href={r.page} target="_blank" rel="noopener noreferrer">{shortUrl(r.page)}</a> },
 			{ key: 'position', label: <span>{__('GSC pos', 'ebq-seo')} <SourceTag source="gsc" /></span>, align: 'right', render: (r) => r.position?.toFixed?.(1) ?? r.position },
 			{ key: 'impressions', label: __('Impressions', 'ebq-seo'), align: 'right', render: (r) => (r.impressions || 0).toLocaleString() },
@@ -154,7 +188,7 @@ const INSIGHT_TABLES = {
 	cannibalization: {
 		defaultSort: 'clicks', defaultDir: 'desc',
 		columns: [
-			{ key: 'query', label: __('Query', 'ebq-seo'), sortValue: (r) => (r.query || '').toLowerCase(), render: (r) => <strong>{r.query}</strong> },
+			{ key: 'query', label: __('Query', 'ebq-seo'), sortValue: (r) => (r.query || '').toLowerCase(), render: (r, ctx) => (<><strong>{r.query}</strong><TrackInlineBtn keyword={r.query} onTrack={ctx?.onTrack} /></>) },
 			{ key: 'pages_count', label: __('Pages', 'ebq-seo'), sortValue: (r) => (r.pages || []).length, align: 'right', render: (r) => (
 				<>
 					<span style={{ marginRight: 6 }}><Pill tone="warn">{(r.pages || []).length}</Pill></span>
@@ -187,7 +221,7 @@ const INSIGHT_TABLES = {
 	quick_wins: {
 		defaultSort: 'upside_value', defaultDir: 'desc',
 		columns: [
-			{ key: 'keyword', label: __('Keyword', 'ebq-seo'), sortValue: (r) => (r.keyword || '').toLowerCase(), render: (r) => <strong>{r.keyword}</strong> },
+			{ key: 'keyword', label: __('Keyword', 'ebq-seo'), sortValue: (r) => (r.keyword || '').toLowerCase(), render: (r, ctx) => (<><strong>{r.keyword}</strong><TrackInlineBtn keyword={r.keyword} onTrack={ctx?.onTrack} /></>) },
 			{ key: 'search_volume', label: __('Volume', 'ebq-seo'), align: 'right', render: (r) => (r.search_volume || 0).toLocaleString() },
 			{ key: 'current_position', label: <span>{__('Best GSC pos', 'ebq-seo')} <SourceTag source="gsc" /></span>, align: 'right', render: (r) => r.current_position?.toFixed?.(1) ?? '—' },
 			{ key: 'upside_value', label: __('Upside', 'ebq-seo'), align: 'right', render: (r) => <strong>${(r.upside_value || 0).toFixed(0)}</strong> },

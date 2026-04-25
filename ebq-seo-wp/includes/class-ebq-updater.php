@@ -132,7 +132,7 @@ final class EBQ_Updater
             ? 'update_available'
             : 'up_to_date';
 
-        wp_safe_redirect(admin_url('options-general.php?page=ebq-seo&ebq_update='.$status.'&latest='.rawurlencode($latest)));
+        wp_safe_redirect(admin_url('admin.php?page=ebq-seo&ebq_update='.$status.'&latest='.rawurlencode($latest)));
         exit;
     }
 

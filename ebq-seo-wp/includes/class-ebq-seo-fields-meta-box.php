@@ -39,6 +39,7 @@ final class EBQ_Seo_Fields_Meta_Box
         '_ebq_schema_type'         => 'ebq_schema_type',
         '_ebq_schema_disabled'     => 'ebq_schema_disabled',
         '_ebq_schemas'             => 'ebq_schemas',
+        '_ebq_breadcrumbs'         => 'ebq_breadcrumbs',
     ];
 
     public function register(): void
@@ -107,6 +108,13 @@ final class EBQ_Seo_Fields_Meta_Box
         // screens since `core/editor` isn't registered there).
         wp_add_inline_script('ebq-seo-classic', 'window.__EBQ_CLASSIC__ = true;', 'before');
 
+        // Guarantee apiFetch's REST nonce + root URL are available. WP only
+        // auto-localizes wpApiSettings on certain admin screens — classic
+        // post.php with the Classic Editor plugin is sometimes left out, so
+        // the "+ Track" button (which calls /wp-json/ebq/v1/track-keyword)
+        // would 401. Setting it ourselves makes the call work everywhere.
+        $this->ensure_api_fetch_settings('ebq-seo-classic');
+
         // Sidebar CSS — same one the block editor uses.
         $css = EBQ_SEO_PATH.'build/sidebar.css';
         if (file_exists($css)) {
@@ -119,9 +127,29 @@ final class EBQ_Seo_Fields_Meta_Box
             'siteName' => get_bloginfo('name'),
             'titleSep' => EBQ_Title_Template::get_sep(),
             'isConnected' => EBQ_Plugin::is_configured(),
-            'settingsUrl' => admin_url('options-general.php?page=ebq-seo'),
+            'settingsUrl' => admin_url('admin.php?page=ebq-seo'),
             'workspaceDomain' => (string) get_option('ebq_website_domain', ''),
         ]);
+    }
+
+    /**
+     * Localize a fresh wpApiSettings { root, nonce } if WP hasn't already
+     * done it. Idempotent — uses `window.wpApiSettings ||= …` so we never
+     * stomp a value core has already set. Inline before the handle so the
+     * apiFetch nonce middleware reads the right value on first call.
+     */
+    private function ensure_api_fetch_settings(string $handle): void
+    {
+        $payload = wp_json_encode([
+            'root'  => esc_url_raw(rest_url()),
+            'nonce' => wp_create_nonce('wp_rest'),
+            'versionString' => 'wp/v2/',
+        ]);
+        wp_add_inline_script(
+            $handle,
+            'window.wpApiSettings = window.wpApiSettings || ' . $payload . ';',
+            'before'
+        );
     }
 
     public function render(WP_Post $post): void
@@ -154,7 +182,7 @@ final class EBQ_Seo_Fields_Meta_Box
         echo '<div style="display:none" aria-hidden="true">';
         foreach (self::FIELDS as $meta_key => $field_name) {
             $value = EBQ_Meta_Fields::get($post->ID, $meta_key, '');
-            $is_textarea = in_array($meta_key, ['_ebq_description', '_ebq_og_description', '_ebq_twitter_description', '_ebq_schemas'], true);
+            $is_textarea = in_array($meta_key, ['_ebq_description', '_ebq_og_description', '_ebq_twitter_description', '_ebq_schemas', '_ebq_breadcrumbs'], true);
             $is_checkbox_like = in_array($meta_key, ['_ebq_robots_noindex', '_ebq_robots_nofollow', '_ebq_schema_disabled'], true);
             if ($is_checkbox_like) {
                 $cast = $value ? '1' : '';
@@ -241,6 +269,17 @@ final class EBQ_Seo_Fields_Meta_Box
                 delete_post_meta($post_id, '_ebq_schemas');
             } else {
                 update_post_meta($post_id, '_ebq_schemas', $clean);
+            }
+        }
+
+        // Breadcrumb override — same JSON pattern.
+        if (isset($_POST['ebq_breadcrumbs'])) {
+            $raw_b = (string) wp_unslash($_POST['ebq_breadcrumbs']);
+            $clean_b = EBQ_Meta_Fields::sanitize_breadcrumbs($raw_b);
+            if ($clean_b === '') {
+                delete_post_meta($post_id, '_ebq_breadcrumbs');
+            } else {
+                update_post_meta($post_id, '_ebq_breadcrumbs', $clean_b);
             }
         }
 

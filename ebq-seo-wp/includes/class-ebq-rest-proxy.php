@@ -176,6 +176,16 @@ final class EBQ_Rest_Proxy
             'permission_callback' => [$this, 'can_view_hq'],
             'callback' => [$this, 'hq_iframe_url'],
         ]);
+
+        // Editor-friendly shortcut: any user with edit_posts can promote a
+        // keyword to the Rank Tracker. Used by the Gutenberg sidebar's
+        // "+ Track" button next to the focus keyphrase, and any other
+        // surface where requiring `manage_options` would block the action.
+        register_rest_route('ebq/v1', '/track-keyword', [
+            'methods' => 'POST',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'track_keyword'],
+        ]);
     }
 
     public function can_edit(): bool
@@ -517,6 +527,40 @@ final class EBQ_Rest_Proxy
     {
         $insight = (string) ($request->get_param('insight') ?: 'cannibalization');
         return new WP_REST_Response(EBQ_Plugin::api_client()->get_iframe_url($insight), 200);
+    }
+
+    /**
+     * Promote a keyword (typically the post's focus keyphrase) to the Rank
+     * Tracker. Editor-accessible — no admin cap required, since the user is
+     * already trusted to edit the post and choose the keyword. Defaults
+     * mirror the modal so a one-click track does the right thing.
+     */
+    public function track_keyword(WP_REST_Request $request): WP_REST_Response
+    {
+        $body = $request->get_json_params();
+        if (! is_array($body)) {
+            $body = $request->get_params();
+        }
+        $keyword = trim((string) wp_unslash((string) ($body['keyword'] ?? '')));
+        if ($keyword === '') {
+            return new WP_REST_Response(['ok' => false, 'error' => 'missing_keyword'], 400);
+        }
+
+        $payload = ['keyword' => $keyword];
+        foreach (['country', 'language', 'device', 'target_url', 'target_domain'] as $opt) {
+            if (! empty($body[$opt]) && is_string($body[$opt])) {
+                $payload[$opt] = wp_strip_all_tags((string) wp_unslash($body[$opt]));
+            }
+        }
+        if (! empty($body['tags']) && is_array($body['tags'])) {
+            $payload['tags'] = array_values(array_filter(array_map(
+                static fn ($t) => is_string($t) ? trim(wp_strip_all_tags((string) wp_unslash($t))) : '',
+                $body['tags']
+            )));
+        }
+
+        $result = EBQ_Plugin::api_client()->hq_create_keyword($payload);
+        return new WP_REST_Response($result, 200);
     }
 
     public function bulk_post_insights(WP_REST_Request $request): WP_REST_Response

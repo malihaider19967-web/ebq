@@ -499,6 +499,20 @@
 	letter-spacing: 0.04em;
 	text-transform: uppercase;
 }
+.ebq-hq-pos--unranked {
+	background: var(--ebq-hq-bg);
+	color: var(--ebq-hq-text-soft);
+	font-size: 11px;
+	font-weight: 700;
+}
+.ebq-hq-pos--bad {
+	background: var(--ebq-hq-bad-soft);
+	color: var(--ebq-hq-bad);
+	font-size: 10px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	cursor: help;
+}
 .ebq-hq-muted { color: var(--ebq-hq-text-mute); }
 
 /* Delta */
@@ -704,6 +718,125 @@
 }
 .ebq-hq-disconnected__inner h2 { margin: 0 0 8px; font-size: 20px; font-weight: 700; color: var(--ebq-hq-text); }
 .ebq-hq-disconnected__inner p  { margin: 0 0 18px; color: var(--ebq-hq-text-soft); font-size: 14px; line-height: 1.55; }
+
+/* Connection guide */
+.ebq-hq-connect {
+	display: grid;
+	place-items: center;
+}
+.ebq-hq-connect--full { padding: 60px 24px; }
+.ebq-hq-connect--compact { padding: 16px 0; }
+.ebq-hq-connect__panel {
+	max-width: 640px;
+	width: 100%;
+	background: var(--ebq-hq-bg-card);
+	border: 1px solid var(--ebq-hq-border);
+	border-radius: 12px;
+	box-shadow: var(--ebq-hq-shadow);
+	padding: 32px;
+}
+.ebq-hq-connect--compact .ebq-hq-connect__panel { padding: 22px 24px; }
+.ebq-hq-connect__reason {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 10px 12px;
+	margin-bottom: 18px;
+	background: #fef3c7;
+	color: #92400e;
+	border-radius: 8px;
+	font-size: 13px;
+	line-height: 1.5;
+}
+.ebq-hq-connect__reason > span:first-child {
+	display: grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: #92400e;
+	color: #fff;
+	font-weight: 700;
+	font-size: 11px;
+	flex-shrink: 0;
+}
+.ebq-hq-connect__title {
+	margin: 0 0 6px;
+	font-size: 22px;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+	color: var(--ebq-hq-text);
+}
+.ebq-hq-connect__lead {
+	margin: 0 0 24px;
+	color: var(--ebq-hq-text-soft);
+	font-size: 14px;
+	line-height: 1.6;
+}
+.ebq-hq-connect__steps {
+	list-style: none;
+	padding: 0;
+	margin: 0 0 24px;
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+.ebq-hq-connect__steps li {
+	display: flex;
+	gap: 14px;
+	align-items: flex-start;
+}
+.ebq-hq-connect__step-num {
+	flex-shrink: 0;
+	width: 28px;
+	height: 28px;
+	display: grid;
+	place-items: center;
+	border-radius: 50%;
+	background: var(--ebq-hq-accent);
+	color: #ffffff;
+	font-weight: 700;
+	font-size: 13px;
+}
+.ebq-hq-connect__steps strong {
+	display: block;
+	font-size: 14px;
+	color: var(--ebq-hq-text);
+	margin-bottom: 2px;
+}
+.ebq-hq-connect__steps p {
+	margin: 0;
+	font-size: 13px;
+	color: var(--ebq-hq-text-soft);
+	line-height: 1.55;
+}
+.ebq-hq-connect__cta {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	align-items: center;
+	margin-bottom: 14px;
+}
+.ebq-hq-connect__recheck {
+	background: transparent;
+	border: 0;
+	padding: 8px 6px;
+	color: var(--ebq-hq-text-soft);
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+	text-decoration: underline;
+	text-decoration-color: var(--ebq-hq-border-strong);
+}
+.ebq-hq-connect__recheck:hover { color: var(--ebq-hq-accent); text-decoration-color: var(--ebq-hq-accent); }
+.ebq-hq-connect__recheck:disabled { opacity: 0.55; cursor: wait; }
+.ebq-hq-connect__foot {
+	margin: 0;
+	padding-top: 14px;
+	border-top: 1px solid var(--ebq-hq-border);
+	font-size: 11px;
+	color: var(--ebq-hq-text-mute);
+}
 
 /* Modal (HQ) */
 .ebq-hq-modal {
@@ -1039,18 +1172,26 @@
 	white-space: nowrap;
 }
 
-/* Header alignment: SourceTag should sit inline with header text without
-   shifting baseline. Wrap th content in inline-flex so alignment stays
-   consistent across columns. */
+/* Header / cell alignment — both use the SAME text-align strategy so a
+   right-aligned numeric column has its label and its value on the exact
+   same right edge. Inline-flex was producing subtly different positions
+   from text-align in the body cells, which read as misalignment. */
 .ebq-hq-table__th {
 	white-space: nowrap;
 	vertical-align: middle;
+	font-variant-numeric: tabular-nums;
 }
 .ebq-hq-table__th > span {
-	display: inline-flex;
-	align-items: center;
-	gap: 4px;
+	display: inline;
 }
-.ebq-hq-table__th--right > span,
-.ebq-hq-table__th--right { justify-content: flex-end; }
-.ebq-hq-table__th--right > span { justify-content: flex-end; }
+.ebq-hq-table__th--right { text-align: right; }
+.ebq-hq-table__td--right { text-align: right; font-variant-numeric: tabular-nums; }
+/* Sort arrow + SourceTag inside header sit inline. Pills are already
+   `display: inline-flex` with vertical-align: middle, so they ride the
+   text baseline cleanly. */
+.ebq-hq-table__arrow {
+	display: inline-block;
+	margin-left: 4px;
+	font-size: 9px;
+	vertical-align: 1px;
+}

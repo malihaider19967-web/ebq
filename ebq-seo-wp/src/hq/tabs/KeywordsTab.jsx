@@ -96,11 +96,7 @@ export default function KeywordsTab() {
 			label: <span title="Live rank from Serper for this keyword's country/device.">{__('Tracker', 'ebq-seo')} <SourceTag source="tracker" /></span>,
 			align: 'right',
 			sortable: true,
-			render: (row) => row.current_position !== null ? (
-				<span className={positionToneCls(row.current_position)}>{Math.round(row.current_position)}</span>
-			) : (
-				<span className="ebq-hq-pos ebq-hq-pos--pending" title={__('Awaiting first SERP check (usually 1–5 min)', 'ebq-seo')}>{__('pending', 'ebq-seo')}</span>
-			),
+			render: (row) => renderTrackerCell(row),
 		},
 		{
 			key: 'best_position',
@@ -258,6 +254,41 @@ function positionToneCls(pos) {
 	if (pos <= 10) return 'ebq-hq-pos ebq-hq-pos--top10';
 	if (pos <= 20) return 'ebq-hq-pos ebq-hq-pos--striking';
 	return 'ebq-hq-pos ebq-hq-pos--deep';
+}
+
+/**
+ * Position cell rendering — three states:
+ *   - has position → coloured pill with the number
+ *   - no position, but last_checked_at is set → "Not ranking" (was checked,
+ *     URL didn't appear in the top N results — depth from settings)
+ *   - no position and never checked → "Pending" (truly queued)
+ *   - last_status === 'failed' → red error pill (with hover tooltip showing
+ *     the upstream error message)
+ */
+function renderTrackerCell(row) {
+	if (row.current_position !== null && row.current_position !== undefined) {
+		return <span className={positionToneCls(row.current_position)}>{Math.round(row.current_position)}</span>;
+	}
+	if (row.last_status === 'failed') {
+		return (
+			<span className="ebq-hq-pos ebq-hq-pos--bad" title={row.last_error || __('SERP check failed — will retry on the next interval.', 'ebq-seo')}>
+				{__('error', 'ebq-seo')}
+			</span>
+		);
+	}
+	if (row.last_checked_at) {
+		const depth = row.depth || 100;
+		return (
+			<span className="ebq-hq-pos ebq-hq-pos--unranked" title={__(`Checked ${relTime(row.last_checked_at)} — not in the top ${depth} results.`, 'ebq-seo')}>
+				&gt;{depth}
+			</span>
+		);
+	}
+	return (
+		<span className="ebq-hq-pos ebq-hq-pos--pending" title={__('Queued for first SERP check (usually 1–5 min).', 'ebq-seo')}>
+			{__('pending', 'ebq-seo')}
+		</span>
+	);
 }
 
 function relTime(iso) {

@@ -98,3 +98,45 @@ export function IconRefresh() {
 		</svg>
 	);
 }
+
+/* Tab-row distinct icons. Each tab needs a recognisable shape — duplicates
+   make scanning harder. Below are dedicated symbols for Links, Insights,
+   Schema, and Advanced, distinct from IconChart / IconSliders. */
+export function IconLink() {
+	return (
+		<svg viewBox="0 0 16 16" aria-hidden focusable="false">
+			<path fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" d="M9.5 6.5a2.5 2.5 0 003.5 0l1.5-1.5a2.5 2.5 0 00-3.5-3.5L10 2.5M6.5 9.5a2.5 2.5 0 00-3.5 0l-1.5 1.5a2.5 2.5 0 003.5 3.5L6 13.5M5.5 10.5l5-5" />
+		</svg>
+	);
+}
+export function IconRadar() {
+	return (
+		<svg viewBox="0 0 16 16" aria-hidden focusable="false">
+			<circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.4" />
+			<path fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" d="M8 8L13 4.5" />
+			<circle cx="8" cy="8" r="1.4" fill="currentColor" />
+		</svg>
+	);
+}
+export function IconCode() {
+	return (
+		<svg viewBox="0 0 16 16" aria-hidden focusable="false">
+			<path fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" d="M5 4L1.5 8 5 12M11 4l3.5 4-3.5 4M9.5 3.5l-3 9" />
+		</svg>
+	);
+}
+export function IconGear() {
+	return (
+		<svg viewBox="0 0 16 16" aria-hidden focusable="false">
+			<circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" strokeWidth="1.4" />
+			<path fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" d="M8 1.6V3M8 13v1.4M14.4 8H13M3 8H1.6M12.5 3.5l-1 1M4.5 11.5l-1 1M12.5 12.5l-1-1M4.5 4.5l-1-1" />
+		</svg>
+	);
+}
+export function IconShield() {
+	return (
+		<svg viewBox="0 0 16 16" aria-hidden focusable="false">
+			<path fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" d="M8 1.5L2.5 3.5v4c0 3.5 2.4 6.4 5.5 7 3.1-.6 5.5-3.5 5.5-7v-4L8 1.5z" />
+		</svg>
+	);
+}

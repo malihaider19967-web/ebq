@@ -100,9 +100,17 @@ export function EmptyState({ title, sub, children }) {
 }
 
 export function ErrorState({ error, retry }) {
-	const msg = error?.error === 'not_connected'
-		? __('This site is not connected to EBQ yet.', 'ebq-seo')
-		: error?.message || error?.error || __('Could not load this data.', 'ebq-seo');
+	// Connection issues get the dedicated guided flow instead of a generic
+	// red error box. Imported via a static import in components that can
+	// hit this case (each tab passes the API response into ErrorState).
+	if (error?.error === 'not_connected' || error?.error === 'http_401' || error?.error === 'http_403') {
+		// Static-import the guide here. It's safe because ConnectionGuide
+		// no longer imports Button from this file (uses a plain <a>).
+		// eslint-disable-next-line @typescript-eslint/no-require-imports, global-require
+		const ConnectionGuide = require('./ConnectionGuide').default;
+		return <ConnectionGuide compact reason={error.error} />;
+	}
+	const msg = error?.message || error?.error || __('Could not load this data.', 'ebq-seo');
 	return (
 		<div className="ebq-hq-error" role="alert">
 			<strong>{__('Something went wrong', 'ebq-seo')}</strong>

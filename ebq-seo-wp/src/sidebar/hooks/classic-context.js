@@ -58,6 +58,7 @@ const META_TO_FIELD = {
 	_ebq_schema_type:         'ebq_schema_type',
 	_ebq_schema_disabled:     'ebq_schema_disabled',
 	_ebq_schemas:             'ebq_schemas',
+	_ebq_breadcrumbs:         'ebq_breadcrumbs',
 };
 
 function findInput(metaKey) {

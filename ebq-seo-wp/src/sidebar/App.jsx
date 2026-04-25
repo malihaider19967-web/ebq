@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from '@wordpress/el
 import { __ } from '@wordpress/i18n';
 
 import { ScoreChip } from './components/primitives';
-import { IconSearch, IconBook, IconShare, IconChart, IconSliders, IconSparkle } from './components/icons';
+import { IconSearch, IconBook, IconShare, IconChart, IconSparkle, IconLink, IconRadar, IconCode, IconGear } from './components/icons';
 import SeoTab from './tabs/SeoTab';
 import ReadabilityTab from './tabs/ReadabilityTab';
 import SocialTab from './tabs/SocialTab';
@@ -22,11 +22,11 @@ const TABS = [
 	{ id: 'seo',         label: __('SEO', 'ebq-seo'),         icon: IconSearch,  Component: SeoTab },
 	{ id: 'readability', label: __('Readability', 'ebq-seo'), icon: IconBook,    Component: ReadabilityTab },
 	{ id: 'inclusive',   label: __('Inclusive', 'ebq-seo'),   icon: IconSparkle, Component: InclusiveTab },
-	{ id: 'links',       label: __('Links', 'ebq-seo'),       icon: IconChart,   Component: LinksTab },
+	{ id: 'links',       label: __('Links', 'ebq-seo'),       icon: IconLink,    Component: LinksTab },
 	{ id: 'social',      label: __('Social', 'ebq-seo'),      icon: IconShare,   Component: SocialTab },
-	{ id: 'schema',      label: __('Schema', 'ebq-seo'),      icon: IconSliders, Component: SchemaTab },
+	{ id: 'schema',      label: __('Schema', 'ebq-seo'),      icon: IconCode,    Component: SchemaTab },
 	{ id: 'insights',    label: __('Insights', 'ebq-seo'),    icon: IconChart,   Component: InsightsTab },
-	{ id: 'advanced',    label: __('Advanced', 'ebq-seo'),    icon: IconSliders, Component: AdvancedTab },
+	{ id: 'advanced',    label: __('Advanced', 'ebq-seo'),    icon: IconGear,    Component: AdvancedTab },
 ];
 
 function tabDot(level, label) {
@@ -95,14 +95,19 @@ export default function App() {
 
 	const inclusiveResult = useMemo(() => analyzeInclusive(debounced), [debounced]);
 
-	const seoLevel = focusKw ? levelFromScore(seoResult.score) : null;
+	// SEO tab dot — show "bad" (red) when no focus keyphrase is set so the
+	// tab visually flags the missing setup. Same chip in the header.
+	const seoLevel = focusKw ? levelFromScore(seoResult.score) : 'bad';
 	const readLevel = readResult.score > 0 ? levelFromScore(readResult.score) : null;
 	const inclusiveLevel = inclusiveResult.totalMatches > 0
 		? (inclusiveResult.score >= 90 ? 'good' : inclusiveResult.score >= 70 ? 'warn' : 'bad')
 		: null;
 
 	const overallScore = focusKw ? Math.round((seoResult.score + readResult.score) / 2) : 0;
-	const showOverall = !!focusKw;
+	// Always show the overall score chip — when no focus keyphrase is set,
+	// it renders as a red "0 · No focus keyphrase" so the missing setup is
+	// always visible from the topbar, not just on the SEO tab.
+	const showOverall = true;
 
 	// ─── Keyboard navigation: roving tabindex (Left/Right/Home/End) ─────
 	const onTabKeyDown = useCallback((e) => {
@@ -168,7 +173,7 @@ export default function App() {
 				<div className="ebq-header__text">
 					<h2 className="ebq-header__title">{__('EBQ SEO', 'ebq-seo')}</h2>
 					<p className="ebq-header__sub">
-						{showOverall
+						{focusKw
 							? labelForScore(overallScore)
 							: __('Set a focus keyphrase to start scoring.', 'ebq-seo')}
 					</p>

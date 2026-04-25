@@ -14,15 +14,32 @@ if (! defined('ABSPATH')) {
 
 final class EBQ_Settings
 {
-    public const PAGE_HOOK = 'settings_page_ebq-seo';
+    // Settings page now lives as a sub-menu of the EBQ HQ top-level menu
+    // (add_submenu_page parent='ebq-hq'), so the hook becomes
+    // `ebq-hq_page_ebq-seo` instead of the old `settings_page_ebq-seo`.
+    public const PAGE_HOOK = 'ebq-hq_page_ebq-seo';
+    public const PAGE_SLUG = 'ebq-seo';
 
     public function register(): void
     {
-        add_action('admin_menu', [$this, 'add_menu']);
-        add_action('admin_post_ebq_save_api_base', [$this, 'save_api_base']);
+        // Use a high priority so we register AFTER EBQ_Hq_Page::register_menu
+        // adds the parent top-level menu — otherwise add_submenu_page can't
+        // find the parent slug.
+        add_action('admin_menu', [$this, 'add_menu'], 20);
         add_action('admin_post_ebq_save_seo_globals', [$this, 'save_seo_globals']);
         add_action('admin_post_ebq_clear_cache', [$this, 'clear_cache']);
         add_action('admin_enqueue_scripts', [$this, 'enqueue_assets']);
+    }
+
+    /**
+     * Settings page URL — used by every other class that needs to deep-link
+     * here (connect flow, updater, sidebars, dashboard widget). One place
+     * to change it again later.
+     */
+    public static function url(string $extra = ''): string
+    {
+        $base = admin_url('admin.php?page=' . self::PAGE_SLUG);
+        return $extra === '' ? $base : ($base . '&' . ltrim($extra, '?&'));
     }
 
     public function clear_cache(): void
@@ -34,13 +51,15 @@ final class EBQ_Settings
 
         $count = EBQ_Api_Client::clear_response_cache();
 
-        wp_safe_redirect(admin_url('options-general.php?page=ebq-seo&ebq_status=cache_cleared&ebq_cache_count='.$count));
+        wp_safe_redirect(self::url('ebq_status=cache_cleared&ebq_cache_count=' . $count));
         exit;
     }
 
     public function enqueue_assets(string $hook): void
     {
-        if ($hook !== self::PAGE_HOOK) {
+        // Match either the top-level-parented hook (new) or the legacy
+        // settings hook in case anything still bookmarks the old URL.
+        if ($hook !== self::PAGE_HOOK && $hook !== 'settings_page_ebq-seo') {
             return;
         }
 
@@ -69,38 +88,20 @@ final class EBQ_Settings
             update_option(EBQ_Title_Template::OPTION_SEP, mb_substr($sep, 0, 12));
         }
 
-        wp_safe_redirect(admin_url('options-general.php?page=ebq-seo&ebq_status=seo_globals_saved'));
-        exit;
-    }
-
-    public function save_api_base(): void
-    {
-        if (! current_user_can('manage_options')) {
-            wp_die(esc_html__('You do not have permission to change this.', 'ebq-seo'), '', ['response' => 403]);
-        }
-        check_admin_referer('ebq_save_api_base');
-
-        $input = isset($_POST['ebq_api_base']) ? esc_url_raw(trim((string) wp_unslash($_POST['ebq_api_base']))) : '';
-        if ($input === '') {
-            delete_option('ebq_api_base_override');
-        } else {
-            update_option('ebq_api_base_override', rtrim($input, '/'));
-        }
-
-        delete_transient(EBQ_Updater::TRANSIENT_KEY);
-        delete_site_transient('update_plugins');
-
-        wp_safe_redirect(admin_url('options-general.php?page=ebq-seo&ebq_status=api_base_saved'));
+        wp_safe_redirect(self::url('ebq_status=seo_globals_saved'));
         exit;
     }
 
     public function add_menu(): void
     {
-        add_options_page(
-            __('EBQ SEO', 'ebq-seo'),
-            __('EBQ SEO', 'ebq-seo'),
+        // Sub-menu of the top-level EBQ HQ menu. Label is just "Settings"
+        // since the parent already says "EBQ HQ".
+        add_submenu_page(
+            EBQ_Hq_Page::SLUG,
+            __('EBQ Settings', 'ebq-seo'),
+            __('Settings', 'ebq-seo'),
             'manage_options',
-            'ebq-seo',
+            self::PAGE_SLUG,
             [$this, 'render_page']
         );
     }
@@ -138,7 +139,7 @@ final class EBQ_Settings
             <?php $this->render_inline_callback($inline_result); ?>
             <?php $this->render_last_error_banner($connected, $last_error); ?>
 
-            <?php $this->render_connect_card($connected, $domain, $website_id); ?>
+            <?php $this->render_connect_card($connected, $domain); ?>
 
             <?php $this->render_updates_card($has_update, $latest, $update_status, $latest_query); ?>
 
@@ -146,11 +147,11 @@ final class EBQ_Settings
 
             <?php $this->render_coexistence_card(); ?>
 
-            <?php $this->render_workspace_card(); ?>
-
             <?php $this->render_diagnostics_card($connected); ?>
         </div>
         <?php
+        // Suppress unused-var lint by referencing $website_id once.
+        unset($website_id);
     }
 
     private function render_hero(): void
@@ -209,10 +210,9 @@ final class EBQ_Settings
         <?php
     }
 
-    private function render_connect_card(bool $connected, string $domain, int $website_id): void
+    private function render_connect_card(bool $connected, string $domain): void
     {
         if ($connected) {
-            $token_len = strlen((string) get_option('ebq_site_token', ''));
             ?>
             <section class="ebq-card ebq-card--accent">
                 <div class="ebq-card-row">
@@ -225,17 +225,9 @@ final class EBQ_Settings
                     </div>
                     <span class="ebq-pill ebq-pill--good"><span class="ebq-pill__dot"></span><?php esc_html_e('Live', 'ebq-seo'); ?></span>
                 </div>
-                <dl class="ebq-kv">
-                    <dt><?php esc_html_e('Website ID', 'ebq-seo'); ?></dt>
-                    <dd>#<?php echo esc_html((string) $website_id); ?></dd>
-                    <dt><?php esc_html_e('Workspace URL', 'ebq-seo'); ?></dt>
-                    <dd><?php echo esc_html(EBQ_Api_Client::base_url()); ?></dd>
-                    <dt><?php esc_html_e('API token', 'ebq-seo'); ?></dt>
-                    <dd><?php echo esc_html(sprintf(__('configured (%d chars)', 'ebq-seo'), $token_len)); ?></dd>
-                </dl>
                 <div class="ebq-form-row" style="margin-top:14px;">
-                    <a href="<?php echo esc_url(EBQ_Api_Client::base_url() . '/reports'); ?>" class="ebq-btn ebq-btn--primary" target="_blank" rel="noopener">
-                        <?php esc_html_e('Open EBQ reports', 'ebq-seo'); ?>
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=' . EBQ_Hq_Page::SLUG)); ?>" class="ebq-btn ebq-btn--primary">
+                        <?php esc_html_e('Open EBQ HQ', 'ebq-seo'); ?>
                     </a>
                     <a href="<?php echo esc_url(wp_nonce_url(admin_url('admin-post.php?action=ebq_clear_cache'), 'ebq_clear_cache')); ?>" class="ebq-btn ebq-btn--ghost">
                         <?php esc_html_e('Refresh data', 'ebq-seo'); ?>
@@ -365,67 +357,21 @@ final class EBQ_Settings
         <?php
     }
 
-    private function render_workspace_card(): void
-    {
-        $override = (string) get_option('ebq_api_base_override', '');
-        $locked = defined('EBQ_API_BASE');
-        $active_base = EBQ_Api_Client::base_url();
-        ?>
-        <section class="ebq-card">
-            <p class="ebq-card__eyebrow"><?php esc_html_e('EBQ workspace URL', 'ebq-seo'); ?></p>
-            <h3 class="ebq-card__title"><?php esc_html_e('Where the plugin reaches EBQ', 'ebq-seo'); ?></h3>
-            <p class="ebq-card__lead">
-                <?php esc_html_e('Used for insights, version metadata, and the Connect flow. Leave blank to use the default.', 'ebq-seo'); ?>
-            </p>
-            <?php if ($locked): ?>
-                <p class="ebq-diag" style="margin:0;">
-                    <?php echo esc_html((string) EBQ_API_BASE); ?>
-                </p>
-                <p style="margin:8px 0 0;font-size:11px;color:var(--ebq-text-soft);">
-                    <?php esc_html_e('Locked by EBQ_API_BASE in wp-config.php.', 'ebq-seo'); ?>
-                </p>
-            <?php else: ?>
-                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="ebq-form-row">
-                    <input type="hidden" name="action" value="ebq_save_api_base">
-                    <?php wp_nonce_field('ebq_save_api_base'); ?>
-                    <input type="url" name="ebq_api_base" value="<?php echo esc_attr($override); ?>"
-                        placeholder="<?php echo esc_attr(EBQ_Api_Client::DEFAULT_BASE); ?>"
-                        class="ebq-input ebq-input--code" />
-                    <button type="submit" class="ebq-btn ebq-btn--ghost"><?php esc_html_e('Save', 'ebq-seo'); ?></button>
-                </form>
-                <p style="margin:8px 0 0;font-size:11px;color:var(--ebq-text-soft);">
-                    <?php echo esc_html(sprintf(
-                        __('Default: %1$s · Active: %2$s', 'ebq-seo'),
-                        EBQ_Api_Client::DEFAULT_BASE,
-                        $active_base
-                    )); ?>
-                </p>
-            <?php endif; ?>
-        </section>
-        <?php
-    }
-
+    /**
+     * Diagnostics block — kept for support purposes but stripped of internal
+     * plumbing (no website ID, no token chars, no API base, no workspace URL).
+     * Just runtime info that helps reproduce a problem: WP/PHP/plugin
+     * versions, multisite flag, object-cache presence, connection status.
+     */
     private function render_diagnostics_card(bool $connected): void
     {
-        $token_opt = (string) get_option('ebq_site_token', '');
-        $state_opt = (string) get_option('ebq_connect_state', '');
-
         $diag = [
-            'plugin_version' => EBQ_SEO_VERSION,
-            'wp_version' => get_bloginfo('version'),
-            'php_version' => PHP_VERSION,
-            'is_multisite' => is_multisite(),
-            'ebq_api_base' => EBQ_Api_Client::base_url(),
-            'home_url' => home_url('/'),
-            'admin_url' => admin_url('options-general.php?page=ebq-seo'),
-            'current_user_id' => get_current_user_id(),
-            'option.ebq_site_token' => $token_opt === '' ? 'empty' : 'set ('.strlen($token_opt).' chars)',
-            'option.ebq_website_id' => (int) get_option('ebq_website_id', 0),
-            'option.ebq_website_domain' => (string) get_option('ebq_website_domain', ''),
-            'option.ebq_connect_state' => $state_opt === '' ? 'empty' : 'set ('.strlen($state_opt).' chars, prefix '.substr($state_opt, 0, 6).'…)',
-            'option.ebq_last_connect_error' => (string) get_option('ebq_last_connect_error', ''),
-            'is_configured()' => EBQ_Plugin::is_configured(),
+            'plugin_version'      => EBQ_SEO_VERSION,
+            'wp_version'          => get_bloginfo('version'),
+            'php_version'         => PHP_VERSION,
+            'is_multisite'        => is_multisite(),
             'object_cache_active' => wp_using_ext_object_cache(),
+            'connected'           => $connected,
         ];
         ?>
         <section class="ebq-card">
@@ -458,7 +404,6 @@ final class EBQ_Settings
             'disconnected'      => ['warn', __('Disconnected. Local token cleared.', 'ebq-seo')],
             'state_mismatch'    => ['bad',  __('Connection rejected — the returned state did not match what this site issued. Try again.', 'ebq-seo')],
             'bad_token'         => ['bad',  __('EBQ sent back an empty or invalid token. Try again.', 'ebq-seo')],
-            'api_base_saved'    => ['good', __('EBQ workspace URL saved. Version cache cleared.', 'ebq-seo')],
             'seo_globals_saved' => ['good', __('SEO title settings saved.', 'ebq-seo')],
             'cache_cleared'     => ['good', sprintf(_n('Cleared %d cached EBQ response. Reload the editor to see fresh data.', 'Cleared %d cached EBQ responses. Reload the editor to see fresh data.', $count, 'ebq-seo'), $count)],
         ];

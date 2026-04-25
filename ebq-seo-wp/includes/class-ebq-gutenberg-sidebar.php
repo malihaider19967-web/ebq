@@ -63,7 +63,7 @@ final class EBQ_Gutenberg_Sidebar
             'siteName' => get_bloginfo('name'),
             'titleSep' => EBQ_Title_Template::get_sep(),
             'isConnected' => EBQ_Plugin::is_configured(),
-            'settingsUrl' => admin_url('options-general.php?page=ebq-seo'),
+            'settingsUrl' => admin_url('admin.php?page=ebq-seo'),
             'workspaceDomain' => (string) get_option('ebq_website_domain', ''),
         ]);
 

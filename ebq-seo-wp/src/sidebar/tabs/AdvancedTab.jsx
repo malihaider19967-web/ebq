@@ -4,6 +4,14 @@ import { Section, TextField, Toggle } from '../components/primitives';
 import { IconSliders } from '../components/icons';
 import { useEditorContext, usePostMeta } from '../hooks/useEditorContext';
 
+/**
+ * Advanced tab — canonical, robots directives. Schema controls have moved
+ * to the dedicated Schema tab (catalogue + custom builder + per-schema
+ * enable/disable). The legacy `_ebq_schema_type` single-override field is
+ * superseded by the catalogue and no longer exposed in the UI; the meta
+ * key remains registered for backward compat and is still honoured by the
+ * output class when no `_ebq_schemas` entries exist.
+ */
 export default function AdvancedTab() {
 	const ctx = useEditorContext();
 	const { get, set } = usePostMeta();
@@ -38,21 +46,6 @@ export default function AdvancedTab() {
 					onChange={(v) => set('_ebq_robots_advanced', v)}
 					placeholder="noarchive, nosnippet, max-snippet:-1"
 					hint={__('Comma-separated. Merged after the index/follow choice above.', 'ebq-seo')}
-				/>
-			</Section>
-
-			<Section title={__('Schema', 'ebq-seo')} icon={<IconSliders />}>
-				<TextField
-					label={__('Schema type', 'ebq-seo')}
-					value={get('_ebq_schema_type', '')}
-					onChange={(v) => set('_ebq_schema_type', v)}
-					placeholder="Article"
-					hint={__('Override the default piece (Article, BlogPosting, NewsArticle, FAQPage…).', 'ebq-seo')}
-				/>
-				<Toggle
-					label={__('Disable schema for this post', 'ebq-seo')}
-					checked={!!get('_ebq_schema_disabled', false)}
-					onChange={(v) => set('_ebq_schema_disabled', v)}
 				/>
 			</Section>
 		</div>
