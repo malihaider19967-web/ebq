@@ -502,6 +502,34 @@
 
 .ebq-snippet--mobile .ebq-snippet__title { font-size: 14px; }
 
+/* Two-column layout when a featured image is present (mirrors Google's
+ * SERP card with thumbnail). Falls back gracefully without the modifier. */
+.ebq-snippet--has-image {
+	display: grid;
+	grid-template-columns: 1fr 92px;
+	gap: 12px;
+	align-items: stretch;
+}
+.ebq-snippet__main { min-width: 0; }
+.ebq-snippet__thumb {
+	width: 92px;
+	min-height: 92px;
+	border-radius: 8px;
+	background-color: var(--ebq-bg-emboss);
+	background-size: cover;
+	background-position: center;
+	flex-shrink: 0;
+	align-self: stretch;
+}
+.ebq-snippet--mobile.ebq-snippet--has-image {
+	grid-template-columns: 1fr 76px;
+}
+.ebq-snippet--mobile .ebq-snippet__thumb {
+	width: 76px;
+	min-height: 76px;
+	border-radius: 6px;
+}
+
 /* ─── Social cards ────────────────────────────────────────────── */
 
 .ebq-social {

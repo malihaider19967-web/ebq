@@ -29,6 +29,7 @@ const state = {
 	content: '',
 	lang: '',
 	meta: {},
+	featuredImageUrl: '',
 };
 
 const listeners = new Set();
@@ -113,6 +114,14 @@ function readTitle() {
 	return el ? el.value : '';
 }
 
+function readFeaturedImage() {
+	// WP renders the chosen featured image as `<img>` inside #set-post-thumbnail
+	// (or #postimagediv .inside img). Pull whichever is present.
+	const img = document.querySelector('#postimagediv #set-post-thumbnail img, #postimagediv .inside img');
+	if (img && img.src) return img.src;
+	return '';
+}
+
 function bootstrapState() {
 	state.postId = readPostId();
 	state.postTitle = readTitle();
@@ -121,6 +130,7 @@ function bootstrapState() {
 	state.content = readContent();
 	state.lang = (document.documentElement && document.documentElement.lang) || '';
 	state.meta = (typeof window !== 'undefined' && window.ebqClassicMeta) ? { ...window.ebqClassicMeta } : {};
+	state.featuredImageUrl = readFeaturedImage();
 }
 
 function attachListeners() {
@@ -151,6 +161,20 @@ function attachListeners() {
 			notify();
 		});
 		mo.observe(permalinkEl, { childList: true, subtree: true, characterData: true });
+	}
+
+	// Watch the featured image metabox — picking / clearing an image swaps
+	// the inner HTML of #postimagediv via WP's media frame.
+	const featuredEl = document.getElementById('postimagediv');
+	if (featuredEl && typeof MutationObserver !== 'undefined') {
+		const mo = new MutationObserver(() => {
+			const next = readFeaturedImage();
+			if (next !== state.featuredImageUrl) {
+				state.featuredImageUrl = next;
+				notify();
+			}
+		});
+		mo.observe(featuredEl, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
 	}
 
 	// Content: TinyMCE in visual mode, textarea in HTML mode.

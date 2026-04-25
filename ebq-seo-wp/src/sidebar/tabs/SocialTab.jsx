@@ -11,7 +11,7 @@ export default function SocialTab() {
 
 	const ogTitle = get('_ebq_og_title', '') || get('_ebq_title', '') || ctx.postTitle;
 	const ogDesc  = get('_ebq_og_description', '') || get('_ebq_description', '');
-	const ogImg   = get('_ebq_og_image', '');
+	const ogImg   = get('_ebq_og_image', '') || ctx.featuredImageUrl || '';
 
 	const twTitle = get('_ebq_twitter_title', '') || ogTitle;
 	const twDesc  = get('_ebq_twitter_description', '') || ogDesc;

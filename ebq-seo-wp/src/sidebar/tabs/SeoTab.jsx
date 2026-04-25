@@ -82,6 +82,7 @@ export default function SeoTab() {
 					siteName={cfg.siteName}
 					title={effectiveTitle}
 					description={description}
+					image={get('_ebq_og_image', '') || ctx.featuredImageUrl || ''}
 					mobile={previewMode === 'mobile'}
 				/>
 

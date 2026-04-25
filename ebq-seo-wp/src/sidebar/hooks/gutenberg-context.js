@@ -5,7 +5,15 @@ import { useCallback } from '@wordpress/element';
 export function useEditorContext() {
 	const ctx = useSelect((select) => {
 		const editor = select('core/editor');
+		const core = select('core');
 		const meta = editor.getEditedPostAttribute('meta') || {};
+		const featuredId = editor.getEditedPostAttribute('featured_media');
+		const media = featuredId ? core.getMedia(featuredId) : null;
+		const featuredImageUrl =
+			media?.media_details?.sizes?.medium_large?.source_url ||
+			media?.media_details?.sizes?.medium?.source_url ||
+			media?.source_url ||
+			'';
 		return {
 			postId: editor.getCurrentPostId(),
 			postTitle: editor.getEditedPostAttribute('title') || '',
@@ -14,6 +22,7 @@ export function useEditorContext() {
 			content: editor.getEditedPostContent(),
 			meta,
 			lang: editor.getCurrentPost()?.lang || '',
+			featuredImageUrl,
 		};
 	}, []);
 	return ctx;
