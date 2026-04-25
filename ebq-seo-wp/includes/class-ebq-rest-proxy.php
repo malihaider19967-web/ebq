@@ -108,9 +108,41 @@ final class EBQ_Rest_Proxy
             'callback' => [$this, 'hq_performance'],
         ]);
         register_rest_route('ebq/v1', '/hq/keywords', [
+            [
+                'methods' => 'GET',
+                'permission_callback' => [$this, 'can_view_hq'],
+                'callback' => [$this, 'hq_keywords'],
+            ],
+            [
+                'methods' => 'POST',
+                'permission_callback' => [$this, 'can_view_hq'],
+                'callback' => [$this, 'hq_create_keyword'],
+            ],
+        ]);
+        register_rest_route('ebq/v1', '/hq/keywords/candidates', [
             'methods' => 'GET',
             'permission_callback' => [$this, 'can_view_hq'],
-            'callback' => [$this, 'hq_keywords'],
+            'callback' => [$this, 'hq_keyword_candidates'],
+        ]);
+        register_rest_route('ebq/v1', '/hq/keywords/(?P<id>\d+)', [
+            [
+                'methods' => 'PATCH',
+                'permission_callback' => [$this, 'can_view_hq'],
+                'callback' => [$this, 'hq_update_keyword'],
+                'args' => ['id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0]],
+            ],
+            [
+                'methods' => 'DELETE',
+                'permission_callback' => [$this, 'can_view_hq'],
+                'callback' => [$this, 'hq_delete_keyword'],
+                'args' => ['id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0]],
+            ],
+        ]);
+        register_rest_route('ebq/v1', '/hq/keywords/(?P<id>\d+)/recheck', [
+            'methods' => 'POST',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_recheck_keyword'],
+            'args' => ['id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0]],
         ]);
         register_rest_route('ebq/v1', '/hq/keywords/(?P<id>\d+)/history', [
             'methods' => 'GET',
@@ -329,6 +361,90 @@ final class EBQ_Rest_Proxy
     public function hq_keyword_history(WP_REST_Request $request): WP_REST_Response
     {
         return new WP_REST_Response(EBQ_Plugin::api_client()->hq_keyword_history((int) $request->get_param('id')), 200);
+    }
+
+    public function hq_keyword_candidates(WP_REST_Request $request): WP_REST_Response
+    {
+        $limit = max(10, min(100, (int) ($request->get_param('limit') ?: 25)));
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_keyword_candidates($limit), 200);
+    }
+
+    public function hq_create_keyword(WP_REST_Request $request): WP_REST_Response
+    {
+        $payload = $this->keyword_payload_from_request($request);
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_create_keyword($payload), 200);
+    }
+
+    public function hq_update_keyword(WP_REST_Request $request): WP_REST_Response
+    {
+        $payload = $this->keyword_payload_from_request($request, /*for_update*/ true);
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_update_keyword((int) $request->get_param('id'), $payload), 200);
+    }
+
+    public function hq_delete_keyword(WP_REST_Request $request): WP_REST_Response
+    {
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_delete_keyword((int) $request->get_param('id')), 200);
+    }
+
+    public function hq_recheck_keyword(WP_REST_Request $request): WP_REST_Response
+    {
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_recheck_keyword((int) $request->get_param('id')), 200);
+    }
+
+    /**
+     * Build the keyword payload to forward to EBQ. Supports both create
+     * (full body) and update (only the mutable subset). JSON body for both;
+     * we pull through wp_unslash + type-narrow each field so the EBQ
+     * validator gets a clean shape regardless of how the JSON came in.
+     */
+    private function keyword_payload_from_request(WP_REST_Request $request, bool $for_update = false): array
+    {
+        $body = $request->get_json_params();
+        if (! is_array($body)) {
+            $body = $request->get_params();
+        }
+        $out = [];
+
+        $passthrough_strings = $for_update
+            ? ['notes', 'target_url']
+            : ['keyword', 'target_domain', 'target_url', 'search_engine', 'search_type', 'country', 'language', 'location', 'tbs', 'notes', 'device'];
+        foreach ($passthrough_strings as $key) {
+            if (array_key_exists($key, $body) && is_string($body[$key])) {
+                $out[$key] = wp_strip_all_tags((string) wp_unslash($body[$key]));
+            }
+        }
+
+        $passthrough_ints = ['depth', 'check_interval_hours'];
+        foreach ($passthrough_ints as $key) {
+            if (array_key_exists($key, $body) && (is_int($body[$key]) || is_numeric($body[$key]))) {
+                $out[$key] = (int) $body[$key];
+            }
+        }
+
+        $passthrough_bools = $for_update
+            ? ['is_active']
+            : ['autocorrect', 'safe_search'];
+        foreach ($passthrough_bools as $key) {
+            if (array_key_exists($key, $body)) {
+                $out[$key] = (bool) $body[$key];
+            }
+        }
+
+        foreach (['competitors', 'tags'] as $list_key) {
+            if (array_key_exists($list_key, $body) && is_array($body[$list_key])) {
+                $clean = [];
+                foreach ($body[$list_key] as $item) {
+                    if (! is_string($item)) continue;
+                    $clean_item = trim(wp_strip_all_tags((string) wp_unslash($item)));
+                    if ($clean_item !== '') {
+                        $clean[] = $clean_item;
+                    }
+                }
+                $out[$list_key] = $clean;
+            }
+        }
+
+        return $out;
     }
 
     public function hq_pages(WP_REST_Request $request): WP_REST_Response

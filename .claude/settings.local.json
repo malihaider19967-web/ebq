@@ -102,7 +102,8 @@
       "Bash(php -l ebq-seo-wp/includes/class-ebq-api-client.php)",
       "Bash(php -l ebq-seo-wp/includes/class-ebq-rest-proxy.php)",
       "Bash(./vendor/bin/phpunit)",
-      "Bash(./vendor/bin/phpunit tests/Feature/Api)"
+      "Bash(./vendor/bin/phpunit tests/Feature/Api)",
+      "Bash(php -l app/Livewire/Reports/InsightsPanel.php)"
     ]
   }
 }

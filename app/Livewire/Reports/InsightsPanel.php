@@ -20,9 +20,21 @@ class InsightsPanel extends Component
     #[Url(as: 'country', history: true)]
     public string $country = '';
 
+    private const ALLOWED_TABS = ['cannibalization', 'striking_distance', 'content_decay', 'indexing_fails', 'audit_performance', 'backlink_impact', 'quick_wins'];
+
     public function mount(): void
     {
         $this->websiteId = (int) session('current_website_id', 0);
+        // Normalize legacy/hyphenated slugs (e.g. ?insight=striking-distance from
+        // the WP plugin's iframe links) so the match() in render() can never
+        // hit an unhandled case from external input.
+        $this->tab = $this->normalizeTab($this->tab);
+    }
+
+    private function normalizeTab(string $tab): string
+    {
+        $candidate = strtolower(str_replace('-', '_', trim($tab)));
+        return in_array($candidate, self::ALLOWED_TABS, true) ? $candidate : 'cannibalization';
     }
 
     #[On('website-changed')]
@@ -40,9 +52,7 @@ class InsightsPanel extends Component
 
     public function setTab(string $tab): void
     {
-        if (! in_array($tab, ['cannibalization', 'striking_distance', 'content_decay', 'indexing_fails', 'audit_performance', 'backlink_impact', 'quick_wins'], true)) {
-            return;
-        }
+        $tab = $this->normalizeTab($tab);
         $this->tab = $tab;
     }
 
@@ -78,6 +88,7 @@ class InsightsPanel extends Component
                 'quick_wins' => $service->quickWins($this->websiteId, 25),
                 'audit_performance' => app(AuditPerformanceService::class)->underperformingPages($this->websiteId, 28, 25, $country),
                 'backlink_impact' => app(BacklinkImpactService::class)->impactByTargetPage($this->websiteId),
+                default => [],
             };
         }
 

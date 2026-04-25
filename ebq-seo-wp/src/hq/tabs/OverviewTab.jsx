@@ -75,10 +75,10 @@ export default function OverviewTab() {
 				<Card title={__('Opportunities', 'ebq-seo')}>
 					<div className="ebq-hq-insights-counts">
 						<InsightCount label={__('Cannibalizations', 'ebq-seo')} count={insight_counts?.cannibalizations} tone="warn" onOpen={() => openInEbq('cannibalization')} />
-						<InsightCount label={__('Striking distance', 'ebq-seo')} count={insight_counts?.striking_distance} tone="good" onOpen={() => openInEbq('striking-distance')} />
-						<InsightCount label={__('Index fails', 'ebq-seo')} count={insight_counts?.indexing_fails_with_traffic} tone="bad" onOpen={() => openInEbq('indexing-fails')} />
-						<InsightCount label={__('Content decay', 'ebq-seo')} count={insight_counts?.content_decay} tone="warn" onOpen={() => openInEbq('content-decay')} />
-						<InsightCount label={__('Quick wins', 'ebq-seo')} count={insight_counts?.quick_wins} tone="good" onOpen={() => openInEbq('quick-wins')} />
+						<InsightCount label={__('Striking distance', 'ebq-seo')} count={insight_counts?.striking_distance} tone="good" onOpen={() => openInEbq('striking_distance')} />
+						<InsightCount label={__('Index fails', 'ebq-seo')} count={insight_counts?.indexing_fails_with_traffic} tone="bad" onOpen={() => openInEbq('indexing_fails')} />
+						<InsightCount label={__('Content decay', 'ebq-seo')} count={insight_counts?.content_decay} tone="warn" onOpen={() => openInEbq('content_decay')} />
+						<InsightCount label={__('Quick wins', 'ebq-seo')} count={insight_counts?.quick_wins} tone="good" onOpen={() => openInEbq('quick_wins')} />
 					</div>
 				</Card>
 			</div>

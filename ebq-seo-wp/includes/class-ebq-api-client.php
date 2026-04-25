@@ -129,6 +129,31 @@ final class EBQ_Api_Client
         return $this->get(sprintf('/api/v1/hq/keywords/%d/history', $id));
     }
 
+    public function hq_keyword_candidates(int $limit = 25): array
+    {
+        return $this->get('/api/v1/hq/keywords/candidates', ['limit' => $limit]);
+    }
+
+    public function hq_create_keyword(array $payload): array
+    {
+        return $this->request('POST', '/api/v1/hq/keywords', $payload);
+    }
+
+    public function hq_update_keyword(int $id, array $payload): array
+    {
+        return $this->request('PATCH', sprintf('/api/v1/hq/keywords/%d', $id), $payload);
+    }
+
+    public function hq_delete_keyword(int $id): array
+    {
+        return $this->request('DELETE', sprintf('/api/v1/hq/keywords/%d', $id));
+    }
+
+    public function hq_recheck_keyword(int $id): array
+    {
+        return $this->request('POST', sprintf('/api/v1/hq/keywords/%d/recheck', $id));
+    }
+
     public function hq_pages(array $args = []): array
     {
         return $this->get('/api/v1/hq/pages', $args);
@@ -170,6 +195,48 @@ final class EBQ_Api_Client
                 'User-Agent' => 'EBQ-SEO-WP/' . EBQ_SEO_VERSION . '; ' . home_url(),
             ],
         ]);
+        return $this->handle_response($response, $cache_key);
+    }
+
+    /**
+     * Non-GET requests for the HQ admin (POST keyword create, PATCH/DELETE,
+     * recheck). Bypasses the read-cache and busts every cached entry on the
+     * mutated namespace so the next GET reflects the change immediately.
+     */
+    private function request(string $method, string $path, array $body = []): array
+    {
+        if ($this->token === '') {
+            return ['ok' => false, 'error' => 'not_connected'];
+        }
+
+        $base = $this->base_url !== '' ? rtrim($this->base_url, '/') : self::base_url();
+        $url = $base . $path;
+
+        $args = [
+            'method'  => $method,
+            'timeout' => 12,
+            'headers' => [
+                'Authorization' => 'Bearer ' . $this->token,
+                'Accept'        => 'application/json',
+                'Content-Type'  => 'application/json',
+                'User-Agent'    => 'EBQ-SEO-WP/' . EBQ_SEO_VERSION . '; ' . home_url(),
+            ],
+        ];
+        if (! empty($body)) {
+            $args['body'] = wp_json_encode($body);
+        }
+
+        $response = wp_remote_request($url, $args);
+        $decoded = $this->handle_response($response, null);
+
+        // Mutating call — kill cached GETs so the UI sees the new state.
+        self::clear_response_cache();
+
+        return $decoded;
+    }
+
+    private function handle_response($response, ?string $cache_key): array
+    {
 
         if (is_wp_error($response)) {
             // NOT cached — transient errors should not stick.
@@ -191,7 +258,7 @@ final class EBQ_Api_Client
         //     hit an empty / mismatched state we may resolve next call)
         //   - Empty `suggestions` arrays (lets retries work without waiting
         //     5 minutes for the cache to expire)
-        $shouldCache = true;
+        $shouldCache = $cache_key !== null;
         if (isset($decoded['ok']) && $decoded['ok'] === false) {
             $shouldCache = false;
         } elseif (isset($decoded['diagnostic']) && $decoded['diagnostic'] !== null && $decoded['diagnostic'] !== '') {
@@ -200,7 +267,7 @@ final class EBQ_Api_Client
             $shouldCache = false;
         }
 
-        if ($shouldCache) {
+        if ($shouldCache && $cache_key !== null) {
             set_transient($cache_key, $decoded, 5 * MINUTE_IN_SECONDS);
         }
 

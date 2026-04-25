@@ -40,19 +40,24 @@ function buildUrl(path, query) {
 	return url.toString();
 }
 
-async function get(path, query) {
+async function request(method, path, { query, body } = {}) {
 	const url = buildUrl(path, query);
-	const res = await apiFetch({ url, method: 'GET', parse: true }).catch((err) => ({ ok: false, error: 'fetch_failed', message: err?.message }));
-	return res;
+	return apiFetch({ url, method, data: body, parse: true })
+		.catch((err) => ({ ok: false, error: 'fetch_failed', message: err?.message }));
 }
 
 export const Api = {
-	overview: (range = '30d') => get('/hq/overview', { range }),
-	performance: (range = '30d') => get('/hq/performance', { range }),
-	keywords: (params) => get('/hq/keywords', params),
-	keywordHistory: (id) => get(`/hq/keywords/${id}/history`),
-	pages: (params) => get('/hq/pages', params),
-	indexStatus: (params) => get('/hq/index-status', params),
-	insights: (type, limit = 25) => get(`/hq/insights/${encodeURIComponent(type)}`, { limit }),
-	iframeUrl: (insight) => get('/hq/iframe-url', { insight }),
+	overview: (range = '30d') => request('GET', '/hq/overview', { query: { range } }),
+	performance: (range = '30d') => request('GET', '/hq/performance', { query: { range } }),
+	keywords: (params) => request('GET', '/hq/keywords', { query: params }),
+	keywordHistory: (id) => request('GET', `/hq/keywords/${id}/history`),
+	keywordCandidates: (limit = 25) => request('GET', '/hq/keywords/candidates', { query: { limit } }),
+	createKeyword: (payload) => request('POST', '/hq/keywords', { body: payload }),
+	updateKeyword: (id, payload) => request('PATCH', `/hq/keywords/${id}`, { body: payload }),
+	deleteKeyword: (id) => request('DELETE', `/hq/keywords/${id}`),
+	recheckKeyword: (id) => request('POST', `/hq/keywords/${id}/recheck`),
+	pages: (params) => request('GET', '/hq/pages', { query: params }),
+	indexStatus: (params) => request('GET', '/hq/index-status', { query: params }),
+	insights: (type, limit = 25) => request('GET', `/hq/insights/${encodeURIComponent(type)}`, { query: { limit } }),
+	iframeUrl: (insight) => request('GET', '/hq/iframe-url', { query: { insight } }),
 };

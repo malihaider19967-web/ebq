@@ -4,11 +4,11 @@ import { Api } from '../api';
 import { Card, ErrorState, EmptyState, Pill, Button, SkeletonRows } from '../components/primitives';
 
 const TYPES = [
-	{ key: 'striking', label: __('Striking distance', 'ebq-seo'), insight: 'striking-distance', desc: __('Keywords ranking position 5–20 — small lift = first-page win.', 'ebq-seo') },
+	{ key: 'striking', label: __('Striking distance', 'ebq-seo'), insight: 'striking_distance', desc: __('Keywords ranking position 5–20 — small lift = first-page win.', 'ebq-seo') },
 	{ key: 'cannibalization', label: __('Cannibalizations', 'ebq-seo'), insight: 'cannibalization', desc: __('Multiple URLs ranking for the same query — you compete with yourself.', 'ebq-seo') },
-	{ key: 'decay', label: __('Content decay', 'ebq-seo'), insight: 'content-decay', desc: __('Pages losing clicks vs the prior period.', 'ebq-seo') },
-	{ key: 'index_fails', label: __('Index fails', 'ebq-seo'), insight: 'indexing-fails', desc: __('URLs not indexed but generating impressions.', 'ebq-seo') },
-	{ key: 'quick_wins', label: __('Quick wins', 'ebq-seo'), insight: 'quick-wins', desc: __('High-volume, low-competition keywords you don\'t rank for yet.', 'ebq-seo') },
+	{ key: 'decay', label: __('Content decay', 'ebq-seo'), insight: 'content_decay', desc: __('Pages losing clicks vs the prior period.', 'ebq-seo') },
+	{ key: 'index_fails', label: __('Index fails', 'ebq-seo'), insight: 'indexing_fails', desc: __('URLs not indexed but generating impressions.', 'ebq-seo') },
+	{ key: 'quick_wins', label: __('Quick wins', 'ebq-seo'), insight: 'quick_wins', desc: __('High-volume, low-competition keywords you don\'t rank for yet.', 'ebq-seo') },
 ];
 
 export default function InsightsTab() {

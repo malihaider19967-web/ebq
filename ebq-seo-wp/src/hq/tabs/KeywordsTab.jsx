@@ -1,9 +1,9 @@
 import { useEffect, useState, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
-import { Api } from '../api';
-import { Card, ErrorState, Pill } from '../components/primitives';
+import { Api, HQ_CONFIG } from '../api';
+import { Card, ErrorState, Pill, Button } from '../components/primitives';
 import { DataTable } from '../components/DataTable';
-import { Sparkline } from '../components/charts';
+import AddKeywordModal from '../components/AddKeywordModal';
 
 export default function KeywordsTab() {
 	const [rows, setRows] = useState([]);
@@ -15,6 +15,8 @@ export default function KeywordsTab() {
 	const [page, setPage] = useState(1);
 	const [search, setSearch] = useState('');
 	const [history, setHistory] = useState({ id: null, series: null, loading: false });
+	const [addOpen, setAddOpen] = useState(false);
+	const [toast, setToast] = useState(null);
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -47,6 +49,32 @@ export default function KeywordsTab() {
 		const res = await Api.keywordHistory(id);
 		setHistory({ id, series: res?.series || [], loading: false, keyword: res?.keyword });
 	}, []);
+
+	const flashToast = useCallback((msg, tone = 'good') => {
+		setToast({ msg, tone });
+		setTimeout(() => setToast(null), 3500);
+	}, []);
+
+	const handleRecheck = useCallback(async (row) => {
+		const res = await Api.recheckKeyword(row.id);
+		if (res?.ok === false || res?.error) flashToast(res?.message || res?.error || 'Re-check failed', 'bad');
+		else { flashToast(__('Re-check queued. New position arrives in a few minutes.', 'ebq-seo'), 'good'); load(); }
+	}, [flashToast, load]);
+
+	const handleTogglePause = useCallback(async (row) => {
+		const next = !(row._pausing ? row.is_active : true);
+		const res = await Api.updateKeyword(row.id, { is_active: !next ? false : true });
+		if (res?.ok === false || res?.error) flashToast(res?.message || res?.error || 'Update failed', 'bad');
+		else { flashToast(__('Keyword updated.', 'ebq-seo'), 'good'); load(); }
+	}, [flashToast, load]);
+
+	const handleDelete = useCallback(async (row) => {
+		// eslint-disable-next-line no-alert
+		if (!window.confirm(__('Stop tracking this keyword? Historical positions are preserved on EBQ.', 'ebq-seo').replace('EBQ', 'EBQ.io'))) return;
+		const res = await Api.deleteKeyword(row.id);
+		if (res?.ok === false || res?.error) flashToast(res?.message || res?.error || 'Delete failed', 'bad');
+		else { flashToast(__('Keyword removed.', 'ebq-seo'), 'good'); load(); }
+	}, [flashToast, load]);
 
 	const columns = [
 		{
@@ -109,19 +137,35 @@ export default function KeywordsTab() {
 			align: 'right',
 			render: (row) => relTime(row.last_checked_at),
 		},
+		{
+			key: '_actions',
+			label: '',
+			align: 'right',
+			render: (row) => (
+				<div className="ebq-hq-row-actions">
+					<button type="button" className="ebq-hq-row-action" title={__('Re-check now', 'ebq-seo')} onClick={() => handleRecheck(row)}>↻</button>
+					<button type="button" className="ebq-hq-row-action ebq-hq-row-action--danger" title={__('Stop tracking', 'ebq-seo')} onClick={() => handleDelete(row)}>×</button>
+				</div>
+			),
+		},
 	];
 
 	return (
 		<div className="ebq-hq-page">
 			<div className="ebq-hq-page__head">
 				<h2 className="ebq-hq-page__title">{__('Keywords', 'ebq-seo')}</h2>
-				<input
-					className="ebq-hq-search"
-					placeholder={__('Search keywords…', 'ebq-seo')}
-					value={search}
-					onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-				/>
+				<div className="ebq-hq-page__head-actions">
+					<input
+						className="ebq-hq-search"
+						placeholder={__('Search keywords…', 'ebq-seo')}
+						value={search}
+						onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+					/>
+					<Button variant="primary" onClick={() => setAddOpen(true)}>+ {__('Add keyword', 'ebq-seo')}</Button>
+				</div>
 			</div>
+
+			{toast ? <div className={`ebq-hq-toast ebq-hq-toast--${toast.tone}`} role="status">{toast.msg}</div> : null}
 
 			<Card padding="flush">
 				{error ? <ErrorState error={error} retry={load} /> : (
@@ -143,6 +187,13 @@ export default function KeywordsTab() {
 			{history.id ? (
 				<HistoryDrawer history={history} onClose={() => setHistory({ id: null, series: null, loading: false })} />
 			) : null}
+
+			<AddKeywordModal
+				open={addOpen}
+				onClose={() => setAddOpen(false)}
+				onCreated={() => { flashToast(__('Keyword added — first check queued.', 'ebq-seo'), 'good'); load(); }}
+				defaultDomain={HQ_CONFIG.workspaceDomain}
+			/>
 		</div>
 	);
 }

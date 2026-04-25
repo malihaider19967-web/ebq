@@ -37,6 +37,14 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/overview', [PluginHqController::class, 'overview'])->name('overview');
             Route::get('/performance', [PluginHqController::class, 'performance'])->name('performance');
             Route::get('/keywords', [PluginHqController::class, 'keywords'])->name('keywords');
+            Route::post('/keywords', [PluginHqController::class, 'storeKeyword'])->name('keywords.store');
+            Route::get('/keywords/candidates', [PluginHqController::class, 'keywordCandidates'])->name('keywords.candidates');
+            Route::patch('/keywords/{id}', [PluginHqController::class, 'updateKeyword'])
+                ->whereNumber('id')->name('keywords.update');
+            Route::delete('/keywords/{id}', [PluginHqController::class, 'deleteKeyword'])
+                ->whereNumber('id')->name('keywords.delete');
+            Route::post('/keywords/{id}/recheck', [PluginHqController::class, 'recheckKeyword'])
+                ->whereNumber('id')->name('keywords.recheck');
             Route::get('/keywords/{id}/history', [PluginHqController::class, 'keywordHistory'])
                 ->whereNumber('id')
                 ->name('keywords.history');

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\TrackKeywordRankJob;
 use App\Models\PageIndexingStatus;
 use App\Models\RankTrackingKeyword;
 use App\Models\SearchConsoleData;
@@ -11,6 +12,7 @@ use App\Services\ReportDataService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Validation\Rule;
 
 /**
  * "EBQ HQ" admin-page API. Powers the top-level WordPress admin menu the
@@ -212,6 +214,205 @@ class PluginHqController extends Controller
                 'dir' => $dir,
             ],
         ]);
+    }
+
+    /**
+     * Create (or upsert) a tracked keyword from the WP plugin. Mirrors the
+     * Livewire RankTrackingManager::addKeyword form so anything you can
+     * configure on EBQ.io you can configure from WP.
+     *
+     *   POST /api/v1/hq/keywords
+     *   body: { keyword, target_domain?, target_url?, search_engine?, search_type?,
+     *           country?, language?, location?, device?, depth?, tbs?,
+     *           autocorrect?, safe_search?, competitors[], tags[], notes?,
+     *           check_interval_hours? }
+     */
+    public function storeKeyword(Request $request): JsonResponse
+    {
+        $website = $this->website($request);
+
+        $data = $request->validate([
+            'keyword'              => 'required|string|min:1|max:500',
+            'target_domain'        => 'nullable|string|max:255',
+            'target_url'           => 'nullable|string|max:2048',
+            'search_engine'        => ['nullable', Rule::in(['google'])],
+            'search_type'          => ['nullable', Rule::in(['organic', 'news', 'images', 'videos', 'shopping', 'maps', 'scholar'])],
+            'country'              => 'nullable|string|size:2',
+            'language'             => 'nullable|string|min:2|max:10',
+            'location'             => 'nullable|string|max:255',
+            'device'               => ['nullable', Rule::in(['desktop', 'mobile'])],
+            'depth'                => 'nullable|integer|min:10|max:100',
+            'tbs'                  => 'nullable|string|max:64',
+            'autocorrect'          => 'nullable|boolean',
+            'safe_search'          => 'nullable|boolean',
+            'competitors'          => 'nullable|array|max:20',
+            'competitors.*'        => 'string|max:255',
+            'tags'                 => 'nullable|array|max:20',
+            'tags.*'               => 'string|max:60',
+            'notes'                => 'nullable|string|max:2000',
+            'check_interval_hours' => 'nullable|integer|min:1|max:168',
+        ]);
+
+        $defaults = [
+            'target_domain'        => $data['target_domain'] ?? $website->domain,
+            'search_engine'        => $data['search_engine'] ?? 'google',
+            'search_type'          => $data['search_type'] ?? 'organic',
+            'country'              => strtolower($data['country'] ?? 'us'),
+            'language'             => strtolower($data['language'] ?? 'en'),
+            'device'               => $data['device'] ?? 'desktop',
+            'depth'                => $data['depth'] ?? 100,
+            'check_interval_hours' => $data['check_interval_hours'] ?? 24,
+            'autocorrect'          => $data['autocorrect'] ?? false,
+            'safe_search'          => $data['safe_search'] ?? false,
+        ];
+
+        $keyword = RankTrackingKeyword::updateOrCreate(
+            [
+                'website_id'    => $website->id,
+                'keyword_hash'  => RankTrackingKeyword::hashKeyword($data['keyword']),
+                'search_engine' => $defaults['search_engine'],
+                'search_type'   => $defaults['search_type'],
+                'country'       => $defaults['country'],
+                'language'      => $defaults['language'],
+                'device'        => $defaults['device'],
+                'location'      => $data['location'] ?? null,
+            ],
+            [
+                'user_id'              => $website->user_id,
+                'keyword'              => trim($data['keyword']),
+                'target_domain'        => trim($defaults['target_domain']),
+                'target_url'           => $data['target_url'] ?? null,
+                'depth'                => $defaults['depth'],
+                'tbs'                  => $data['tbs'] ?? null,
+                'autocorrect'          => (bool) $defaults['autocorrect'],
+                'safe_search'          => (bool) $defaults['safe_search'],
+                'competitors'          => $data['competitors'] ?? [],
+                'tags'                 => $data['tags'] ?? [],
+                'notes'                => $data['notes'] ?? null,
+                'check_interval_hours' => $defaults['check_interval_hours'],
+                'is_active'            => true,
+                'next_check_at'        => Carbon::now(),
+            ]
+        );
+
+        // Queue an immediate first check so the row populates within minutes.
+        TrackKeywordRankJob::dispatch($keyword->id, true);
+
+        return response()->json([
+            'ok' => true,
+            'keyword' => [
+                'id'      => $keyword->id,
+                'keyword' => $keyword->keyword,
+                'country' => $keyword->country,
+                'device'  => $keyword->device,
+            ],
+        ], 201);
+    }
+
+    /**
+     * Update a small set of mutable fields on an existing keyword (pause,
+     * tags, notes, check interval). Anything that would change the unique
+     * key (engine/type/country/language/device/location) requires creating
+     * a new tracked keyword instead.
+     *
+     *   PATCH /api/v1/hq/keywords/{id}
+     */
+    public function updateKeyword(Request $request, int $id): JsonResponse
+    {
+        $website = $this->website($request);
+        $keyword = RankTrackingKeyword::query()
+            ->where('website_id', $website->id)
+            ->findOrFail($id);
+
+        $data = $request->validate([
+            'is_active'            => 'sometimes|boolean',
+            'tags'                 => 'sometimes|array|max:20',
+            'tags.*'               => 'string|max:60',
+            'notes'                => 'sometimes|nullable|string|max:2000',
+            'check_interval_hours' => 'sometimes|integer|min:1|max:168',
+            'target_url'           => 'sometimes|nullable|string|max:2048',
+        ]);
+
+        $keyword->fill($data)->save();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * Force an immediate re-check. Same job the EBQ Livewire UI dispatches.
+     *   POST /api/v1/hq/keywords/{id}/recheck
+     */
+    public function recheckKeyword(Request $request, int $id): JsonResponse
+    {
+        $website = $this->website($request);
+        $keyword = RankTrackingKeyword::query()
+            ->where('website_id', $website->id)
+            ->findOrFail($id);
+
+        TrackKeywordRankJob::dispatch($keyword->id, true);
+        $keyword->forceFill(['last_status' => 'queued', 'next_check_at' => Carbon::now()])->save();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     *   DELETE /api/v1/hq/keywords/{id}
+     */
+    public function deleteKeyword(Request $request, int $id): JsonResponse
+    {
+        $website = $this->website($request);
+        $keyword = RankTrackingKeyword::query()
+            ->where('website_id', $website->id)
+            ->findOrFail($id);
+        $keyword->delete();
+
+        return response()->json(['ok' => true]);
+    }
+
+    /**
+     * GSC keyword candidates the user could promote into Rank Tracker — the
+     * "auto-add" pool. Returns queries the site already shows up for in GSC
+     * but that aren't yet tracked, ordered by impressions.
+     *   GET /api/v1/hq/keywords/candidates
+     */
+    public function keywordCandidates(Request $request): JsonResponse
+    {
+        $website = $this->website($request);
+        $limit = max(10, min(100, (int) $request->query('limit', 25)));
+
+        $tz = config('app.timezone');
+        $end = Carbon::yesterday($tz)->toDateString();
+        $start = Carbon::yesterday($tz)->subDays(89)->toDateString();
+
+        $existing = RankTrackingKeyword::query()
+            ->where('website_id', $website->id)
+            ->pluck('keyword')
+            ->map(fn ($k) => mb_strtolower((string) $k))
+            ->all();
+
+        $rows = SearchConsoleData::query()
+            ->where('website_id', $website->id)
+            ->whereBetween('date', [$start, $end])
+            ->where('query', '!=', '')
+            ->selectRaw('query, SUM(clicks) AS clicks, SUM(impressions) AS impressions, AVG(position) AS position')
+            ->groupBy('query')
+            ->orderByDesc('impressions')
+            ->limit($limit * 4) // over-fetch so we can filter out tracked ones
+            ->get();
+
+        $out = [];
+        foreach ($rows as $r) {
+            if (in_array(mb_strtolower((string) $r->query), $existing, true)) continue;
+            $out[] = [
+                'keyword' => (string) $r->query,
+                'clicks' => (int) $r->clicks,
+                'impressions' => (int) $r->impressions,
+                'position' => $r->position !== null ? round((float) $r->position, 1) : null,
+            ];
+            if (count($out) >= $limit) break;
+        }
+
+        return response()->json(['data' => $out]);
     }
 
     /**
