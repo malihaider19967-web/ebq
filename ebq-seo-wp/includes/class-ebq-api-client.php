@@ -134,6 +134,11 @@ final class EBQ_Api_Client
         return $this->get('/api/v1/hq/keywords/candidates', ['limit' => $limit]);
     }
 
+    public function hq_gsc_keywords(array $args = []): array
+    {
+        return $this->get('/api/v1/hq/gsc-keywords', $args);
+    }
+
     public function hq_create_keyword(array $payload): array
     {
         return $this->request('POST', '/api/v1/hq/keywords', $payload);
@@ -181,10 +186,24 @@ final class EBQ_Api_Client
             $url .= (str_contains($path, '?') ? '&' : '?') . http_build_query($query);
         }
 
-        $cache_key = 'ebq_api_' . md5($url);
-        $cached = get_transient($cache_key);
-        if ($cached !== false) {
-            return $cached;
+        // EBQ HQ admin endpoints are user-driven dashboards — cache hides
+        // newly-added keywords / fresh syncs and breaks the "I clicked Save,
+        // why didn't it appear?" expectation. Skip the transient layer for
+        // anything under /api/v1/hq/ so the UI is always live. Editor-side
+        // sidebar calls (per-post insights, suggestions) still benefit from
+        // the 5-minute cache.
+        $skip_cache = str_starts_with($path, '/api/v1/hq/');
+        // Cache key is namespaced by the current version (incremented on
+        // every write). This invalidates ALL cached entries atomically
+        // regardless of where the cache backend stores them — safe across
+        // database transients, Redis, Memcache, etc.
+        $cache_key = $skip_cache ? null : ('ebq_api_v' . self::cache_version() . '_' . md5($url));
+
+        if ($cache_key !== null) {
+            $cached = get_transient($cache_key);
+            if ($cached !== false) {
+                return $cached;
+            }
         }
 
         $response = wp_remote_get($url, [
@@ -229,8 +248,10 @@ final class EBQ_Api_Client
         $response = wp_remote_request($url, $args);
         $decoded = $this->handle_response($response, null);
 
-        // Mutating call — kill cached GETs so the UI sees the new state.
-        self::clear_response_cache();
+        // Mutating call — bump the cache version so every previously-cached
+        // GET becomes orphaned. Works on any cache backend (db transients,
+        // Redis, Memcache) because we just change the namespace, not delete.
+        self::bump_cache_version();
 
         return $decoded;
     }
@@ -275,30 +296,39 @@ final class EBQ_Api_Client
     }
 
     /**
-     * Drop every transient this client has set. Called from the settings page
-     * "Refresh data" button so a misconfigured first load can be recovered
-     * without waiting 5 minutes.
+     * Current cache namespace version. Cache keys include this so bumping
+     * it invalidates every cached entry at once — no need to enumerate
+     * keys, no LIKE queries, works on any cache backend (object cache,
+     * Redis, Memcache, db transients).
+     */
+    public static function cache_version(): int
+    {
+        $v = (int) get_option('ebq_api_cache_v', 1);
+        return $v > 0 ? $v : 1;
+    }
+
+    /**
+     * Increment the cache namespace. Old entries become orphaned and expire
+     * naturally via the 5-minute TTL. Called automatically after every
+     * write (POST/PATCH/DELETE) and from the settings page "Refresh data"
+     * button.
+     */
+    public static function bump_cache_version(): int
+    {
+        $next = self::cache_version() + 1;
+        // autoload=true so the bump propagates instantly across all PHP
+        // requests on this site without a follow-up query.
+        update_option('ebq_api_cache_v', $next, true);
+        return $next;
+    }
+
+    /**
+     * Backwards-compatible alias kept for any code (e.g. settings page) that
+     * still calls the old name. Cache versioning is the real mechanism now.
      */
     public static function clear_response_cache(): int
     {
-        global $wpdb;
-
-        $like = $wpdb->esc_like('_transient_ebq_api_').'%';
-        $rows = (array) $wpdb->get_col(
-            $wpdb->prepare(
-                "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
-                $like
-            )
-        );
-
-        $count = 0;
-        foreach ($rows as $row) {
-            $key = preg_replace('/^_transient_/', '', (string) $row);
-            if ($key !== '' && delete_transient($key)) {
-                $count++;
-            }
-        }
-
-        return $count;
+        self::bump_cache_version();
+        return 0;
     }
 }

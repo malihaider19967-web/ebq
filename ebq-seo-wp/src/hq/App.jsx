@@ -6,6 +6,7 @@ import { Button } from './components/primitives';
 import OverviewTab from './tabs/OverviewTab';
 import PerformanceTab from './tabs/PerformanceTab';
 import KeywordsTab from './tabs/KeywordsTab';
+import GscKeywordsTab from './tabs/GscKeywordsTab';
 import PagesTab from './tabs/PagesTab';
 import IndexStatusTab from './tabs/IndexStatusTab';
 import InsightsTab from './tabs/InsightsTab';
@@ -13,7 +14,8 @@ import InsightsTab from './tabs/InsightsTab';
 const TABS = [
 	{ id: 'overview',     label: __('Overview', 'ebq-seo'),       Component: OverviewTab,     icon: HomeIcon },
 	{ id: 'performance',  label: __('SEO Performance', 'ebq-seo'), Component: PerformanceTab,  icon: ChartIcon },
-	{ id: 'keywords',     label: __('Keywords', 'ebq-seo'),       Component: KeywordsTab,     icon: SearchIcon },
+	{ id: 'keywords',     label: __('Keywords', 'ebq-seo'),       Component: GscKeywordsTab,  icon: SearchIcon },
+	{ id: 'rank_tracker', label: __('Rank Tracker', 'ebq-seo'),   Component: KeywordsTab,     icon: TargetIcon },
 	{ id: 'pages',        label: __('Pages', 'ebq-seo'),          Component: PagesTab,        icon: PageIcon },
 	{ id: 'index_status', label: __('Index Status', 'ebq-seo'),   Component: IndexStatusTab,  icon: ShieldIcon },
 	{ id: 'insights',     label: __('Insights', 'ebq-seo'),       Component: InsightsTab,     icon: SparkIcon },
@@ -103,3 +105,4 @@ function SearchIcon() { return <svg {...iconProps()}><circle cx="11" cy="11" r="
 function PageIcon() { return <svg {...iconProps()}><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg>; }
 function ShieldIcon() { return <svg {...iconProps()}><path d="M12 2 4 5v7c0 5 3.5 9 8 10 4.5-1 8-5 8-10V5z"/></svg>; }
 function SparkIcon() { return <svg {...iconProps()}><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/></svg>; }
+function TargetIcon() { return <svg {...iconProps()}><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/></svg>; }

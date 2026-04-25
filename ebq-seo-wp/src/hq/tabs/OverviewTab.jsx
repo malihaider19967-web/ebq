@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Api, RANGES } from '../api';
-import { Card, KpiCard, Pill, Button, ErrorState, SkeletonRows, RangePicker, EmptyState } from '../components/primitives';
+import { Card, KpiCard, Pill, Button, ErrorState, SkeletonRows, RangePicker, EmptyState, SourceTag } from '../components/primitives';
 import { Sparkline, BarChart } from '../components/charts';
 
 export default function OverviewTab() {
@@ -42,7 +42,7 @@ export default function OverviewTab() {
 	if (error) return <ErrorState error={error} retry={load} />;
 	if (!data) return null;
 
-	const { kpi, position_distribution, sparkline, insight_counts, top_winning_keywords, top_losing_keywords } = data;
+	const { kpi, position_distribution, tracker_distribution, sparkline, insight_counts, top_winning_keywords, top_losing_keywords } = data;
 
 	const slabs = [
 		{ label: __('Top 3', 'ebq-seo'), value: position_distribution?.top_3 || 0 },
@@ -50,6 +50,16 @@ export default function OverviewTab() {
 		{ label: __('11–50', 'ebq-seo'), value: position_distribution?.top_50 || 0 },
 		{ label: __('51–100', 'ebq-seo'), value: position_distribution?.top_100 || 0 },
 	];
+
+	const trackerSlabs = [
+		{ label: __('Top 3', 'ebq-seo'), value: tracker_distribution?.top_3 || 0, tone: 'good' },
+		{ label: __('4–10', 'ebq-seo'), value: tracker_distribution?.top_10 || 0, tone: 'good' },
+		{ label: __('11–50', 'ebq-seo'), value: tracker_distribution?.top_50 || 0, tone: 'warn' },
+		{ label: __('51–100', 'ebq-seo'), value: tracker_distribution?.top_100 || 0, tone: 'warn' },
+		{ label: __('100+', 'ebq-seo'),  value: tracker_distribution?.deep || 0, tone: 'bad' },
+		{ label: __('Pending', 'ebq-seo'), value: tracker_distribution?.pending || 0, tone: 'neutral' },
+	];
+	const trackerTotal = trackerSlabs.reduce((sum, s) => sum + s.value, 0);
 
 	return (
 		<div className="ebq-hq-page">
@@ -61,17 +71,37 @@ export default function OverviewTab() {
 			<div className="ebq-hq-kpi-row">
 				<KpiCard label={__('Search clicks', 'ebq-seo')} value={kpi.clicks.value} change={kpi.clicks} sparkline={<Sparkline data={sparkline} color="#4f46e5" />} />
 				<KpiCard label={__('Impressions', 'ebq-seo')} value={kpi.impressions.value} change={kpi.impressions} sparkline={<Sparkline data={sparkline} color="#0891b2" />} />
-				<KpiCard label={__('Avg. position', 'ebq-seo')} value={kpi.avg_position.value} change={kpi.avg_position} />
-				<KpiCard label={__('CTR', 'ebq-seo')} value={kpi.ctr.value} suffix="%" change={kpi.ctr} />
-				<KpiCard label={__('Ranking keywords', 'ebq-seo')} value={kpi.ranking_keywords.value} sub={__('queries in top 100', 'ebq-seo')} />
-				<KpiCard label={__('Tracked keywords', 'ebq-seo')} value={kpi.tracked_keywords.value} sub={__('Rank Tracker', 'ebq-seo')} />
+				<KpiCard label={<>GSC avg position <SourceTag source="gsc" /></>} value={kpi.avg_position.value} change={kpi.avg_position} />
+				<KpiCard label={<>{__('CTR', 'ebq-seo')} <SourceTag source="gsc" /></>} value={kpi.ctr.value} suffix="%" change={kpi.ctr} />
+				<KpiCard label={<>{__('Ranking keywords', 'ebq-seo')} <SourceTag source="gsc" /></>} value={kpi.ranking_keywords.value} sub={__('queries in top 100', 'ebq-seo')} />
+				<KpiCard label={<>{__('Tracked keywords', 'ebq-seo')} <SourceTag source="tracker" /></>} value={kpi.tracked_keywords.value} sub={__('Rank Tracker', 'ebq-seo')} />
 			</div>
 
 			<div className="ebq-hq-grid ebq-hq-grid--2">
-				<Card title={__('Keyword position distribution', 'ebq-seo')} action={<Pill tone="neutral">{range}</Pill>}>
+				<Card title={<>{__('Keyword position distribution', 'ebq-seo')} <SourceTag source="gsc" /></>} action={<Pill tone="neutral">{range}</Pill>}>
 					<BarChart items={slabs} valueKey="value" labelKey="label" />
 				</Card>
 
+				<Card title={<>{__('Rank Tracker positions', 'ebq-seo')} <SourceTag source="tracker" /></>} action={<Pill tone="neutral">{trackerTotal} {__('tracked', 'ebq-seo')}</Pill>}>
+					{trackerTotal === 0 ? (
+						<EmptyState
+							title={__('No tracked keywords yet', 'ebq-seo')}
+							sub={__('Add keywords from the Rank Tracker tab to see live SERP positions here.', 'ebq-seo')}
+						/>
+					) : (
+						<div className="ebq-hq-tracker-slabs">
+							{trackerSlabs.map((s) => (
+								<div key={s.label} className={`ebq-hq-tracker-slab ebq-hq-tracker-slab--${s.tone}`}>
+									<span className="ebq-hq-tracker-slab__num">{s.value.toLocaleString()}</span>
+									<span className="ebq-hq-tracker-slab__label">{s.label}</span>
+								</div>
+							))}
+						</div>
+					)}
+				</Card>
+			</div>
+
+			<div className="ebq-hq-grid">
 				<Card title={__('Opportunities', 'ebq-seo')}>
 					<div className="ebq-hq-insights-counts">
 						<InsightCount label={__('Cannibalizations', 'ebq-seo')} count={insight_counts?.cannibalizations} tone="warn" onOpen={() => openInEbq('cannibalization')} />
@@ -103,15 +133,16 @@ function InsightCount({ label, count, tone, onOpen }) {
 }
 
 function MoversCard({ title, rows, direction }) {
+	const titled = <>{title} <SourceTag source="gsc" /></>;
 	if (!rows || rows.length === 0) {
 		return (
-			<Card title={title}>
+			<Card title={titled}>
 				<EmptyState title={__('Not enough data yet', 'ebq-seo')} sub={__('We need at least one full period of GSC history to compare.', 'ebq-seo')} />
 			</Card>
 		);
 	}
 	return (
-		<Card title={title}>
+		<Card title={titled}>
 			<table className="ebq-hq-table ebq-hq-table--compact">
 				<thead>
 					<tr>

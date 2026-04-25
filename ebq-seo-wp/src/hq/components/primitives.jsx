@@ -53,6 +53,30 @@ export function Pill({ tone = 'neutral', children }) {
 	return <span className={`ebq-hq-pill ebq-hq-pill--${tone}`}>{children}</span>;
 }
 
+/**
+ * Source-tagged label primitive — everywhere we surface a "position" we
+ * mark it as either GSC (Google's reported average across all impressions)
+ * or Tracker (live SERP scrape via Serper for the configured country /
+ * device). Both are correct — they just measure different things, and
+ * conflating them is the most common HQ-page confusion.
+ */
+export function SourceTag({ source }) {
+	const label = source === 'tracker' ? 'TRACKER' : 'GSC';
+	const tip = source === 'tracker'
+		? 'Live SERP rank for the specific country / device this keyword was set up with.'
+		: 'Google Search Console average position across all impressions — often differs from a live rank lookup.';
+	return <span className={`ebq-hq-source ebq-hq-source--${source}`} title={tip}>{label}</span>;
+}
+
+export function HelpDot({ children }) {
+	return (
+		<span className="ebq-hq-helpdot" tabIndex={0} title={typeof children === 'string' ? children : undefined}>
+			?
+			{typeof children !== 'string' ? <span className="ebq-hq-helpdot__pop">{children}</span> : null}
+		</span>
+	);
+}
+
 export function Button({ children, variant = 'ghost', size = 'md', onClick, href, target, disabled }) {
 	const cls = `ebq-hq-btn ebq-hq-btn--${variant} ebq-hq-btn--${size}${disabled ? ' is-disabled' : ''}`;
 	if (href) {

@@ -922,3 +922,135 @@
 @keyframes ebq-hq-toast-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
 .ebq-hq-toast--good { background: var(--ebq-hq-good-soft); color: var(--ebq-hq-good); }
 .ebq-hq-toast--bad  { background: var(--ebq-hq-bad-soft); color: var(--ebq-hq-bad); }
+
+/* Source-tag pill */
+.ebq-hq-source {
+	display: inline-flex;
+	align-items: center;
+	padding: 1px 5px;
+	border-radius: 3px;
+	font-size: 9px;
+	font-weight: 800;
+	letter-spacing: 0.06em;
+	margin-left: 4px;
+	cursor: help;
+	vertical-align: middle;
+}
+.ebq-hq-source--gsc {
+	background: #fef3c7;
+	color: #92400e;
+}
+.ebq-hq-source--tracker {
+	background: #dbeafe;
+	color: #1e3a8a;
+}
+
+/* Help dot */
+.ebq-hq-helpdot {
+	display: inline-grid;
+	place-items: center;
+	width: 14px;
+	height: 14px;
+	border-radius: 50%;
+	background: var(--ebq-hq-bg-muted, var(--ebq-hq-bg));
+	color: var(--ebq-hq-text-soft);
+	font-size: 9px;
+	font-weight: 700;
+	cursor: help;
+	margin-left: 4px;
+	vertical-align: middle;
+}
+
+/* Banner explaining the two sources */
+.ebq-hq-source-banner {
+	display: flex;
+	gap: 10px;
+	align-items: flex-start;
+	padding: 10px 14px;
+	border: 1px solid var(--ebq-hq-border);
+	border-left: 3px solid var(--ebq-hq-accent);
+	background: #f5f3ff;
+	border-radius: var(--ebq-hq-radius-sm);
+	font-size: 12px;
+	color: var(--ebq-hq-text);
+	line-height: 1.55;
+}
+.ebq-hq-source-banner__icon {
+	display: grid;
+	place-items: center;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: var(--ebq-hq-accent);
+	color: #ffffff;
+	font-size: 11px;
+	font-weight: 700;
+	font-style: italic;
+	flex-shrink: 0;
+}
+
+/* Tracker position slabs (Overview card) */
+.ebq-hq-tracker-slabs {
+	display: grid;
+	grid-template-columns: repeat(6, minmax(0, 1fr));
+	gap: 8px;
+}
+@media (max-width: 720px) { .ebq-hq-tracker-slabs { grid-template-columns: repeat(3, 1fr); } }
+.ebq-hq-tracker-slab {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	gap: 2px;
+	padding: 12px 8px;
+	border-radius: var(--ebq-hq-radius-sm);
+	background: var(--ebq-hq-bg);
+	border: 1px solid var(--ebq-hq-border);
+	min-height: 70px;
+}
+.ebq-hq-tracker-slab__num {
+	font-size: 22px;
+	font-weight: 700;
+	letter-spacing: -0.02em;
+	color: var(--ebq-hq-text);
+	font-variant-numeric: tabular-nums;
+}
+.ebq-hq-tracker-slab__label {
+	font-size: 10px;
+	color: var(--ebq-hq-text-soft);
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+}
+.ebq-hq-tracker-slab--good .ebq-hq-tracker-slab__num { color: var(--ebq-hq-good); }
+.ebq-hq-tracker-slab--warn .ebq-hq-tracker-slab__num { color: var(--ebq-hq-warn); }
+.ebq-hq-tracker-slab--bad  .ebq-hq-tracker-slab__num { color: var(--ebq-hq-bad); }
+
+/* Query cell in GSC Keywords tab */
+.ebq-hq-query-cell {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	max-width: 360px;
+}
+.ebq-hq-query-cell strong {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+/* Header alignment: SourceTag should sit inline with header text without
+   shifting baseline. Wrap th content in inline-flex so alignment stays
+   consistent across columns. */
+.ebq-hq-table__th {
+	white-space: nowrap;
+	vertical-align: middle;
+}
+.ebq-hq-table__th > span {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+}
+.ebq-hq-table__th--right > span,
+.ebq-hq-table__th--right { justify-content: flex-end; }
+.ebq-hq-table__th--right > span { justify-content: flex-end; }

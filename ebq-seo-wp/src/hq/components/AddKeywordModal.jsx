@@ -14,7 +14,7 @@ import { Api } from '../api';
  * tbs / device / autocorrect / safe-search / competitors / tags / notes /
  * check interval. Same field set EBQ_v1_HqController::storeKeyword() validates.
  */
-export default function AddKeywordModal({ open, onClose, onCreated, defaultDomain }) {
+export default function AddKeywordModal({ open, onClose, onCreated, defaultDomain, seedKeyword = '' }) {
 	const [form, setForm] = useState(initialForm(defaultDomain));
 	const [submitting, setSubmitting] = useState(false);
 	const [error, setError] = useState(null);
@@ -23,15 +23,23 @@ export default function AddKeywordModal({ open, onClose, onCreated, defaultDomai
 
 	useEffect(() => {
 		if (!open) return;
-		setForm(initialForm(defaultDomain));
+		const next = initialForm(defaultDomain);
+		if (seedKeyword) next.keyword = seedKeyword;
+		setForm(next);
 		setError(null);
 		setShowAdvanced(false);
 		// Pre-load GSC candidates so the user can promote them with one click.
-		setCandidates({ loading: true, data: [] });
-		Api.keywordCandidates(15).then((res) => {
-			setCandidates({ loading: false, data: res?.data || [] });
-		});
-	}, [open, defaultDomain]);
+		// Skip when we already have a seed (the user picked one — don't crowd
+		// the modal with more suggestions).
+		if (!seedKeyword) {
+			setCandidates({ loading: true, data: [] });
+			Api.keywordCandidates(15).then((res) => {
+				setCandidates({ loading: false, data: res?.data || [] });
+			});
+		} else {
+			setCandidates({ loading: false, data: [] });
+		}
+	}, [open, defaultDomain, seedKeyword]);
 
 	const set = (key, value) => setForm((prev) => ({ ...prev, [key]: value }));
 

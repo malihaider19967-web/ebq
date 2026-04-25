@@ -1,7 +1,7 @@
-import { useEffect, useState, useCallback } from '@wordpress/element';
+import { useEffect, useState, useCallback, useMemo } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Api } from '../api';
-import { Card, ErrorState, EmptyState, Pill, Button, SkeletonRows } from '../components/primitives';
+import { Card, ErrorState, EmptyState, Pill, Button, SkeletonRows, SourceTag } from '../components/primitives';
 
 const TYPES = [
 	{ key: 'striking', label: __('Striking distance', 'ebq-seo'), insight: 'striking_distance', desc: __('Keywords ranking position 5–20 — small lift = first-page win.', 'ebq-seo') },
@@ -77,97 +77,123 @@ export default function InsightsTab() {
 }
 
 function InsightTable({ type, rows }) {
-	if (type === 'striking') {
-		return (
-			<table className="ebq-hq-table">
-				<thead><tr><th>{__('Query', 'ebq-seo')}</th><th>{__('Page', 'ebq-seo')}</th><th className="ebq-hq-table__th--right">{__('Position', 'ebq-seo')}</th><th className="ebq-hq-table__th--right">{__('Impressions', 'ebq-seo')}</th><th className="ebq-hq-table__th--right">{__('Clicks', 'ebq-seo')}</th></tr></thead>
-				<tbody>
-					{rows.map((r, i) => (
-						<tr key={i}>
-							<td><strong>{r.query || r.keyword}</strong></td>
-							<td><a href={r.page} target="_blank" rel="noopener noreferrer">{shortUrl(r.page)}</a></td>
-							<td className="ebq-hq-table__td--right">{r.position?.toFixed?.(1) ?? r.position}</td>
-							<td className="ebq-hq-table__td--right">{(r.impressions || 0).toLocaleString()}</td>
-							<td className="ebq-hq-table__td--right">{(r.clicks || 0).toLocaleString()}</td>
-						</tr>
-					))}
-				</tbody>
-			</table>
-		);
-	}
-	if (type === 'cannibalization') {
-		return (
-			<table className="ebq-hq-table">
-				<thead><tr><th>{__('Query', 'ebq-seo')}</th><th>{__('Pages', 'ebq-seo')}</th><th className="ebq-hq-table__th--right">{__('Total clicks', 'ebq-seo')}</th></tr></thead>
-				<tbody>
-					{rows.map((r, i) => (
-						<tr key={i}>
-							<td><strong>{r.query}</strong></td>
-							<td>
-								{(r.pages || []).slice(0, 3).map((p, j) => (
-									<a key={j} className="ebq-hq-canib-link" href={p.page} target="_blank" rel="noopener noreferrer">{shortUrl(p.page)}</a>
-								))}
-								{(r.pages || []).length > 3 ? <span className="ebq-hq-muted"> +{r.pages.length - 3} more</span> : null}
+	const config = useMemo(() => INSIGHT_TABLES[type], [type]);
+	const [sort, setSort] = useState(config?.defaultSort || null);
+	const [dir, setDir] = useState(config?.defaultDir || 'desc');
+
+	useEffect(() => {
+		setSort(INSIGHT_TABLES[type]?.defaultSort || null);
+		setDir(INSIGHT_TABLES[type]?.defaultDir || 'desc');
+	}, [type]);
+
+	const sortedRows = useMemo(() => {
+		if (!sort) return rows;
+		const accessor = (config?.columns || []).find((c) => c.key === sort)?.sortValue
+			?? ((row) => row[sort]);
+		const sorted = rows.slice().sort((a, b) => {
+			const av = accessor(a);
+			const bv = accessor(b);
+			if (av == null && bv == null) return 0;
+			if (av == null) return 1;
+			if (bv == null) return -1;
+			if (typeof av === 'number' && typeof bv === 'number') return av - bv;
+			return String(av).localeCompare(String(bv), undefined, { numeric: true });
+		});
+		return dir === 'desc' ? sorted.reverse() : sorted;
+	}, [rows, sort, dir, config]);
+
+	if (!config) return null;
+
+	const onSort = (key) => {
+		if (sort === key) setDir(dir === 'asc' ? 'desc' : 'asc');
+		else { setSort(key); setDir(key === 'query' || key === 'keyword' || key === 'page' ? 'asc' : 'desc'); }
+	};
+
+	return (
+		<table className="ebq-hq-table">
+			<thead>
+				<tr>
+					{config.columns.map((c) => {
+						const isSorted = sort === c.key;
+						const arrow = isSorted ? (dir === 'desc' ? '▼' : '▲') : '';
+						const cls = `ebq-hq-table__th${c.align === 'right' ? ' ebq-hq-table__th--right' : ''}${c.sortable !== false ? ' is-sortable' : ''}${isSorted ? ' is-sorted' : ''}`;
+						return (
+							<th key={c.key} className={cls} onClick={c.sortable !== false ? () => onSort(c.key) : undefined}>
+								<span>{c.label}{arrow ? <span className="ebq-hq-table__arrow">{arrow}</span> : null}</span>
+							</th>
+						);
+					})}
+				</tr>
+			</thead>
+			<tbody>
+				{sortedRows.map((r, i) => (
+					<tr key={i}>
+						{config.columns.map((c) => (
+							<td key={c.key} className={`ebq-hq-table__td${c.align === 'right' ? ' ebq-hq-table__td--right' : ''}`}>
+								{c.render ? c.render(r) : r[c.key]}
 							</td>
-							<td className="ebq-hq-table__td--right">{(r.clicks || 0).toLocaleString()}</td>
-						</tr>
-					))}
-				</tbody>
-			</table>
-		);
-	}
-	if (type === 'decay') {
-		return (
-			<table className="ebq-hq-table">
-				<thead><tr><th>{__('Page', 'ebq-seo')}</th><th className="ebq-hq-table__th--right">{__('Clicks now', 'ebq-seo')}</th><th className="ebq-hq-table__th--right">{__('Clicks prev', 'ebq-seo')}</th><th className="ebq-hq-table__th--right">{__('Δ', 'ebq-seo')}</th></tr></thead>
-				<tbody>
-					{rows.map((r, i) => (
-						<tr key={i}>
-							<td><a href={r.page} target="_blank" rel="noopener noreferrer">{shortUrl(r.page)}</a></td>
-							<td className="ebq-hq-table__td--right">{(r.current_clicks || 0).toLocaleString()}</td>
-							<td className="ebq-hq-table__td--right">{(r.previous_clicks || 0).toLocaleString()}</td>
-							<td className="ebq-hq-table__td--right ebq-hq-delta ebq-hq-delta--down">{r.change_pct ? `${r.change_pct.toFixed(0)}%` : '—'}</td>
-						</tr>
-					))}
-				</tbody>
-			</table>
-		);
-	}
-	if (type === 'index_fails') {
-		return (
-			<table className="ebq-hq-table">
-				<thead><tr><th>{__('Page', 'ebq-seo')}</th><th>{__('Verdict', 'ebq-seo')}</th><th className="ebq-hq-table__th--right">{__('Impressions', 'ebq-seo')}</th></tr></thead>
-				<tbody>
-					{rows.map((r, i) => (
-						<tr key={i}>
-							<td><a href={r.page} target="_blank" rel="noopener noreferrer">{shortUrl(r.page)}</a></td>
-							<td><Pill tone={r.verdict === 'PASS' ? 'good' : r.verdict === 'FAIL' ? 'bad' : 'warn'}>{r.verdict || '—'}</Pill></td>
-							<td className="ebq-hq-table__td--right">{(r.impressions || 0).toLocaleString()}</td>
-						</tr>
-					))}
-				</tbody>
-			</table>
-		);
-	}
-	if (type === 'quick_wins') {
-		return (
-			<table className="ebq-hq-table">
-				<thead><tr><th>{__('Keyword', 'ebq-seo')}</th><th className="ebq-hq-table__th--right">{__('Volume', 'ebq-seo')}</th><th className="ebq-hq-table__th--right">{__('Position', 'ebq-seo')}</th><th className="ebq-hq-table__th--right">{__('Upside', 'ebq-seo')}</th></tr></thead>
-				<tbody>
-					{rows.map((r, i) => (
-						<tr key={i}>
-							<td><strong>{r.keyword}</strong></td>
-							<td className="ebq-hq-table__td--right">{(r.search_volume || 0).toLocaleString()}</td>
-							<td className="ebq-hq-table__td--right">{r.current_position?.toFixed?.(1) ?? '—'}</td>
-							<td className="ebq-hq-table__td--right"><strong>${(r.upside_value || 0).toFixed(0)}</strong>/mo</td>
-						</tr>
-					))}
-				</tbody>
-			</table>
-		);
-	}
-	return null;
+						))}
+					</tr>
+				))}
+			</tbody>
+		</table>
+	);
 }
+
+const INSIGHT_TABLES = {
+	striking: {
+		defaultSort: 'impressions', defaultDir: 'desc',
+		columns: [
+			{ key: 'query', label: __('Query', 'ebq-seo'), sortValue: (r) => (r.query || r.keyword || '').toLowerCase(), render: (r) => <strong>{r.query || r.keyword}</strong> },
+			{ key: 'page', label: __('Page', 'ebq-seo'), sortValue: (r) => (r.page || '').toLowerCase(), render: (r) => <a href={r.page} target="_blank" rel="noopener noreferrer">{shortUrl(r.page)}</a> },
+			{ key: 'position', label: <span>{__('GSC pos', 'ebq-seo')} <SourceTag source="gsc" /></span>, align: 'right', render: (r) => r.position?.toFixed?.(1) ?? r.position },
+			{ key: 'impressions', label: __('Impressions', 'ebq-seo'), align: 'right', render: (r) => (r.impressions || 0).toLocaleString() },
+			{ key: 'clicks', label: __('Clicks', 'ebq-seo'), align: 'right', render: (r) => (r.clicks || 0).toLocaleString() },
+		],
+	},
+	cannibalization: {
+		defaultSort: 'clicks', defaultDir: 'desc',
+		columns: [
+			{ key: 'query', label: __('Query', 'ebq-seo'), sortValue: (r) => (r.query || '').toLowerCase(), render: (r) => <strong>{r.query}</strong> },
+			{ key: 'pages_count', label: __('Pages', 'ebq-seo'), sortValue: (r) => (r.pages || []).length, align: 'right', render: (r) => (
+				<>
+					<span style={{ marginRight: 6 }}><Pill tone="warn">{(r.pages || []).length}</Pill></span>
+					{(r.pages || []).slice(0, 2).map((p, j) => (
+						<a key={j} className="ebq-hq-canib-link" href={p.page} target="_blank" rel="noopener noreferrer">{shortUrl(p.page)}</a>
+					))}
+					{(r.pages || []).length > 2 ? <span className="ebq-hq-muted"> +{r.pages.length - 2} more</span> : null}
+				</>
+			) },
+			{ key: 'clicks', label: __('Total clicks', 'ebq-seo'), align: 'right', render: (r) => (r.clicks || 0).toLocaleString() },
+		],
+	},
+	decay: {
+		defaultSort: 'change_pct', defaultDir: 'asc',
+		columns: [
+			{ key: 'page', label: __('Page', 'ebq-seo'), sortValue: (r) => (r.page || '').toLowerCase(), render: (r) => <a href={r.page} target="_blank" rel="noopener noreferrer">{shortUrl(r.page)}</a> },
+			{ key: 'current_clicks', label: __('Clicks now', 'ebq-seo'), align: 'right', render: (r) => (r.current_clicks || 0).toLocaleString() },
+			{ key: 'previous_clicks', label: __('Clicks prev', 'ebq-seo'), align: 'right', render: (r) => (r.previous_clicks || 0).toLocaleString() },
+			{ key: 'change_pct', label: __('Δ', 'ebq-seo'), align: 'right', render: (r) => <span className="ebq-hq-delta ebq-hq-delta--down">{r.change_pct ? `${r.change_pct.toFixed(0)}%` : '—'}</span> },
+		],
+	},
+	index_fails: {
+		defaultSort: 'impressions', defaultDir: 'desc',
+		columns: [
+			{ key: 'page', label: __('Page', 'ebq-seo'), sortValue: (r) => (r.page || '').toLowerCase(), render: (r) => <a href={r.page} target="_blank" rel="noopener noreferrer">{shortUrl(r.page)}</a> },
+			{ key: 'verdict', label: __('Verdict', 'ebq-seo'), sortValue: (r) => r.verdict || '', render: (r) => <Pill tone={r.verdict === 'PASS' ? 'good' : r.verdict === 'FAIL' ? 'bad' : 'warn'}>{r.verdict || '—'}</Pill> },
+			{ key: 'impressions', label: __('Impressions', 'ebq-seo'), align: 'right', render: (r) => (r.impressions || 0).toLocaleString() },
+		],
+	},
+	quick_wins: {
+		defaultSort: 'upside_value', defaultDir: 'desc',
+		columns: [
+			{ key: 'keyword', label: __('Keyword', 'ebq-seo'), sortValue: (r) => (r.keyword || '').toLowerCase(), render: (r) => <strong>{r.keyword}</strong> },
+			{ key: 'search_volume', label: __('Volume', 'ebq-seo'), align: 'right', render: (r) => (r.search_volume || 0).toLocaleString() },
+			{ key: 'current_position', label: <span>{__('Best GSC pos', 'ebq-seo')} <SourceTag source="gsc" /></span>, align: 'right', render: (r) => r.current_position?.toFixed?.(1) ?? '—' },
+			{ key: 'upside_value', label: __('Upside', 'ebq-seo'), align: 'right', render: (r) => <strong>${(r.upside_value || 0).toFixed(0)}</strong> },
+		],
+	},
+};
 
 function shortUrl(url) {
 	if (!url) return '';

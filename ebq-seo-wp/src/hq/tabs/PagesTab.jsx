@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Api, RANGES } from '../api';
-import { Card, ErrorState, RangePicker } from '../components/primitives';
+import { Card, ErrorState, RangePicker, SourceTag } from '../components/primitives';
 import { DataTable } from '../components/DataTable';
 
 export default function PagesTab() {
@@ -74,7 +74,7 @@ export default function PagesTab() {
 		},
 		{
 			key: 'position',
-			label: __('Avg pos', 'ebq-seo'),
+			label: <span title="Google Search Console average position for this URL across all queries that drove impressions in the range.">{__('GSC avg pos', 'ebq-seo')} <SourceTag source="gsc" /></span>,
 			sortable: true,
 			align: 'right',
 			render: (row) => row.position !== null ? row.position.toFixed(1) : '—',
@@ -84,7 +84,7 @@ export default function PagesTab() {
 	return (
 		<div className="ebq-hq-page">
 			<div className="ebq-hq-page__head">
-				<h2 className="ebq-hq-page__title">{__('Pages', 'ebq-seo')}</h2>
+				<h2 className="ebq-hq-page__title">{__('Pages', 'ebq-seo')} <SourceTag source="gsc" /></h2>
 				<div className="ebq-hq-page__head-actions">
 					<RangePicker value={range} options={RANGES} onChange={(v) => { setRange(v); setPage(1); }} />
 					<input

@@ -37,13 +37,23 @@ function buildUrl(path, query) {
 			url.searchParams.set(k, String(v));
 		}
 	}
+	// Cache-buster — every request has a unique URL so no CDN, no LiteSpeed,
+	// no browser-disk layer can return a stale response. Server-side we still
+	// send no-cache headers; this is the defense-in-depth layer.
+	url.searchParams.set('_', Date.now().toString(36));
 	return url.toString();
 }
 
 async function request(method, path, { query, body } = {}) {
 	const url = buildUrl(path, query);
-	return apiFetch({ url, method, data: body, parse: true })
-		.catch((err) => ({ ok: false, error: 'fetch_failed', message: err?.message }));
+	return apiFetch({
+		url,
+		method,
+		data: body,
+		parse: true,
+		// Tell the browser fetch layer to never use HTTP cache for these calls.
+		headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' },
+	}).catch((err) => ({ ok: false, error: 'fetch_failed', message: err?.message }));
 }
 
 export const Api = {
@@ -52,6 +62,7 @@ export const Api = {
 	keywords: (params) => request('GET', '/hq/keywords', { query: params }),
 	keywordHistory: (id) => request('GET', `/hq/keywords/${id}/history`),
 	keywordCandidates: (limit = 25) => request('GET', '/hq/keywords/candidates', { query: { limit } }),
+	gscKeywords: (params) => request('GET', '/hq/gsc-keywords', { query: params }),
 	createKeyword: (payload) => request('POST', '/hq/keywords', { body: payload }),
 	updateKeyword: (id, payload) => request('PATCH', `/hq/keywords/${id}`, { body: payload }),
 	deleteKeyword: (id) => request('DELETE', `/hq/keywords/${id}`),

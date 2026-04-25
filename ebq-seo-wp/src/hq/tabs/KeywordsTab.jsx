@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Api, HQ_CONFIG } from '../api';
-import { Card, ErrorState, Pill, Button } from '../components/primitives';
+import { Card, ErrorState, Pill, Button, SourceTag } from '../components/primitives';
 import { DataTable } from '../components/DataTable';
 import AddKeywordModal from '../components/AddKeywordModal';
 
@@ -93,7 +93,7 @@ export default function KeywordsTab() {
 		},
 		{
 			key: 'current_position',
-			label: __('Pos', 'ebq-seo'),
+			label: <span title="Live rank from Serper for this keyword's country/device.">{__('Tracker', 'ebq-seo')} <SourceTag source="tracker" /></span>,
 			align: 'right',
 			sortable: true,
 			render: (row) => row.current_position !== null ? (
@@ -121,14 +121,22 @@ export default function KeywordsTab() {
 			},
 		},
 		{
+			key: 'gsc_position',
+			label: <span title="Google Search Console reported average position over the last 30 days. Often differs from the live tracker rank because GSC averages across all impressions globally.">{__('GSC avg', 'ebq-seo')} <SourceTag source="gsc" /></span>,
+			align: 'right',
+			render: (row) => row.gsc_position !== null && row.gsc_position !== undefined
+				? <span className="ebq-hq-muted">{Math.round(row.gsc_position)}</span>
+				: <span className="ebq-hq-muted">—</span>,
+		},
+		{
 			key: 'gsc_clicks',
-			label: __('Clicks 30d', 'ebq-seo'),
+			label: <span>{__('Clicks 30d', 'ebq-seo')} <SourceTag source="gsc" /></span>,
 			align: 'right',
 			render: (row) => (row.gsc_clicks || 0).toLocaleString(),
 		},
 		{
 			key: 'gsc_impressions',
-			label: __('Impr 30d', 'ebq-seo'),
+			label: <span>{__('Impr 30d', 'ebq-seo')} <SourceTag source="gsc" /></span>,
 			align: 'right',
 			render: (row) => (row.gsc_impressions || 0).toLocaleString(),
 		},
@@ -168,6 +176,15 @@ export default function KeywordsTab() {
 			</div>
 
 			{toast ? <div className={`ebq-hq-toast ebq-hq-toast--${toast.tone}`} role="status">{toast.msg}</div> : null}
+
+			<div className="ebq-hq-source-banner">
+				<span className="ebq-hq-source-banner__icon">i</span>
+				<span>
+					<strong>{__('Two position sources, both correct:', 'ebq-seo')}</strong>{' '}
+					<SourceTag source="tracker" /> {__('= live SERP scrape for your specific country / device.', 'ebq-seo')}{' '}
+					<SourceTag source="gsc" /> {__('= Google\'s reported average across all impressions (usually higher / worse).', 'ebq-seo')}
+				</span>
+			</div>
 
 			<Card padding="flush">
 				{error ? <ErrorState error={error} retry={load} /> : (

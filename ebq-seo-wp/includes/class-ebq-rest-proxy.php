@@ -150,6 +150,11 @@ final class EBQ_Rest_Proxy
             'callback' => [$this, 'hq_keyword_history'],
             'args' => ['id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0]],
         ]);
+        register_rest_route('ebq/v1', '/hq/gsc-keywords', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_gsc_keywords'],
+        ]);
         register_rest_route('ebq/v1', '/hq/pages', [
             'methods' => 'GET',
             'permission_callback' => [$this, 'can_view_hq'],
@@ -181,6 +186,23 @@ final class EBQ_Rest_Proxy
     public function can_view_hq(): bool
     {
         return current_user_can('manage_options');
+    }
+
+    /**
+     * Wrap a payload in a WP_REST_Response with aggressive no-cache headers.
+     * Defeats LiteSpeed Cache, Cloudflare, browser cache, and any other
+     * layer between WP and the React app. HQ data is admin-only and
+     * mutates often — never appropriate to cache anywhere.
+     */
+    private function hq_response($data, int $status = 200): WP_REST_Response
+    {
+        $response = new WP_REST_Response($data, $status);
+        $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0, private');
+        $response->header('Pragma', 'no-cache');
+        $response->header('Expires', '0');
+        // LiteSpeed-specific: stops LSCache from storing this response.
+        $response->header('X-LiteSpeed-Cache-Control', 'no-cache');
+        return $response;
     }
 
     public function post_insights(WP_REST_Request $request): WP_REST_Response
@@ -338,12 +360,12 @@ final class EBQ_Rest_Proxy
 
     public function hq_overview(WP_REST_Request $request): WP_REST_Response
     {
-        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_overview((string) ($request->get_param('range') ?: '30d')), 200);
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_overview((string) ($request->get_param('range') ?: '30d')), 200);
     }
 
     public function hq_performance(WP_REST_Request $request): WP_REST_Response
     {
-        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_performance((string) ($request->get_param('range') ?: '30d')), 200);
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_performance((string) ($request->get_param('range') ?: '30d')), 200);
     }
 
     public function hq_keywords(WP_REST_Request $request): WP_REST_Response
@@ -355,40 +377,40 @@ final class EBQ_Rest_Proxy
             'per_page' => (int) ($request->get_param('per_page') ?: 25),
             'search' => (string) ($request->get_param('search') ?: ''),
         ], static fn ($v) => $v !== '' && $v !== 0);
-        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_keywords($args), 200);
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_keywords($args), 200);
     }
 
     public function hq_keyword_history(WP_REST_Request $request): WP_REST_Response
     {
-        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_keyword_history((int) $request->get_param('id')), 200);
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_keyword_history((int) $request->get_param('id')), 200);
     }
 
     public function hq_keyword_candidates(WP_REST_Request $request): WP_REST_Response
     {
         $limit = max(10, min(100, (int) ($request->get_param('limit') ?: 25)));
-        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_keyword_candidates($limit), 200);
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_keyword_candidates($limit), 200);
     }
 
     public function hq_create_keyword(WP_REST_Request $request): WP_REST_Response
     {
         $payload = $this->keyword_payload_from_request($request);
-        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_create_keyword($payload), 200);
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_create_keyword($payload), 200);
     }
 
     public function hq_update_keyword(WP_REST_Request $request): WP_REST_Response
     {
         $payload = $this->keyword_payload_from_request($request, /*for_update*/ true);
-        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_update_keyword((int) $request->get_param('id'), $payload), 200);
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_update_keyword((int) $request->get_param('id'), $payload), 200);
     }
 
     public function hq_delete_keyword(WP_REST_Request $request): WP_REST_Response
     {
-        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_delete_keyword((int) $request->get_param('id')), 200);
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_delete_keyword((int) $request->get_param('id')), 200);
     }
 
     public function hq_recheck_keyword(WP_REST_Request $request): WP_REST_Response
     {
-        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_recheck_keyword((int) $request->get_param('id')), 200);
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_recheck_keyword((int) $request->get_param('id')), 200);
     }
 
     /**
@@ -447,6 +469,19 @@ final class EBQ_Rest_Proxy
         return $out;
     }
 
+    public function hq_gsc_keywords(WP_REST_Request $request): WP_REST_Response
+    {
+        $args = array_filter([
+            'range' => (string) ($request->get_param('range') ?: '30d'),
+            'sort' => (string) $request->get_param('sort'),
+            'dir' => (string) $request->get_param('dir'),
+            'page' => (int) ($request->get_param('page') ?: 1),
+            'per_page' => (int) ($request->get_param('per_page') ?: 25),
+            'search' => (string) ($request->get_param('search') ?: ''),
+        ], static fn ($v) => $v !== '' && $v !== 0);
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_gsc_keywords($args), 200);
+    }
+
     public function hq_pages(WP_REST_Request $request): WP_REST_Response
     {
         $args = array_filter([
@@ -457,7 +492,7 @@ final class EBQ_Rest_Proxy
             'per_page' => (int) ($request->get_param('per_page') ?: 25),
             'search' => (string) ($request->get_param('search') ?: ''),
         ], static fn ($v) => $v !== '' && $v !== 0);
-        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_pages($args), 200);
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_pages($args), 200);
     }
 
     public function hq_index_status(WP_REST_Request $request): WP_REST_Response
@@ -468,14 +503,14 @@ final class EBQ_Rest_Proxy
             'per_page' => (int) ($request->get_param('per_page') ?: 25),
             'search' => (string) ($request->get_param('search') ?: ''),
         ], static fn ($v) => $v !== '' && $v !== 0);
-        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_index_status($args), 200);
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_index_status($args), 200);
     }
 
     public function hq_insights(WP_REST_Request $request): WP_REST_Response
     {
         $type = (string) $request->get_param('type');
         $limit = max(5, min(100, (int) ($request->get_param('limit') ?: 25)));
-        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_insights($type, $limit), 200);
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_insights($type, $limit), 200);
     }
 
     public function hq_iframe_url(WP_REST_Request $request): WP_REST_Response

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Api, RANGES } from '../api';
-import { Card, ErrorState, SkeletonRows, RangePicker, Pill } from '../components/primitives';
+import { Card, ErrorState, SkeletonRows, RangePicker, Pill, SourceTag } from '../components/primitives';
 import { LineChart } from '../components/charts';
 
 const METRICS = [
@@ -45,9 +45,13 @@ export default function PerformanceTab() {
 	return (
 		<div className="ebq-hq-page">
 			<div className="ebq-hq-page__head">
-				<h2 className="ebq-hq-page__title">{__('SEO Performance', 'ebq-seo')}</h2>
+				<h2 className="ebq-hq-page__title">{__('SEO Performance', 'ebq-seo')} <SourceTag source="gsc" /></h2>
 				<RangePicker value={range} options={RANGES} onChange={setRange} />
 			</div>
+
+			<p className="ebq-hq-help" style={{ marginTop: -4 }}>
+				{__('All metrics on this tab come from Google Search Console — averaged across every impression for the period. For live position lookups on specific queries, use the Keywords tab.', 'ebq-seo')}
+			</p>
 
 			<Card
 				title={METRICS.find((m) => m.key === metric)?.label}
@@ -84,7 +88,7 @@ export default function PerformanceTab() {
 				<Card title={__('Total impressions', 'ebq-seo')}>
 					<div className="ebq-hq-bignum">{totals.impressions.toLocaleString()}</div>
 				</Card>
-				<Card title={__('Avg position', 'ebq-seo')}>
+				<Card title={<>{__('GSC avg position', 'ebq-seo')} <SourceTag source="gsc" /></>}>
 					<div className="ebq-hq-bignum">{totals.positionN ? (totals.position / totals.positionN).toFixed(1) : '—'}</div>
 				</Card>
 				<Card title={__('Avg CTR', 'ebq-seo')}>

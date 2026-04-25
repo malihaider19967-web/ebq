@@ -38,8 +38,10 @@ export function DataTable({
 									className={`ebq-hq-table__th${c.align === 'right' ? ' ebq-hq-table__th--right' : ''}${c.sortable ? ' is-sortable' : ''}${isSorted ? ' is-sorted' : ''}`}
 									onClick={c.sortable && onSort ? () => onSort(c.key) : undefined}
 								>
-									<span>{c.label}</span>
-									{arrow ? <span className="ebq-hq-table__arrow">{arrow}</span> : null}
+									<span>
+										{c.label}
+										{arrow ? <span className="ebq-hq-table__arrow">{arrow}</span> : null}
+									</span>
 								</th>
 							);
 						})}

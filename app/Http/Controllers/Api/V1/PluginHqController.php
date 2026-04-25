@@ -57,6 +57,7 @@ class PluginHqController extends Controller
             ->count();
 
         $positionSlabs = $this->positionDistribution($website->id, $start, $end);
+        $trackerSlabs = $this->trackerPositionDistribution($website->id);
 
         // Light line-chart data so the overview can render its own sparkline
         // without a follow-up fetch.
@@ -91,6 +92,7 @@ class PluginHqController extends Controller
                 'tracked_keywords' => $this->kpiTriple($trackedKeywords, null),
             ],
             'position_distribution' => $positionSlabs,
+            'tracker_distribution' => $trackerSlabs,
             'sparkline' => $sparkline,
             'insight_counts' => $this->reports->insightCounts($website->id),
             'top_winning_keywords' => $this->topMovers($website->id, $start, $end, 'gainers', 5),
@@ -448,6 +450,87 @@ class PluginHqController extends Controller
     }
 
     /**
+     * GSC keywords directory — every query the site has impressions for in
+     * the chosen range, with clicks/impressions/CTR/position aggregates.
+     * Marks each one with `is_tracked` so the UI can show a "Track this"
+     * shortcut for queries not yet in Rank Tracker.
+     *   GET /api/v1/hq/gsc-keywords?range=30d&sort=impressions&dir=desc&page=1&search=
+     */
+    public function gscKeywords(Request $request): JsonResponse
+    {
+        $website = $this->website($request);
+        [$start, $end, , , $rangeKey] = $this->resolveRange($request);
+
+        $sort = (string) $request->query('sort', 'impressions');
+        $dir = strtolower((string) $request->query('dir', 'desc')) === 'asc' ? 'asc' : 'desc';
+        $perPage = max(10, min(100, (int) $request->query('per_page', 25)));
+        $page = max(1, (int) $request->query('page', 1));
+        $search = trim((string) $request->query('search', ''));
+
+        $allowedSorts = ['clicks', 'impressions', 'position', 'ctr', 'query'];
+        if (! in_array($sort, $allowedSorts, true)) {
+            $sort = 'impressions';
+        }
+
+        $base = SearchConsoleData::query()
+            ->where('website_id', $website->id)
+            ->whereBetween('date', [$start, $end])
+            ->where('query', '!=', '');
+
+        if ($search !== '') {
+            $base->where('query', 'LIKE', '%' . addcslashes($search, '\\%_') . '%');
+        }
+
+        $total = (clone $base)->distinct('query')->count('query');
+
+        $orderBy = match ($sort) {
+            'query' => 'query',
+            'ctr' => '(SUM(clicks) / NULLIF(SUM(impressions), 0))',
+            'position' => 'AVG(position)',
+            default => "SUM($sort)",
+        };
+
+        $rows = (clone $base)
+            ->selectRaw('query, SUM(clicks) AS clicks, SUM(impressions) AS impressions, AVG(position) AS position')
+            ->groupBy('query')
+            ->orderByRaw("$orderBy $dir")
+            ->limit($perPage)
+            ->offset(($page - 1) * $perPage)
+            ->get();
+
+        // Mark which queries are already in Rank Tracker so the UI can flag
+        // a "Track" button only for the rest.
+        $tracked = RankTrackingKeyword::query()
+            ->where('website_id', $website->id)
+            ->whereIn(\DB::raw('LOWER(keyword)'), $rows->pluck('query')->map(fn ($q) => mb_strtolower((string) $q))->all())
+            ->pluck('keyword')
+            ->map(fn ($k) => mb_strtolower((string) $k))
+            ->flip();
+
+        $items = $rows->map(fn ($r) => [
+            'query'       => (string) $r->query,
+            'clicks'      => (int) $r->clicks,
+            'impressions' => (int) $r->impressions,
+            'position'    => $r->position !== null ? round((float) $r->position, 2) : null,
+            'ctr'         => $r->impressions > 0 ? round(($r->clicks / $r->impressions) * 100, 2) : 0.0,
+            'is_tracked'  => $tracked->has(mb_strtolower((string) $r->query)),
+        ])->all();
+
+        return response()->json([
+            'range' => ['key' => $rangeKey, 'start' => $start, 'end' => $end],
+            'data' => $items,
+            'meta' => [
+                'page' => $page,
+                'per_page' => $perPage,
+                'total' => $total,
+                'last_page' => max(1, (int) ceil($total / $perPage)),
+                'sort' => $sort,
+                'dir' => $dir,
+            ],
+        ]);
+    }
+
+    /**
      * Site-pages directory with per-page GSC aggregates over the chosen range.
      *   GET /api/v1/hq/pages?range=30d&sort=clicks&dir=desc&page=1&search=
      */
@@ -701,6 +784,37 @@ class PluginHqController extends Controller
             elseif ($pos <= 10) $buckets['top_10']++;
             elseif ($pos <= 50) $buckets['top_50']++;
             elseif ($pos <= 100) $buckets['top_100']++;
+        }
+        return $buckets;
+    }
+
+    /**
+     * Tracker-side position distribution — counts of *tracked* keywords (the
+     * ones the user explicitly added to Rank Tracker) by current SERP rank
+     * slab. This is the "true rank" view, distinct from GSC's averaged
+     * report. `pending` covers keywords queued but not yet checked.
+     *
+     * @return array{top_3:int, top_10:int, top_50:int, top_100:int, deep:int, pending:int}
+     */
+    private function trackerPositionDistribution(int $websiteId): array
+    {
+        $rows = RankTrackingKeyword::query()
+            ->where('website_id', $websiteId)
+            ->where('is_active', true)
+            ->get(['current_position']);
+
+        $buckets = ['top_3' => 0, 'top_10' => 0, 'top_50' => 0, 'top_100' => 0, 'deep' => 0, 'pending' => 0];
+        foreach ($rows as $r) {
+            if ($r->current_position === null) {
+                $buckets['pending']++;
+                continue;
+            }
+            $pos = (float) $r->current_position;
+            if ($pos <= 3) $buckets['top_3']++;
+            elseif ($pos <= 10) $buckets['top_10']++;
+            elseif ($pos <= 50) $buckets['top_50']++;
+            elseif ($pos <= 100) $buckets['top_100']++;
+            else $buckets['deep']++;
         }
         return $buckets;
     }
