@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\ClientActivity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -190,60 +189,64 @@ class UsageController extends Controller
     {
         $monthStart = Carbon::now()->startOfMonth();
 
-        $byProviderInRange = ClientActivity::query()
+        // Period — pulls both units and calls so cards can show both.
+        $rowsPeriod = ClientActivity::query()
             ->selectRaw('provider, COALESCE(SUM(units_consumed), 0) AS units, COUNT(*) AS calls')
             ->whereIn('provider', array_keys(self::PROVIDERS))
             ->whereBetween('created_at', [$start, $end])
             ->groupBy('provider')
-            ->pluck(DB::raw("CONCAT(units, '|', calls)"), 'provider');
+            ->get();
 
-        $byProviderMonth = ClientActivity::query()
+        $rowsMonth = ClientActivity::query()
             ->selectRaw('provider, COALESCE(SUM(units_consumed), 0) AS units')
             ->whereIn('provider', array_keys(self::PROVIDERS))
             ->where('created_at', '>=', $monthStart)
             ->groupBy('provider')
-            ->pluck('units', 'provider');
+            ->get();
 
-        $byProviderLifetime = ClientActivity::query()
+        $rowsLifetime = ClientActivity::query()
             ->selectRaw('provider, COALESCE(SUM(units_consumed), 0) AS units')
             ->whereIn('provider', array_keys(self::PROVIDERS))
             ->groupBy('provider')
-            ->pluck('units', 'provider');
-
-        $shape = function ($map, array $rates): array {
-            $totalUnits = 0; $totalCost = 0; $byProvider = [];
-            foreach (self::PROVIDERS as $key => $_meta) {
-                $raw = $map[$key] ?? '0|0';
-                if (str_contains((string) $raw, '|')) {
-                    [$units, $calls] = array_map('intval', explode('|', (string) $raw, 2));
-                } else {
-                    $units = (int) $raw; $calls = 0;
-                }
-                $cost = $units * ($rates[$key] ?? 0);
-                $byProvider[$key] = ['units' => $units, 'calls' => $calls, 'cost' => $cost];
-                $totalUnits += $units;
-                $totalCost += $cost;
-            }
-            return ['units' => $totalUnits, 'cost' => $totalCost, 'providers' => $byProvider];
-        };
-
-        $shapeUnitsOnly = function ($map, array $rates): array {
-            $totalUnits = 0; $totalCost = 0; $byProvider = [];
-            foreach (self::PROVIDERS as $key => $_meta) {
-                $units = (int) ($map[$key] ?? 0);
-                $cost = $units * ($rates[$key] ?? 0);
-                $byProvider[$key] = ['units' => $units, 'cost' => $cost];
-                $totalUnits += $units;
-                $totalCost += $cost;
-            }
-            return ['units' => $totalUnits, 'cost' => $totalCost, 'providers' => $byProvider];
-        };
+            ->get();
 
         return [
-            'period' => $shape($byProviderInRange, $rates),
-            'this_month' => $shapeUnitsOnly($byProviderMonth, $rates),
-            'lifetime' => $shapeUnitsOnly($byProviderLifetime, $rates),
+            'period' => $this->shapeProviderRows($rowsPeriod, $rates, withCalls: true),
+            'this_month' => $this->shapeProviderRows($rowsMonth, $rates, withCalls: false),
+            'lifetime' => $this->shapeProviderRows($rowsLifetime, $rates, withCalls: false),
         ];
+    }
+
+    /**
+     * @param  iterable<\stdClass>  $rows  rows with `provider`, `units`, optional `calls`
+     */
+    private function shapeProviderRows(iterable $rows, array $rates, bool $withCalls): array
+    {
+        $byProvider = [];
+        foreach (self::PROVIDERS as $key => $_meta) {
+            $byProvider[$key] = $withCalls
+                ? ['units' => 0, 'calls' => 0, 'cost' => 0.0]
+                : ['units' => 0, 'cost' => 0.0];
+        }
+
+        $totalUnits = 0;
+        $totalCost = 0.0;
+
+        foreach ($rows as $r) {
+            $key = (string) ($r->provider ?? '');
+            if (! isset($byProvider[$key])) continue;
+            $units = (int) ($r->units ?? 0);
+            $cost = $units * ($rates[$key] ?? 0);
+            $byProvider[$key]['units'] = $units;
+            $byProvider[$key]['cost'] = $cost;
+            if ($withCalls) {
+                $byProvider[$key]['calls'] = (int) ($r->calls ?? 0);
+            }
+            $totalUnits += $units;
+            $totalCost += $cost;
+        }
+
+        return ['units' => $totalUnits, 'cost' => $totalCost, 'providers' => $byProvider];
     }
 
     /**
