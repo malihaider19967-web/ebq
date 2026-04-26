@@ -37,8 +37,16 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected }) {
 	const fetchScore = useCallback((isPoll = false) => {
 		if (!isConnected || !postId) return;
 		if (!isPoll) setState((s) => ({ ...s, status: 'loading' }));
-		const path = `/ebq/v1/seo-score/${postId}` + (focusKeyword ? `?focus_keyword=${encodeURIComponent(focusKeyword)}` : '');
-		apiFetch({ path }).then((res) => {
+		// POST (not GET) so LiteSpeed / Cloudflare / browser never cache
+		// the response. Header-based opt-outs aren't reliable on real
+		// LSCache installs — using POST is the unconditional escape hatch
+		// because no spec-compliant cache stores POST responses. Keeps
+		// _cb anyway as a defense for any non-compliant proxy.
+		const params = new URLSearchParams();
+		if (focusKeyword) params.set('focus_keyword', focusKeyword);
+		params.set('_cb', String(Date.now()));
+		const path = `/ebq/v1/seo-score/${postId}?${params.toString()}`;
+		apiFetch({ path, method: 'POST' }).then((res) => {
 			if (res?.ok === false || res?.error) {
 				setState({ status: 'error', data: null, error: res?.message || res?.error || 'Fetch failed' });
 			} else {

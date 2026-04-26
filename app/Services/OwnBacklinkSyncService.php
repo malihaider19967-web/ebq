@@ -6,7 +6,6 @@ use App\Enums\BacklinkType;
 use App\Models\Backlink;
 use App\Models\Website;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -14,48 +13,33 @@ use Illuminate\Support\Facades\Log;
  * them into the `backlinks` table. Distinct from `CompetitorBacklinkService`,
  * which targets competitor domains and writes to `competitor_backlinks`.
  *
- * 30-day cache gate
- * ─────────────────
- * KE charges per result row, so we only refresh once per website per month
- * regardless of how often the live-score endpoint asks. The cache marker is
- * set even on empty/failed responses so we don't retry on every page load.
- *
- * Re-trigger
- * ──────────
- * To force a fresh fetch (e.g., after a link-building campaign) call
- * `forget($websiteId)` from a Tinker shell or a future "refresh now" UI.
+ * Freshness
+ * ─────────
+ * Delegated to `BacklinkFreshnessGate`, which applies the SAME rule across
+ * every code path (own / competitor / page audit / WP plugin). KE never
+ * gets re-billed for a domain we already fetched in the last
+ * `services.keywords_everywhere.backlinks_ttl_days` (default 30, env-tunable
+ * via `KE_BACKLINKS_TTL_DAYS`).
  */
 class OwnBacklinkSyncService
 {
-    public const CACHE_TTL_DAYS = 30;
-
-    public function __construct(private readonly KeywordsEverywhereBacklinkClient $client) {}
-
-    public function isFresh(int $websiteId): bool
-    {
-        return Cache::has($this->cacheKey($websiteId));
-    }
-
-    public function forget(int $websiteId): void
-    {
-        Cache::forget($this->cacheKey($websiteId));
-    }
+    public function __construct(
+        private readonly KeywordsEverywhereBacklinkClient $client,
+        private readonly BacklinkFreshnessGate $gate,
+    ) {}
 
     /**
-     * Runs the KE → Backlink upsert. No-op when the 30-day window is still
-     * fresh. Returns the number of rows written/updated.
+     * Runs the KE → Backlink upsert. No-op when the gate says the domain
+     * was fetched within the TTL window. Returns the number of rows written.
      */
     public function syncForWebsite(Website $website, ?int $ownerUserId = null): int
     {
-        if ($this->isFresh($website->id)) {
+        $domain = $this->extractDomain((string) $website->domain);
+        if ($domain === '') {
             return 0;
         }
 
-        $domain = $this->extractDomain((string) $website->domain);
-        if ($domain === '') {
-            // Mark fresh anyway — bad domain isn't going to fix itself in 30s.
-            $this->markFresh($website->id);
-
+        if ($this->gate->isFresh($domain)) {
             return 0;
         }
 
@@ -69,9 +53,10 @@ class OwnBacklinkSyncService
             ownerUserId: $ownerUserId,
         );
 
-        // ALWAYS mark fresh — even on null/empty — so we don't retry for
-        // 30 days. The whole point is "once per month" gating.
-        $this->markFresh($website->id);
+        // ALWAYS mark fresh — even on null/empty — so we don't retry until
+        // the TTL window elapses. The gate respects this for every caller,
+        // not just this service.
+        $this->gate->markFetched($domain);
 
         if (! is_array($items) || $items === []) {
             Log::info('OwnBacklinkSyncService: KE returned no backlinks', [
@@ -124,20 +109,6 @@ class OwnBacklinkSyncService
         ]);
 
         return $written;
-    }
-
-    private function markFresh(int $websiteId): void
-    {
-        Cache::put(
-            $this->cacheKey($websiteId),
-            Carbon::now()->toIso8601String(),
-            Carbon::now()->addDays(self::CACHE_TTL_DAYS),
-        );
-    }
-
-    private function cacheKey(int $websiteId): string
-    {
-        return 'ke_own_backlinks_synced:' . $websiteId;
     }
 
     /**

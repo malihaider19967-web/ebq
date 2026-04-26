@@ -11,9 +11,45 @@ if (! defined('ABSPATH')) {
 
 final class EBQ_Rest_Proxy
 {
+    /**
+     * Routes whose responses are dynamic (live SEO score, audit state,
+     * GSC suggestions, anything that changes on every save) and must
+     * NEVER be served from any cache layer — browser, Cloudflare, nginx
+     * fastcgi_cache, LiteSpeed Cache.
+     *
+     * Listed as path prefixes (without `/wp-json`) so dynamic-id routes
+     * like `/ebq/v1/seo-score/123` match without enumerating each ID.
+     *
+     * Static-ish routes (e.g. `/ebq/v1/dashboard-html`) are deliberately
+     * NOT in this list — they're allowed to ride normal caching policy.
+     * That's the point of the "scope to my plugin endpoint" requirement:
+     * we only opt out of caching where it matters, not site-wide.
+     *
+     * @var list<string>
+     */
+    private const NEVER_CACHE_ROUTE_PREFIXES = [
+        '/ebq/v1/seo-score',
+        '/ebq/v1/topical-gaps',
+        '/ebq/v1/post-insights',
+        '/ebq/v1/focus-keyword-suggestions',
+        '/ebq/v1/related-keywords',
+        '/ebq/v1/serp-preview',
+        '/ebq/v1/internal-link-suggestions',
+        '/ebq/v1/track-keyword',
+    ];
+
     public function register(): void
     {
         add_action('rest_api_init', [$this, 'register_routes']);
+
+        // rest_pre_dispatch fires BEFORE the route handler runs — early
+        // enough that DONOTCACHEPAGE / LiteSpeed control actions take effect
+        // before any cache layer makes its store-or-skip decision.
+        add_filter('rest_pre_dispatch', [$this, 'maybe_disable_cache_for_dynamic_routes'], 10, 3);
+
+        // rest_post_dispatch fires AFTER the response is built — the right
+        // place to attach Cache-Control / Pragma / Expires / vendor headers.
+        add_filter('rest_post_dispatch', [$this, 'maybe_apply_nocache_headers'], 10, 3);
     }
 
     public function register_routes(): void
@@ -71,8 +107,14 @@ final class EBQ_Rest_Proxy
             ],
         ]);
 
+        // POST (not GET) so no cache layer (browser, CDN, LiteSpeed
+        // page-cache) ever stores the response. The header-based opt-outs
+        // were not enough on real LiteSpeed installs — switching the
+        // method is the bulletproof fix because POST is unconditionally
+        // never cached. Also accepts GET for back-compat with older plugin
+        // builds still in the wild.
         register_rest_route('ebq/v1', '/seo-score/(?P<id>\d+)', [
-            'methods' => 'GET',
+            'methods' => ['GET', 'POST'],
             'permission_callback' => [$this, 'can_edit'],
             'callback' => [$this, 'seo_score'],
             'args' => [
@@ -343,12 +385,119 @@ final class EBQ_Rest_Proxy
             }
         }
 
-        $response = new WP_REST_Response(
+        return new WP_REST_Response(
             EBQ_Plugin::api_client()->get_seo_score((string) $post_id, $url, $focus, $modified),
             200
         );
-        // Same no-cache headers HQ uses — live score must never be cached.
+        // Headers + cache-bust are applied by maybe_apply_nocache_headers()
+        // via the rest_post_dispatch filter — see register().
+    }
+
+    /* ─── Cache hardening for dynamic plugin endpoints ─────────────
+     *
+     * Two filter callbacks + one matcher. The `register()` method wires:
+     *   - rest_pre_dispatch  → maybe_disable_cache_for_dynamic_routes()
+     *     fires BEFORE the handler so DONOTCACHEPAGE / LiteSpeed control
+     *     actions are set early enough for the cache layer's store decision.
+     *   - rest_post_dispatch → maybe_apply_nocache_headers()
+     *     fires AFTER the response is built, the only place to attach
+     *     Cache-Control / Pragma / Expires / vendor headers to a
+     *     WP_REST_Response.
+     *
+     * Both callbacks check `is_dynamic_route()`, so this only affects the
+     * specific plugin endpoints that need it — never anyone else's routes.
+     * ────────────────────────────────────────────────────────────── */
+
+    /**
+     * Returns true when the request targets a dynamic ebq endpoint that
+     * must never be served from a cache. Match is by route-path PREFIX so
+     * `/ebq/v1/seo-score/123` matches `'/ebq/v1/seo-score'`.
+     */
+    private function is_dynamic_route(WP_REST_Request $request): bool
+    {
+        $route = (string) $request->get_route();
+        if ($route === '') {
+            return false;
+        }
+        foreach (self::NEVER_CACHE_ROUTE_PREFIXES as $prefix) {
+            if ($route === $prefix || strpos($route, $prefix . '/') === 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * rest_pre_dispatch callback. Sets the constants + LiteSpeed control
+     * actions BEFORE the handler runs — the only window where they reliably
+     * influence the cache layer's store decision.
+     *
+     * @param  mixed             $result   Existing pre-dispatch result (null = continue).
+     * @param  WP_REST_Server    $server   Unused.
+     * @param  WP_REST_Request   $request  The incoming REST request.
+     * @return mixed Pass-through; we never short-circuit dispatch.
+     */
+    public function maybe_disable_cache_for_dynamic_routes($result, $server, $request)
+    {
+        if (! ($request instanceof WP_REST_Request) || ! $this->is_dynamic_route($request)) {
+            return $result;
+        }
+
+        // Generic WP page-cache plugins (W3TC, WP Rocket, WP Super Cache,
+        // Cachify, Comet Cache, Hummingbird) all check these constants and
+        // bail when truthy. Only set if not already defined — defining twice
+        // raises a notice on some PHP setups.
+        if (! defined('DONOTCACHEPAGE'))   define('DONOTCACHEPAGE', true);
+        if (! defined('DONOTCACHEDB'))     define('DONOTCACHEDB', true);
+        if (! defined('DONOTCACHEOBJECT')) define('DONOTCACHEOBJECT', true);
+
+        // LiteSpeed Cache: the X-LiteSpeed-Cache-Control header alone is
+        // unreliable when "Cache REST API" is enabled. The official action
+        // hooks are the only deterministic opt-out — they run before LSCache
+        // makes its store decision and don't depend on settings.
+        do_action('litespeed_control_set_nocache', 'EBQ dynamic plugin endpoint');
+        do_action('litespeed_control_set_private', 'EBQ dynamic plugin endpoint is per-user');
+
+        return $result;
+    }
+
+    /**
+     * rest_post_dispatch callback. Attaches the full layered set of no-cache
+     * headers so every common cache layer (browser, Cloudflare, nginx,
+     * LiteSpeed) backs off via at least one signal it understands.
+     *
+     * @param  WP_HTTP_Response  $response  The dispatched response.
+     * @param  WP_REST_Server    $server    Unused.
+     * @param  WP_REST_Request   $request   The incoming REST request.
+     * @return WP_HTTP_Response Same response, possibly with headers added.
+     */
+    public function maybe_apply_nocache_headers($response, $server, $request)
+    {
+        if (! ($response instanceof WP_HTTP_Response)) {
+            return $response;
+        }
+        if (! ($request instanceof WP_REST_Request) || ! $this->is_dynamic_route($request)) {
+            return $response;
+        }
+
+        // Browser + standards-compliant proxies.
         $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0, private');
+        $response->header('Pragma', 'no-cache');
+        $response->header('Expires', 'Thu, 01 Jan 1970 00:00:00 GMT');
+
+        // nginx fastcgi_cache / proxy_cache honor this even when other
+        // headers are stripped or rewritten upstream.
+        $response->header('X-Accel-Expires', '0');
+
+        // Cloudflare APO + Workers honor these (cdn-cache-control is the
+        // formal IETF draft header for split client/CDN policies).
+        $response->header('CDN-Cache-Control', 'no-store');
+        $response->header('Cloudflare-CDN-Cache-Control', 'no-store');
+
+        // LiteSpeed Cache reads this header on top of the action hooks
+        // we already fired in rest_pre_dispatch. Belt-and-suspenders.
+        $response->header('X-LiteSpeed-Cache-Control', 'no-cache');
+
         return $response;
     }
 

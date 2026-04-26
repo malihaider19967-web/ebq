@@ -69,6 +69,14 @@ return [
         'backlinks_country' => env('KEYWORDS_EVERYWHERE_BACKLINKS_COUNTRY', 'us'),
         'backlinks_currency' => env('KEYWORDS_EVERYWHERE_BACKLINKS_CURRENCY', 'USD'),
         'backlinks_data_source' => env('KEYWORDS_EVERYWHERE_BACKLINKS_DATASOURCE', 'g'),
+        // Universal freshness window for ALL Keywords Everywhere backlink
+        // calls — own-domain syncs, competitor lookups, page-audit triggers,
+        // anywhere. If we have records for the domain newer than this, we
+        // serve stored data and never re-bill KE. Default 30 days; override
+        // with KE_BACKLINKS_TTL_DAYS in .env when you want to tighten or
+        // loosen the window (e.g., 7 for a research project, 90 for a stable
+        // archive).
+        'backlinks_ttl_days' => (int) env('KE_BACKLINKS_TTL_DAYS', 30),
     ],
 
     'competitor_backlinks' => [

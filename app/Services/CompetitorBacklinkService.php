@@ -17,8 +17,10 @@ use Illuminate\Support\Facades\Log;
  */
 class CompetitorBacklinkService
 {
-    public function __construct(private KeywordsEverywhereBacklinkClient $client)
-    {
+    public function __construct(
+        private KeywordsEverywhereBacklinkClient $client,
+        private BacklinkFreshnessGate $gate,
+    ) {
     }
 
     /**
@@ -41,7 +43,9 @@ class CompetitorBacklinkService
     }
 
     /**
-     * Has this domain been fetched and is the cache still fresh?
+     * Has this domain been fetched and is the cache still fresh? Delegates
+     * to the unified `BacklinkFreshnessGate` so own-domain syncs, page audits,
+     * and competitor refreshes all share one definition of "fresh".
      */
     public function isFresh(string $domain): bool
     {
@@ -50,10 +54,7 @@ class CompetitorBacklinkService
             return false;
         }
 
-        return CompetitorBacklink::query()
-            ->forDomain($domain)
-            ->fresh()
-            ->exists();
+        return $this->gate->isFresh($domain);
     }
 
     /**
@@ -94,13 +95,11 @@ class CompetitorBacklinkService
             return 0;
         }
 
-        // Belt-and-suspenders: queueRefresh() filters out fresh domains
-        // before dispatching, but this method is also reachable directly
-        // (CLI commands, manual scripts, future call sites). Re-check here
-        // so a fresh domain never bills KE — saves credits even when callers
-        // forget to gate.
-        if ($this->isFresh($domain)) {
-            Log::info('CompetitorBacklinkService.refresh: cache fresh, skipping KE call', [
+        // Universal freshness gate — same rule applied to every backlink
+        // call site (own-domain sync, WP plugin live-score, page audit,
+        // CLI). If we have rows newer than the TTL window, never re-bill KE.
+        if ($this->gate->isFresh($domain)) {
+            Log::info('CompetitorBacklinkService.refresh: gate fresh, skipping KE call', [
                 'domain' => $domain,
                 'website_id' => $websiteId,
             ]);
@@ -116,6 +115,12 @@ class CompetitorBacklinkService
             websiteId: $websiteId,
             ownerUserId: $ownerUserId,
         );
+        // Mark fresh as soon as KE returns — including null / empty — so the
+        // gate covers 0-result cases and we don't re-bill on the next call.
+        // Real rows below also satisfy isFresh() via fetched_at, but the
+        // sentinel is what protects us when KE legitimately had nothing.
+        $this->gate->markFetched($domain);
+
         if ($items === null) {
             Log::warning('CompetitorBacklinkService.refresh: client returned null', ['domain' => $domain]);
 
