@@ -154,10 +154,17 @@ class LiveSeoScoreService
         // Stale = the post was edited in WP after the last audit ran.
         // We still show the existing audit's data (better than blank) but
         // queue a refresh so the breakdown updates once it's done.
-        $auditStale = $auditReady
-            && $postModifiedAt !== null
-            && $latestAudit->audited_at !== null
-            && $postModifiedAt->greaterThan($latestAudit->audited_at);
+        //
+        // 60s tolerance absorbs clock skew between the WP host and the EBQ
+        // host. Without it, a sub-minute drift can pin the score on
+        // "refreshing" forever — every new audit completes a few seconds
+        // BEFORE the WP clock thinks the post was modified, so it always
+        // reads as stale and immediately re-queues.
+        $auditStale = false;
+        if ($auditReady && $postModifiedAt !== null && $latestAudit->audited_at !== null) {
+            $diffSeconds = $postModifiedAt->getTimestamp() - $latestAudit->audited_at->getTimestamp();
+            $auditStale = $diffSeconds > 60;
+        }
 
         $auditState = $this->resolveAuditState($website, $url, $focusKeyword, $latestAudit, $auditReady, $auditStale);
 

@@ -326,10 +326,22 @@ final class EBQ_Rest_Proxy
         // audit's audited_at and re-queue an audit when the post was
         // updated after the last run. Sourced server-side so the React
         // client doesn't have to track it.
+        //
+        // We MUST use get_post_modified_time('c', true) instead of
+        // mysql2date('c', $post_modified_gmt). Reason: mysql2date parses
+        // datetime strings using wp_timezone() — which means a GMT-stored
+        // value gets re-interpreted as the site's local time, producing a
+        // timestamp that's hours off. get_post_modified_time correctly
+        // builds a UTC DateTime and formats with offset (e.g. "+00:00")
+        // so Carbon::parse() on the EBQ side reads the actual instant.
         $post = get_post($post_id);
-        $modified = ($post && $post->post_modified_gmt && $post->post_modified_gmt !== '0000-00-00 00:00:00')
-            ? mysql2date('c', $post->post_modified_gmt, false)
-            : '';
+        $modified = '';
+        if ($post && $post->post_modified_gmt && $post->post_modified_gmt !== '0000-00-00 00:00:00') {
+            $candidate = get_post_modified_time('c', true, $post, false);
+            if (is_string($candidate) && $candidate !== '') {
+                $modified = $candidate;
+            }
+        }
 
         $response = new WP_REST_Response(
             EBQ_Plugin::api_client()->get_seo_score((string) $post_id, $url, $focus, $modified),
