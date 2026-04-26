@@ -95,11 +95,17 @@ final class EBQ_Api_Client
      * Live SEO score — EBQ-side composite from real GSC data + audit
      * signals. Renders alongside the editor's local self-check.
      */
-    public function get_seo_score(string $post_id, string $url, string $focus_keyword = ''): array
+    public function get_seo_score(string $post_id, string $url, string $focus_keyword = '', string $post_modified_at = ''): array
     {
         $args = ['url' => $url];
         if ($focus_keyword !== '') {
             $args['focus_keyword'] = $focus_keyword;
+        }
+        if ($post_modified_at !== '') {
+            // ISO 8601 timestamp of the post's last edit (GMT). Server
+            // compares this against the latest PageAuditReport.audited_at
+            // and re-queues the audit when the post was updated since.
+            $args['post_modified_at'] = $post_modified_at;
         }
         return $this->get(
             sprintf('/api/v1/posts/%s/seo-score', rawurlencode($post_id)),

@@ -269,7 +269,19 @@ class PluginInsightsController extends Controller
         $url = (string) $request->query('url', '');
         $kw  = (string) $request->query('focus_keyword', '');
 
-        $payload = $service->score($website, $url, $kw !== '' ? $kw : null);
+        // ISO 8601 GMT timestamp of the WP post's last edit. Used by the
+        // service to detect "post updated since last audit" and re-queue.
+        $postModifiedRaw = (string) $request->query('post_modified_at', '');
+        $postModifiedAt = null;
+        if ($postModifiedRaw !== '') {
+            try {
+                $postModifiedAt = \Carbon\Carbon::parse($postModifiedRaw);
+            } catch (\Throwable) {
+                $postModifiedAt = null;
+            }
+        }
+
+        $payload = $service->score($website, $url, $kw !== '' ? $kw : null, $postModifiedAt);
         return response()->json([
             'external_post_id' => $externalPostId,
             'url' => $url,

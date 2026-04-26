@@ -4,7 +4,14 @@
  * Density target: WordPress admin / Linear / Notion. Compact, dense,
  * tools-not-marketing. Default font ~12px. Hit areas ~28px tall. */
 
-.ebq-root {
+/* Tokens are also re-declared on portaled popovers (`.ebq-track-pop`,
+ * `.ebq-live-score__pop`) because they're mounted on `document.body`,
+ * outside the `.ebq-root` scope, and would otherwise see every token as
+ * `unset` — turning `var(--ebq-accent)` into transparent and making
+ * primary buttons white-on-white. */
+.ebq-root,
+.ebq-track-pop,
+.ebq-live-score__pop {
 	/* Surfaces */
 	--ebq-bg:           #ffffff;
 	--ebq-bg-subtle:    #fafbfc;

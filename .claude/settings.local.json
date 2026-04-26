@@ -115,7 +115,8 @@
       "Bash(php -l app/Services/LiveSeoScoreService.php)",
       "Bash(php -l app/Services/TopicalGapService.php)",
       "Bash(php -l app/Http/Controllers/Api/V1/PluginInsightsController.php)",
-      "Bash(php -l app/Services/PluginInsightResolver.php)"
+      "Bash(php -l app/Services/PluginInsightResolver.php)",
+      "Bash(php *)"
     ]
   }
 }

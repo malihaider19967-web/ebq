@@ -75,8 +75,30 @@ export default function SeoTab() {
 		setRelatedTarget(null);
 	};
 
+	const hasFocus = !!(focusKeyword && focusKeyword.trim());
+	const offlineScore = hasFocus ? analysis.score : 0;
+	const offlineCaption = hasFocus
+		? analysis.scoreLabel
+		: __('No focus keyphrase set — add one above to start scoring.', 'ebq-seo');
+
 	return (
 		<div className="ebq-stack">
+			<div className="ebq-score-stack">
+				<ScoreBadge
+					kind="offline"
+					score={offlineScore}
+					displayScore={hasFocus ? offlineScore : '—'}
+					badge={__('Self-check', 'ebq-seo')}
+					label={__('On-page (offline)', 'ebq-seo')}
+					caption={offlineCaption}
+				/>
+				<LiveSeoScore
+					postId={ctx.postId}
+					focusKeyword={focusKeyword}
+					isConnected={cfg.isConnected}
+				/>
+			</div>
+
 			<Section title={__('Focus keyphrase', 'ebq-seo')} icon={<IconChart />}>
 				<KeyphraseInput
 					value={focusKeyword}
@@ -111,31 +133,6 @@ export default function SeoTab() {
 					onShowRelated={(index) => setRelatedTarget({ kind: 'additional', index, keyword: focusKeyword })}
 				/>
 			</Section>
-
-			{(() => {
-				// No focus keyphrase = no scoring possible — render explicitly as
-				// "bad" (red) so the editor knows the page is not yet SEO-graded
-				// rather than seeing a misleading neutral state.
-				const hasFocus = !!(focusKeyword && focusKeyword.trim());
-				const score = hasFocus ? analysis.score : 0;
-				const caption = hasFocus
-					? analysis.scoreLabel
-					: __('No focus keyphrase set — add one above to start scoring.', 'ebq-seo');
-				return (
-					<div className="ebq-score-stack">
-						<ScoreBadge
-							score={score}
-							label={__('Self-check (offline)', 'ebq-seo')}
-							caption={caption}
-						/>
-						<LiveSeoScore
-							postId={ctx.postId}
-							focusKeyword={focusKeyword}
-							isConnected={cfg.isConnected}
-						/>
-					</div>
-				);
-			})()}
 
 			<Section
 				title={__('Snippet preview', 'ebq-seo')}

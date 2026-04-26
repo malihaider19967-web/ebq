@@ -154,20 +154,50 @@ export function CharGauge({ length = 0, goodMin = 0, goodMax, hardMax }) {
 
 /* ─── Score badge (overall) ──────────────────────────────────── */
 
-export function ScoreBadge({ score, label, caption }) {
-	const level = score >= 65 ? 'good' : score >= 45 ? 'warn' : 'bad';
-	const colorVar = level === 'good' ? 'var(--ebq-good)' : level === 'warn' ? 'var(--ebq-warn)' : 'var(--ebq-bad)';
-	return (
-		<div className="ebq-scorebadge">
-			<div className="ebq-scorebadge__ring" style={{ '--p': score, '--col': colorVar }}>
-				<span className="ebq-scorebadge__num">{score}</span>
+/**
+ * Both the offline self-check and the EBQ live score render through this
+ * one component so they're visually identical. The only differences:
+ *
+ *   `kind="offline"` → accent-blue tint, ring color is always neutral accent
+ *   `kind="live"`    → ring color follows the score level (good / warn / bad)
+ *
+ * `displayScore` lets the caller render "—" (or any string) instead of 0
+ * when there's no score yet, without losing the layout.
+ *
+ * Pass `onClick` to make the whole card a button (used by the live card so
+ * it can toggle a factor-breakdown popover). Without `onClick` the card
+ * renders as a static div.
+ */
+export function ScoreBadge({ kind = 'offline', score = 0, displayScore, label, caption, onClick, ariaExpanded, badge, trailing }) {
+	const safeScore = Math.max(0, Math.min(100, Number(score) || 0));
+	const level = safeScore >= 65 ? 'good' : safeScore >= 45 ? 'warn' : 'bad';
+	const colorVar = kind === 'live'
+		? (level === 'good' ? 'var(--ebq-good)' : level === 'warn' ? 'var(--ebq-warn)' : 'var(--ebq-bad)')
+		: 'var(--ebq-accent)';
+	const cls = `ebq-scorebadge ebq-scorebadge--${kind}${onClick ? ' is-clickable' : ''}`;
+	const inner = (
+		<>
+			<div className="ebq-scorebadge__ring" style={{ '--p': safeScore, '--col': colorVar }}>
+				<span className="ebq-scorebadge__num">{displayScore ?? safeScore}</span>
 			</div>
 			<div className="ebq-scorebadge__main">
-				<p className="ebq-scorebadge__label">{label}</p>
+				<p className="ebq-scorebadge__label">
+					{badge ? <span className="ebq-scorebadge__badge">{badge}</span> : null}
+					<span>{label}</span>
+				</p>
 				<p className="ebq-scorebadge__caption">{caption}</p>
 			</div>
-		</div>
+			{trailing ? <span className="ebq-scorebadge__trailing">{trailing}</span> : null}
+		</>
 	);
+	if (onClick) {
+		return (
+			<button type="button" className={cls} onClick={onClick} aria-expanded={ariaExpanded} aria-haspopup="dialog">
+				{inner}
+			</button>
+		);
+	}
+	return <div className={cls}>{inner}</div>;
 }
 
 /* ─── Check card (unified offline + live factor row) ─────────── */
@@ -182,24 +212,25 @@ export function ScoreBadge({ score, label, caption }) {
  * of the SEO panel a row came from. The left stripe is always tinted by
  * `level` (good / warn / bad / mute).
  */
-export function CheckCard({ kind = 'offline', level = 'mute', label, score, weight, detail, recommendation, action, icon }) {
+export function CheckCard({ kind = 'offline', level = 'mute', label, score, detail, recommendation, action, icon }) {
 	const cardLevel = level === 'ok' ? 'warn' : level;
 	const cls = `ebq-check-card ebq-check-card--${kind} ebq-check-card--${cardLevel}`;
 	return (
 		<div className={cls}>
 			{icon ? <span className={`ebq-check-card__icon ebq-check-card__icon--${cardLevel}`}>{icon}</span> : null}
-			<div className="ebq-check-card__head">
-				<span className="ebq-check-card__label">{label}</span>
-				{score != null ? (
-					<span className={`ebq-check-card__chip ebq-check-card__chip--${cardLevel}`}>
-						{score}
-						{weight ? <small> · ×{weight}%</small> : null}
-					</span>
-				) : null}
+			<div className="ebq-check-card__body">
+				<div className="ebq-check-card__head">
+					<span className="ebq-check-card__label">{label}</span>
+					{score != null ? (
+						<span className={`ebq-check-card__chip ebq-check-card__chip--${cardLevel}`}>
+							{score}
+						</span>
+					) : null}
+				</div>
+				{detail ? <p className="ebq-check-card__detail">{detail}</p> : null}
+				{recommendation ? <p className="ebq-check-card__recommend">{recommendation}</p> : null}
+				{action ? <div className="ebq-check-card__action">{action}</div> : null}
 			</div>
-			{detail ? <p className="ebq-check-card__detail">{detail}</p> : null}
-			{recommendation ? <p className="ebq-check-card__recommend">{recommendation}</p> : null}
-			{action ? <div className="ebq-check-card__action">{action}</div> : null}
 		</div>
 	);
 }

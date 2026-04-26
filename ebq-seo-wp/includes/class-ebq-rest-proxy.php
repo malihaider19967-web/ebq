@@ -322,8 +322,17 @@ final class EBQ_Rest_Proxy
         // actively optimizing for.
         $focus = (string) ($request->get_param('focus_keyword') ?: get_post_meta($post_id, '_ebq_focus_keyword', true));
 
+        // post_modified_gmt lets the server compare against the latest
+        // audit's audited_at and re-queue an audit when the post was
+        // updated after the last run. Sourced server-side so the React
+        // client doesn't have to track it.
+        $post = get_post($post_id);
+        $modified = ($post && $post->post_modified_gmt && $post->post_modified_gmt !== '0000-00-00 00:00:00')
+            ? mysql2date('c', $post->post_modified_gmt, false)
+            : '';
+
         $response = new WP_REST_Response(
-            EBQ_Plugin::api_client()->get_seo_score((string) $post_id, $url, $focus),
+            EBQ_Plugin::api_client()->get_seo_score((string) $post_id, $url, $focus, $modified),
             200
         );
         // Same no-cache headers HQ uses — live score must never be cached.

@@ -2,22 +2,36 @@
 
 namespace App\Services;
 
+use App\Jobs\RunCustomPageAudit;
+use App\Models\Backlink;
+use App\Models\CustomPageAudit;
 use App\Models\PageAuditReport;
+use App\Models\PageIndexingStatus;
 use App\Models\RankTrackingKeyword;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Log;
 
 /**
  * "Live" SEO score — what Google actually thinks of the post, derived from
- * GSC rank + CTR + Lighthouse audit + cannibalization presence + coverage
- * breadth. Distinct from the editor's local self-check (which only knows
- * about word counts and keyword density).
+ * the full data we already have:
  *
- * The killer signal is the *delta* between the two scores — a high
- * self-check + low live score means "your post follows every rule but
- * Google still doesn't rank it; here's why" — that diff is what pulls
- * users back to the EBQ platform when an answer is needed.
+ *   GSC                → rank, CTR vs expected curve, coverage, cannibalization
+ *   PageIndexingStatus → Google verdict / coverage state (can the page even rank?)
+ *   PageAuditReport    → Core Web Vitals, Lighthouse perf, on-page SEO,
+ *                        technical health, content quality (the audit blob is
+ *                        already huge — we just project useful slices into score factors)
+ *   Backlink           → referring-domain authority signal
+ *   RankTrackingKeyword → small "tracked = +confidence" nudge
+ *
+ * Audit gating
+ * ────────────
+ * If we've never audited this URL we enqueue a `CustomPageAudit` synchronously
+ * via the existing background queue and return `audit.status = "queued"`. The
+ * client polls until the audit completes; once a `PageAuditReport` exists we
+ * don't re-audit (no content-hash check yet) — the user can manually re-audit
+ * from HQ if they want fresh CWV/perf data.
  *
  * URL matching uses `PluginInsightResolver::__publicPageVariants()` so we
  * match GSC rows regardless of:
@@ -25,16 +39,17 @@ use Illuminate\Support\Carbon;
  *   - www vs apex            (`www.x.com` vs `x.com`)
  *   - scheme                 (`http://` vs `https://`)
  *   - case                   (lowercased URLs in storage)
- * The same matcher handles 12 cross-variants in one indexed `whereIn` lookup.
  *
- * Pure data composition, no LLM call. Returns:
- *   [
- *     'score' => 0..100,
- *     'label' => 'Bad' | 'Needs work' | 'Good',
- *     'available' => bool,                  // false when no data yet
- *     'factors' => list<{key,label,score,weight,detail}>,
- *     'explanation' => string,              // one-line summary
- *   ]
+ * Pure data composition, no LLM call.
+ *
+ * @return array{
+ *   score: int,
+ *   label: string,
+ *   available: bool,
+ *   audit: array{status: string, message: string, audited_at?: string|null, queued_at?: string|null},
+ *   factors: list<array<string, mixed>>,
+ *   explanation: string,
+ * }
  */
 class LiveSeoScoreService
 {
@@ -42,26 +57,21 @@ class LiveSeoScoreService
         private readonly PluginInsightResolver $resolver,
     ) {}
 
-    public function score(Website $website, string $canonicalUrl, ?string $focusKeyword = null): array
+    public function score(Website $website, string $canonicalUrl, ?string $focusKeyword = null, ?Carbon $postModifiedAt = null): array
     {
         $url = trim($canonicalUrl);
         if ($url === '' || ! $website->isAuditUrlForThisSite($url)) {
             return $this->unavailable('url_not_for_website', ['url' => $url, 'domain' => $website->domain]);
         }
 
-        // Strict 12-way variant set covering trailing slash / www / scheme
-        // / case. Used standalone for cannibalization (whereNotIn) and the
-        // diagnostic counts. The actual GSC reads use applyPageMatch which
-        // adds a LIKE fallback on top of variants for query strings / AMP /
-        // CDN drift the variant generator can't enumerate exactly.
         $variants = $this->resolver->__publicPageVariants($url);
+        $variantHashes = array_map(static fn (string $v) => hash('sha256', $v), $variants);
 
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz);
         $start30 = $end->copy()->subDays(29);
 
-        // ── GSC totals for the URL (last 30 days). Match via the resolver's
-        // strict + LIKE matcher so we don't miss query-string / AMP variants.
+        // ── GSC totals (last 30 days) ───────────────────────────
         $gsc = SearchConsoleData::query()
             ->where('website_id', $website->id)
             ->whereDate('date', '>=', $start30->toDateString())
@@ -71,7 +81,6 @@ class LiveSeoScoreService
             ->first();
 
         $impressions = (int) ($gsc->impressions ?? 0);
-        $clicks = (int) ($gsc->clicks ?? 0);
         $avgPos = $gsc && $gsc->position !== null ? (float) $gsc->position : null;
         $avgCtr = $gsc && $gsc->ctr !== null ? (float) $gsc->ctr : null;
 
@@ -79,7 +88,7 @@ class LiveSeoScoreService
             return $this->unavailable('no_gsc_data_for_url', $this->buildDiagnostics($website, $url, $variants));
         }
 
-        // ── Focus-keyword rank (when supplied) — gets the heaviest weight.
+        // ── Focus-keyword rank ──────────────────────────────────
         $kwRank = null;
         if ($focusKeyword !== null && $focusKeyword !== '') {
             $kwRow = SearchConsoleData::query()
@@ -95,7 +104,7 @@ class LiveSeoScoreService
             }
         }
 
-        // ── Coverage breadth — how many distinct queries the URL ranks for in top 100.
+        // ── Coverage breadth ─────────────────────────────────────
         $coverage = (int) SearchConsoleData::query()
             ->where('website_id', $website->id)
             ->whereDate('date', '>=', $start30->toDateString())
@@ -106,9 +115,7 @@ class LiveSeoScoreService
             ->distinct('query')
             ->count('query');
 
-        // ── Cannibalization — is another URL competing for the same focus keyword?
-        // Strict variants only here (no LIKE) so a query-string twin of OUR URL
-        // doesn't get counted as a competing page.
+        // ── Cannibalization ──────────────────────────────────────
         $cannibalized = false;
         if ($focusKeyword !== null && $focusKeyword !== '') {
             $competingPages = SearchConsoleData::query()
@@ -123,29 +130,38 @@ class LiveSeoScoreService
             $cannibalized = $competingPages > 0;
         }
 
-        // ── Audit / Lighthouse score (latest report) — match by variant too.
-        // PageAuditReport stores the URL in `page` and we look it up by
-        // sha256(`page_hash`) for index-friendly matching, mirroring
-        // PluginInsightResolver. The Lighthouse performance score is nested
-        // inside the JSON `result` blob (already on a 0–100 scale).
-        $auditScore = null;
-        $variantHashes = array_map(static fn (string $v) => hash('sha256', $v), $variants);
+        // ── Latest audit + queue gating ──────────────────────────
         $latestAudit = PageAuditReport::query()
             ->where('website_id', $website->id)
             ->whereIn('page_hash', $variantHashes)
             ->latest('audited_at')
             ->first();
-        if ($latestAudit && is_array($latestAudit->result)) {
-            $cwv = $latestAudit->result['core_web_vitals'] ?? [];
-            $mobile = is_array($cwv['mobile'] ?? null) ? $cwv['mobile'] : [];
-            $desktop = is_array($cwv['desktop'] ?? null) ? $cwv['desktop'] : [];
-            $perf = $mobile['performance_score'] ?? $desktop['performance_score'] ?? null;
-            if ($perf !== null) {
-                $auditScore = (int) round((float) $perf);
-            }
-        }
 
-        // ── Tracked-keyword bonus — explicit tracker entry adds confidence.
+        $auditReady = $latestAudit
+            && $latestAudit->status === 'completed'
+            && is_array($latestAudit->result);
+
+        // Stale = the post was edited in WP after the last audit ran.
+        // We still show the existing audit's data (better than blank) but
+        // queue a refresh so the breakdown updates once it's done.
+        $auditStale = $auditReady
+            && $postModifiedAt !== null
+            && $latestAudit->audited_at !== null
+            && $postModifiedAt->greaterThan($latestAudit->audited_at);
+
+        $auditState = $this->resolveAuditState($website, $url, $focusKeyword, $latestAudit, $auditReady, $auditStale);
+
+        // ── Indexing ─────────────────────────────────────────────
+        $indexing = PageIndexingStatus::query()
+            ->where('website_id', $website->id)
+            ->tap(fn ($q) => $this->resolver->__publicApplyPageMatch($q, $url))
+            ->orderByDesc('last_google_status_checked_at')
+            ->first();
+
+        // ── Backlinks (referring domain count for any URL variant) ──
+        $referringDomains = $this->countReferringDomains($website->id, $variants);
+
+        // ── Tracked-keyword nudge ────────────────────────────────
         $tracked = false;
         if ($focusKeyword !== null && $focusKeyword !== '') {
             $tracked = RankTrackingKeyword::query()
@@ -155,107 +171,556 @@ class LiveSeoScoreService
                 ->exists();
         }
 
-        // ── Build factor breakdown ────────────────────────────────
+        // ── Build factors ────────────────────────────────────────
         $factors = [];
-
-        // Rank (35%) — focus-keyword rank if known, else average page rank.
         $rankBasis = $kwRank ?? $avgPos ?? 100.0;
-        $rankScore = $this->positionScore($rankBasis);
-        $factors[] = [
+
+        // GSC-derived (always available once we have impressions)
+        $factors[] = $this->factorRank($kwRank, $avgPos, $focusKeyword, $rankBasis);
+        $factors[] = $this->factorCtr($avgCtr ?? 0.0, $rankBasis);
+        $factors[] = $this->factorCoverage($coverage);
+        $factors[] = $this->factorCannibalization($cannibalized);
+
+        // Indexing (always available — even null state has a recommendation)
+        $factors[] = $this->factorIndexing($indexing);
+
+        // Backlinks (always available)
+        $factors[] = $this->factorBacklinks($referringDomains);
+
+        // Audit-derived (pending if no audit yet). When `refreshing` we still
+        // show the prior audit's data — the client will swap to fresh data
+        // via polling once the queued re-audit completes.
+        if ($auditReady) {
+            $factors[] = $this->factorCoreWebVitals($latestAudit);
+            $factors[] = $this->factorPagePerformance($latestAudit);
+            $factors[] = $this->factorOnPageSeo($latestAudit);
+            $factors[] = $this->factorTechnicalHealth($latestAudit);
+            $factors[] = $this->factorContentQuality($latestAudit);
+        } else {
+            $msg = $auditState['status'] === 'running'
+                ? 'Audit running — refreshes when complete.'
+                : ($auditState['status'] === 'queued'
+                    ? 'Audit queued — refreshes when complete.'
+                    : 'No audit on file. Trigger one from HQ → Page Audits.');
+            $factors[] = $this->pendingFactor('core_web_vitals', 'Core Web Vitals', $msg);
+            $factors[] = $this->pendingFactor('page_performance', 'Page performance', $msg);
+            $factors[] = $this->pendingFactor('on_page_seo', 'On-page SEO', $msg);
+            $factors[] = $this->pendingFactor('technical_health', 'Technical health', $msg);
+            $factors[] = $this->pendingFactor('content_quality', 'Content quality', $msg);
+        }
+
+        // Tracked nudge
+        $factors[] = $this->factorTracked($tracked, $focusKeyword);
+
+        // ── Weighted composite (skip pending) ────────────────────
+        $real = array_values(array_filter($factors, static fn (array $f) => empty($f['pending'])));
+        $weightSum = array_sum(array_column($real, 'weight'));
+        $weighted = 0.0;
+        foreach ($real as $f) {
+            $weighted += $f['score'] * ($f['weight'] / max(1, $weightSum));
+        }
+        $score = max(0, min(100, (int) round($weighted)));
+
+        $label = $score >= 65 ? 'Good' : ($score >= 45 ? 'Needs work' : 'Bad');
+        $explanation = $this->buildExplanation($score, $rankBasis, $cannibalized, $coverage, $kwRank !== null, $auditState['status']);
+
+        return [
+            'score' => $score,
+            'label' => $label,
+            'available' => true,
+            'audit' => $auditState,
+            'factors' => $factors,
+            'explanation' => $explanation,
+        ];
+    }
+
+    /* ──────────────────────────────────────────────────────────────
+     *                  Audit queue gating
+     * ──────────────────────────────────────────────────────────── */
+
+    /**
+     * Returns the audit state block returned to the client. If no audit
+     * exists and none is queued, enqueue one via the existing
+     * `CustomPageAudit` + `RunCustomPageAudit` queue. We never re-audit
+     * once a completed report exists — the user must manually re-audit.
+     *
+     * @return array{status: string, message: string, audited_at?: string|null, queued_at?: string|null}
+     */
+    private function resolveAuditState(Website $website, string $url, ?string $focusKeyword, ?PageAuditReport $latest, bool $auditReady, bool $auditStale = false): array
+    {
+        if ($auditReady && $latest && ! $auditStale) {
+            return [
+                'status' => 'ready',
+                'message' => 'Audit data is current.',
+                'audited_at' => $latest->audited_at?->toIso8601String(),
+            ];
+        }
+
+        // Don't queue duplicates — return whatever's already in flight.
+        $pageHash = hash('sha256', $url);
+        $inFlight = CustomPageAudit::query()
+            ->where('website_id', $website->id)
+            ->where('page_url_hash', $pageHash)
+            ->whereIn('status', [CustomPageAudit::STATUS_QUEUED, CustomPageAudit::STATUS_RUNNING])
+            ->latest('queued_at')
+            ->first();
+
+        if ($inFlight) {
+            // Re-running over a prior good audit (post was updated) →
+            // surface as `refreshing` so the client knows the visible
+            // factor data is from the last audit but a refresh is on the way.
+            $status = $auditStale && $auditReady ? 'refreshing' : $inFlight->status;
+            $message = $status === 'refreshing'
+                ? 'Post was updated since the last audit — EBQ is re-auditing now. Factor data will refresh automatically.'
+                : ($inFlight->status === CustomPageAudit::STATUS_RUNNING
+                    ? 'EBQ is auditing this page right now. Usually takes 30–90s.'
+                    : 'Audit queued. EBQ will run it in the background — score will refresh automatically.');
+
+            return [
+                'status' => $status,
+                'message' => $message,
+                'queued_at' => $inFlight->queued_at?->toIso8601String(),
+                'previous_audited_at' => $auditStale && $latest ? $latest->audited_at?->toIso8601String() : null,
+            ];
+        }
+
+        // Latest audit failed and there's nothing in flight — show the failure
+        // but don't auto-requeue (avoids burning Serper/Lighthouse credits on
+        // a URL that's permanently broken).
+        if ($latest && $latest->status === 'failed') {
+            return [
+                'status' => 'failed',
+                'message' => $latest->error_message
+                    ? 'Last audit failed: ' . $latest->error_message
+                    : 'Last audit failed. Re-trigger it from HQ → Page Audits.',
+                'audited_at' => $latest->audited_at?->toIso8601String(),
+            ];
+        }
+
+        // No audit, no in-flight — queue one now.
+        $ownerUserId = (int) ($website->user_id ?? 0);
+        if ($ownerUserId <= 0) {
+            return [
+                'status' => 'unavailable',
+                'message' => 'Cannot enqueue audit: website has no owner user.',
+            ];
+        }
+
+        try {
+            $queued = CustomPageAudit::queue(
+                websiteId: $website->id,
+                userId: $ownerUserId,
+                pageUrl: $url,
+                targetKeyword: $focusKeyword ?? '',
+                serpSampleGl: null,
+                source: CustomPageAudit::SOURCE_PAGE_DETAIL,
+            );
+            RunCustomPageAudit::dispatch($queued->id);
+
+            // Stale-and-no-prior-in-flight: surface as `refreshing` so the
+            // client keeps showing the prior audit's factor data while the
+            // new run completes.
+            if ($auditStale && $auditReady) {
+                return [
+                    'status' => 'refreshing',
+                    'message' => 'Post was updated since the last audit — EBQ is re-auditing now. Factor data will refresh automatically.',
+                    'queued_at' => $queued->queued_at?->toIso8601String(),
+                    'previous_audited_at' => $latest?->audited_at?->toIso8601String(),
+                ];
+            }
+
+            return [
+                'status' => 'queued',
+                'message' => 'EBQ is auditing this page for the first time. Usually takes 30–90s — your score will refresh automatically.',
+                'queued_at' => $queued->queued_at?->toIso8601String(),
+            ];
+        } catch (\Throwable $e) {
+            Log::warning('LiveSeoScoreService: failed to enqueue audit', [
+                'url' => $url,
+                'website_id' => $website->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            return [
+                'status' => 'failed',
+                'message' => 'Could not enqueue audit: ' . $e->getMessage(),
+            ];
+        }
+    }
+
+    /* ──────────────────────────────────────────────────────────────
+     *                          Factors
+     * ──────────────────────────────────────────────────────────── */
+
+    private function factorRank(?float $kwRank, ?float $avgPos, ?string $focusKeyword, float $rankBasis): array
+    {
+        $score = $this->positionScore($rankBasis);
+
+        return [
             'key' => 'rank',
             'label' => $kwRank !== null ? 'Focus-keyword rank' : 'Average page rank',
-            'score' => $rankScore,
-            'weight' => 35,
+            'score' => $score,
+            'weight' => 22,
             'detail' => $kwRank !== null
                 ? sprintf('Position %.1f for "%s"', $kwRank, $focusKeyword)
                 : sprintf('Avg position %.1f across all queries', $rankBasis),
-            'recommendation' => $rankScore < 65
+            'recommendation' => $score < 65
                 ? ($kwRank !== null
                     ? sprintf(
-                        'Add internal links to this page using "%s" as anchor text and place the keyphrase in an H2/H3. Strengthen the topical depth (covered subtopics, supporting media) to climb out of position %.0f.',
+                        'Add internal links pointing to this page using "%s" as anchor text and place the keyphrase in an H2/H3. Strengthen on-page topical depth to climb out of position %.0f.',
                         $focusKeyword !== null && $focusKeyword !== '' ? $focusKeyword : 'your focus keyphrase',
                         $rankBasis
                     )
-                    : 'Set a focus keyphrase so we can score the page on a specific query, then strengthen internal links and on-page placement for it.')
+                    : 'Set a focus keyphrase so the page can be scored on a specific query, then strengthen on-page placement and internal links for it.')
                 : null,
         ];
+    }
 
-        // CTR (15%) — actual CTR vs expected for the rank.
-        $expectedCtr = $this->expectedCtrForPosition($rankBasis);
-        $ctrScore = $this->ctrScore($avgCtr ?? 0, $expectedCtr);
-        $factors[] = [
+    private function factorCtr(float $actualCtr, float $rankBasis): array
+    {
+        $expected = $this->expectedCtrForPosition($rankBasis);
+        $score = $this->ctrScore($actualCtr, $expected);
+
+        return [
             'key' => 'ctr',
             'label' => 'Click-through rate',
-            'score' => $ctrScore,
-            'weight' => 15,
-            'detail' => sprintf(
-                'CTR %.2f%% (expected %.2f%% for rank %.0f)',
-                ($avgCtr ?? 0) * 100,
-                $expectedCtr * 100,
-                $rankBasis
-            ),
-            'recommendation' => $ctrScore < 65
+            'score' => $score,
+            'weight' => 8,
+            'detail' => sprintf('CTR %.2f%% (expected %.2f%% for rank %.0f)', $actualCtr * 100, $expected * 100, $rankBasis),
+            'recommendation' => $score < 65
                 ? 'Rewrite the SEO title and meta description so the snippet earns more clicks: lead with the keyphrase, add a year or specific number, and answer the searcher\'s intent in plain language.'
                 : null,
         ];
+    }
 
-        // Coverage (20%) — number of distinct ranking queries.
-        $coverageScore = $this->coverageScore($coverage);
-        $factors[] = [
+    private function factorCoverage(int $coverage): array
+    {
+        $score = $this->coverageScore($coverage);
+
+        return [
             'key' => 'coverage',
             'label' => 'Topical coverage',
-            'score' => $coverageScore,
-            'weight' => 20,
+            'score' => $score,
+            'weight' => 8,
             'detail' => sprintf('Ranks for %d distinct queries in the top 100', $coverage),
-            'recommendation' => $coverageScore < 65
-                ? 'Add 1–2 sections covering related sub-questions and long-tail variants of the focus keyphrase. Use the "Topical gaps vs. top SERP" panel above for specific subtopic ideas competitors cover.'
+            'recommendation' => $score < 65
+                ? 'Add 1–2 sections covering related sub-questions and long-tail variants. Use the "Topical gaps vs. top SERP" panel for specific subtopic ideas competitors cover.'
                 : null,
         ];
+    }
 
-        // Cannibalization (15%) — penalty when present.
-        $cannibalScore = $cannibalized ? 30 : 100;
-        $factors[] = [
+    private function factorCannibalization(bool $cannibalized): array
+    {
+        return [
             'key' => 'cannibalization',
             'label' => 'No cannibalization',
-            'score' => $cannibalScore,
-            'weight' => 15,
+            'score' => $cannibalized ? 30 : 100,
+            'weight' => 6,
             'detail' => $cannibalized
                 ? 'Another URL on this site is also ranking for the focus keyword.'
                 : 'No competing pages on the site for this query.',
             'recommendation' => $cannibalized
-                ? 'Find the other ranking URL in the HQ → Insights → Cannibalization view and either 301-redirect it into this page or shift its targeting to a different keyphrase.'
+                ? 'Find the competing URL in HQ → Insights → Cannibalization and either 301-redirect it into this page or shift its targeting to a different keyphrase.'
                 : null,
         ];
+    }
 
-        // Audit (10%) — Lighthouse performance.
-        $auditFactor = $auditScore ?? 60; // neutral default when no audit
-        $factors[] = [
-            'key' => 'audit',
-            'label' => 'Page performance',
-            'score' => $auditFactor,
-            'weight' => 10,
-            'detail' => $auditScore !== null
-                ? sprintf('Lighthouse: %d/100', $auditScore)
-                : 'No recent Lighthouse audit on file.',
-            'recommendation' => $auditScore !== null && $auditScore < 65
-                ? 'Compress and lazy-load images, defer third-party JS (analytics, chat widgets), and inline critical CSS. Re-run the audit from HQ → Page Audits to verify.'
-                : ($auditScore === null
-                    ? 'Run a page audit from HQ → Page Audits so the live score can factor in real Lighthouse performance.'
-                    : null),
+    private function factorIndexing(?PageIndexingStatus $indexing): array
+    {
+        $verdict = $indexing?->google_verdict;
+        $coverage = $indexing?->google_coverage_state;
+
+        if ($indexing === null) {
+            return [
+                'key' => 'indexing',
+                'label' => 'Google index status',
+                'score' => 50,
+                'weight' => 12,
+                'detail' => 'No URL Inspection data yet for this page.',
+                'recommendation' => 'Open Search Console → URL Inspection on this URL so EBQ can check whether Google is indexing it. Indexing health is a hard precondition for any traffic.',
+            ];
+        }
+
+        $score = match (strtoupper((string) $verdict)) {
+            'PASS' => 100,
+            'PARTIAL' => 60,
+            'NEUTRAL' => 70,
+            'FAIL' => 10,
+            default => 50,
+        };
+
+        $detail = sprintf(
+            'Verdict: %s · %s',
+            $verdict ?? 'unknown',
+            $coverage !== null && $coverage !== '' ? $coverage : 'no coverage_state',
+        );
+
+        $recommendation = null;
+        if ($score < 65) {
+            $recommendation = $verdict && strtoupper((string) $verdict) === 'FAIL'
+                ? sprintf('Google reports the page as not indexed (%s). Open Search Console → URL Inspection, fix the underlying issue (canonical, robots, redirect chain), then click Request Indexing.', $coverage ?: 'unknown reason')
+                : 'Indexing is partial or unclear. Open URL Inspection in Search Console — click Request Indexing if the page is intended to be live.';
+        }
+
+        return [
+            'key' => 'indexing',
+            'label' => 'Google index status',
+            'score' => $score,
+            'weight' => 12,
+            'detail' => $detail,
+            'recommendation' => $recommendation,
         ];
+    }
 
-        // Tracked-keyword (5%) — small nudge.
-        $factors[] = [
+    private function factorBacklinks(int $referringDomains): array
+    {
+        $score = $this->backlinksScore($referringDomains);
+
+        return [
+            'key' => 'backlinks',
+            'label' => 'Backlinks',
+            'score' => $score,
+            'weight' => 6,
+            'detail' => sprintf('%d referring domain%s', $referringDomains, $referringDomains === 1 ? '' : 's'),
+            'recommendation' => $score < 65
+                ? 'Run prospecting from HQ → Backlinks. Find sites linking to top-ranking competitors but not to you and pitch a relevant resource on this page.'
+                : null,
+        ];
+    }
+
+    private function factorCoreWebVitals(PageAuditReport $audit): array
+    {
+        $cwv = $audit->result['core_web_vitals'] ?? [];
+        $mobile = is_array($cwv['mobile'] ?? null) ? $cwv['mobile'] : [];
+        $lcp = isset($mobile['lcp_ms']) && is_numeric($mobile['lcp_ms']) ? (float) $mobile['lcp_ms'] : null;
+        $cls = isset($mobile['cls']) && is_numeric($mobile['cls']) ? (float) $mobile['cls'] : null;
+
+        // Google's official "good / needs improvement / poor" buckets.
+        $lcpScore = $lcp === null ? null : ($lcp <= 2500 ? 100 : ($lcp <= 4000 ? 60 : 20));
+        $clsScore = $cls === null ? null : ($cls <= 0.1 ? 100 : ($cls <= 0.25 ? 60 : 20));
+        $parts = array_filter([$lcpScore, $clsScore], static fn ($v) => $v !== null);
+        $score = $parts === [] ? 60 : (int) round(array_sum($parts) / count($parts));
+
+        $detailParts = [];
+        if ($lcp !== null) {
+            $detailParts[] = sprintf('LCP %sms', number_format($lcp));
+        }
+        if ($cls !== null) {
+            $detailParts[] = sprintf('CLS %.3f', $cls);
+        }
+        $detail = $detailParts === [] ? 'No CWV measurements in latest audit.' : implode(' · ', $detailParts) . ' (mobile)';
+
+        $recs = [];
+        if ($lcpScore !== null && $lcpScore < 65) {
+            $recs[] = 'Reduce LCP: serve hero images from a CDN, use modern formats (WebP/AVIF), preload the LCP image, and trim render-blocking JS.';
+        }
+        if ($clsScore !== null && $clsScore < 65) {
+            $recs[] = 'Reduce CLS: declare width/height on every image, reserve space for ads/embeds, and avoid late-injected DOM above the fold.';
+        }
+
+        return [
+            'key' => 'core_web_vitals',
+            'label' => 'Core Web Vitals',
+            'score' => $score,
+            'weight' => 10,
+            'detail' => $detail,
+            'recommendation' => $recs === [] ? null : implode(' ', $recs),
+        ];
+    }
+
+    private function factorPagePerformance(PageAuditReport $audit): array
+    {
+        $cwv = $audit->result['core_web_vitals'] ?? [];
+        $mobile = is_array($cwv['mobile'] ?? null) ? $cwv['mobile'] : [];
+        $desktop = is_array($cwv['desktop'] ?? null) ? $cwv['desktop'] : [];
+        $mPerf = isset($mobile['performance_score']) && is_numeric($mobile['performance_score']) ? (int) $mobile['performance_score'] : null;
+        $dPerf = isset($desktop['performance_score']) && is_numeric($desktop['performance_score']) ? (int) $desktop['performance_score'] : null;
+
+        $parts = array_filter([$mPerf, $dPerf], static fn ($v) => $v !== null);
+        $score = $parts === [] ? 60 : (int) round(array_sum($parts) / count($parts));
+
+        $detail = $parts === []
+            ? 'No Lighthouse performance data in latest audit.'
+            : sprintf('Mobile %d/100, Desktop %d/100', $mPerf ?? 0, $dPerf ?? 0);
+
+        return [
+            'key' => 'page_performance',
+            'label' => 'Page performance',
+            'score' => $score,
+            'weight' => 6,
+            'detail' => $detail,
+            'recommendation' => $score < 65
+                ? 'Compress and lazy-load images, defer third-party JS (analytics, chat widgets), and inline critical CSS. Re-run the audit from HQ → Page Audits to verify.'
+                : null,
+        ];
+    }
+
+    private function factorOnPageSeo(PageAuditReport $audit): array
+    {
+        $meta = is_array($audit->result['metadata'] ?? null) ? $audit->result['metadata'] : [];
+        $content = is_array($audit->result['content'] ?? null) ? $audit->result['content'] : [];
+        $advanced = is_array($audit->result['advanced'] ?? null) ? $audit->result['advanced'] : [];
+
+        $titleLen = (int) ($meta['title_length'] ?? 0);
+        $descLen = (int) ($meta['meta_description_length'] ?? 0);
+        $canonicalOk = (bool) ($meta['canonical_matches'] ?? false);
+        $ogCount = (int) ($meta['og_tag_count'] ?? 0);
+        $h1Count = (int) ($content['h1_count'] ?? 0);
+        $headingOrderOk = (bool) ($content['heading_order_ok'] ?? false);
+        $schemaBlocks = (int) ($advanced['schema_blocks'] ?? 0);
+
+        $checks = [
+            'title' => $titleLen >= 30 && $titleLen <= 70 ? 100 : ($titleLen > 0 ? 60 : 0),
+            'meta_description' => $descLen >= 120 && $descLen <= 170 ? 100 : ($descLen > 0 ? 60 : 0),
+            'canonical' => $canonicalOk ? 100 : 50,
+            'open_graph' => $ogCount >= 4 ? 100 : ($ogCount > 0 ? 60 : 30),
+            'h1' => $h1Count === 1 ? 100 : ($h1Count > 1 ? 50 : 20),
+            'heading_order' => $headingOrderOk ? 100 : 60,
+            'schema' => $schemaBlocks >= 1 ? 100 : 40,
+        ];
+        $score = (int) round(array_sum($checks) / count($checks));
+
+        $issues = [];
+        if ($titleLen === 0)                            $issues[] = 'no SEO title';
+        elseif ($titleLen < 30 || $titleLen > 70)      $issues[] = sprintf('title length %d (target 30–70)', $titleLen);
+        if ($descLen === 0)                             $issues[] = 'no meta description';
+        elseif ($descLen < 120 || $descLen > 170)      $issues[] = sprintf('meta description length %d (target 130–155)', $descLen);
+        if (! $canonicalOk)                             $issues[] = 'canonical missing/mismatched';
+        if ($h1Count !== 1)                             $issues[] = sprintf('%d H1 tags (need exactly 1)', $h1Count);
+        if (! $headingOrderOk)                          $issues[] = 'heading hierarchy out of order';
+        if ($schemaBlocks === 0)                        $issues[] = 'no JSON-LD schema';
+        if ($ogCount === 0)                             $issues[] = 'no Open Graph tags';
+
+        $detail = sprintf('Title %d, meta %d, %d H1, %d schema blocks', $titleLen, $descLen, $h1Count, $schemaBlocks);
+
+        return [
+            'key' => 'on_page_seo',
+            'label' => 'On-page SEO',
+            'score' => $score,
+            'weight' => 9,
+            'detail' => $detail,
+            'recommendation' => $score < 65
+                ? 'Fix the on-page basics: ' . ($issues === [] ? 'tighten title, meta, H1, and schema.' : implode('; ', $issues) . '.')
+                : null,
+        ];
+    }
+
+    private function factorTechnicalHealth(PageAuditReport $audit): array
+    {
+        $tech = is_array($audit->result['technical'] ?? null) ? $audit->result['technical'] : [];
+        $links = is_array($audit->result['links'] ?? null) ? $audit->result['links'] : [];
+
+        $httpStatus = isset($tech['http_status']) && is_numeric($tech['http_status']) ? (int) $tech['http_status'] : null;
+        $isHttps = (bool) ($tech['is_https'] ?? false);
+        $ttfb = isset($tech['ttfb_ms']) && is_numeric($tech['ttfb_ms']) ? (int) $tech['ttfb_ms'] : null;
+        $brokenCount = is_array($links['broken'] ?? null) ? count($links['broken']) : 0;
+
+        $statusScore = match (true) {
+            $httpStatus === null => 50,
+            $httpStatus >= 200 && $httpStatus < 300 => 100,
+            $httpStatus >= 300 && $httpStatus < 400 => 60,
+            default => 10,
+        };
+        $httpsScore = $isHttps ? 100 : 30;
+        $ttfbScore = $ttfb === null ? 60 : ($ttfb <= 500 ? 100 : ($ttfb <= 1500 ? 70 : ($ttfb <= 3000 ? 40 : 20)));
+        $brokenScore = $brokenCount === 0 ? 100 : ($brokenCount <= 2 ? 70 : ($brokenCount <= 5 ? 40 : 15));
+
+        $score = (int) round(($statusScore * 0.40) + ($httpsScore * 0.20) + ($ttfbScore * 0.20) + ($brokenScore * 0.20));
+
+        $bits = [];
+        if ($httpStatus !== null)  $bits[] = sprintf('HTTP %d', $httpStatus);
+        $bits[] = $isHttps ? 'HTTPS' : 'no HTTPS';
+        if ($ttfb !== null)        $bits[] = sprintf('%dms TTFB', $ttfb);
+        $bits[] = sprintf('%d broken link%s', $brokenCount, $brokenCount === 1 ? '' : 's');
+
+        $recs = [];
+        if ($httpStatus !== null && $httpStatus >= 400)   $recs[] = sprintf('Page returns HTTP %d. Investigate before any other SEO work.', $httpStatus);
+        if (! $isHttps)                                    $recs[] = 'Serve over HTTPS — required for ranking and modern browser features.';
+        if ($ttfb !== null && $ttfb > 1500)               $recs[] = sprintf('Server TTFB is %dms (target ≤500ms). Add caching, upgrade hosting, or move static assets to a CDN.', $ttfb);
+        if ($brokenCount > 0)                              $recs[] = sprintf('Fix the %d broken link%s on this page (see audit report for the list).', $brokenCount, $brokenCount === 1 ? '' : 's');
+
+        return [
+            'key' => 'technical_health',
+            'label' => 'Technical health',
+            'score' => $score,
+            'weight' => 6,
+            'detail' => implode(' · ', $bits),
+            'recommendation' => $recs === [] ? null : implode(' ', $recs),
+        ];
+    }
+
+    private function factorContentQuality(PageAuditReport $audit): array
+    {
+        $content = is_array($audit->result['content'] ?? null) ? $audit->result['content'] : [];
+        $advanced = is_array($audit->result['advanced'] ?? null) ? $audit->result['advanced'] : [];
+        $images = is_array($audit->result['images'] ?? null) ? $audit->result['images'] : [];
+
+        $wordCount = (int) ($content['word_count'] ?? 0);
+        $flesch = isset($advanced['readability']['flesch']) && is_numeric($advanced['readability']['flesch'])
+            ? (float) $advanced['readability']['flesch']
+            : null;
+        $imgTotal = (int) ($images['total'] ?? 0);
+        $imgMissingAlt = (int) ($images['missing_alt_count'] ?? 0);
+
+        $wordScore = match (true) {
+            $wordCount >= 1200 => 100,
+            $wordCount >= 700 => 85,
+            $wordCount >= 400 => 70,
+            $wordCount >= 200 => 45,
+            default => 20,
+        };
+
+        // Flesch sweet-spot for general web content is ~60–80.
+        $fleschScore = $flesch === null ? 60 : match (true) {
+            $flesch >= 60 && $flesch <= 80 => 100,
+            $flesch >= 50 && $flesch < 60 => 80,
+            $flesch > 80 && $flesch <= 90 => 80,
+            $flesch >= 30 && $flesch < 50 => 60,
+            default => 40,
+        };
+
+        // Image coverage — 0 images is a soft penalty, lots of images with
+        // missing alt text is a hard one.
+        $imgScore = $imgTotal === 0
+            ? 50
+            : (int) round(100 * (1 - ($imgMissingAlt / max(1, $imgTotal))));
+
+        $score = (int) round(($wordScore * 0.50) + ($fleschScore * 0.30) + ($imgScore * 0.20));
+
+        $bits = [sprintf('%d words', $wordCount)];
+        if ($flesch !== null) $bits[] = sprintf('Flesch %.0f', $flesch);
+        $bits[] = $imgTotal > 0
+            ? sprintf('%d/%d images with alt', $imgTotal - $imgMissingAlt, $imgTotal)
+            : 'no images';
+
+        $recs = [];
+        if ($wordCount < 700)              $recs[] = sprintf('Expand the article — %d words is below the depth top-ranking pages typically have. Aim for 700+ for content posts.', $wordCount);
+        if ($flesch !== null && $flesch < 50) $recs[] = 'Tighten readability: shorter sentences, simpler words, more paragraph breaks. Aim for a Flesch score of 60–80.';
+        if ($imgMissingAlt > 0)            $recs[] = sprintf('Add alt text to %d image%s — alt text is required for accessibility and helps Google understand visual context.', $imgMissingAlt, $imgMissingAlt === 1 ? '' : 's');
+
+        return [
+            'key' => 'content_quality',
+            'label' => 'Content quality',
+            'score' => $score,
+            'weight' => 7,
+            'detail' => implode(' · ', $bits),
+            'recommendation' => $recs === [] ? null : implode(' ', $recs),
+        ];
+    }
+
+    private function factorTracked(bool $tracked, ?string $focusKeyword): array
+    {
+        return [
             'key' => 'tracked',
             'label' => 'Tracked in Rank Tracker',
             'score' => $tracked ? 100 : 50,
-            'weight' => 5,
+            'weight' => 0, // ZERO-weight: surfaces the prompt + action, doesn't move the score
             'detail' => $tracked
                 ? 'Focus keyword is in your Rank Tracker.'
-                : 'Focus keyword is not yet tracked. Tracking sharpens the score.',
+                : 'Focus keyword is not yet tracked.',
             'recommendation' => $tracked
                 ? null
-                : 'Add this keyphrase to your Rank Tracker so EBQ can monitor weekly position, SERP features, and competitor changes.',
+                : 'Add this keyphrase to Rank Tracker so EBQ can monitor weekly position, SERP features, and competitor changes.',
             'action' => $tracked || $focusKeyword === null || $focusKeyword === ''
                 ? null
                 : [
@@ -264,33 +729,153 @@ class LiveSeoScoreService
                     'keyword' => $focusKeyword,
                 ],
         ];
-
-        // ── Weighted composite ───────────────────────────────────
-        $weightSum = array_sum(array_column($factors, 'weight'));
-        $weighted = 0;
-        foreach ($factors as $f) {
-            $weighted += $f['score'] * ($f['weight'] / $weightSum);
-        }
-        $score = max(0, min(100, (int) round($weighted)));
-
-        $label = $score >= 65 ? 'Good' : ($score >= 45 ? 'Needs work' : 'Bad');
-        $explanation = $this->buildExplanation($score, $rankBasis, $cannibalized, $coverage, $kwRank !== null);
-
-        return [
-            'score' => $score,
-            'label' => $label,
-            'available' => true,
-            'factors' => $factors,
-            'explanation' => $explanation,
-        ];
     }
 
     /**
+     * Pending placeholder for an audit-derived factor when no audit exists yet.
+     * `pending: true` keeps it out of the weighted average but still shows in
+     * the breakdown so the user knows what's coming.
+     */
+    private function pendingFactor(string $key, string $label, string $message): array
+    {
+        return [
+            'key' => $key,
+            'label' => $label,
+            'score' => 0,
+            'weight' => 0,
+            'pending' => true,
+            'detail' => $message,
+            'recommendation' => null,
+        ];
+    }
+
+    /* ──────────────────────────────────────────────────────────────
+     *                      Data lookups
+     * ──────────────────────────────────────────────────────────── */
+
+    /**
+     * Distinct referring DOMAINS (not URLs) for any of the URL variants.
+     * Counts in PHP rather than SQL so we don't have to write a portable
+     * "extract host from URL" expression — the row volumes here are tiny
+     * (one website, one page).
+     */
+    private function countReferringDomains(int $websiteId, array $variants): int
+    {
+        $refUrls = Backlink::query()
+            ->where('website_id', $websiteId)
+            ->whereIn('target_page_url', $variants)
+            ->pluck('referring_page_url')
+            ->all();
+
+        $domains = [];
+        foreach ($refUrls as $u) {
+            $host = parse_url((string) $u, PHP_URL_HOST);
+            if (is_string($host) && $host !== '') {
+                $domains[strtolower(preg_replace('/^www\./', '', $host) ?: $host)] = true;
+            }
+        }
+
+        return count($domains);
+    }
+
+    /* ──────────────────────────────────────────────────────────────
+     *                     Score curves + helpers
+     * ──────────────────────────────────────────────────────────── */
+
+    /**
+     * Position 1 = 100, position 100 = 0, decaying logarithmically so the
+     * 1→3 jump is worth more than 30→50.
+     */
+    private function positionScore(float $pos): int
+    {
+        if ($pos <= 1) return 100;
+        if ($pos >= 100) return 0;
+        $score = 100 - (log10($pos) / log10(100)) * 100;
+
+        return (int) round(max(0, min(100, $score)));
+    }
+
+    /**
+     * Approximate AWR / Sistrix CTR-by-rank curve. Position 1 ≈ 30%,
+     * 5 ≈ 6%, 10 ≈ 2.5%, 20+ ≈ <1%. Used as the "expected" baseline.
+     */
+    private function expectedCtrForPosition(float $pos): float
+    {
+        if ($pos <= 1) return 0.30;
+        if ($pos <= 2) return 0.20;
+        if ($pos <= 3) return 0.13;
+        if ($pos <= 4) return 0.10;
+        if ($pos <= 5) return 0.07;
+        if ($pos <= 10) return 0.025;
+        if ($pos <= 20) return 0.010;
+
+        return 0.005;
+    }
+
+    /**
+     * 100 = at expected, 130%+ = 100 (capped), under expected scales linearly.
+     */
+    private function ctrScore(float $actual, float $expected): int
+    {
+        if ($expected <= 0) return 50;
+        $ratio = $actual / $expected;
+        if ($ratio >= 1.0) return 100;
+
+        return (int) round(max(0, min(100, $ratio * 100)));
+    }
+
+    /**
+     * 0 queries = 0, 5 ≈ 50, 20+ ≈ 100. Plateau so a 200-query post
+     * doesn't dwarf a focused 30-query post.
+     */
+    private function coverageScore(int $count): int
+    {
+        if ($count <= 0) return 0;
+        if ($count >= 20) return 100;
+
+        return (int) round(($count / 20) * 100);
+    }
+
+    /**
+     * Backlink referring-domain curve. 0 = 0, 5 ≈ 50, 50+ = 100, log scale
+     * so the 5→20 jump matters more than 100→200.
+     */
+    private function backlinksScore(int $domains): int
+    {
+        if ($domains <= 0) return 0;
+        if ($domains >= 50) return 100;
+        // log10 maps 1..50 onto roughly 0..1.7
+        return (int) round(min(100, (log10(1 + $domains) / log10(51)) * 100));
+    }
+
+    private function buildExplanation(int $score, float $rankBasis, bool $cannibalized, int $coverage, bool $kwKnown, string $auditStatus): string
+    {
+        if (in_array($auditStatus, ['queued', 'running'], true)) {
+            return 'EBQ is auditing this page in the background. The score above uses GSC + indexing + backlinks while the on-page audit completes — it will refresh automatically with Core Web Vitals, performance, on-page SEO, technical health, and content-quality factors once the audit finishes.';
+        }
+        if ($auditStatus === 'refreshing') {
+            return 'Post was edited since the last audit — EBQ is re-auditing now. The audit-derived factors below show the previous run\'s data; they\'ll refresh automatically when the new audit completes.';
+        }
+        if ($score >= 65) {
+            return sprintf('Live performance is strong. Average rank %.0f across %d queries. Keep adding internal links and tracking competitor moves to defend the position.', $rankBasis, $coverage);
+        }
+        $reasons = [];
+        if ($rankBasis > 20) $reasons[] = 'rank is below page 2';
+        if ($cannibalized)   $reasons[] = 'another URL competes for the same keyword';
+        if ($coverage < 5)   $reasons[] = 'the page only ranks for a handful of queries';
+        if (! $kwKnown)      $reasons[] = "we don't have a confirmed focus-keyword rank yet";
+        if (empty($reasons)) $reasons[] = 'multiple soft signals are below benchmark';
+
+        return 'Why low: ' . implode(', ', $reasons) . '.';
+    }
+
+    /* ──────────────────────────────────────────────────────────────
+     *                   Diagnostics + unavailable
+     * ──────────────────────────────────────────────────────────── */
+
+    /**
      * When GSC returns nothing for the URL, attach diagnostic counters
-     * to the unavailable response so we can quickly see WHY: did the
-     * site sync at all? Are there any rows for this host? Are there
-     * similar URLs (path LIKE) that suggest a normalization mismatch?
-     * Same shape the focus-keyword-suggestions endpoint already uses.
+     * to the unavailable response so we can quickly see WHY.
      */
     private function buildDiagnostics(Website $website, string $url, array $variants): array
     {
@@ -332,80 +917,13 @@ class LiveSeoScoreService
         }
 
         return [
-            'queried_url'            => $url,
-            'queried_path'           => $path,
-            'tried_variants'         => $variants,
-            'gsc_rows_total_all_time'=> $totalRows,
-            'gsc_last_sync_date'     => $latestSync ? (string) $latestSync : null,
-            'similar_urls_in_gsc'    => $similar,
+            'queried_url'             => $url,
+            'queried_path'            => $path,
+            'tried_variants'          => $variants,
+            'gsc_rows_total_all_time' => $totalRows,
+            'gsc_last_sync_date'      => $latestSync ? (string) $latestSync : null,
+            'similar_urls_in_gsc'     => $similar,
         ];
-    }
-
-    /**
-     * Position 1 = 100, position 100 = 0, decaying logarithmically so the
-     * 1→3 jump is worth more than 30→50.
-     */
-    private function positionScore(float $pos): int
-    {
-        if ($pos <= 1) return 100;
-        if ($pos >= 100) return 0;
-        $score = 100 - (log10($pos) / log10(100)) * 100;
-        return (int) round(max(0, min(100, $score)));
-    }
-
-    /**
-     * Approximate AWR / Sistrix CTR-by-rank curve. Position 1 ≈ 30%,
-     * 5 ≈ 6%, 10 ≈ 2.5%, 20+ ≈ <1%. Used as the "expected" baseline.
-     */
-    private function expectedCtrForPosition(float $pos): float
-    {
-        if ($pos <= 1) return 0.30;
-        if ($pos <= 2) return 0.20;
-        if ($pos <= 3) return 0.13;
-        if ($pos <= 4) return 0.10;
-        if ($pos <= 5) return 0.07;
-        if ($pos <= 10) return 0.025;
-        if ($pos <= 20) return 0.010;
-        return 0.005;
-    }
-
-    /**
-     * 100 = at expected, 130%+ = 100 (capped), under expected scales linearly.
-     */
-    private function ctrScore(float $actual, float $expected): int
-    {
-        if ($expected <= 0) return 50;
-        $ratio = $actual / $expected;
-        if ($ratio >= 1.0) return 100;
-        return (int) round(max(0, min(100, $ratio * 100)));
-    }
-
-    /**
-     * 0 queries = 0, 5 ≈ 50, 20+ ≈ 100. Plateau so a 200-query post
-     * doesn't dwarf a focused 30-query post.
-     */
-    private function coverageScore(int $count): int
-    {
-        if ($count <= 0) return 0;
-        if ($count >= 20) return 100;
-        return (int) round(($count / 20) * 100);
-    }
-
-    private function buildExplanation(int $score, float $rankBasis, bool $cannibalized, int $coverage, bool $kwKnown): string
-    {
-        if ($score >= 65) {
-            return sprintf(
-                'Live performance is strong. Average rank %.0f across %d queries. Keep adding internal links + tracking keywords to defend the position.',
-                $rankBasis, $coverage
-            );
-        }
-        $reasons = [];
-        if ($rankBasis > 20) $reasons[] = 'rank is below page 2';
-        if ($cannibalized)   $reasons[] = 'another URL competes for the same keyword';
-        if ($coverage < 5)   $reasons[] = 'the page only ranks for a handful of queries';
-        if (! $kwKnown)      $reasons[] = "we don't have a confirmed focus-keyword rank yet";
-        if (empty($reasons)) $reasons[] = 'multiple soft signals are below benchmark';
-        return 'Why low: ' . implode(', ', $reasons) . '.';
     }
 
     private function unavailable(string $reason, array $debug = []): array
@@ -414,6 +932,10 @@ class LiveSeoScoreService
             'score' => 0,
             'label' => 'Unavailable',
             'available' => false,
+            'audit' => [
+                'status' => 'unavailable',
+                'message' => 'No live score yet — see explanation.',
+            ],
             'factors' => [],
             'explanation' => match ($reason) {
                 'url_not_for_website' => 'This URL doesn\'t belong to your connected website.',

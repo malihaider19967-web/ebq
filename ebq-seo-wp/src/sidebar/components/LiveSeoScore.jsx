@@ -1,131 +1,223 @@
-import { useEffect, useState, useRef } from '@wordpress/element';
-import { __ } from '@wordpress/i18n';
+import { useEffect, useState, useRef, useCallback } from '@wordpress/element';
+import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
-import { CheckCard } from './primitives';
+import { createPortal } from 'react-dom';
+import { ScoreBadge, CheckCard } from './primitives';
 import TrackKeywordButton from './TrackKeywordButton';
 
 /**
- * Live SEO score pill — fetches the EBQ-side composite (GSC rank + CTR +
- * audit + cannibalization + coverage) and renders it next to the editor's
- * local self-check. The DELTA between the two is the moat: when the
- * self-check is high but the live score is low, EBQ explains why.
+ * EBQ live score card. Mirrors the offline `ScoreBadge` shape so the two
+ * read as a matched pair at the top of the SEO tab. Clicking the card
+ * opens a portal-mounted popover with the per-factor breakdown.
  *
- * Debounced 1.2s on (postId, focusKeyword) so we don't burn calls every
- * keystroke. Renders a clickable factor breakdown popover on the score
- * pill so the user can drill into the why without leaving the sidebar.
+ * Two fetch paths:
+ *   - Debounced 1.2s on (postId, focusKeyword) for normal use
+ *   - Polled every 12s while the server reports an audit is queued/running,
+ *     so the score auto-refreshes once the background audit finishes (no
+ *     user action needed). Polling stops as soon as `audit.status` is
+ *     `ready`, `failed`, or `unavailable`.
+ *
+ * Audits never re-run automatically once a `ready` report exists; the user
+ * can trigger a fresh audit from HQ → Page Audits.
  */
+const POLL_INTERVAL_MS = 12000;
+
 export default function LiveSeoScore({ postId, focusKeyword, isConnected }) {
 	const [state, setState] = useState({ status: 'idle', data: null, error: null });
 	const [open, setOpen] = useState(false);
 	const debounceRef = useRef(null);
+	const pollRef = useRef(null);
+	const anchorRef = useRef(null);
 	const popRef = useRef(null);
+	const [anchor, setAnchor] = useState({ top: 0, left: 0, width: 360 });
 
+	const fetchScore = useCallback((isPoll = false) => {
+		if (!isConnected || !postId) return;
+		if (!isPoll) setState((s) => ({ ...s, status: 'loading' }));
+		const path = `/ebq/v1/seo-score/${postId}` + (focusKeyword ? `?focus_keyword=${encodeURIComponent(focusKeyword)}` : '');
+		apiFetch({ path }).then((res) => {
+			if (res?.ok === false || res?.error) {
+				setState({ status: 'error', data: null, error: res?.message || res?.error || 'Fetch failed' });
+			} else {
+				setState({ status: 'ready', data: res?.live || null, error: null });
+			}
+		}).catch((err) => {
+			setState({ status: 'error', data: null, error: err?.message || 'Network error' });
+		});
+	}, [postId, focusKeyword, isConnected]);
+
+	// Debounced fetch on edit. Cancels any in-flight poll so we don't double-fetch.
 	useEffect(() => {
-		if (! isConnected || ! postId) {
+		if (!isConnected || !postId) {
 			setState({ status: 'idle', data: null, error: null });
 			return;
 		}
 		clearTimeout(debounceRef.current);
-		debounceRef.current = setTimeout(() => {
-			setState((s) => ({ ...s, status: 'loading' }));
-			const path = `/ebq/v1/seo-score/${postId}` + (focusKeyword ? `?focus_keyword=${encodeURIComponent(focusKeyword)}` : '');
-			apiFetch({ path }).then((res) => {
-				if (res?.ok === false || res?.error) {
-					setState({ status: 'error', data: null, error: res?.message || res?.error || 'Fetch failed' });
-				} else {
-					setState({ status: 'ready', data: res?.live || null, error: null });
-				}
-			}).catch((err) => {
-				setState({ status: 'error', data: null, error: err?.message || 'Network error' });
-			});
-		}, 1200);
+		debounceRef.current = setTimeout(() => fetchScore(false), 1200);
 		return () => clearTimeout(debounceRef.current);
-	}, [postId, focusKeyword, isConnected]);
+	}, [postId, focusKeyword, isConnected, fetchScore]);
+
+	// Auto-poll while the server reports the audit is still in flight, so the
+	// breakdown swaps from "running…" to full data without the user reloading.
+	useEffect(() => {
+		clearInterval(pollRef.current);
+		const auditStatus = state.data?.audit?.status;
+		const pending = auditStatus === 'queued' || auditStatus === 'running' || auditStatus === 'refreshing';
+		if (state.status === 'ready' && pending) {
+			pollRef.current = setInterval(() => fetchScore(true), POLL_INTERVAL_MS);
+		}
+		return () => clearInterval(pollRef.current);
+	}, [state.status, state.data, fetchScore]);
 
 	useEffect(() => {
-		if (! open) return;
+		if (!open) return;
+		const reposition = () => {
+			const r = anchorRef.current?.getBoundingClientRect();
+			if (!r) return;
+			const margin = 12;
+			const vw = window.innerWidth;
+			const vh = window.innerHeight;
+			const popW = Math.min(380, vw - margin * 2);
+			let left = Math.max(margin, Math.min(r.left, vw - popW - margin));
+			let top = r.bottom + 6;
+			const popH = popRef.current?.offsetHeight || 320;
+			if (top + popH + margin > vh && r.top - popH - 6 > margin) {
+				top = r.top - popH - 6;
+			}
+			setAnchor({ top, left, width: popW });
+		};
+		reposition();
+		const raf = requestAnimationFrame(reposition);
+		const onResize = () => reposition();
+		const onScroll = () => reposition();
+		const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
 		const onClick = (e) => {
 			if (popRef.current?.contains(e.target)) return;
+			if (anchorRef.current?.contains(e.target)) return;
 			setOpen(false);
 		};
-		const onKey = (e) => { if (e.key === 'Escape') setOpen(false); };
-		document.addEventListener('mousedown', onClick, true);
+		window.addEventListener('resize', onResize);
+		window.addEventListener('scroll', onScroll, true);
 		document.addEventListener('keydown', onKey, true);
+		document.addEventListener('mousedown', onClick, true);
 		return () => {
-			document.removeEventListener('mousedown', onClick, true);
+			cancelAnimationFrame(raf);
+			window.removeEventListener('resize', onResize);
+			window.removeEventListener('scroll', onScroll, true);
 			document.removeEventListener('keydown', onKey, true);
+			document.removeEventListener('mousedown', onClick, true);
 		};
 	}, [open]);
 
-	if (! isConnected) {
-		return (
-			<div className="ebq-live-score ebq-live-score--disconnected" title={__('Connect this site to EBQ to see the live score.', 'ebq-seo')}>
-				<span className="ebq-live-score__badge">EBQ</span>
-				<span className="ebq-live-score__num">—</span>
-				<span className="ebq-live-score__label">{__('Connect for live', 'ebq-seo')}</span>
-			</div>
-		);
+	const badgeText = __('EBQ', 'ebq-seo');
+	const labelText = __('Live SEO score', 'ebq-seo');
+
+	let score = 0;
+	let displayScore = '—';
+	let caption = __('Loading…', 'ebq-seo');
+	let canOpen = false;
+	let data = null;
+	let auditStatus = null;
+
+	if (!isConnected) {
+		caption = __('Connect this site to EBQ for the live score.', 'ebq-seo');
+	} else if (state.status === 'loading' || state.status === 'idle') {
+		caption = __('Fetching live signals…', 'ebq-seo');
+	} else if (state.status === 'error') {
+		caption = state.error || __('Live score unavailable.', 'ebq-seo');
+	} else if (state.status === 'ready') {
+		data = state.data;
+		auditStatus = data?.audit?.status || null;
+		if (!data || data.available === false) {
+			caption = data?.explanation || __('No live data yet — waiting on Search Console impressions.', 'ebq-seo');
+		} else {
+			score = Number(data.score) || 0;
+			displayScore = score;
+			canOpen = true;
+			if (auditStatus === 'queued' || auditStatus === 'running') {
+				caption = auditStatus === 'running'
+					? __('Auditing page…', 'ebq-seo')
+					: __('Audit queued…', 'ebq-seo');
+			} else if (auditStatus === 'refreshing') {
+				caption = __('Re-auditing — post was updated', 'ebq-seo');
+			} else {
+				caption = data.label || '';
+			}
+		}
 	}
 
-	if (state.status === 'loading' || state.status === 'idle') {
-		return (
-			<div className="ebq-live-score ebq-live-score--loading">
-				<span className="ebq-live-score__badge">EBQ</span>
-				<span className="ebq-live-score__num">…</span>
-				<span className="ebq-live-score__label">{__('Live score', 'ebq-seo')}</span>
-			</div>
-		);
-	}
-
-	if (state.status === 'error') {
-		return (
-			<div className="ebq-live-score ebq-live-score--error" title={state.error || ''}>
-				<span className="ebq-live-score__badge">EBQ</span>
-				<span className="ebq-live-score__num">!</span>
-				<span className="ebq-live-score__label">{__('Live score error', 'ebq-seo')}</span>
-			</div>
-		);
-	}
-
-	const data = state.data;
-	if (! data || data.available === false) {
-		const reason = data?.explanation || __('Not enough Google Search Console data yet.', 'ebq-seo');
-		return (
-			<div className="ebq-live-score ebq-live-score--unavailable" title={reason}>
-				<span className="ebq-live-score__badge">EBQ</span>
-				<span className="ebq-live-score__num">—</span>
-				<span className="ebq-live-score__label">{__('No live data yet', 'ebq-seo')}</span>
-			</div>
-		);
-	}
-
-	const tone = data.score >= 65 ? 'good' : data.score >= 45 ? 'warn' : 'bad';
+	const setRef = (el) => { anchorRef.current = el; };
+	const isAuditPending = auditStatus === 'queued' || auditStatus === 'running' || auditStatus === 'refreshing';
 
 	return (
-		<div className="ebq-live-score-wrap" style={{ position: 'relative' }}>
-			<button
-				type="button"
-				className={`ebq-live-score ebq-live-score--${tone} is-clickable`}
-				onClick={() => setOpen((v) => !v)}
-				aria-expanded={open}
-				aria-haspopup="dialog"
-				title={__('Click for full breakdown', 'ebq-seo')}
-			>
-				<span className="ebq-live-score__badge">EBQ</span>
-				<span className="ebq-live-score__num">{data.score}</span>
-				<span className="ebq-live-score__label">{__('Live', 'ebq-seo')} · {data.label}</span>
-			</button>
+		<>
+			<div ref={setRef} style={{ width: '100%', position: 'relative' }}>
+				<ScoreBadge
+					kind="live"
+					score={score}
+					displayScore={displayScore}
+					badge={badgeText}
+					label={labelText}
+					caption={caption}
+					onClick={canOpen ? () => setOpen((v) => !v) : undefined}
+					ariaExpanded={open}
+					trailing={isAuditPending ? <span className="ebq-spinner" aria-hidden /> : null}
+				/>
+			</div>
 
-			{open ? (
-				<div ref={popRef} className="ebq-live-score__pop" role="dialog">
+			{open && data && data.available !== false ? createPortal(
+				<div
+					ref={popRef}
+					className="ebq-live-score__pop"
+					role="dialog"
+					aria-label={__('EBQ live score breakdown', 'ebq-seo')}
+					style={{ top: anchor.top, left: anchor.left, width: anchor.width }}
+				>
 					<header className="ebq-live-score__pop-head">
 						<strong>{__('Live SEO score breakdown', 'ebq-seo')}</strong>
-						<button type="button" className="ebq-live-score__pop-close" onClick={() => setOpen(false)} aria-label={__('Close', 'ebq-seo')}>×</button>
+						<button
+							type="button"
+							className="ebq-live-score__pop-close"
+							onClick={() => setOpen(false)}
+							aria-label={__('Close', 'ebq-seo')}
+						>×</button>
 					</header>
-					<p className="ebq-live-score__pop-explanation">{data.explanation}</p>
+
+					{isAuditPending ? (
+						<div className={`ebq-audit-banner ebq-audit-banner--${auditStatus}`}>
+							<span className="ebq-spinner" aria-hidden />
+							<div>
+								<strong>
+									{auditStatus === 'running'
+										? __('Auditing this page now', 'ebq-seo')
+										: auditStatus === 'refreshing'
+											? __('Re-auditing — post was updated', 'ebq-seo')
+											: __('Audit queued', 'ebq-seo')}
+								</strong>
+								<p>{data.audit?.message || __('EBQ is preparing the on-page audit. This score will refresh automatically when it finishes — usually 30–90s.', 'ebq-seo')}</p>
+							</div>
+						</div>
+					) : null}
+
+					{data.audit?.status === 'failed' && data.audit?.message ? (
+						<div className="ebq-audit-banner ebq-audit-banner--failed">
+							<div>
+								<strong>{__('Last audit failed', 'ebq-seo')}</strong>
+								<p>{data.audit.message}</p>
+							</div>
+						</div>
+					) : null}
+
+					{data.explanation ? (
+						<p className="ebq-live-score__pop-explanation">{data.explanation}</p>
+					) : null}
+
 					<div className="ebq-check-list">
 						{(data.factors || []).map((f) => {
-							const fLevel = f.score >= 65 ? 'good' : f.score >= 45 ? 'warn' : 'bad';
+							const isPending = !!f.pending;
+							const fLevel = isPending
+								? 'mute'
+								: (f.score >= 65 ? 'good' : f.score >= 45 ? 'warn' : 'bad');
 							let actionEl = null;
 							if (f.action?.kind === 'track-keyword' && f.action.keyword) {
 								actionEl = <TrackKeywordButton keyword={f.action.keyword} />;
@@ -135,9 +227,8 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected }) {
 									key={f.key}
 									kind="live"
 									level={fLevel}
-									label={f.label}
-									score={f.score}
-									weight={f.weight}
+									label={isPending ? `${f.label} · ${__('pending', 'ebq-seo')}` : f.label}
+									score={isPending ? null : f.score}
 									detail={f.detail}
 									recommendation={f.recommendation || null}
 									action={actionEl}
@@ -146,10 +237,11 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected }) {
 						})}
 					</div>
 					<footer className="ebq-live-score__pop-foot">
-						{__('Live score uses real Google Search Console data and a Lighthouse audit. The local self-check above only sees what you wrote.', 'ebq-seo')}
+						{__('Live score blends Google Search Console data, indexing status, backlinks, and the EBQ on-page audit. Once an audit completes, EBQ doesn\'t re-run it automatically — re-trigger from HQ → Page Audits when you want fresh CWV / performance numbers.', 'ebq-seo')}
 					</footer>
-				</div>
+				</div>,
+				document.body
 			) : null}
-		</div>
+		</>
 	);
 }
