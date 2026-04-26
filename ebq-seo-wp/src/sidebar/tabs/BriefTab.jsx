@@ -4,6 +4,7 @@ import apiFetch from '@wordpress/api-fetch';
 import { Section, Button, EmptyState, Pill, TextField } from '../components/primitives';
 import { IconSparkle, IconChart } from '../components/icons';
 import { useEditorContext, usePostMeta, publicConfig } from '../hooks/useEditorContext';
+import { useTier } from '../hooks/useTier';
 
 /**
  * "Brief" tab — Pro tier only.
@@ -20,6 +21,9 @@ export default function BriefTab() {
 	const ctx = useEditorContext();
 	const { get } = usePostMeta();
 	const cfg = publicConfig();
+	// Reactive tier — flips Free → Pro UI without an editor reload when
+	// the backend reports an upgrade on any in-flight API response.
+	const tier = useTier();
 
 	const [keyword, setKeyword] = useState(get('_ebq_focus_keyword', '') || '');
 	const [state, setState] = useState({ status: 'idle', data: null, error: null });
@@ -52,7 +56,7 @@ export default function BriefTab() {
 			});
 	}, [ctx.postId, keyword]);
 
-	if (cfg.tier !== 'pro') {
+	if (tier !== 'pro') {
 		return (
 			<div className="ebq-stack">
 				<Section title={__('AI content brief', 'ebq-seo')} icon={<IconSparkle />}>

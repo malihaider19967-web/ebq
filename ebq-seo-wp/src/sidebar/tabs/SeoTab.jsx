@@ -18,6 +18,7 @@ import LiveSeoScore from '../components/LiveSeoScore';
 import TopicalGaps from '../components/TopicalGaps';
 
 import { useEditorContext, usePostMeta, resolveTitleTemplate, publicConfig } from '../hooks/useEditorContext';
+import { useTier } from '../hooks/useTier';
 import useDebounced from '../hooks/useDebounced';
 import { analyzeSeo, labelForScore } from '../analysis/seo';
 
@@ -25,6 +26,10 @@ export default function SeoTab() {
 	const ctx = useEditorContext();
 	const { get, set } = usePostMeta();
 	const cfg = publicConfig();
+	// Tier is reactive — useTier listens for `ebq:tier-changed` events
+	// emitted by the apiFetch middleware when the backend reports a new
+	// tier. So upgrading in EBQ flips the editor UI without a reload.
+	const tier = useTier();
 	const [previewMode, setPreviewMode] = useState('desktop');
 	// `relatedTarget` doubles as the open/closed flag: null when closed,
 	// `{ kind: 'focus' | 'additional', index?: number, keyword: string }`
@@ -196,7 +201,7 @@ export default function SeoTab() {
 				    nudge so they know the feature exists without us
 				    rendering a non-functional button. */}
 				<div className="ebq-row" style={{ marginTop: 8, gap: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
-					{cfg.tier === 'pro' ? (
+					{tier === 'pro' ? (
 						<AiRewriteSnippet
 							postId={ctx.postId}
 							focusKeyword={focusKeyword}
