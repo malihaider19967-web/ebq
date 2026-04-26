@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Jobs\RunCustomPageAudit;
+use App\Jobs\SyncOwnBacklinksFromKeywordsEverywhere;
 use App\Models\Backlink;
 use App\Models\CustomPageAudit;
 use App\Models\PageAuditReport;
@@ -166,6 +167,16 @@ class LiveSeoScoreService
             ->tap(fn ($q) => $this->resolver->__publicApplyPageMatch($q, $url))
             ->orderByDesc('last_google_status_checked_at')
             ->first();
+
+        // ── Trigger a background sync of the website's own backlinks from
+        //    Keywords Everywhere. The job is unique-per-website and the
+        //    service itself only hits KE once every 30 days — safe to fire
+        //    on every score request. Once the job lands, the count below
+        //    picks up the new rows on the next score call.
+        SyncOwnBacklinksFromKeywordsEverywhere::dispatch(
+            $website->id,
+            $website->user_id ?? null,
+        );
 
         // ── Backlinks (referring domain count for any URL variant) ──
         $referringDomains = $this->countReferringDomains($website->id, $variants);
