@@ -68,9 +68,22 @@ class TopicalGapService
             substr(hash('sha256', $contentText), 0, 12),
         );
 
-        return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($kw, $contentText, $country, $language, $website) {
-            return $this->compute($website, $kw, $contentText, $country, $language);
-        });
+        // We DELIBERATELY don't use Cache::remember here: that would cache
+        // the failure tuple too (`available=false, reason=llm_parse_failed`,
+        // etc.), pinning a transient error for 7 days even after the
+        // upstream issue clears. Instead: read the cache; on miss compute;
+        // only persist on success. Re-clicks during the failure window now
+        // actually retry instead of returning the bad cached result.
+        $cached = Cache::get($cacheKey);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
+        $result = $this->compute($website, $kw, $contentText, $country, $language);
+        if (($result['available'] ?? false) === true) {
+            Cache::put($cacheKey, $result, self::CACHE_TTL);
+        }
+        return $result;
     }
 
     private function compute(Website $website, string $kw, string $contentText, string $country, string $language): array
