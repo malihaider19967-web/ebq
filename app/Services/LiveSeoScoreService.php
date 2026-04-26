@@ -169,6 +169,15 @@ class LiveSeoScoreService
             'detail' => $kwRank !== null
                 ? sprintf('Position %.1f for "%s"', $kwRank, $focusKeyword)
                 : sprintf('Avg position %.1f across all queries', $rankBasis),
+            'recommendation' => $rankScore < 65
+                ? ($kwRank !== null
+                    ? sprintf(
+                        'Add internal links to this page using "%s" as anchor text and place the keyphrase in an H2/H3. Strengthen the topical depth (covered subtopics, supporting media) to climb out of position %.0f.',
+                        $focusKeyword !== null && $focusKeyword !== '' ? $focusKeyword : 'your focus keyphrase',
+                        $rankBasis
+                    )
+                    : 'Set a focus keyphrase so we can score the page on a specific query, then strengthen internal links and on-page placement for it.')
+                : null,
         ];
 
         // CTR (15%) — actual CTR vs expected for the rank.
@@ -185,6 +194,9 @@ class LiveSeoScoreService
                 $expectedCtr * 100,
                 $rankBasis
             ),
+            'recommendation' => $ctrScore < 65
+                ? 'Rewrite the SEO title and meta description so the snippet earns more clicks: lead with the keyphrase, add a year or specific number, and answer the searcher\'s intent in plain language.'
+                : null,
         ];
 
         // Coverage (20%) — number of distinct ranking queries.
@@ -195,6 +207,9 @@ class LiveSeoScoreService
             'score' => $coverageScore,
             'weight' => 20,
             'detail' => sprintf('Ranks for %d distinct queries in the top 100', $coverage),
+            'recommendation' => $coverageScore < 65
+                ? 'Add 1–2 sections covering related sub-questions and long-tail variants of the focus keyphrase. Use the "Topical gaps vs. top SERP" panel above for specific subtopic ideas competitors cover.'
+                : null,
         ];
 
         // Cannibalization (15%) — penalty when present.
@@ -207,6 +222,9 @@ class LiveSeoScoreService
             'detail' => $cannibalized
                 ? 'Another URL on this site is also ranking for the focus keyword.'
                 : 'No competing pages on the site for this query.',
+            'recommendation' => $cannibalized
+                ? 'Find the other ranking URL in the HQ → Insights → Cannibalization view and either 301-redirect it into this page or shift its targeting to a different keyphrase.'
+                : null,
         ];
 
         // Audit (10%) — Lighthouse performance.
@@ -219,6 +237,11 @@ class LiveSeoScoreService
             'detail' => $auditScore !== null
                 ? sprintf('Lighthouse: %d/100', $auditScore)
                 : 'No recent Lighthouse audit on file.',
+            'recommendation' => $auditScore !== null && $auditScore < 65
+                ? 'Compress and lazy-load images, defer third-party JS (analytics, chat widgets), and inline critical CSS. Re-run the audit from HQ → Page Audits to verify.'
+                : ($auditScore === null
+                    ? 'Run a page audit from HQ → Page Audits so the live score can factor in real Lighthouse performance.'
+                    : null),
         ];
 
         // Tracked-keyword (5%) — small nudge.
@@ -230,6 +253,16 @@ class LiveSeoScoreService
             'detail' => $tracked
                 ? 'Focus keyword is in your Rank Tracker.'
                 : 'Focus keyword is not yet tracked. Tracking sharpens the score.',
+            'recommendation' => $tracked
+                ? null
+                : 'Add this keyphrase to your Rank Tracker so EBQ can monitor weekly position, SERP features, and competitor changes.',
+            'action' => $tracked || $focusKeyword === null || $focusKeyword === ''
+                ? null
+                : [
+                    'kind' => 'track-keyword',
+                    'label' => 'Add to Rank Tracker',
+                    'keyword' => $focusKeyword,
+                ],
         ];
 
         // ── Weighted composite ───────────────────────────────────

@@ -1,4 +1,5 @@
 import { IconCheck, IconCross, IconWarn, IconDot } from './icons';
+import { CheckCard } from './primitives';
 
 const ICONS = {
 	good: <IconCheck />,
@@ -7,23 +8,28 @@ const ICONS = {
 	mute: <IconDot />,
 };
 
+/**
+ * Offline self-check rows. Renders each assessment as a `CheckCard` with
+ * `kind="offline"` so it shares layout with the live-score factor cards
+ * but gets a distinct neutral tint to signal the source.
+ */
 export default function AssessmentList({ items }) {
 	if (!items || !items.length) {
 		return null;
 	}
 	return (
-		<ul className="ebq-checklist">
+		<div className="ebq-check-list">
 			{items.map((a, i) => (
-				<li className="ebq-check" key={i}>
-					<span className={`ebq-check__icon ebq-check__icon--${a.level === 'ok' ? 'warn' : a.level}`}>
-						{ICONS[a.level] || <IconDot />}
-					</span>
-					<div className="ebq-check__text">
-						<span>{a.label}</span>
-						{a.hint ? <div className="ebq-check__hint">{a.hint}</div> : null}
-					</div>
-				</li>
+				<CheckCard
+					key={i}
+					kind="offline"
+					level={a.level}
+					label={a.label}
+					detail={null}
+					recommendation={a.hint || null}
+					icon={ICONS[a.level] || <IconDot />}
+				/>
 			))}
-		</ul>
+		</div>
 	);
 }

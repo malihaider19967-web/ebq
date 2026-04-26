@@ -1,6 +1,8 @@
 import { useEffect, useState, useRef } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
+import { CheckCard } from './primitives';
+import TrackKeywordButton from './TrackKeywordButton';
 
 /**
  * Live SEO score pill — fetches the EBQ-side composite (GSC rank + CTR +
@@ -121,21 +123,28 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected }) {
 						<button type="button" className="ebq-live-score__pop-close" onClick={() => setOpen(false)} aria-label={__('Close', 'ebq-seo')}>×</button>
 					</header>
 					<p className="ebq-live-score__pop-explanation">{data.explanation}</p>
-					<ul className="ebq-live-score__factors">
+					<div className="ebq-check-list">
 						{(data.factors || []).map((f) => {
-							const fTone = f.score >= 65 ? 'good' : f.score >= 45 ? 'warn' : 'bad';
+							const fLevel = f.score >= 65 ? 'good' : f.score >= 45 ? 'warn' : 'bad';
+							let actionEl = null;
+							if (f.action?.kind === 'track-keyword' && f.action.keyword) {
+								actionEl = <TrackKeywordButton keyword={f.action.keyword} />;
+							}
 							return (
-								<li key={f.key} className={`ebq-live-score__factor ebq-live-score__factor--${fTone}`}>
-									<div className="ebq-live-score__factor-row">
-										<span className="ebq-live-score__factor-label">{f.label}</span>
-										<span className="ebq-live-score__factor-score">{f.score}</span>
-										<span className="ebq-live-score__factor-weight">×{f.weight}%</span>
-									</div>
-									<p className="ebq-live-score__factor-detail">{f.detail}</p>
-								</li>
+								<CheckCard
+									key={f.key}
+									kind="live"
+									level={fLevel}
+									label={f.label}
+									score={f.score}
+									weight={f.weight}
+									detail={f.detail}
+									recommendation={f.recommendation || null}
+									action={actionEl}
+								/>
 							);
 						})}
-					</ul>
+					</div>
 					<footer className="ebq-live-score__pop-foot">
 						{__('Live score uses real Google Search Console data and a Lighthouse audit. The local self-check above only sees what you wrote.', 'ebq-seo')}
 					</footer>

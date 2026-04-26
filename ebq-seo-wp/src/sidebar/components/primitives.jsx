@@ -170,6 +170,40 @@ export function ScoreBadge({ score, label, caption }) {
 	);
 }
 
+/* ─── Check card (unified offline + live factor row) ─────────── */
+
+/**
+ * Single row used by both the offline self-check (`AssessmentList`) and the
+ * EBQ live-score factor breakdown. Same layout — colored left stripe,
+ * label + score chip, detail line, optional recommendation, optional action.
+ *
+ * `kind` paints the card's background tint ("offline" = neutral surface,
+ * "live" = subtle accent tint) so the user can tell at a glance which side
+ * of the SEO panel a row came from. The left stripe is always tinted by
+ * `level` (good / warn / bad / mute).
+ */
+export function CheckCard({ kind = 'offline', level = 'mute', label, score, weight, detail, recommendation, action, icon }) {
+	const cardLevel = level === 'ok' ? 'warn' : level;
+	const cls = `ebq-check-card ebq-check-card--${kind} ebq-check-card--${cardLevel}`;
+	return (
+		<div className={cls}>
+			{icon ? <span className={`ebq-check-card__icon ebq-check-card__icon--${cardLevel}`}>{icon}</span> : null}
+			<div className="ebq-check-card__head">
+				<span className="ebq-check-card__label">{label}</span>
+				{score != null ? (
+					<span className={`ebq-check-card__chip ebq-check-card__chip--${cardLevel}`}>
+						{score}
+						{weight ? <small> · ×{weight}%</small> : null}
+					</span>
+				) : null}
+			</div>
+			{detail ? <p className="ebq-check-card__detail">{detail}</p> : null}
+			{recommendation ? <p className="ebq-check-card__recommend">{recommendation}</p> : null}
+			{action ? <div className="ebq-check-card__action">{action}</div> : null}
+		</div>
+	);
+}
+
 /* ─── Stat tile ──────────────────────────────────────────────── */
 
 export function StatGrid({ children }) {
