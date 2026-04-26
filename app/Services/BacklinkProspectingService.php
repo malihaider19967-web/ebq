@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Backlink;
 use App\Models\CompetitorBacklink;
+use App\Models\OutreachProspect;
 use App\Models\Website;
 use App\Services\Llm\LlmClient;
 use Illuminate\Support\Carbon;
@@ -133,6 +134,13 @@ class BacklinkProspectingService
 
         $prospects = array_slice(array_values($prospects), 0, self::MAX_PROSPECTS);
 
+        // Persist into outreach_prospects so the user can come back to a
+        // working list — status / notes / drafts survive across sessions
+        // and the next prospect() call enriches existing rows instead of
+        // wiping them. This is what turns the feature from "compute on
+        // demand" into a real outreach workflow.
+        $this->upsertProspects($website, $prospects);
+
         $result = [
             'prospects' => $prospects,
             'summary' => [
@@ -144,6 +152,148 @@ class BacklinkProspectingService
         ];
         Cache::put($cacheKey, $result, Carbon::now()->addHours(self::CACHE_TTL_HOURS));
         return $result;
+    }
+
+    /**
+     * The persisted-prospects view used by the HQ tab on initial load.
+     * Returns saved prospects with status + notes + latest draft,
+     * filtered by status if requested. This is the call the tab fires
+     * before the user has typed any competitor — they should see their
+     * working list immediately, not an empty form.
+     *
+     * @return array{
+     *   prospects: list<array<string, mixed>>,
+     *   counts: array<string, int>,
+     * }
+     */
+    public function listSaved(Website $website, ?string $status = null): array
+    {
+        $query = OutreachProspect::query()
+            ->where('website_id', $website->id)
+            ->orderByRaw("CASE status
+                WHEN 'replied' THEN 1
+                WHEN 'drafted' THEN 2
+                WHEN 'new' THEN 3
+                WHEN 'contacted' THEN 4
+                WHEN 'snoozed' THEN 5
+                WHEN 'converted' THEN 6
+                WHEN 'declined' THEN 7
+                ELSE 8 END")
+            ->orderByDesc('domain_authority');
+
+        if ($status !== null && $status !== '' && $status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        $rows = $query->limit(500)->get();
+
+        // Always compute the full status histogram so the toolbar pills
+        // can show counts even when the current filter is restrictive.
+        $counts = OutreachProspect::query()
+            ->where('website_id', $website->id)
+            ->selectRaw('status, COUNT(*) AS c')
+            ->groupBy('status')
+            ->pluck('c', 'status')
+            ->all();
+
+        return [
+            'prospects' => $rows->map(fn (OutreachProspect $p) => $this->serializeProspect($p))->all(),
+            'counts' => array_merge(array_fill_keys(OutreachProspect::STATUSES, 0), array_map('intval', $counts)),
+        ];
+    }
+
+    /**
+     * Update one persisted prospect's status / notes from the HQ tab.
+     */
+    public function updateProspect(Website $website, int $id, array $patch): ?OutreachProspect
+    {
+        $prospect = OutreachProspect::query()
+            ->where('website_id', $website->id)
+            ->where('id', $id)
+            ->first();
+        if (! $prospect) return null;
+
+        if (array_key_exists('status', $patch) && in_array($patch['status'], OutreachProspect::STATUSES, true)) {
+            $prospect->status = (string) $patch['status'];
+            // Auto-stamp contacted_at the first time a prospect crosses
+            // into a "we reached out" state — useful for outreach SLA reports.
+            if (in_array($prospect->status, [OutreachProspect::STATUS_CONTACTED, OutreachProspect::STATUS_REPLIED, OutreachProspect::STATUS_CONVERTED], true)
+                && $prospect->contacted_at === null) {
+                $prospect->contacted_at = Carbon::now();
+            }
+        }
+        if (array_key_exists('notes', $patch)) {
+            $prospect->notes = mb_substr((string) $patch['notes'], 0, 4000);
+        }
+        $prospect->save();
+
+        return $prospect;
+    }
+
+    /**
+     * @param  list<array{domain: string, domain_authority: int|null, linked_to: list<string>, anchor_examples: list<string>, last_seen_at: string|null}>  $prospects
+     */
+    private function upsertProspects(Website $website, array $prospects): void
+    {
+        $now = Carbon::now();
+        foreach ($prospects as $p) {
+            $domain = (string) ($p['domain'] ?? '');
+            if ($domain === '') continue;
+
+            $existing = OutreachProspect::query()
+                ->where('website_id', $website->id)
+                ->where('referring_domain', $domain)
+                ->first();
+
+            $payload = [
+                'domain_authority' => $p['domain_authority'] ?? null,
+                'linked_to_competitors' => array_values($p['linked_to'] ?? []),
+                'anchor_examples' => array_slice(array_values($p['anchor_examples'] ?? []), 0, 3),
+                'last_seen_at' => $now,
+            ];
+
+            if ($existing) {
+                // Merge competitor list — re-runs against new competitors
+                // should expand, not replace. Status + notes untouched.
+                $merged = array_values(array_unique(array_merge(
+                    $existing->linked_to_competitors ?? [],
+                    $payload['linked_to_competitors'],
+                )));
+                $payload['linked_to_competitors'] = $merged;
+                // Keep the highest DA seen across runs (KE may revise it).
+                if (($existing->domain_authority ?? 0) > ($payload['domain_authority'] ?? 0)) {
+                    $payload['domain_authority'] = $existing->domain_authority;
+                }
+                $existing->fill($payload)->save();
+            } else {
+                OutreachProspect::create(array_merge($payload, [
+                    'website_id' => $website->id,
+                    'referring_domain' => $domain,
+                    'status' => OutreachProspect::STATUS_NEW,
+                    'first_seen_at' => $now,
+                ]));
+            }
+        }
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeProspect(OutreachProspect $p): array
+    {
+        return [
+            'id' => $p->id,
+            'domain' => $p->referring_domain,
+            'domain_authority' => $p->domain_authority,
+            'linked_to' => $p->linked_to_competitors ?? [],
+            'anchor_examples' => $p->anchor_examples ?? [],
+            'status' => $p->status,
+            'notes' => $p->notes,
+            'latest_draft' => $p->latest_draft,
+            'first_seen_at' => $p->first_seen_at?->toIso8601String(),
+            'last_seen_at' => $p->last_seen_at?->toIso8601String(),
+            'contacted_at' => $p->contacted_at?->toIso8601String(),
+        ];
     }
 
     /**
@@ -204,6 +354,29 @@ class BacklinkProspectingService
             'cached' => false,
         ];
         Cache::put($cacheKey, $result, Carbon::now()->addDays(7));
+
+        // Persist the draft on the matching prospect row so it survives
+        // page reloads + appears next to the row. If the prospect record
+        // doesn't exist yet (e.g. first-ever search), we don't create one
+        // — drafts are only persisted for prospects already in the table.
+        if (! empty($context['website_id'])) {
+            $prospect = OutreachProspect::query()
+                ->where('website_id', (int) $context['website_id'])
+                ->where('referring_domain', $domain)
+                ->first();
+            if ($prospect) {
+                $prospect->latest_draft = [
+                    'subject' => $result['subject'],
+                    'body' => $result['body'],
+                    'generated_at' => Carbon::now()->toIso8601String(),
+                ];
+                if ($prospect->status === OutreachProspect::STATUS_NEW) {
+                    $prospect->status = OutreachProspect::STATUS_DRAFTED;
+                }
+                $prospect->save();
+            }
+        }
+
         return $result;
     }
 

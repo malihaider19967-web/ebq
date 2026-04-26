@@ -202,6 +202,17 @@ final class EBQ_Api_Client
         return $this->get('/api/v1/hq/topical-authority', []);
     }
 
+    public function hq_outreach_prospects_list(string $status = ''): array
+    {
+        $args = $status !== '' ? ['status' => $status] : [];
+        return $this->get('/api/v1/hq/outreach-prospects', $args);
+    }
+
+    public function hq_outreach_prospects_update(int $id, array $patch): array
+    {
+        return $this->request('POST', sprintf('/api/v1/hq/outreach-prospects/%d', $id), $patch);
+    }
+
     public function entity_coverage(string $post_id, string $url): array
     {
         return $this->get(sprintf('/api/v1/posts/%s/entity-coverage', rawurlencode($post_id)), ['url' => $url]);

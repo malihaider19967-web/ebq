@@ -1403,3 +1403,50 @@
 .ebq-topauth-pages { list-style: none; margin: 4px 0 0; padding: 0; }
 .ebq-topauth-pages li a { color: #1d4ed8; text-decoration: none; font-size: 11px; word-break: break-all; }
 .ebq-topauth-pages li a:hover { text-decoration: underline; }
+
+/* Prospects v2 — persisted workflow */
+.ebq-hq-prospects__add {
+	background: #f8fafc;
+	border: 1px solid #e2e8f0;
+	border-radius: 6px;
+	padding: 8px 12px;
+	margin-bottom: 12px;
+}
+.ebq-hq-prospects__add summary {
+	cursor: pointer;
+	font-size: 12px;
+	font-weight: 600;
+	color: #1d4ed8;
+	padding: 4px 0;
+}
+.ebq-hq-prospects__add[open] summary { margin-bottom: 8px; }
+.ebq-hq-toolbar__filter em { font-style: normal; opacity: 0.75; margin-left: 2px; }
+.ebq-hq-prospects__status {
+	font-size: 11px;
+	border: 1px solid #e2e8f0;
+	border-radius: 4px;
+	padding: 2px 4px;
+	background: #fff;
+}
+.ebq-hq-prospects__notes {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid #e2e8f0;
+}
+.ebq-hq-prospects__notes label {
+	display: block;
+	font-size: 11px;
+	font-weight: 700;
+	color: #475569;
+	margin-bottom: 4px;
+}
+.ebq-hq-prospects__notes textarea {
+	width: 100%;
+	border: 1px solid #e2e8f0;
+	border-radius: 4px;
+	padding: 8px;
+	font-size: 12px;
+	font-family: inherit;
+	box-sizing: border-box;
+	margin-bottom: 6px;
+}

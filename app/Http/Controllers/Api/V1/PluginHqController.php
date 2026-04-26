@@ -750,7 +750,38 @@ class PluginHqController extends Controller
             'our_page_url' => $data['our_page_url'],
             'our_page_title' => $data['our_page_title'] ?? '',
             'our_page_summary' => $data['our_page_summary'] ?? '',
+            'website_id' => $website->id,
         ]));
+    }
+
+    /**
+     * Persisted prospect list — what the HQ tab loads on open.
+     *   GET /api/v1/hq/outreach-prospects?status=new
+     */
+    public function outreachProspectsList(Request $request, BacklinkProspectingService $service): JsonResponse
+    {
+        $website = $this->website($request);
+        $status = (string) $request->query('status', '');
+        return response()->json($service->listSaved($website, $status !== '' ? $status : null));
+    }
+
+    /**
+     * Update one prospect's status / notes from the HQ tab.
+     *   POST /api/v1/hq/outreach-prospects/{id}
+     *   body: { status?, notes? }
+     */
+    public function outreachProspectsUpdate(Request $request, int $id, BacklinkProspectingService $service): JsonResponse
+    {
+        $website = $this->website($request);
+        $data = $request->validate([
+            'status' => 'nullable|in:new,drafted,contacted,replied,converted,declined,snoozed',
+            'notes' => 'nullable|string|max:4000',
+        ]);
+        $prospect = $service->updateProspect($website, $id, $data);
+        if (! $prospect) {
+            return response()->json(['ok' => false, 'error' => 'not_found'], 404);
+        }
+        return response()->json(['ok' => true, 'id' => $prospect->id, 'status' => $prospect->status]);
     }
 
     /**

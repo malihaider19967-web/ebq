@@ -43,6 +43,7 @@ final class EBQ_Rest_Proxy
         '/ebq/v1/hq/benchmarks',
         '/ebq/v1/hq/backlink-prospects',
         '/ebq/v1/hq/topical-authority',
+        '/ebq/v1/hq/outreach-prospects',
         '/ebq/v1/entity-coverage',
     ];
 
@@ -197,6 +198,19 @@ final class EBQ_Rest_Proxy
             'methods' => 'GET',
             'permission_callback' => [$this, 'can_view_hq'],
             'callback' => [$this, 'hq_topical_authority'],
+        ]);
+        register_rest_route('ebq/v1', '/hq/outreach-prospects', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_outreach_prospects_list'],
+        ]);
+        register_rest_route('ebq/v1', '/hq/outreach-prospects/(?P<id>\d+)', [
+            'methods' => 'POST',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_outreach_prospects_update'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+            ],
         ]);
         register_rest_route('ebq/v1', '/entity-coverage/(?P<id>\d+)', [
             'methods' => 'GET',
@@ -735,6 +749,20 @@ final class EBQ_Rest_Proxy
     public function hq_topical_authority(WP_REST_Request $request): WP_REST_Response
     {
         return new WP_REST_Response(EBQ_Plugin::api_client()->hq_topical_authority(), 200);
+    }
+
+    public function hq_outreach_prospects_list(WP_REST_Request $request): WP_REST_Response
+    {
+        $status = (string) ($request->get_param('status') ?: '');
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_outreach_prospects_list($status), 200);
+    }
+
+    public function hq_outreach_prospects_update(WP_REST_Request $request): WP_REST_Response
+    {
+        $id = (int) $request->get_param('id');
+        $body = $request->get_json_params();
+        if (! is_array($body)) $body = $request->get_params();
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_outreach_prospects_update($id, $body), 200);
     }
 
     public function entity_coverage(WP_REST_Request $request): WP_REST_Response

@@ -81,6 +81,10 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/serp-features', [PluginHqController::class, 'serpFeatures'])->name('serp-features');
             Route::post('/backlink-prospects', [PluginHqController::class, 'backlinkProspects'])->name('backlink-prospects');
             Route::post('/backlink-prospects/draft', [PluginHqController::class, 'backlinkOutreachDraft'])->name('backlink-prospects.draft');
+            Route::get('/outreach-prospects', [PluginHqController::class, 'outreachProspectsList'])->name('outreach-prospects.index');
+            Route::post('/outreach-prospects/{id}', [PluginHqController::class, 'outreachProspectsUpdate'])
+                ->whereNumber('id')
+                ->name('outreach-prospects.update');
             Route::get('/benchmarks', [PluginHqController::class, 'crossSiteBenchmarks'])->name('benchmarks');
             Route::get('/topical-authority', [PluginHqController::class, 'topicalAuthority'])->name('topical-authority');
         });
