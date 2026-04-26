@@ -6,12 +6,6 @@
         ['text' => $auditMessage, 'kind' => $auditMessageKind],
     ])->filter(fn ($m) => ! empty($m['text']))->values();
 
-    $verdict = $indexingStatus?->google_verdict;
-    $verdictKind = match (strtoupper((string) $verdict)) {
-        'PASS' => 'success',
-        'FAIL', 'NEUTRAL', 'PARTIAL' => 'warning',
-        default => 'muted',
-    };
 @endphp
 
 <div class="space-y-5" wire:init="autoGenerateSnippet">
@@ -148,14 +142,20 @@
         <div class="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-center justify-between">
                 <h3 class="text-sm font-bold text-slate-900 dark:text-slate-100">Google Indexing</h3>
-                <span @class([
-                    'inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold',
-                    'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $verdictKind === 'success',
-                    'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' => $verdictKind === 'warning',
-                    'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' => $verdictKind === 'muted',
-                ])>{{ $verdict ?? 'Unknown' }}</span>
+                <span
+                    title="{{ $indexVerdict['tooltip'] }}"
+                    @class([
+                        'inline-flex rounded-full px-2 py-0.5 text-[10px] font-semibold',
+                        'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400' => $indexVerdict['kind'] === 'success',
+                        'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400' => $indexVerdict['kind'] === 'warning',
+                        'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' => $indexVerdict['kind'] === 'muted',
+                    ])>{{ $indexVerdict['label'] }}</span>
             </div>
             <dl class="mt-3 space-y-2 text-xs">
+                <div class="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 dark:border-slate-800">
+                    <dt class="text-slate-500 dark:text-slate-400">Impressions{{ $gscKeywordLookbackDays ? ' ('.(int) $gscKeywordLookbackDays.'d)' : '' }}</dt>
+                    <dd class="text-right font-medium text-slate-800 dark:text-slate-100">{{ number_format((int) ($summary->total_impressions ?? 0)) }}</dd>
+                </div>
                 <div class="flex items-center justify-between gap-3 border-b border-slate-100 pb-2 dark:border-slate-800">
                     <dt class="text-slate-500 dark:text-slate-400">Coverage</dt>
                     <dd class="truncate text-right font-medium text-slate-800 dark:text-slate-100">{{ $indexingStatus?->google_coverage_state ?? '—' }}</dd>

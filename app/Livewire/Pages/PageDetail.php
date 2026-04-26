@@ -409,6 +409,13 @@ class PageDetail extends Component
                 ->first();
         }
 
+        $indexVerdict = $this->buildIndexVerdict(
+            $indexingStatus,
+            $summary,
+            $gscKeywordWindowFrom ?? null,
+            $gscKeywordLookbackDays
+        );
+
         return view('livewire.pages.page-detail', compact(
             'summary',
             'keywords',
@@ -416,7 +423,73 @@ class PageDetail extends Component
             'auditReport',
             'pageAuditRuns',
             'gscKeywordLookbackDays',
+            'indexVerdict',
         ));
+    }
+
+    /**
+     * Decide what the Google Indexing card badge should say.
+     *
+     * Order of trust: an explicit URL Inspection result (user clicked
+     * "Refresh status") overrides everything; otherwise we infer from
+     * Search Console performance data — any impressions in the window
+     * means Google has indexed and surfaced the URL.
+     *
+     * @return array{label: string, kind: string, tooltip: string}
+     */
+    private function buildIndexVerdict(
+        ?PageIndexingStatus $indexingStatus,
+        ?object $summary,
+        ?string $gscKeywordWindowFrom,
+        ?int $gscKeywordLookbackDays,
+    ): array {
+        $rawVerdict = $indexingStatus?->google_verdict;
+        if (is_string($rawVerdict) && $rawVerdict !== '') {
+            $kind = match (strtoupper($rawVerdict)) {
+                'PASS' => 'success',
+                'FAIL', 'NEUTRAL', 'PARTIAL' => 'warning',
+                default => 'muted',
+            };
+            $checkedAt = $indexingStatus?->last_google_status_checked_at;
+            $tooltip = $checkedAt
+                ? 'Verified via Search Console URL Inspection on '.$checkedAt->format('M j, Y')
+                : 'Verified via Search Console URL Inspection.';
+
+            return ['label' => $rawVerdict, 'kind' => $kind, 'tooltip' => $tooltip];
+        }
+
+        $impressions = (int) ($summary->total_impressions ?? 0);
+        $days = (int) ($gscKeywordLookbackDays ?? 0);
+
+        if ($impressions >= 1) {
+            return [
+                'label' => 'Indexed',
+                'kind' => 'success',
+                'tooltip' => 'Detected from Search Console performance data — '.number_format($impressions).' impressions in the last '.$days.' days.',
+            ];
+        }
+
+        $siteHasGscData = false;
+        if ($this->websiteId && $gscKeywordWindowFrom) {
+            $siteHasGscData = SearchConsoleData::query()
+                ->where('website_id', $this->websiteId)
+                ->whereDate('date', '>=', $gscKeywordWindowFrom)
+                ->exists();
+        }
+
+        if ($siteHasGscData) {
+            return [
+                'label' => 'Not indexed (likely)',
+                'kind' => 'warning',
+                'tooltip' => 'No impressions in the last '.$days.' days. Click Refresh status for an authoritative check.',
+            ];
+        }
+
+        return [
+            'label' => 'Unknown',
+            'kind' => 'muted',
+            'tooltip' => 'Connect Google Search Console to detect indexing status, or click Refresh status for a one-off check.',
+        ];
     }
 
     private function setReindexMessage(string $message, string $kind = 'info'): void
