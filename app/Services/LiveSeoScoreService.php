@@ -284,11 +284,19 @@ class LiveSeoScoreService
         }
 
         // Don't queue duplicates — return whatever's already in flight.
+        // Cap in-flight age at 15 minutes: if a CustomPageAudit has been
+        // queued/running longer than that, the worker most likely died
+        // (process killed, OOM, deploy mid-job). Without this cap a zombie
+        // row pins the score on "refreshing" forever because the in-flight
+        // check keeps finding it. Skipping zombies lets us queue a fresh
+        // audit and recover automatically.
         $pageHash = hash('sha256', $url);
+        $maxInFlightAge = Carbon::now()->subMinutes(15);
         $inFlight = CustomPageAudit::query()
             ->where('website_id', $website->id)
             ->where('page_url_hash', $pageHash)
             ->whereIn('status', [CustomPageAudit::STATUS_QUEUED, CustomPageAudit::STATUS_RUNNING])
+            ->where('queued_at', '>=', $maxInFlightAge)
             ->latest('queued_at')
             ->first();
 
