@@ -5,6 +5,8 @@
  * margin in `.ebq-hq-wrap`.
  */
 
+@import "./aiw.css";
+
 .ebq-hq-wrap {
 	--ebq-hq-bg: #f8fafc;
 	--ebq-hq-bg-card: #ffffff;

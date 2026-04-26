@@ -12,6 +12,7 @@ import GscKeywordsTab from './tabs/GscKeywordsTab';
 import PagesTab from './tabs/PagesTab';
 import IndexStatusTab from './tabs/IndexStatusTab';
 import InsightsTab from './tabs/InsightsTab';
+import AiWriterTab from './tabs/AiWriterTab';
 import RedirectSuggestionsTab from './tabs/RedirectSuggestionsTab';
 import SerpFeaturesTab from './tabs/SerpFeaturesTab';
 import BenchmarksTab from './tabs/BenchmarksTab';
@@ -26,6 +27,7 @@ const TABS = [
 	{ id: 'pages',        label: __('Pages', 'ebq-seo'),          Component: PagesTab,        icon: PageIcon },
 	{ id: 'index_status', label: __('Index Status', 'ebq-seo'),   Component: IndexStatusTab,  icon: ShieldIcon },
 	{ id: 'insights',     label: __('Insights', 'ebq-seo'),       Component: InsightsTab,     icon: SparkIcon },
+	{ id: 'ai_writer',    label: __('AI Writer', 'ebq-seo'),      Component: AiWriterTab,     icon: SparkIcon },
 	{ id: 'redirects_ai', label: __('Redirects (AI)', 'ebq-seo'), Component: RedirectSuggestionsTab, icon: SparkIcon },
 	{ id: 'serp_features', label: __('SERP Features', 'ebq-seo'), Component: SerpFeaturesTab, icon: TargetIcon },
 	{ id: 'benchmarks', label: __('Benchmarks', 'ebq-seo'), Component: BenchmarksTab, icon: ChartIcon },

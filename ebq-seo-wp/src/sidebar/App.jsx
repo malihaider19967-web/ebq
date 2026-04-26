@@ -12,7 +12,6 @@ import InclusiveTab from './tabs/InclusiveTab';
 import LinksTab from './tabs/LinksTab';
 import SchemaTab from './tabs/SchemaTab';
 import BriefTab from './tabs/BriefTab';
-import AiWriterTab from './tabs/AiWriterTab';
 
 import { useEditorContext, usePostMeta, resolveTitleTemplate, publicConfig } from './hooks/useEditorContext';
 import useDebounced from './hooks/useDebounced';
@@ -23,7 +22,6 @@ import { analyzeInclusive } from './analysis/inclusive';
 const TABS = [
 	{ id: 'seo',         label: __('SEO', 'ebq-seo'),         icon: IconSearch,  Component: SeoTab },
 	{ id: 'brief',       label: __('Brief', 'ebq-seo'),       icon: IconSparkle, Component: BriefTab },
-	{ id: 'writer',      label: __('Writer', 'ebq-seo'),      icon: IconSparkle, Component: AiWriterTab },
 	{ id: 'readability', label: __('Readability', 'ebq-seo'), icon: IconBook,    Component: ReadabilityTab },
 	{ id: 'inclusive',   label: __('Inclusive', 'ebq-seo'),   icon: IconSparkle, Component: InclusiveTab },
 	{ id: 'links',       label: __('Links', 'ebq-seo'),       icon: IconLink,    Component: LinksTab },
