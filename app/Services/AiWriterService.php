@@ -113,14 +113,15 @@ class AiWriterService
 
         // Cache version — bump when the prompt or output shape changes so
         // existing cached results don't pin users to a stale generation.
-        // v10: strict-selection mode — when user curated inputs in plan
-        //      step, prompt now mandates exactly-one-section-per-input
-        //      and forbids inventing new sections to host internal links.
+        // v11: strict mode now hard-forbids kind="replace" and removes the
+        //      input-scarcity fallback paragraph that was tempting the
+        //      model to produce one consolidated "replace" section even
+        //      with a curated selection.
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
         $cacheKey = sprintf(
-            'ai_writer_v10:%d:%d:%s:%s:%s:%s:%d:%d:%s',
+            'ai_writer_v11:%d:%d:%s:%s:%s:%s:%d:%d:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -169,6 +170,27 @@ class AiWriterService
         }
 
         $sections = $this->normalizeSections($response['sections']);
+
+        // Belt-and-suspenders for strict mode: drop any "replace" sections
+        // the model snuck in despite the prompt. They collapse the entire
+        // generation into one block, which is exactly the bug strict mode
+        // exists to prevent.
+        if ($selected !== null) {
+            $beforeCount = count($sections);
+            $sections = array_values(array_filter(
+                $sections,
+                static fn (array $s) => ($s['kind'] ?? '') !== 'replace',
+            ));
+            $dropped = $beforeCount - count($sections);
+            if ($dropped > 0) {
+                Log::warning('AiWriterService: stripped replace sections in strict mode', [
+                    'website_id' => $website->id,
+                    'post_id' => $postId,
+                    'dropped' => $dropped,
+                ]);
+            }
+        }
+
         if ($sections === []) {
             return ['ok' => false, 'error' => 'no_sections'];
         }
@@ -325,8 +347,7 @@ Output rules (STRICT — non-compliance breaks the consumer):
                  verbatim substring of the source post (copy-paste exact,
                  do not paraphrase). If you cannot copy a verbatim slice,
                  use kind="add" instead.
-   • "replace" — full post replacement. Use ONLY when the post is empty
-                 or fundamentally unsalvageable. Maximum one per response.
+   • "replace" — full post replacement. %REPLACE_RULE%
 - source_tags: non-empty subset of {"brief","gaps","content"} indicating
   which inputs drove the change.
 - rationale: one short sentence — the reader benefit or ranking gain.
@@ -339,28 +360,27 @@ prominence — the focus keyword should appear naturally in the H1 (when
 you generate one) or the opening paragraph of any "add" section, and
 again in at least one <h2> within the first three sections.
 
-INPUT-SCARCITY FALLBACK: when CONTENT BRIEF, TOPICAL GAPS, and CURRENT
-POST CONTENT are ALL marked "(none)" / "(empty post)", you still produce
-a useful first draft using only the target keyword and any user-curated
-items in the user message (H1 to use, topics selected, etc). In that
-case, return ONE "replace" section that scaffolds a complete article:
-H1 (if not yet on page) → 2–4 sentence intro paragraph → 6–10 H2
-sections covering the keyword's typical search intent (problem → core
-explanation → how-to / comparison → FAQs → next steps), each followed
-by 2–4 paragraphs of substantive prose. Do NOT refuse — the absence of
-brief / gaps means richer output is impossible, not that no output is.
+%SCARCITY_FALLBACK%
 SYS;
         $sectionCountRule = $strictSelection
-            ? 'STRICT MODE — the user curated their inputs in a prior step. Generate EXACTLY one "add" or "edit" section per item already present in subtopics + people_also_ask + missing-gap topics. Do NOT invent additional topics. Do NOT pad. The section count is derived from the input lists; if there are 5 inputs total, you produce 5 add/edit sections (plus optional edit sections for weak passages of the existing post). Existing-content edit sections do not count against the input total.'
+            ? "STRICT-SELECTION MODE — the user curated their inputs in a prior step. Follow these rules exactly:\n  (1) Count N = total items in the brief's `subtopics` + `people_also_ask` arrays + the gap analysis's `missing` array. (Do NOT count `must_have_entities`, `top_serp_titles`, or internal_links — those are CONTEXT, not section drivers.)\n  (2) Generate EXACTLY N sections of kind=\"add\", one per input item, in input order. Each section's <h2> uses or closely paraphrases its source item.\n  (3) NEVER use kind=\"replace\" in strict mode, EVEN WHEN THE POST IS EMPTY. Always emit N add sections instead.\n  (4) Do NOT invent new topics, do NOT pad with extra sections, do NOT split an input into multiple sections, do NOT merge two inputs into one section. One input → one section.\n  (5) Optionally append `edit` sections for weak passages of the existing post (improvements). These do NOT count toward N and are extra, not substitutes."
             : 'BETWEEN 12 AND 20 sections. Coverage is the point — produce one section per brief subtopic, one per topical gap, and one per "people also ask" question. Combining is allowed only when two inputs cover the same ground; otherwise each gets its own section. Returning fewer than 12 sections when richer inputs are available is a failure of the task.';
 
         $linkFallbackRule = $strictSelection
             ? 'If no section is a clean fit, place the link in the closest-related section anyway — DO NOT invent a new section to host the link in strict mode.'
             : 'If no section is a clean fit, create one (an "add" section about that topic) so the link has a home — that\'s preferable to dropping the entry.';
 
+        $replaceRule = $strictSelection
+            ? 'FORBIDDEN in strict-selection mode — never emit kind="replace" here. If the post is empty, still produce N "add" sections per the rule above.'
+            : 'Use ONLY when the post is empty or fundamentally unsalvageable. Maximum one per response.';
+
+        $scarcityFallback = $strictSelection
+            ? '' // no fallback paragraph in strict mode — STRICT-SELECTION rule already covers it
+            : "INPUT-SCARCITY FALLBACK: when CONTENT BRIEF, TOPICAL GAPS, and CURRENT\nPOST CONTENT are ALL marked \"(none)\" / \"(empty post)\", you still produce\na useful first draft using only the target keyword and any user-curated\nitems in the user message. In that case, return ONE \"replace\" section\nthat scaffolds a complete article: H1 (if not yet on page) → 2–4\nsentence intro paragraph → 6–10 H2 sections covering the keyword's\ntypical search intent (problem → core explanation → how-to / comparison\n→ FAQs → next steps), each followed by 2–4 paragraphs of substantive\nprose. Do NOT refuse — the absence of brief / gaps means richer output\nis impossible, not that no output is.";
+
         $system = str_replace(
-            ['%H1_FLAG%', '%SECTION_COUNT_RULE%', '%LINK_FALLBACK_RULE%'],
-            [$hasH1 ? 'true' : 'false', $sectionCountRule, $linkFallbackRule],
+            ['%H1_FLAG%', '%SECTION_COUNT_RULE%', '%LINK_FALLBACK_RULE%', '%REPLACE_RULE%', '%SCARCITY_FALLBACK%'],
+            [$hasH1 ? 'true' : 'false', $sectionCountRule, $linkFallbackRule, $replaceRule, $scarcityFallback],
             $system,
         );
 
