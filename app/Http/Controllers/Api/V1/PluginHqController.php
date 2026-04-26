@@ -602,7 +602,15 @@ class PluginHqController extends Controller
     }
 
     /**
-     * Index status directory backed by the URL Inspection cache.
+     * Index status directory.
+     *
+     * Verdict source order: an explicit URL Inspection verdict (PASS / FAIL /
+     * PARTIAL / NEUTRAL written by the nightly job or the Refresh status
+     * button) wins. Otherwise we derive `PASS` from Search Console
+     * performance data — any URL that has ≥1 impression in the GSC keyword
+     * window is, by definition, indexed. This keeps the directory full
+     * without burning the 2k/day URL Inspection quota.
+     *
      *   GET /api/v1/hq/index-status?status=PASS|PARTIAL|FAIL&page=1
      */
     public function indexStatus(Request $request): JsonResponse
@@ -613,48 +621,119 @@ class PluginHqController extends Controller
         $page = max(1, (int) $request->query('page', 1));
         $search = trim((string) $request->query('search', ''));
 
-        $query = PageIndexingStatus::query()
-            ->where('website_id', $website->id);
+        $windowFrom = $website->gscKeywordWindowStartDate();
+        $windowDays = $website->effectiveGscKeywordLookbackDays();
+
+        // "Has Google ever surfaced this URL?" — full historical sweep, no
+        // date filter. A page indexed by Google but with no impressions in
+        // the recent keyword window still belongs in the directory.
+        $indexedPages = SearchConsoleData::query()
+            ->where('website_id', $website->id)
+            ->where('page', '!=', '')
+            ->where('impressions', '>', 0)
+            ->select('page')
+            ->distinct()
+            ->pluck('page')
+            ->all();
+        $indexedPagesSet = array_flip($indexedPages);
+
+        // Recent-window impressions only feed the per-row "Impressions (Nd)"
+        // display — they're not used for the indexed/not-indexed decision.
+        $recentImpressionsByPage = SearchConsoleData::query()
+            ->where('website_id', $website->id)
+            ->whereDate('date', '>=', $windowFrom)
+            ->where('page', '!=', '')
+            ->selectRaw('page, SUM(impressions) AS impressions')
+            ->groupBy('page')
+            ->pluck('impressions', 'page');
+
+        $pisByPage = PageIndexingStatus::query()
+            ->where('website_id', $website->id)
+            ->get()
+            ->keyBy('page');
+
+        $pages = collect($indexedPages)
+            ->concat($pisByPage->keys())
+            ->unique()
+            ->values();
+
+        $merged = $pages->map(function (string $pageUrl) use ($pisByPage, $recentImpressionsByPage, $indexedPagesSet, $windowDays) {
+            /** @var PageIndexingStatus|null $pis */
+            $pis = $pisByPage->get($pageUrl);
+            $recentImpressions = (int) ($recentImpressionsByPage->get($pageUrl) ?? 0);
+            $hasAnyImpressions = isset($indexedPagesSet[$pageUrl]);
+
+            $explicitVerdict = $pis?->google_verdict;
+            if (is_string($explicitVerdict) && $explicitVerdict !== '') {
+                $verdict = strtoupper($explicitVerdict);
+                $verdictSource = 'url_inspection';
+            } elseif ($hasAnyImpressions) {
+                $verdict = 'PASS';
+                $verdictSource = 'impressions';
+            } else {
+                $verdict = null;
+                $verdictSource = null;
+            }
+
+            return [
+                'page' => $pageUrl,
+                'verdict' => $verdict,
+                'verdict_source' => $verdictSource,
+                'coverage_state' => $pis?->google_coverage_state,
+                'indexing_state' => $pis?->google_indexing_state,
+                'last_crawl_at' => $pis?->google_last_crawl_at?->toIso8601String(),
+                'last_checked_at' => $pis?->last_google_status_checked_at?->toIso8601String(),
+                'last_reindex_requested_at' => $pis?->last_reindex_requested_at?->toIso8601String(),
+                'impressions' => $recentImpressions,
+                'impressions_window_days' => $windowDays,
+                '_sort_checked_at' => $pis?->last_google_status_checked_at?->getTimestamp() ?? 0,
+            ];
+        });
+
+        $verdictCounts = [
+            'PASS' => 0,
+            'PARTIAL' => 0,
+            'FAIL' => 0,
+            'NEUTRAL' => 0,
+            'UNKNOWN' => 0,
+        ];
+        foreach ($merged as $row) {
+            $key = $row['verdict'] ?? 'UNKNOWN';
+            if (! array_key_exists($key, $verdictCounts)) {
+                $key = 'UNKNOWN';
+            }
+            $verdictCounts[$key]++;
+        }
+
+        $filtered = $merged;
 
         if (in_array($status, ['PASS', 'PARTIAL', 'FAIL', 'NEUTRAL'], true)) {
-            $query->where('google_verdict', $status);
+            $filtered = $filtered->filter(fn (array $r) => $r['verdict'] === $status)->values();
+        } elseif ($status === 'UNKNOWN') {
+            $filtered = $filtered->filter(fn (array $r) => $r['verdict'] === null)->values();
         }
 
         if ($search !== '') {
-            $query->where('page', 'LIKE', '%' . addcslashes($search, '\\%_') . '%');
+            $needle = mb_strtolower($search);
+            $filtered = $filtered->filter(fn (array $r) => str_contains(mb_strtolower($r['page']), $needle))->values();
         }
 
-        $total = (clone $query)->count();
-        $rows = (clone $query)
-            ->orderByDesc('last_google_status_checked_at')
-            ->limit($perPage)
-            ->offset(($page - 1) * $perPage)
-            ->get();
+        $sorted = $filtered
+            ->sortByDesc('_sort_checked_at')
+            ->values();
 
-        $verdictCounts = PageIndexingStatus::query()
-            ->where('website_id', $website->id)
-            ->selectRaw('google_verdict, COUNT(*) AS n')
-            ->groupBy('google_verdict')
-            ->pluck('n', 'google_verdict')
-            ->all();
+        $total = $sorted->count();
+        $sliced = $sorted->slice(($page - 1) * $perPage, $perPage)->values();
+
+        $data = $sliced->map(function (array $r) {
+            unset($r['_sort_checked_at']);
+
+            return $r;
+        })->all();
 
         return response()->json([
-            'verdict_counts' => [
-                'PASS' => (int) ($verdictCounts['PASS'] ?? 0),
-                'PARTIAL' => (int) ($verdictCounts['PARTIAL'] ?? 0),
-                'FAIL' => (int) ($verdictCounts['FAIL'] ?? 0),
-                'NEUTRAL' => (int) ($verdictCounts['NEUTRAL'] ?? 0),
-                'UNKNOWN' => (int) ($verdictCounts[''] ?? 0) + (int) ($verdictCounts[null] ?? 0),
-            ],
-            'data' => $rows->map(fn (PageIndexingStatus $r) => [
-                'page' => $r->page,
-                'verdict' => $r->google_verdict,
-                'coverage_state' => $r->google_coverage_state,
-                'indexing_state' => $r->google_indexing_state,
-                'last_crawl_at' => $r->google_last_crawl_at?->toIso8601String(),
-                'last_checked_at' => $r->last_google_status_checked_at?->toIso8601String(),
-                'last_reindex_requested_at' => $r->last_reindex_requested_at?->toIso8601String(),
-            ])->all(),
+            'verdict_counts' => $verdictCounts,
+            'data' => $data,
             'meta' => [
                 'page' => $page,
                 'per_page' => $perPage,

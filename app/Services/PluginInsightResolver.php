@@ -181,14 +181,37 @@ class PluginInsightResolver
             ->orderByDesc('last_google_status_checked_at')
             ->first();
 
-        $indexingPayload = null;
-        if ($indexingRow) {
+        $explicitVerdict = $indexingRow?->google_verdict;
+
+        // Indexation is a permanent state, not a recency signal. Use the
+        // full stored history (no date filter) — a page can be indexed
+        // without any impressions in the last 30 days.
+        $hasAnyImpressions = SearchConsoleData::query()
+            ->where('website_id', $website->id)
+            ->where('impressions', '>', 0)
+            ->tap(fn ($q) => $this->applyPageMatch($q, $normalized))
+            ->exists();
+
+        if (is_string($explicitVerdict) && $explicitVerdict !== '') {
             $indexingPayload = [
-                'verdict' => $indexingRow->google_verdict,
-                'coverage_state' => $indexingRow->google_coverage_state,
-                'last_crawl_at' => $indexingRow->google_last_crawl_at?->toIso8601String(),
-                'checked_at' => $indexingRow->last_google_status_checked_at?->toIso8601String(),
+                'verdict' => $explicitVerdict,
+                'verdict_source' => 'url_inspection',
+                'indexed' => strtoupper($explicitVerdict) === 'PASS',
+                'coverage_state' => $indexingRow?->google_coverage_state,
+                'last_crawl_at' => $indexingRow?->google_last_crawl_at?->toIso8601String(),
+                'checked_at' => $indexingRow?->last_google_status_checked_at?->toIso8601String(),
             ];
+        } elseif ($hasAnyImpressions) {
+            $indexingPayload = [
+                'verdict' => 'PASS',
+                'verdict_source' => 'impressions',
+                'indexed' => true,
+                'coverage_state' => null,
+                'last_crawl_at' => null,
+                'checked_at' => null,
+            ];
+        } else {
+            $indexingPayload = null;
         }
 
         $primaryQuery = isset($topQueries[0]['query']) ? (string) $topQueries[0]['query'] : null;

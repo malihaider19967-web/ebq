@@ -432,8 +432,10 @@ class PageDetail extends Component
      *
      * Order of trust: an explicit URL Inspection result (user clicked
      * "Refresh status") overrides everything; otherwise we infer from
-     * Search Console performance data — any impressions in the window
-     * means Google has indexed and surfaced the URL.
+     * Search Console performance data — any historical impression for
+     * this URL means Google has indexed and surfaced it. Indexation is
+     * a permanent state, so detection looks at the full stored GSC
+     * history, not the recent keyword window.
      *
      * @return array{label: string, kind: string, tooltip: string}
      */
@@ -458,14 +460,27 @@ class PageDetail extends Component
             return ['label' => $rawVerdict, 'kind' => $kind, 'tooltip' => $tooltip];
         }
 
-        $impressions = (int) ($summary->total_impressions ?? 0);
+        $recentImpressions = (int) ($summary->total_impressions ?? 0);
         $days = (int) ($gscKeywordLookbackDays ?? 0);
 
-        if ($impressions >= 1) {
+        $hasAnyImpressions = false;
+        if ($this->websiteId && $this->pageUrl !== '') {
+            $hasAnyImpressions = SearchConsoleData::query()
+                ->where('website_id', $this->websiteId)
+                ->where('page', $this->pageUrl)
+                ->where('impressions', '>', 0)
+                ->exists();
+        }
+
+        if ($hasAnyImpressions) {
+            $tooltip = $recentImpressions >= 1
+                ? 'Detected from Search Console performance data — '.number_format($recentImpressions).' impressions in the last '.$days.' days.'
+                : 'Detected from Search Console history — Google has surfaced this URL before, no impressions in the last '.$days.' days.';
+
             return [
                 'label' => 'Indexed',
                 'kind' => 'success',
-                'tooltip' => 'Detected from Search Console performance data — '.number_format($impressions).' impressions in the last '.$days.' days.',
+                'tooltip' => $tooltip,
             ];
         }
 
@@ -481,7 +496,7 @@ class PageDetail extends Component
             return [
                 'label' => 'Not indexed (likely)',
                 'kind' => 'warning',
-                'tooltip' => 'No impressions in the last '.$days.' days. Click Refresh status for an authoritative check.',
+                'tooltip' => 'Search Console has no record of this URL surfacing in Google. Click Refresh status for an authoritative check.',
             ];
         }
 
