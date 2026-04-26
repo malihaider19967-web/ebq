@@ -12,6 +12,7 @@ use App\Services\BacklinkProspectingService;
 use App\Services\CrossSiteBenchmarkService;
 use App\Services\ReportDataService;
 use App\Services\SerpFeatureTrackerService;
+use App\Services\TopicalAuthorityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -750,6 +751,17 @@ class PluginHqController extends Controller
             'our_page_title' => $data['our_page_title'] ?? '',
             'our_page_summary' => $data['our_page_summary'] ?? '',
         ]));
+    }
+
+    /**
+     * Phase 3 #4 — Topical authority map. Clusters GSC queries by token
+     * co-occurrence + page sharing, scores each cluster, surfaces gaps.
+     *   GET /api/v1/hq/topical-authority
+     */
+    public function topicalAuthority(Request $request, TopicalAuthorityService $service): JsonResponse
+    {
+        $website = $this->website($request);
+        return response()->json($service->map($website));
     }
 
     /**

@@ -9,6 +9,7 @@ import KeyphraseInput from '../components/KeyphraseInput';
 import GscSuggestions from '../components/GscSuggestions';
 import RelatedKeyphrases from '../components/RelatedKeyphrases';
 import AiRewriteSnippet from '../components/AiRewriteSnippet';
+import EntityCoverage from '../components/EntityCoverage';
 import AdditionalKeyphrases, { parseAdditionalKeywords, stringifyAdditionalKeywords } from '../components/AdditionalKeyphrases';
 import TopicalCoverage from '../components/TopicalCoverage';
 import KeywordDensity from '../components/KeywordDensity';
@@ -239,6 +240,11 @@ export default function SeoTab() {
 				postId={ctx.postId}
 				focusKeyword={focusKeyword}
 				content={debouncedContent}
+				isConnected={cfg.isConnected}
+			/>
+
+			<EntityCoverage
+				postId={ctx.postId}
 				isConnected={cfg.isConnected}
 			/>
 

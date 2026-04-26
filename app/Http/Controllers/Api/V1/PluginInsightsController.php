@@ -8,6 +8,7 @@ use App\Models\RedirectSuggestion;
 use App\Models\Website;
 use App\Services\AiContentBriefService;
 use App\Services\AiSnippetRewriterService;
+use App\Services\EntityCoverageService;
 use App\Services\LiveSeoScoreService;
 use App\Services\PluginInsightResolver;
 use App\Services\ReportDataService;
@@ -415,6 +416,29 @@ class PluginInsightsController extends Controller
             'focus_keyword' => $data['focus_keyword'],
             'tier' => $website->tier,
             'brief' => $payload,
+        ]);
+    }
+
+    /**
+     * Phase 3 #11 — Entity coverage analysis for one URL. Compares the
+     * page's entities (people, brands, products, concepts) against what
+     * top-3 SERP competitors mention. Pulls from the existing audit data
+     * — no new audit run.
+     *   GET /api/v1/posts/{externalPostId}/entity-coverage?url=...
+     */
+    public function entityCoverage(Request $request, string $externalPostId, EntityCoverageService $service): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        $url = (string) $request->query('url', '');
+        if ($url === '') {
+            return response()->json(['ok' => false, 'error' => 'missing_url'], 400);
+        }
+        $payload = $service->analyze($website, $url);
+        return response()->json([
+            'external_post_id' => $externalPostId,
+            'url' => $url,
+            'tier' => $website->tier,
+            'entities' => $payload,
         ]);
     }
 

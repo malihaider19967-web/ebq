@@ -13,6 +13,10 @@ import PagesTab from './tabs/PagesTab';
 import IndexStatusTab from './tabs/IndexStatusTab';
 import InsightsTab from './tabs/InsightsTab';
 import RedirectSuggestionsTab from './tabs/RedirectSuggestionsTab';
+import SerpFeaturesTab from './tabs/SerpFeaturesTab';
+import BenchmarksTab from './tabs/BenchmarksTab';
+import ProspectsTab from './tabs/ProspectsTab';
+import TopicalAuthorityTab from './tabs/TopicalAuthorityTab';
 
 const TABS = [
 	{ id: 'overview',     label: __('Overview', 'ebq-seo'),       Component: OverviewTab,     icon: HomeIcon },
@@ -23,6 +27,10 @@ const TABS = [
 	{ id: 'index_status', label: __('Index Status', 'ebq-seo'),   Component: IndexStatusTab,  icon: ShieldIcon },
 	{ id: 'insights',     label: __('Insights', 'ebq-seo'),       Component: InsightsTab,     icon: SparkIcon },
 	{ id: 'redirects_ai', label: __('Redirects (AI)', 'ebq-seo'), Component: RedirectSuggestionsTab, icon: SparkIcon },
+	{ id: 'serp_features', label: __('SERP Features', 'ebq-seo'), Component: SerpFeaturesTab, icon: TargetIcon },
+	{ id: 'benchmarks', label: __('Benchmarks', 'ebq-seo'), Component: BenchmarksTab, icon: ChartIcon },
+	{ id: 'prospects', label: __('Prospects', 'ebq-seo'), Component: ProspectsTab, icon: SparkIcon },
+	{ id: 'topical_authority', label: __('Topical Authority', 'ebq-seo'), Component: TopicalAuthorityTab, icon: ChartIcon },
 ];
 
 export default function App() {

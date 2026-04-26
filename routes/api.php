@@ -35,6 +35,9 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/posts/{externalPostId}/content-brief', [PluginInsightsController::class, 'contentBrief'])
             ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
             ->name('api.v1.posts.content-brief');
+        Route::get('/posts/{externalPostId}/entity-coverage', [PluginInsightsController::class, 'entityCoverage'])
+            ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
+            ->name('api.v1.posts.entity-coverage');
         Route::post('/posts/report-404s', [PluginInsightsController::class, 'report404s'])
             ->name('api.v1.posts.report-404s');
         Route::get('/redirect-suggestions', [PluginInsightsController::class, 'redirectSuggestions'])
@@ -79,6 +82,7 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/backlink-prospects', [PluginHqController::class, 'backlinkProspects'])->name('backlink-prospects');
             Route::post('/backlink-prospects/draft', [PluginHqController::class, 'backlinkOutreachDraft'])->name('backlink-prospects.draft');
             Route::get('/benchmarks', [PluginHqController::class, 'crossSiteBenchmarks'])->name('benchmarks');
+            Route::get('/topical-authority', [PluginHqController::class, 'topicalAuthority'])->name('topical-authority');
         });
     });
 });

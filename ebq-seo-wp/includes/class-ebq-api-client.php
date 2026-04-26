@@ -172,6 +172,41 @@ final class EBQ_Api_Client
         return $this->request('POST', sprintf('/api/v1/redirect-suggestions/%d/decide', $id), ['action' => $action]);
     }
 
+    /* ─── Phase 3 ──────────────────────────────────────────── */
+
+    public function hq_serp_features(int $days = 30): array
+    {
+        return $this->get('/api/v1/hq/serp-features', ['days' => $days]);
+    }
+
+    public function hq_benchmarks(string $country = ''): array
+    {
+        $args = $country !== '' ? ['country' => $country] : [];
+        return $this->get('/api/v1/hq/benchmarks', $args);
+    }
+
+    public function hq_backlink_prospects(array $competitors): array
+    {
+        return $this->request('POST', '/api/v1/hq/backlink-prospects', [
+            'competitors' => array_values(array_slice(array_filter(array_map('strval', $competitors)), 0, 20)),
+        ]);
+    }
+
+    public function hq_backlink_prospects_draft(array $body): array
+    {
+        return $this->request('POST', '/api/v1/hq/backlink-prospects/draft', $body);
+    }
+
+    public function hq_topical_authority(): array
+    {
+        return $this->get('/api/v1/hq/topical-authority', []);
+    }
+
+    public function entity_coverage(string $post_id, string $url): array
+    {
+        return $this->get(sprintf('/api/v1/posts/%s/entity-coverage', rawurlencode($post_id)), ['url' => $url]);
+    }
+
     public function ai_content_brief(string $post_id, string $focus_keyword, string $country = '', string $language = ''): array
     {
         $body = ['focus_keyword' => $focus_keyword];
@@ -306,7 +341,8 @@ final class EBQ_Api_Client
         // a red herring; the stale data lived in WP transients all along).
         $skip_cache = str_starts_with($path, '/api/v1/hq/')
             || str_contains($path, '/seo-score')
-            || str_contains($path, '/topical-gaps');
+            || str_contains($path, '/topical-gaps')
+            || str_contains($path, '/entity-coverage');
         // Cache key is namespaced by the current version (incremented on
         // every write). This invalidates ALL cached entries atomically
         // regardless of where the cache backend stores them — safe across

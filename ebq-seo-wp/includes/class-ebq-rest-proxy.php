@@ -39,6 +39,11 @@ final class EBQ_Rest_Proxy
         '/ebq/v1/rewrite-snippet',
         '/ebq/v1/content-brief',
         '/ebq/v1/redirect-suggestions',
+        '/ebq/v1/hq/serp-features',
+        '/ebq/v1/hq/benchmarks',
+        '/ebq/v1/hq/backlink-prospects',
+        '/ebq/v1/hq/topical-authority',
+        '/ebq/v1/entity-coverage',
     ];
 
     public function register(): void
@@ -162,6 +167,41 @@ final class EBQ_Rest_Proxy
             'methods' => 'POST',
             'permission_callback' => [$this, 'can_view_hq'],
             'callback' => [$this, 'redirect_suggestions_decide'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+            ],
+        ]);
+
+        // Phase 3 — network-effect HQ endpoints
+        register_rest_route('ebq/v1', '/hq/serp-features', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_serp_features'],
+        ]);
+        register_rest_route('ebq/v1', '/hq/benchmarks', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_benchmarks'],
+        ]);
+        register_rest_route('ebq/v1', '/hq/backlink-prospects', [
+            'methods' => 'POST',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_backlink_prospects'],
+        ]);
+        register_rest_route('ebq/v1', '/hq/backlink-prospects/draft', [
+            'methods' => 'POST',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_backlink_prospects_draft'],
+        ]);
+        register_rest_route('ebq/v1', '/hq/topical-authority', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_topical_authority'],
+        ]);
+        register_rest_route('ebq/v1', '/entity-coverage/(?P<id>\d+)', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'entity_coverage'],
             'args' => [
                 'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
             ],
@@ -661,6 +701,50 @@ final class EBQ_Rest_Proxy
 
         $payload = EBQ_Plugin::api_client()->decide_redirect_suggestion($id, $action);
         return new WP_REST_Response($payload, 200);
+    }
+
+    /* ─── Phase 3 proxies ─────────────────────────────────────── */
+
+    public function hq_serp_features(WP_REST_Request $request): WP_REST_Response
+    {
+        $days = (int) ($request->get_param('days') ?: 30);
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_serp_features($days), 200);
+    }
+
+    public function hq_benchmarks(WP_REST_Request $request): WP_REST_Response
+    {
+        $country = (string) ($request->get_param('country') ?: '');
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_benchmarks($country), 200);
+    }
+
+    public function hq_backlink_prospects(WP_REST_Request $request): WP_REST_Response
+    {
+        $body = $request->get_json_params();
+        if (! is_array($body)) $body = $request->get_params();
+        $competitors = is_array($body['competitors'] ?? null) ? $body['competitors'] : [];
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_backlink_prospects($competitors), 200);
+    }
+
+    public function hq_backlink_prospects_draft(WP_REST_Request $request): WP_REST_Response
+    {
+        $body = $request->get_json_params();
+        if (! is_array($body)) $body = $request->get_params();
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_backlink_prospects_draft($body), 200);
+    }
+
+    public function hq_topical_authority(WP_REST_Request $request): WP_REST_Response
+    {
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_topical_authority(), 200);
+    }
+
+    public function entity_coverage(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $url = get_permalink($post_id);
+        if (! $url) {
+            return new WP_REST_Response(['ok' => false, 'error' => 'post_not_found'], 404);
+        }
+        return new WP_REST_Response(EBQ_Plugin::api_client()->entity_coverage((string) $post_id, $url), 200);
     }
 
     public function internal_link_suggestions(WP_REST_Request $request): WP_REST_Response
