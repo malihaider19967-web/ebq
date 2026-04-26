@@ -69,8 +69,10 @@ class AiContentBriefService
         $language = is_string($input['language'] ?? null) && $input['language'] !== ''
             ? strtolower($input['language']) : 'en';
 
+        // v2 cache namespace — bump when the brief schema/prompt changes.
+        // v2 added: suggested_h1 field.
         $cacheKey = sprintf(
-            'ai_content_brief:%d:%s:%s',
+            'ai_content_brief_v2:%d:%s:%s',
             $website->id,
             hash('xxh3', mb_strtolower($keyword)),
             $country,
@@ -122,6 +124,7 @@ class AiContentBriefService
                 'angle' => (string) ($brief['angle'] ?? 'informational'),
                 'recommended_word_count' => max(0, (int) ($brief['recommended_word_count'] ?? 0)),
                 'suggested_schema_type' => (string) ($brief['suggested_schema_type'] ?? 'Article'),
+                'suggested_h1' => trim((string) ($brief['suggested_h1'] ?? '')),
                 'subtopics' => $this->normalizeStringList($brief['subtopics'] ?? [], 20),
                 'must_have_entities' => $this->normalizeStringList($brief['must_have_entities'] ?? [], 12),
                 'suggested_outline' => $this->normalizeOutline($brief['suggested_outline'] ?? []),
@@ -166,6 +169,9 @@ top-ranking pages, you produce a content brief sharp enough that a writer
 can draft a winning page in one sitting.
 
 Constraints:
+- suggested_h1: ONE compelling, click-worthy H1 title (≤ 65 chars). Must
+  contain the target keyword naturally; not just a duplicate of one of
+  the SERP titles — improve on them.
 - subtopics: 8–14 specific topics the page must cover, derived from what
   the top SERP pages share. Not generic ("introduction", "conclusion").
 - recommended_word_count: integer; based on the median word depth implied
@@ -189,6 +195,7 @@ Top 10 SERP results:
 
 Return JSON exactly in this shape:
 {
+  "suggested_h1": "Compelling H1 with keyword",
   "angle": "...",
   "recommended_word_count": 1800,
   "suggested_schema_type": "Article",

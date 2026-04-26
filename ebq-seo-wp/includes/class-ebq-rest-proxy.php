@@ -175,6 +175,15 @@ final class EBQ_Rest_Proxy
             ],
         ]);
 
+        register_rest_route('ebq/v1', '/ai-writer/(?P<id>\d+)/plan', [
+            'methods' => 'POST',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'ai_writer_plan'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+            ],
+        ]);
+
         register_rest_route('ebq/v1', '/redirect-suggestions', [
             'methods' => 'GET',
             'permission_callback' => [$this, 'can_view_hq'],
@@ -699,6 +708,7 @@ final class EBQ_Rest_Proxy
         if (! is_array($body)) $body = $request->get_params();
 
         $wp_pages = $this->collect_wp_link_candidates($post_id);
+        $selected = is_array($body['selected'] ?? null) ? $body['selected'] : null;
 
         $payload = EBQ_Plugin::api_client()->ai_writer(
             (string) $post_id,
@@ -706,6 +716,29 @@ final class EBQ_Rest_Proxy
             (string) ($body['current_html'] ?? ''),
             (string) ($body['url'] ?? ''),
             $wp_pages,
+            (string) ($body['country'] ?? ''),
+            (string) ($body['language'] ?? ''),
+            $selected
+        );
+
+        return new WP_REST_Response($payload, 200);
+    }
+
+    /**
+     * AI Writer plan — fetches brief + gaps and returns selectable items
+     * (suggested H1, H2 outline, subtopics, PAA, gap topics, competitor
+     * subtopics) for the user to curate before generation.
+     */
+    public function ai_writer_plan(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $body = $request->get_json_params();
+        if (! is_array($body)) $body = $request->get_params();
+
+        $payload = EBQ_Plugin::api_client()->ai_writer_plan(
+            (string) $post_id,
+            (string) ($body['focus_keyword'] ?? ''),
+            (string) ($body['current_html'] ?? ''),
             (string) ($body['country'] ?? ''),
             (string) ($body['language'] ?? '')
         );

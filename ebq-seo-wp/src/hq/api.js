@@ -70,6 +70,7 @@ export const Api = {
 	pages: (params) => request('GET', '/hq/pages', { query: params }),
 	indexStatus: (params) => request('GET', '/hq/index-status', { query: params }),
 	indexSubmit: (url) => request('POST', '/hq/index-status/submit', { body: { url } }),
+	// Note: AI Writer is sidebar-only; the HQ Api stays focused on HQ tabs.
 	insights: (type, limit = 25) => request('GET', `/hq/insights/${encodeURIComponent(type)}`, { query: { limit } }),
 	iframeUrl: (insight) => request('GET', '/hq/iframe-url', { query: { insight } }),
 };

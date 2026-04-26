@@ -72,6 +72,14 @@ class AiWriterService
         $brief = is_array($input['brief'] ?? null) ? $input['brief'] : null;
         $gaps = is_array($input['gaps'] ?? null) ? $input['gaps'] : null;
         $excludeUrl = trim((string) ($input['exclude_url'] ?? ''));
+        $selected = is_array($input['selected'] ?? null) ? $input['selected'] : null;
+
+        // When the user has curated a selection in the plan step, filter
+        // the brief / gaps lists down to those items so the prompt isn't
+        // told to cover topics the user explicitly skipped.
+        if ($selected !== null) {
+            [$brief, $gaps] = $this->applySelection($brief, $gaps, $selected);
+        }
         $wpPages = is_array($input['wp_pages'] ?? null) ? $input['wp_pages'] : [];
 
         // Topic-aware internal-link candidate pool. GSC click data is the
@@ -106,10 +114,15 @@ class AiWriterService
 
         // Cache version — bump when the prompt or output shape changes so
         // existing cached results don't pin users to a stale generation.
-        // v7: WP-page candidates added as fallback to the GSC moat for
-        //     never-indexed published content.
+        // v8: user selection (selected.h1, selected.h2_outline,
+        //     selected.subtopics, selected.paa, selected.gap_topics,
+        //     selected.competitor_subtopics) keyed in so different
+        //     selections produce different generations.
+        $selectionHash = $selected !== null
+            ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
+            : '0';
         $cacheKey = sprintf(
-            'ai_writer_v7:%d:%d:%s:%s:%s:%s:%d:%d',
+            'ai_writer_v8:%d:%d:%s:%s:%s:%s:%d:%d:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -118,6 +131,7 @@ class AiWriterService
             substr(hash('sha256', $currentText), 0, 12),
             count($smartLinks),
             count($wpPages),
+            $selectionHash,
         );
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && ($cached['ok'] ?? false) === true) {
@@ -372,6 +386,100 @@ USER;
             ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => $user],
         ];
+    }
+
+    /**
+     * Apply the user's curated selection (from the plan step) to the
+     * brief / gaps blobs. Anything the user didn't tick is removed, so
+     * the writer prompt only mentions what the user wants.
+     *
+     *   selected = {
+     *     h1?: string,
+     *     h2_outline?: string[],
+     *     subtopics?: string[],
+     *     paa?: string[],
+     *     gap_topics?: string[],
+     *     competitor_subtopics?: string[],
+     *   }
+     *
+     * If a selection key is absent OR an empty array, that signal stays
+     * intact (treated as "user didn't curate this list"). If a selection
+     * key is a non-empty array, the corresponding brief/gaps list is
+     * filtered to that exact set.
+     *
+     * @return array{0: ?array<string,mixed>, 1: ?array<string,mixed>}
+     */
+    private function applySelection(?array $brief, ?array $gaps, array $selected): array
+    {
+        $brief = is_array($brief) ? $brief : null;
+        $gaps = is_array($gaps) ? $gaps : null;
+
+        $filterList = static function (?array $list, $picked): ?array {
+            if (! is_array($list)) {
+                return $list;
+            }
+            if (! is_array($picked) || empty($picked)) {
+                return $list;
+            }
+            $set = [];
+            foreach ($picked as $p) {
+                if (is_string($p) && trim($p) !== '') {
+                    $set[mb_strtolower(trim($p))] = true;
+                }
+            }
+            if (empty($set)) {
+                return $list;
+            }
+            $filtered = [];
+            foreach ($list as $item) {
+                if (! is_string($item)) {
+                    continue;
+                }
+                if (isset($set[mb_strtolower(trim($item))])) {
+                    $filtered[] = $item;
+                }
+            }
+            return $filtered;
+        };
+
+        if ($brief !== null) {
+            // Suggested H1 — when the user picked one (or wrote a custom),
+            // overwrite the brief's value so the prompt's H1 rule lands
+            // on what they chose.
+            if (isset($selected['h1']) && is_string($selected['h1']) && trim($selected['h1']) !== '') {
+                $brief['suggested_h1'] = trim($selected['h1']);
+            }
+            $brief['suggested_outline'] = $filterList($brief['suggested_outline'] ?? [], $selected['h2_outline'] ?? null);
+            $brief['subtopics']         = $filterList($brief['subtopics'] ?? [], $selected['subtopics'] ?? null);
+            $brief['people_also_ask']   = $filterList($brief['people_also_ask'] ?? [], $selected['paa'] ?? null);
+        }
+
+        if ($gaps !== null) {
+            // Gap "missing" entries are objects {topic, rationale}; filter
+            // by topic match. Competitor subtopics are plain strings.
+            if (is_array($selected['gap_topics'] ?? null) && ! empty($selected['gap_topics'])) {
+                $picks = [];
+                foreach ((array) $selected['gap_topics'] as $p) {
+                    if (is_string($p) && trim($p) !== '') {
+                        $picks[mb_strtolower(trim($p))] = true;
+                    }
+                }
+                if (! empty($picks) && is_array($gaps['missing'] ?? null)) {
+                    $gaps['missing'] = array_values(array_filter(
+                        $gaps['missing'],
+                        static fn ($m) => is_array($m)
+                            && is_string($m['topic'] ?? null)
+                            && isset($picks[mb_strtolower(trim($m['topic']))]),
+                    ));
+                }
+            }
+            $gaps['competitor_subtopics'] = $filterList(
+                $gaps['competitor_subtopics'] ?? [],
+                $selected['competitor_subtopics'] ?? null,
+            );
+        }
+
+        return [$brief, $gaps];
     }
 
     /**

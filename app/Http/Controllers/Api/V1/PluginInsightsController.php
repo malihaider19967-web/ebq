@@ -453,18 +453,130 @@ class PluginInsightsController extends Controller
     }
 
     /**
-     * AI Writer — produces section-level proposals (add / edit / replace)
-     * for a post using whatever inputs are available: existing content,
-     * the AI content brief, and the topical-gap analysis. The user
-     * approves per section in the sidebar and the plugin writes the merged
-     * HTML back via WP core's REST API.
+     * AI Writer — Phase 1: build the "plan options" payload.
+     *
+     * Returns the brief + gaps grouped into selectable items. The plugin
+     * shows these as checkbox lists; the user picks which suggestions
+     * to feed into generation, then calls aiWriter() with their
+     * selection. This split lets users curate inputs (avoid PAA they
+     * don't want, skip irrelevant gap topics, etc.) instead of getting
+     * everything blasted into one generation.
+     *
+     *   POST /api/v1/posts/{externalPostId}/ai-writer/plan
+     *   body: { focus_keyword, current_html?, country?, language? }
+     */
+    public function aiWriterPlan(
+        Request $request,
+        string $externalPostId,
+        AiContentBriefService $briefService,
+        TopicalGapService $gapService,
+    ): JsonResponse {
+        $website = $this->resolveWebsite($request);
+        if (! $website->isPro()) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'tier_required',
+                'tier' => $website->tier,
+                'required_tier' => Website::TIER_PRO,
+                'message' => 'AI Writer is available on Pro. Upgrade to unlock.',
+            ], 402);
+        }
+
+        $data = $request->validate([
+            'focus_keyword' => 'required|string|min:2|max:200',
+            'current_html' => 'nullable|string|max:200000',
+            'country' => 'nullable|string|size:2',
+            'language' => 'nullable|string|min:2|max:10',
+        ]);
+
+        // Plan generation can chain Serper + brief LLM + topical-gaps LLM
+        // (~90s wall time on cold cache). Cached calls return ~instantly.
+        @set_time_limit(180);
+
+        $keyword = (string) $data['focus_keyword'];
+        $currentHtml = (string) ($data['current_html'] ?? '');
+        $country = isset($data['country']) ? (string) $data['country'] : null;
+        $language = isset($data['language']) ? (string) $data['language'] : null;
+
+        $brief = null;
+        try {
+            $briefRes = $briefService->brief($website, (int) $externalPostId, [
+                'focus_keyword' => $keyword,
+                'country' => $country,
+                'language' => $language,
+            ]);
+            if (is_array($briefRes) && ($briefRes['ok'] ?? false) === true && is_array($briefRes['brief'] ?? null)) {
+                $brief = $briefRes['brief'];
+            }
+        } catch (\Throwable $e) {
+            // Best-effort.
+        }
+
+        $gaps = null;
+        try {
+            $currentText = trim(strip_tags($currentHtml));
+            if (mb_strlen($currentText) >= 200) {
+                $gapRes = $gapService->analyze($website, $keyword, $currentText, $country, $language);
+                if (is_array($gapRes) && ($gapRes['available'] ?? false) === true) {
+                    $gaps = $gapRes;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Best-effort.
+        }
+
+        // Reshape into a flat plan the UI can render with checkboxes.
+        return response()->json([
+            'external_post_id' => $externalPostId,
+            'tier' => $website->tier,
+            'plan' => [
+                'brief' => $brief ? [
+                    'available' => true,
+                    'suggested_h1' => (string) ($brief['suggested_h1'] ?? ''),
+                    'suggested_h2_outline' => array_values(array_filter((array) ($brief['suggested_outline'] ?? []), 'is_string')),
+                    'subtopics' => array_values(array_filter((array) ($brief['subtopics'] ?? []), 'is_string')),
+                    'people_also_ask' => array_values(array_filter((array) ($brief['people_also_ask'] ?? []), 'is_string')),
+                ] : ['available' => false],
+                'gaps' => $gaps ? [
+                    'available' => true,
+                    'missing_subtopics' => array_values(array_filter(array_map(
+                        static fn ($m) => is_array($m) ? (string) ($m['topic'] ?? '') : '',
+                        (array) ($gaps['missing'] ?? [])
+                    ), static fn ($s) => $s !== '')),
+                    'competitor_subtopics' => array_values(array_filter((array) ($gaps['competitor_subtopics'] ?? []), 'is_string')),
+                ] : ['available' => false],
+            ],
+        ]);
+    }
+
+    /**
+     * AI Writer — Phase 2: generate proposals from the user's curated
+     * selection (or, when no selection is provided, fall back to using
+     * everything the brief + gaps offer — backward compatible).
+     *
+     * The user approves per section in the sidebar and the plugin writes
+     * the merged HTML back via WP core's REST API.
      *
      * Pro tier only. Brief + gaps are silently fetched here so the writer
      * has the richest possible context — both services have their own 7d
      * caches, so this is cheap on repeat clicks.
      *
      *   POST /api/v1/posts/{externalPostId}/ai-writer
-     *   body: { focus_keyword, current_html?, country?, language? }
+     *   body: {
+     *     focus_keyword,
+     *     current_html?,
+     *     url?,
+     *     country?,
+     *     language?,
+     *     selected?: {
+     *       h1?: string,
+     *       h2_outline?: string[],
+     *       subtopics?: string[],
+     *       paa?: string[],
+     *       gap_topics?: string[],
+     *       competitor_subtopics?: string[]
+     *     }
+     *   }
      */
     public function aiWriter(
         Request $request,
@@ -497,6 +609,21 @@ class PluginInsightsController extends Controller
             'wp_pages' => 'nullable|array|max:300',
             'wp_pages.*.url' => 'required_with:wp_pages|string|max:2048',
             'wp_pages.*.title' => 'nullable|string|max:300',
+            // User-curated subset from the plan step. When present, the
+            // writer ONLY uses these items (filters brief/gaps to match)
+            // instead of being told to cover everything available.
+            'selected' => 'nullable|array',
+            'selected.h1' => 'nullable|string|max:300',
+            'selected.h2_outline' => 'nullable|array|max:30',
+            'selected.h2_outline.*' => 'string|max:200',
+            'selected.subtopics' => 'nullable|array|max:30',
+            'selected.subtopics.*' => 'string|max:200',
+            'selected.paa' => 'nullable|array|max:30',
+            'selected.paa.*' => 'string|max:300',
+            'selected.gap_topics' => 'nullable|array|max:30',
+            'selected.gap_topics.*' => 'string|max:200',
+            'selected.competitor_subtopics' => 'nullable|array|max:30',
+            'selected.competitor_subtopics.*' => 'string|max:200',
         ]);
 
         // Cold path can chain Serper + 3 LLM calls totaling ~5 minutes wall
@@ -548,6 +675,7 @@ class PluginInsightsController extends Controller
             'brief' => $brief,
             'gaps' => $gaps,
             'wp_pages' => is_array($data['wp_pages'] ?? null) ? $data['wp_pages'] : [],
+            'selected' => is_array($data['selected'] ?? null) ? $data['selected'] : null,
         ]);
 
         return response()->json([
