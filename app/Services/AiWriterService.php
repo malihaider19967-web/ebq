@@ -88,8 +88,13 @@ class AiWriterService
             ];
         }
 
+        // Cache version — bump when the prompt or output shape changes so
+        // existing cached results don't pin users to a stale generation.
+        // v3 adds: 20-section cap, full PAA / outline / entities / internal
+        // links / serp_titles / schema_type, H1 rule, top-3-section-keyword
+        // requirement.
         $cacheKey = sprintf(
-            'ai_writer_v1:%d:%d:%s:%s:%s:%s',
+            'ai_writer_v3:%d:%d:%s:%s:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -221,16 +226,22 @@ and the topical-gap analysis — and turn them into reviewable sections.
 Output rules (STRICT — non-compliance breaks the consumer):
 - Return ONE JSON object only. No prose, no markdown fences, no commentary.
 - Top-level keys: "summary" (string) and "sections" (array).
-- Generate UP TO 20 sections. Cover every important brief subtopic, every
-  topical gap, and every "people also ask" question worth answering with
-  its own section. Don't pad — skip ones that would just repeat — but
-  don't undersell either. 200–500 words per section is the sweet spot;
-  up to 800 when the topic genuinely warrants depth.
-- For every "people also ask" question, prefer producing an <h2> framed
-  as the question itself (or a near-paraphrase) followed by a direct
-  answer in the first paragraph. This is the snippet-grab pattern.
+- Section count target: BETWEEN 12 AND 20 sections. Coverage is the
+  point — produce one section per brief subtopic, one per topical gap,
+  and one per "people also ask" question. Combining is allowed only
+  when two inputs cover the same ground; otherwise each gets its own
+  section. Returning fewer than 12 sections when richer inputs are
+  available is a failure of the task.
+- 200–500 words per section is the sweet spot; up to 800 when the topic
+  genuinely warrants depth. Don't pad. Don't undersell.
+- "people also ask" handling — REQUIRED: for EACH question in the
+  brief's `people_also_ask` array, produce one section whose <h2> is the
+  question itself (or a near-paraphrase). The first <p> after that <h2>
+  must be a direct, snippet-ready answer (40–60 words, no preamble).
+  Tag these with source_tags ⊇ ["brief"] (since PAA comes from the
+  brief). Do NOT skip PAA questions — every one gets a section.
 - For every topical-gap "missing" topic, produce a section that closes
-  it. Tag it with source_tags including "gaps".
+  it. Tag with source_tags ⊇ ["gaps"].
 - For every must-have entity, weave it naturally into at least one
   section (no entity stuffing — work it into prose where it fits).
 - For every internal_link_targets entry, when its anchor is relevant to

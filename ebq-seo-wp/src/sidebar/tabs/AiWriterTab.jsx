@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect, useMemo } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
-import { dispatch } from '@wordpress/data';
+import { dispatch, select } from '@wordpress/data';
 import { parse as parseBlocks, rawHandler } from '@wordpress/blocks';
 import { Section, Button, EmptyState, Pill, NeedsSetup } from '../components/primitives';
 import { IconSparkle } from '../components/icons';
@@ -360,31 +360,32 @@ function HtmlBlock({ label, html, tone }) {
 /* ────────────────── apply helpers ──────────────────────────── */
 
 /**
- * Build the HTML string we'll feed back into the editor.
- *  - replace → overrides everything (first one wins)
- *  - edit    → substring swap of section.current_html → proposed_html
- *  - add     → appended in order
- * Edits whose current_html can't be located (Gutenberg block markers
- * almost always disagree with the model's plain-text excerpt) fall
- * back to append so the proposal isn't silently dropped.
+ * Build the apply plan from approved sections.
  *
- * Returns an object with the merged HTML plus the slice that's PURELY
- * additive (the appended/replace HTML) so the Gutenberg path can insert
- * those as fresh blocks rather than re-parsing the whole post.
+ *  - kind=replace → overrides everything (first one wins).
+ *  - kind=edit    → if section.current_html appears verbatim in the
+ *                   current post HTML, swap it. Otherwise append (Gutenberg
+ *                   block markers in the source rarely match the model's
+ *                   plain-text excerpt; fall back rather than drop).
+ *  - kind=add     → appended in order.
+ *
+ * Returns:
+ *   { mode: 'replace', replaceHtml }
+ *   { mode: 'merge', editedBaseHtml, additiveHtmls: list<string> }
+ *
+ * `additiveHtmls` is a LIST not a joined string — the Gutenberg apply
+ * path converts each section to blocks INDIVIDUALLY so the editor ends
+ * up with one or more blocks per section instead of every section
+ * collapsing into a single Classic block.
  */
 function buildMergePlan(currentHtml, sections) {
 	const replace = sections.find((s) => s.kind === 'replace');
 	if (replace) {
-		return {
-			mode: 'replace',
-			html: String(replace.proposed_html || ''),
-			additiveHtml: String(replace.proposed_html || ''),
-			editedBaseHtml: '',
-		};
+		return { mode: 'replace', replaceHtml: String(replace.proposed_html || '') };
 	}
 
 	let editedBase = String(currentHtml || '');
-	const appended = [];
+	const additiveHtmls = [];
 	for (const s of sections) {
 		if (s.kind === 'edit' && s.current_html) {
 			const idx = editedBase.indexOf(s.current_html);
@@ -392,46 +393,46 @@ function buildMergePlan(currentHtml, sections) {
 				editedBase = editedBase.slice(0, idx) + (s.proposed_html || '') + editedBase.slice(idx + s.current_html.length);
 				continue;
 			}
-			// Fallback: couldn't locate the verbatim slice → append instead.
-			appended.push(s.proposed_html || '');
+			additiveHtmls.push(s.proposed_html || '');
 			continue;
 		}
 		if (s.kind === 'add') {
-			appended.push(s.proposed_html || '');
+			additiveHtmls.push(s.proposed_html || '');
 		}
 	}
-
-	const additiveHtml = appended.join('\n\n');
-	const html = additiveHtml
-		? editedBase.replace(/\s+$/, '') + '\n\n' + additiveHtml
-		: editedBase;
-
-	return { mode: 'merge', html, additiveHtml, editedBaseHtml: editedBase };
+	return { mode: 'merge', editedBaseHtml: editedBase, additiveHtmls };
 }
 
 /**
  * Push the change into whichever editor is active.
  *
- * Gutenberg quirk: `editPost({ content })` updates the post.content
- * attribute but the block-editor canonical state is the BLOCK TREE, not
- * the content string. So when we previously appended raw HTML to
- * `content`, the block tree was never re-parsed — only the originally
- * inserted single block remained, hence "only one section applies".
+ * Gutenberg quirk that bit us before: `editPost({ content })` updates
+ * the post.content attribute but the block-editor canonical state is
+ * the BLOCK TREE, not the content string — so appending raw HTML to
+ * the content string had no visible effect on the block tree.
  *
- * The fix is to operate on blocks directly:
- *   - mode=replace → resetBlocks(parsed full HTML)
- *   - mode=merge   → keep existing blocks, build new blocks from the
- *                    edited-base HTML where edits happened, then APPEND
- *                    rawHandler-converted blocks for the additive HTML.
- *     Practically: we re-parse the merged HTML once (block markers in the
- *     existing portion preserve those blocks; raw HTML at the tail gets
- *     converted to Heading / Paragraph / List blocks via rawHandler).
+ * The reliable pattern, the one this implementation now uses:
+ *   1. Read the LIVE block tree from `core/block-editor`.
+ *   2. For each additive section, run `rawHandler({ HTML })` which
+ *      converts a contiguous HTML string into proper block(s)
+ *      (Heading + Paragraph + List + …). Crucially we call rawHandler
+ *      ONCE PER SECTION rather than once on the joined HTML, so
+ *      sections never get lumped into a single Classic block.
+ *   3. Concatenate the new blocks onto the live block tree and call
+ *      `resetBlocks` on the result.
+ *
+ * Edits don't go through the block tree (their current_html almost
+ * never matches the serialized block markers exactly); they fall back
+ * to "append" via additiveHtmls in the merge plan above.
  */
 function writeContentToEditor(plan) {
 	const isClassic = typeof window !== 'undefined' && window.__EBQ_CLASSIC__ === true;
 
 	if (isClassic) {
-		const html = plan.html;
+		// Build the final HTML once for TinyMCE / textarea.
+		const html = plan.mode === 'replace'
+			? plan.replaceHtml
+			: (plan.editedBaseHtml.replace(/\s+$/, '') + (plan.additiveHtmls.length ? '\n\n' + plan.additiveHtmls.join('\n\n') : ''));
 		const tm = window.tinymce;
 		if (tm && tm.activeEditor && !tm.activeEditor.isHidden()) {
 			tm.activeEditor.setContent(html);
@@ -445,26 +446,35 @@ function writeContentToEditor(plan) {
 		return;
 	}
 
-	// Gutenberg path.
+	// Gutenberg.
 	const blockEditor = dispatch('core/block-editor');
 	if (!blockEditor || typeof blockEditor.resetBlocks !== 'function') {
 		throw new Error(__('Block editor unavailable.', 'ebq-seo'));
 	}
 
 	if (plan.mode === 'replace') {
-		const parsed = parseBlocks(plan.html);
+		// Whole-post replacement. rawHandler is more forgiving than parse
+		// for raw HTML without block markers (the model never emits them).
+		const parsed = rawHandler({ HTML: plan.replaceHtml || '' });
 		blockEditor.resetBlocks(parsed);
 		return;
 	}
 
-	// Merge mode. Re-parse the edited base (block markers preserve those
-	// blocks). For the additive tail (raw HTML, no block markers) use
-	// rawHandler so headings/paragraphs/lists become proper blocks instead
-	// of one giant Classic block.
-	const baseBlocks = plan.editedBaseHtml ? parseBlocks(plan.editedBaseHtml) : [];
-	const additiveBlocks = plan.additiveHtml
-		? rawHandler({ HTML: plan.additiveHtml })
-		: [];
-	const merged = [...baseBlocks, ...additiveBlocks];
-	blockEditor.resetBlocks(merged);
+	// Merge mode. Read the LIVE block tree (preserves clientIds + any
+	// edits the user already made elsewhere), then append one rawHandler
+	// run per additive section so each section becomes its own block(s).
+	const liveBlocks = (select('core/block-editor')?.getBlocks?.() || []).slice();
+	const newBlocks = [];
+	for (const html of plan.additiveHtmls) {
+		const trimmed = String(html || '').trim();
+		if (!trimmed) continue;
+		const parsed = rawHandler({ HTML: trimmed });
+		if (Array.isArray(parsed) && parsed.length) {
+			newBlocks.push(...parsed);
+		}
+	}
+	if (newBlocks.length === 0 && plan.editedBaseHtml === '') {
+		throw new Error(__('Nothing to apply.', 'ebq-seo'));
+	}
+	blockEditor.resetBlocks([...liveBlocks, ...newBlocks]);
 }
