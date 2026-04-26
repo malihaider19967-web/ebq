@@ -755,6 +755,19 @@ class PluginHqController extends Controller
     }
 
     /**
+     * Auto-discover competitors from this site's last 30 days of audits
+     * and run the prospect engine against them. Idempotent — safe to call
+     * on every tab open or from a manual "Refresh from audits" button.
+     *   POST /api/v1/hq/outreach-prospects/auto-discover?days=30
+     */
+    public function outreachProspectsAutoDiscover(Request $request, BacklinkProspectingService $service): JsonResponse
+    {
+        $website = $this->website($request);
+        $days = (int) $request->query('days', 30);
+        return response()->json($service->autoDiscoverFromAudits($website, max(1, min(90, $days))));
+    }
+
+    /**
      * Persisted prospect list — what the HQ tab loads on open.
      *   GET /api/v1/hq/outreach-prospects?status=new
      */

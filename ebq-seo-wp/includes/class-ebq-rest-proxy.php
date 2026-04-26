@@ -204,6 +204,11 @@ final class EBQ_Rest_Proxy
             'permission_callback' => [$this, 'can_view_hq'],
             'callback' => [$this, 'hq_outreach_prospects_list'],
         ]);
+        register_rest_route('ebq/v1', '/hq/outreach-prospects/auto-discover', [
+            'methods' => 'POST',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_outreach_prospects_auto_discover'],
+        ]);
         register_rest_route('ebq/v1', '/hq/outreach-prospects/(?P<id>\d+)', [
             'methods' => 'POST',
             'permission_callback' => [$this, 'can_view_hq'],
@@ -763,6 +768,12 @@ final class EBQ_Rest_Proxy
         $body = $request->get_json_params();
         if (! is_array($body)) $body = $request->get_params();
         return new WP_REST_Response(EBQ_Plugin::api_client()->hq_outreach_prospects_update($id, $body), 200);
+    }
+
+    public function hq_outreach_prospects_auto_discover(WP_REST_Request $request): WP_REST_Response
+    {
+        $days = (int) ($request->get_param('days') ?: 30);
+        return new WP_REST_Response(EBQ_Plugin::api_client()->hq_outreach_prospects_auto_discover($days), 200);
     }
 
     public function entity_coverage(WP_REST_Request $request): WP_REST_Response

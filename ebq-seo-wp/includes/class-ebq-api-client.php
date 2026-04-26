@@ -213,6 +213,11 @@ final class EBQ_Api_Client
         return $this->request('POST', sprintf('/api/v1/hq/outreach-prospects/%d', $id), $patch);
     }
 
+    public function hq_outreach_prospects_auto_discover(int $days = 30): array
+    {
+        return $this->request('POST', '/api/v1/hq/outreach-prospects/auto-discover?days=' . $days);
+    }
+
     public function entity_coverage(string $post_id, string $url): array
     {
         return $this->get(sprintf('/api/v1/posts/%s/entity-coverage', rawurlencode($post_id)), ['url' => $url]);

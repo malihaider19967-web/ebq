@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Backlink;
 use App\Models\CompetitorBacklink;
 use App\Models\OutreachProspect;
+use App\Models\PageAuditReport;
 use App\Models\Website;
 use App\Services\Llm\LlmClient;
 use Illuminate\Support\Carbon;
@@ -152,6 +153,68 @@ class BacklinkProspectingService
         ];
         Cache::put($cacheKey, $result, Carbon::now()->addHours(self::CACHE_TTL_HOURS));
         return $result;
+    }
+
+    /**
+     * Auto-discover competitors from this site's recent page audits and
+     * run prospect() against them. Removes the need for the user to
+     * manually paste competitor domains — every page they audit already
+     * tells EBQ who their SERP neighbours are via Serper benchmark.
+     *
+     * Called on every prospects-tab open (when saved list is empty),
+     * from a manual "Refresh from audits" button, and from a nightly
+     * scheduled command. Idempotent — re-runs enrich the existing list,
+     * never wipe it.
+     *
+     * @return array{
+     *   ok: bool,
+     *   reason?: string,
+     *   discovered_competitors: int,
+     *   competitors: list<string>,
+     *   prospect_count?: int,
+     *   new_in_run?: int,
+     * }
+     */
+    public function autoDiscoverFromAudits(Website $website, int $daysBack = 30): array
+    {
+        $cutoff = Carbon::now()->subDays(max(1, min(365, $daysBack)));
+
+        $competitors = PageAuditReport::query()
+            ->where('website_id', $website->id)
+            ->where('status', 'completed')
+            ->where('audited_at', '>=', $cutoff)
+            ->whereNotNull('result')
+            ->get(['result'])
+            ->flatMap(function ($a) {
+                $list = data_get($a->result, 'benchmark.competitors', []);
+                if (! is_array($list)) return [];
+                return collect($list)->map(fn ($c) => CompetitorBacklink::extractDomain((string) ($c['url'] ?? '')));
+            })
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($competitors === []) {
+            return [
+                'ok' => false,
+                'reason' => 'no_competitors_in_audits',
+                'discovered_competitors' => 0,
+                'competitors' => [],
+            ];
+        }
+
+        $beforeCount = OutreachProspect::query()->where('website_id', $website->id)->count();
+        $result = $this->prospect($website, $competitors);
+        $afterCount = OutreachProspect::query()->where('website_id', $website->id)->count();
+
+        return [
+            'ok' => true,
+            'discovered_competitors' => count($competitors),
+            'competitors' => $competitors,
+            'prospect_count' => $result['summary']['prospect_count'] ?? 0,
+            'new_in_run' => max(0, $afterCount - $beforeCount),
+        ];
     }
 
     /**
