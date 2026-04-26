@@ -487,6 +487,9 @@ class PluginInsightsController extends Controller
             'current_html' => 'nullable|string|max:200000',
             'country' => 'nullable|string|size:2',
             'language' => 'nullable|string|min:2|max:10',
+            'title' => 'nullable|string|max:300',
+            'additional_keywords' => 'nullable|array|max:20',
+            'additional_keywords.*' => 'string|max:200',
         ]);
 
         // Plan generation can chain Serper + brief LLM + topical-gaps LLM
@@ -609,6 +612,11 @@ class PluginInsightsController extends Controller
             'wp_pages' => 'nullable|array|max:300',
             'wp_pages.*.url' => 'required_with:wp_pages|string|max:2048',
             'wp_pages.*.title' => 'nullable|string|max:300',
+            // Standalone-draft mode: user supplies Title + additional
+            // keyphrases instead of pointing at an existing post.
+            'title' => 'nullable|string|max:300',
+            'additional_keywords' => 'nullable|array|max:20',
+            'additional_keywords.*' => 'string|max:200',
             // User-curated subset from the plan step. When present, the
             // writer ONLY uses these items (filters brief/gaps to match)
             // instead of being told to cover everything available.
@@ -676,6 +684,10 @@ class PluginInsightsController extends Controller
             'gaps' => $gaps,
             'wp_pages' => is_array($data['wp_pages'] ?? null) ? $data['wp_pages'] : [],
             'selected' => is_array($data['selected'] ?? null) ? $data['selected'] : null,
+            'title' => (string) ($data['title'] ?? ''),
+            'additional_keywords' => is_array($data['additional_keywords'] ?? null)
+                ? array_values(array_filter(array_map('strval', $data['additional_keywords'])))
+                : [],
         ]);
 
         return response()->json([

@@ -73,6 +73,20 @@ class AiWriterService
         $gaps = is_array($input['gaps'] ?? null) ? $input['gaps'] : null;
         $excludeUrl = trim((string) ($input['exclude_url'] ?? ''));
         $selected = is_array($input['selected'] ?? null) ? $input['selected'] : null;
+        $title = trim((string) ($input['title'] ?? ''));
+        $additionalKeywords = array_values(array_filter(
+            array_map('trim', (array) ($input['additional_keywords'] ?? [])),
+            static fn ($k) => is_string($k) && $k !== ''
+        ));
+
+        // Standalone-draft mode: user supplied a Title but no existing
+        // content. Treat the title as the brief's suggested H1 if the
+        // brief didn't return one (or override if user explicitly chose
+        // their title via the H1 picker — that lands here as
+        // `selected.h1`, which applySelection already handles).
+        if ($title !== '' && is_array($brief) && empty($brief['suggested_h1'] ?? null)) {
+            $brief['suggested_h1'] = $title;
+        }
 
         // When the user has curated a selection in the plan step, filter
         // the brief / gaps lists down to those items so the prompt isn't
@@ -123,11 +137,15 @@ class AiWriterService
         // v14: strict-mode count rule rewritten to use the UNION of
         //      outline + subtopics + paa + gap as input list, so
         //      outline-origin picks aren't silently excluded from N.
+        // v15: additional_keywords + title supplied by the standalone
+        //      draft form land in the prompt; cache key includes them
+        //      so different keyword sets produce different generations.
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
+        $extraHash = substr(hash('sha256', mb_strtolower($title).'|'.implode('|', $additionalKeywords)), 0, 8);
         $cacheKey = sprintf(
-            'ai_writer_v14:%d:%d:%s:%s:%s:%s:%d:%d:%s',
+            'ai_writer_v15:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -137,6 +155,7 @@ class AiWriterService
             count($smartLinks),
             count($wpPages),
             $selectionHash,
+            $extraHash,
         );
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && ($cached['ok'] ?? false) === true) {
@@ -145,7 +164,7 @@ class AiWriterService
             return $cached;
         }
 
-        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1, $smartLinks, $selected !== null);
+        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1, $smartLinks, $selected !== null, $title, $additionalKeywords);
         // 16k output tokens supports the 20-section cap with room for JSON
         // overhead. Mistral Small's 32k context window comfortably fits
         // input + this output. 240s timeout matches the worst-case wall
@@ -286,9 +305,10 @@ class AiWriterService
 
     /**
      * @param  list<array{url: string, anchor: string, topic: string, clicks: int}>  $smartLinks
+     * @param  list<string>  $additionalKeywords
      * @return list<array{role: string, content: string}>
      */
-    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1, array $smartLinks, bool $strictSelection): array
+    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1, array $smartLinks, bool $strictSelection, string $title, array $additionalKeywords): array
     {
         $briefBlock = '(none)';
         if (is_array($brief) && ! empty($brief)) {
@@ -461,8 +481,20 @@ SYS;
             $system,
         );
 
+        $titleBlock = $title !== '' ? "\"{$title}\"" : '(none — derive a title from the brief or keyword)';
+        $additionalBlock = empty($additionalKeywords)
+            ? '(none)'
+            : '"' . implode('", "', array_slice($additionalKeywords, 0, 20)) . '"';
+
         $user = <<<USER
 Target keyword: "{$keyword}"
+
+User-supplied page title:
+{$titleBlock}
+
+Additional keyphrases (weave naturally into the prose, do NOT keyword-stuff;
+each should appear in at least one section where it fits):
+{$additionalBlock}
 
 CONTENT BRIEF (may be empty):
 {$briefBlock}

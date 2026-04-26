@@ -166,12 +166,14 @@ final class EBQ_Rest_Proxy
             ],
         ]);
 
+        // AI Writer accepts id=0 for standalone-draft mode (HQ tab where
+        // user supplies title + focus keyword without picking a post).
         register_rest_route('ebq/v1', '/ai-writer/(?P<id>\d+)', [
             'methods' => 'POST',
             'permission_callback' => [$this, 'can_edit'],
             'callback' => [$this, 'ai_writer'],
             'args' => [
-                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v >= 0],
             ],
         ]);
 
@@ -180,7 +182,7 @@ final class EBQ_Rest_Proxy
             'permission_callback' => [$this, 'can_edit'],
             'callback' => [$this, 'ai_writer_plan'],
             'args' => [
-                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v >= 0],
             ],
         ]);
 
@@ -707,8 +709,13 @@ final class EBQ_Rest_Proxy
         $body = $request->get_json_params();
         if (! is_array($body)) $body = $request->get_params();
 
-        $wp_pages = $this->collect_wp_link_candidates($post_id);
+        // Standalone-draft mode passes id=0 (no real post yet); skip the
+        // wp_pages collection in that case since there's no post context.
+        $wp_pages = $post_id > 0 ? $this->collect_wp_link_candidates($post_id) : [];
         $selected = is_array($body['selected'] ?? null) ? $body['selected'] : null;
+        $additional = is_array($body['additional_keywords'] ?? null)
+            ? array_values(array_filter(array_map('strval', $body['additional_keywords'])))
+            : [];
 
         $payload = EBQ_Plugin::api_client()->ai_writer(
             (string) $post_id,
@@ -718,7 +725,9 @@ final class EBQ_Rest_Proxy
             $wp_pages,
             (string) ($body['country'] ?? ''),
             (string) ($body['language'] ?? ''),
-            $selected
+            $selected,
+            (string) ($body['title'] ?? ''),
+            $additional
         );
 
         return new WP_REST_Response($payload, 200);
@@ -735,12 +744,18 @@ final class EBQ_Rest_Proxy
         $body = $request->get_json_params();
         if (! is_array($body)) $body = $request->get_params();
 
+        $additional = is_array($body['additional_keywords'] ?? null)
+            ? array_values(array_filter(array_map('strval', $body['additional_keywords'])))
+            : [];
+
         $payload = EBQ_Plugin::api_client()->ai_writer_plan(
             (string) $post_id,
             (string) ($body['focus_keyword'] ?? ''),
             (string) ($body['current_html'] ?? ''),
             (string) ($body['country'] ?? ''),
-            (string) ($body['language'] ?? '')
+            (string) ($body['language'] ?? ''),
+            (string) ($body['title'] ?? ''),
+            $additional
         );
 
         return new WP_REST_Response($payload, 200);
