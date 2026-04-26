@@ -188,6 +188,8 @@ export default function AiWriterTab() {
 							<p className="ebq-help" style={{ marginTop: 0 }}>{state.data.summary}</p>
 						) : null}
 
+						<DiagnosticsRow diag={state.data.diagnostics} />
+
 						<div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
 							<SourcesUsedRow used={state.data.sources_used} />
 							<div style={{ flex: 1 }} />
@@ -245,6 +247,43 @@ export default function AiWriterTab() {
 					</>
 				) : null}
 			</Section>
+		</div>
+	);
+}
+
+function DiagnosticsRow({ diag }) {
+	if (!diag) return null;
+	const linkRow = (() => {
+		if (diag.internal_links_available === 0) {
+			return {
+				tone: 'neutral',
+				text: __('No internal-link targets available — connect Search Console with click history to surface candidates.', 'ebq-seo'),
+			};
+		}
+		if (diag.internal_links_in_output >= diag.internal_links_available) {
+			return {
+				tone: 'good',
+				text: sprintf(__('Internal links: %1$d of %2$d included.', 'ebq-seo'), diag.internal_links_in_output, diag.internal_links_available),
+			};
+		}
+		return {
+			tone: 'warn',
+			text: sprintf(__('Internal links: %1$d of %2$d included — regenerate to retry.', 'ebq-seo'), diag.internal_links_in_output, diag.internal_links_available),
+		};
+	})();
+	return (
+		<div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+			<span className="ebq-text-xs" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+				<Pill tone={linkRow.tone}>{linkRow.text}</Pill>
+			</span>
+			<span className="ebq-text-xs ebq-text-soft" style={{ fontSize: 11 }}>
+				{sprintf(
+					__('Sections: %1$d · PAA available: %2$d · gap topics: %3$d', 'ebq-seo'),
+					diag.sections_returned || 0,
+					diag.paa_questions_available || 0,
+					diag.gaps_available || 0,
+				)}
+			</span>
 		</div>
 	);
 }

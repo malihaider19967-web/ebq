@@ -74,6 +74,15 @@ class AiWriterService
         $hasBrief = $brief !== null && ! empty($brief['subtopics'] ?? []);
         $hasGaps = $gaps !== null && ! empty($gaps['missing'] ?? []);
         $hasContent = mb_strlen($currentText) >= 100;
+        $availableInternalLinks = is_array($brief['internal_link_targets'] ?? null)
+            ? count(array_filter($brief['internal_link_targets'], static fn ($r) => is_array($r) && ! empty($r['url'])))
+            : 0;
+        $availablePaaCount = is_array($brief['people_also_ask'] ?? null)
+            ? count(array_filter($brief['people_also_ask'], 'is_string'))
+            : 0;
+        $availableGapsCount = is_array($gaps['missing'] ?? null)
+            ? count(array_filter($gaps['missing'], 'is_array'))
+            : 0;
         // Look at the raw HTML (block markers and all) for an <h1> — the
         // strip_tags'd $currentText loses tag info. Editor themes render the
         // post title as H1, so most published posts won't have one inside the
@@ -90,11 +99,10 @@ class AiWriterService
 
         // Cache version — bump when the prompt or output shape changes so
         // existing cached results don't pin users to a stale generation.
-        // v3 adds: 20-section cap, full PAA / outline / entities / internal
-        // links / serp_titles / schema_type, H1 rule, top-3-section-keyword
-        // requirement.
+        // v5: H1 must be followed by an intro <p> before any <h2>; no two
+        //     headings may be back-to-back without body content between.
         $cacheKey = sprintf(
-            'ai_writer_v3:%d:%d:%s:%s:%s:%s',
+            'ai_writer_v5:%d:%d:%s:%s:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -144,6 +152,16 @@ class AiWriterService
             return ['ok' => false, 'error' => 'no_sections'];
         }
 
+        // How many of the available signals actually made it into the
+        // generated output. Lets the UI explain "no internal links?" with
+        // "the brief had 0 link targets to use" vs. "the model ignored
+        // them" — we can tell because we know the input count and we can
+        // count <a href> tags in the output.
+        $linkCount = 0;
+        foreach ($sections as $section) {
+            $linkCount += preg_match_all('/<a\s+href=/i', (string) ($section['proposed_html'] ?? ''));
+        }
+
         $result = [
             'ok' => true,
             'summary' => mb_substr((string) ($response['summary'] ?? ''), 0, 600),
@@ -152,6 +170,13 @@ class AiWriterService
                 'brief' => $hasBrief,
                 'gaps' => $hasGaps,
                 'content' => $hasContent,
+            ],
+            'diagnostics' => [
+                'internal_links_available' => $availableInternalLinks,
+                'internal_links_in_output' => $linkCount,
+                'paa_questions_available' => $availablePaaCount,
+                'gaps_available' => $availableGapsCount,
+                'sections_returned' => count($sections),
             ],
             'cached' => false,
             'generated_at' => Carbon::now()->toIso8601String(),
@@ -244,16 +269,37 @@ Output rules (STRICT — non-compliance breaks the consumer):
   it. Tag with source_tags ⊇ ["gaps"].
 - For every must-have entity, weave it naturally into at least one
   section (no entity stuffing — work it into prose where it fits).
-- For every internal_link_targets entry, when its anchor is relevant to
-  the section you're writing, include exactly ONE <a href="<url>">
-  <anchor>...</anchor></a> link to it. Don't link to the same URL twice.
+- INTERNAL LINKS — REQUIRED: for EVERY entry in
+  internal_link_targets, you MUST place exactly ONE <a href="...">
+  link to that URL somewhere in the response. Pick the section where
+  the link's anchor is most topically relevant; if no perfect fit
+  exists, place it in the closest-related section anyway. The anchor
+  text inside the <a> tag should match (or closely paraphrase) the
+  entry's "anchor" field. Do not link to the same URL more than once.
+  Do not skip any entry.
+
+  Concrete example: if internal_link_targets contains
+    [{"url":"https://example.com/protein-guide","anchor":"vegan protein"}]
+  then ONE of your sections must include something like
+    <p>...for an in-depth comparison see our
+    <a href="https://example.com/protein-guide">vegan protein</a>
+    guide...</p>
+  Failing to include all internal_link_targets is a failure of the task.
 - proposed_html: valid HTML using <h1>, <h2>, <h3>, <p>, <ul>, <ol>,
   <li>, <strong>, <em>, <a>. No inline styles, no <script>, no markdown,
   no <html>/<body>/<head>.
 - H1 RULE: the post says HAS_H1=%H1_FLAG%. When HAS_H1=false, the FIRST
-  add (or the replace, if any) MUST start with one <h1> that includes the
-  focus keyword naturally. When HAS_H1=true, do NOT introduce another
+  add (or the replace, if any) MUST start with one <h1> that includes
+  the focus keyword naturally, IMMEDIATELY FOLLOWED by an intro <p>
+  paragraph of 2–4 sentences that previews what the post covers and
+  uses the focus keyword once. Only AFTER that intro paragraph may any
+  <h2> appear. Never place an <h2> directly after an <h1> with no
+  intervening body content. When HAS_H1=true, do NOT introduce another
   <h1> in any section.
+- HEADING-AFTER-HEADING RULE: at no point should two heading tags
+  (<h1>/<h2>/<h3>) appear back-to-back with no body content (<p>,
+  <ul>, <ol>) between them. Every heading must be followed by at least
+  one paragraph or list before the next heading.
 - kind ∈ {"add","edit","replace"}.
    • "add"     — new section the post is missing. Lead with an <h2>.
    • "edit"    — rewrite an existing passage. current_html MUST be a
