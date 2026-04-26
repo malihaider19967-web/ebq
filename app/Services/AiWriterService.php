@@ -113,14 +113,14 @@ class AiWriterService
 
         // Cache version — bump when the prompt or output shape changes so
         // existing cached results don't pin users to a stale generation.
-        // v9: dropped the no_inputs hard guard; prompt now produces a
-        //     scaffold even when brief / gaps / content are all empty,
-        //     using only the focus keyword + user-curated selection.
+        // v10: strict-selection mode — when user curated inputs in plan
+        //      step, prompt now mandates exactly-one-section-per-input
+        //      and forbids inventing new sections to host internal links.
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
         $cacheKey = sprintf(
-            'ai_writer_v9:%d:%d:%s:%s:%s:%s:%d:%d:%s',
+            'ai_writer_v10:%d:%d:%s:%s:%s:%s:%d:%d:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -138,7 +138,7 @@ class AiWriterService
             return $cached;
         }
 
-        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1, $smartLinks);
+        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1, $smartLinks, $selected !== null);
         // 16k output tokens supports the 20-section cap with room for JSON
         // overhead. Mistral Small's 32k context window comfortably fits
         // input + this output. 240s timeout matches the worst-case wall
@@ -212,7 +212,7 @@ class AiWriterService
      * @param  list<array{url: string, anchor: string, topic: string, clicks: int}>  $smartLinks
      * @return list<array{role: string, content: string}>
      */
-    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1, array $smartLinks): array
+    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1, array $smartLinks, bool $strictSelection): array
     {
         $briefBlock = '(none)';
         if (is_array($brief) && ! empty($brief)) {
@@ -268,12 +268,7 @@ and the topical-gap analysis — and turn them into reviewable sections.
 Output rules (STRICT — non-compliance breaks the consumer):
 - Return ONE JSON object only. No prose, no markdown fences, no commentary.
 - Top-level keys: "summary" (string) and "sections" (array).
-- Section count target: BETWEEN 12 AND 20 sections. Coverage is the
-  point — produce one section per brief subtopic, one per topical gap,
-  and one per "people also ask" question. Combining is allowed only
-  when two inputs cover the same ground; otherwise each gets its own
-  section. Returning fewer than 12 sections when richer inputs are
-  available is a failure of the task.
+- Section count: %SECTION_COUNT_RULE%
 - 200–500 words per section is the sweet spot; up to 800 when the topic
   genuinely warrants depth. Don't pad. Don't undersell.
 - "people also ask" handling — REQUIRED: for EACH question in the
@@ -296,10 +291,9 @@ Output rules (STRICT — non-compliance breaks the consumer):
                         most clicks to it
   For EVERY entry you MUST include exactly ONE <a href="<url>"><anchor
   or paraphrase></a> in the response. Place each link in the section
-  whose subject most overlaps with the entry's best_fit_topic. If no
-  section is a clean fit, create one (an "add" section about that
-  topic) so the link has a home — that's preferable to dropping the
-  entry. Do not link to the same URL twice. Do not skip any entry.
+  whose subject most overlaps with the entry's best_fit_topic.
+  %LINK_FALLBACK_RULE%
+  Do not link to the same URL twice. Do not skip any entry.
 
   Concrete example: if internal_links contains
     [{"url":"https://example.com/protein-guide",
@@ -356,7 +350,19 @@ explanation → how-to / comparison → FAQs → next steps), each followed
 by 2–4 paragraphs of substantive prose. Do NOT refuse — the absence of
 brief / gaps means richer output is impossible, not that no output is.
 SYS;
-        $system = str_replace('%H1_FLAG%', $hasH1 ? 'true' : 'false', $system);
+        $sectionCountRule = $strictSelection
+            ? 'STRICT MODE — the user curated their inputs in a prior step. Generate EXACTLY one "add" or "edit" section per item already present in subtopics + people_also_ask + missing-gap topics. Do NOT invent additional topics. Do NOT pad. The section count is derived from the input lists; if there are 5 inputs total, you produce 5 add/edit sections (plus optional edit sections for weak passages of the existing post). Existing-content edit sections do not count against the input total.'
+            : 'BETWEEN 12 AND 20 sections. Coverage is the point — produce one section per brief subtopic, one per topical gap, and one per "people also ask" question. Combining is allowed only when two inputs cover the same ground; otherwise each gets its own section. Returning fewer than 12 sections when richer inputs are available is a failure of the task.';
+
+        $linkFallbackRule = $strictSelection
+            ? 'If no section is a clean fit, place the link in the closest-related section anyway — DO NOT invent a new section to host the link in strict mode.'
+            : 'If no section is a clean fit, create one (an "add" section about that topic) so the link has a home — that\'s preferable to dropping the entry.';
+
+        $system = str_replace(
+            ['%H1_FLAG%', '%SECTION_COUNT_RULE%', '%LINK_FALLBACK_RULE%'],
+            [$hasH1 ? 'true' : 'false', $sectionCountRule, $linkFallbackRule],
+            $system,
+        );
 
         $user = <<<USER
 Target keyword: "{$keyword}"
