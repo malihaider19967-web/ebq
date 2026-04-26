@@ -69,10 +69,12 @@ class AiContentBriefService
         $language = is_string($input['language'] ?? null) && $input['language'] !== ''
             ? strtolower($input['language']) : 'en';
 
-        // v2 cache namespace — bump when the brief schema/prompt changes.
+        // v3 cache namespace — bump when the brief schema/prompt changes.
         // v2 added: suggested_h1 field.
+        // v3 sharpened the suggested_outline vs. subtopics distinction so
+        //     they're no longer near-duplicates in the UI.
         $cacheKey = sprintf(
-            'ai_content_brief_v2:%d:%s:%s',
+            'ai_content_brief_v3:%d:%s:%s',
             $website->id,
             hash('xxh3', mb_strtolower($keyword)),
             $country,
@@ -172,8 +174,14 @@ Constraints:
 - suggested_h1: ONE compelling, click-worthy H1 title (≤ 65 chars). Must
   contain the target keyword naturally; not just a duplicate of one of
   the SERP titles — improve on them.
-- subtopics: 8–14 specific topics the page must cover, derived from what
-  the top SERP pages share. Not generic ("introduction", "conclusion").
+- subtopics: 8–14 specific concepts, sub-points, entities, or angles
+  the page must cover. These are NOT section headlines — they're the
+  granular ideas that may appear inside any section. They MUST NOT
+  duplicate items in `suggested_outline`. Examples of good subtopics:
+  "macro vs. micro nutrients", "leucine threshold", "plant-based
+  bioavailability", "post-workout timing window". Bad subtopics
+  (because they read like H2s): "What is vegan protein?", "Best
+  vegan protein sources" — those belong in `suggested_outline`.
 - recommended_word_count: integer; based on the median word depth implied
   by the SERP titles + snippets. 600 floor, 4500 ceiling.
 - suggested_schema_type: one of Article, HowTo, FAQ, Review, Product,
@@ -181,6 +189,9 @@ Constraints:
 - must_have_entities: people, brands, products, places, frameworks the
   competitors mention in their titles/snippets.
 - suggested_outline: 6–10 H2-level section titles in narrative order.
+  These ARE the article's structural backbone (intro → body sections
+  → conclusion-style). Phrased as headlines, not concepts. MUST NOT
+  duplicate items in `subtopics`.
 - people_also_ask: 5–10 questions a reader is likely to want answered.
 - angle: commercial | informational | comparison | guide | listicle.
 

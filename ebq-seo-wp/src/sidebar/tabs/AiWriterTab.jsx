@@ -37,7 +37,10 @@ export default function AiWriterTab() {
 	const [planError, setPlanError] = useState('');
 	const [genError, setGenError] = useState('');
 	const [plan, setPlan] = useState(null); // { brief: {...}, gaps: {...} }
-	const [pick, setPick] = useState({ h1: '', h1Mode: 'suggested', h2_outline: {}, subtopics: {}, paa: {}, gap_topics: {}, competitor_subtopics: {} });
+	// `topics` merges suggested_h2_outline + subtopics — same conceptual
+	// signal at different granularity. We track origin per item so the
+	// writer prompt still receives both buckets populated downstream.
+	const [pick, setPick] = useState({ h1: '', h1Mode: 'suggested', topics: {}, paa: {}, gap_topics: {}, competitor_subtopics: {} });
 	const [data, setData] = useState(null); // writer response
 	// Per-section approval state, keyed by section.id. true = approved.
 	const [approved, setApproved] = useState({});
@@ -67,11 +70,17 @@ export default function AiWriterTab() {
 				// Pre-tick everything by default — the user removes what they
 				// don't want rather than ticking each item from scratch.
 				const tickAll = (arr) => (Array.isArray(arr) ? Object.fromEntries(arr.map((v) => [v, true])) : {});
+				// Merge H2 outline + subtopics into a single ordered list,
+				// deduping case-insensitively. H2 outline items go first
+				// (the narrative spine); subtopics fill in granular ideas.
+				const mergedTopics = mergeTopics(
+					inner.brief?.suggested_h2_outline,
+					inner.brief?.subtopics,
+				);
 				setPick({
 					h1: (inner.brief?.suggested_h1 || ''),
 					h1Mode: 'suggested',
-					h2_outline: tickAll(inner.brief?.suggested_h2_outline),
-					subtopics: tickAll(inner.brief?.subtopics),
+					topics: tickAll(mergedTopics),
 					paa: tickAll(inner.brief?.people_also_ask),
 					gap_topics: tickAll(inner.gaps?.missing_subtopics),
 					competitor_subtopics: tickAll(inner.gaps?.competitor_subtopics),
@@ -91,10 +100,14 @@ export default function AiWriterTab() {
 		setApplyState({ status: 'idle', message: '' });
 
 		const ticked = (obj) => Object.entries(obj || {}).filter(([, v]) => v).map(([k]) => k);
+		// Merged "Topics to cover" in the UI maps to BOTH backend buckets
+		// (suggested_outline + subtopics). The writer's applySelection
+		// filters both lists to the same picked set — works either way.
+		const pickedTopics = ticked(pick.topics);
 		const selected = {
 			h1: pick.h1Mode === 'none' ? '' : (pick.h1 || ''),
-			h2_outline: ticked(pick.h2_outline),
-			subtopics: ticked(pick.subtopics),
+			h2_outline: pickedTopics,
+			subtopics: pickedTopics,
 			paa: ticked(pick.paa),
 			gap_topics: ticked(pick.gap_topics),
 			competitor_subtopics: ticked(pick.competitor_subtopics),
@@ -342,6 +355,26 @@ function SelectionPanel({ plan, pick, setPick, onGenerate }) {
 	const briefAvail = !!plan?.brief?.available;
 	const gapsAvail = !!plan?.gaps?.available;
 
+	// Dedupe across groups so the user doesn't see the same string twice.
+	// `topics` (H2 outline + subtopics, merged) is built first; PAA / gaps
+	// are then filtered against the topics seen-set so a PAA that's also
+	// a topic shows only in the topics group.
+	const seen = new Set();
+	const dedup = (list) => {
+		if (!Array.isArray(list)) return [];
+		return list.filter((item) => {
+			const k = normTopic(item);
+			if (!k || seen.has(k)) return false;
+			seen.add(k);
+			return true;
+		});
+	};
+	const mergedTopics = mergeTopics(plan?.brief?.suggested_h2_outline, plan?.brief?.subtopics);
+	mergedTopics.forEach((t) => seen.add(normTopic(t)));
+	const dedupedPaa = dedup(plan?.brief?.people_also_ask);
+	const dedupedGapMissing = dedup(plan?.gaps?.missing_subtopics);
+	const dedupedGapCompetitor = dedup(plan?.gaps?.competitor_subtopics);
+
 	const toggle = (group, key) => {
 		setPick((p) => ({ ...p, [group]: { ...p[group], [key]: !p[group]?.[key] } }));
 	};
@@ -351,11 +384,10 @@ function SelectionPanel({ plan, pick, setPick, onGenerate }) {
 
 	const totalPicked =
 		(pick.h1 && pick.h1Mode !== 'none' ? 1 : 0) +
-		Object.values(pick.h2_outline).filter(Boolean).length +
-		Object.values(pick.subtopics).filter(Boolean).length +
-		Object.values(pick.paa).filter(Boolean).length +
-		Object.values(pick.gap_topics).filter(Boolean).length +
-		Object.values(pick.competitor_subtopics).filter(Boolean).length;
+		Object.values(pick.topics || {}).filter(Boolean).length +
+		Object.values(pick.paa || {}).filter(Boolean).length +
+		Object.values(pick.gap_topics || {}).filter(Boolean).length +
+		Object.values(pick.competitor_subtopics || {}).filter(Boolean).length;
 
 	return (
 		<div className="ebq-stack" style={{ gap: 14 }}>
@@ -405,27 +437,20 @@ function SelectionPanel({ plan, pick, setPick, onGenerate }) {
 					) : null}
 
 					<SelectionGroup
-						title={__('Suggested H2 outline', 'ebq-seo')}
-						items={plan.brief.suggested_h2_outline}
-						picks={pick.h2_outline}
-						onToggle={(k) => toggle('h2_outline', k)}
-						onAll={(val) => setAll('h2_outline', plan.brief.suggested_h2_outline, val)}
-					/>
-
-					<SelectionGroup
-						title={__('Subtopics to cover', 'ebq-seo')}
-						items={plan.brief.subtopics}
-						picks={pick.subtopics}
-						onToggle={(k) => toggle('subtopics', k)}
-						onAll={(val) => setAll('subtopics', plan.brief.subtopics, val)}
+						title={__('Topics to cover', 'ebq-seo')}
+						hint={__('Merged from your brief\'s suggested H2 outline and subtopics. Order is the suggested narrative flow.', 'ebq-seo')}
+						items={mergedTopics}
+						picks={pick.topics}
+						onToggle={(k) => toggle('topics', k)}
+						onAll={(val) => setAll('topics', mergedTopics, val)}
 					/>
 
 					<SelectionGroup
 						title={__('People also ask', 'ebq-seo')}
-						items={plan.brief.people_also_ask}
+						items={dedupedPaa}
 						picks={pick.paa}
 						onToggle={(k) => toggle('paa', k)}
-						onAll={(val) => setAll('paa', plan.brief.people_also_ask, val)}
+						onAll={(val) => setAll('paa', dedupedPaa, val)}
 					/>
 				</>
 			) : (
@@ -436,18 +461,18 @@ function SelectionPanel({ plan, pick, setPick, onGenerate }) {
 				<>
 					<SelectionGroup
 						title={__('Subtopics to add (missing vs. top SERP)', 'ebq-seo')}
-						items={plan.gaps.missing_subtopics}
+						items={dedupedGapMissing}
 						picks={pick.gap_topics}
 						onToggle={(k) => toggle('gap_topics', k)}
-						onAll={(val) => setAll('gap_topics', plan.gaps.missing_subtopics, val)}
+						onAll={(val) => setAll('gap_topics', dedupedGapMissing, val)}
 					/>
 
 					<SelectionGroup
 						title={__('Subtopics covered by top 5', 'ebq-seo')}
-						items={plan.gaps.competitor_subtopics}
+						items={dedupedGapCompetitor}
 						picks={pick.competitor_subtopics}
 						onToggle={(k) => toggle('competitor_subtopics', k)}
-						onAll={(val) => setAll('competitor_subtopics', plan.gaps.competitor_subtopics, val)}
+						onAll={(val) => setAll('competitor_subtopics', dedupedGapCompetitor, val)}
 					/>
 				</>
 			) : (
@@ -468,7 +493,7 @@ function SelectionPanel({ plan, pick, setPick, onGenerate }) {
 	);
 }
 
-function SelectionGroup({ title, items, picks, onToggle, onAll, children }) {
+function SelectionGroup({ title, hint, items, picks, onToggle, onAll, children }) {
 	const list = Array.isArray(items) ? items : [];
 	if (children) {
 		return (
@@ -485,6 +510,9 @@ function SelectionGroup({ title, items, picks, onToggle, onAll, children }) {
 			<legend className="ebq-text-xs" style={{ fontWeight: 600, marginBottom: 4 }}>
 				{title} <span className="ebq-text-soft">({tickedCount}/{list.length})</span>
 			</legend>
+			{hint ? (
+				<p className="ebq-text-xs ebq-text-soft" style={{ margin: '0 0 6px', fontSize: 11 }}>{hint}</p>
+			) : null}
 			<div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
 				<button type="button" className="ebq-link" onClick={() => onAll(true)}>{__('All', 'ebq-seo')}</button>
 				<span className="ebq-text-soft">·</span>
@@ -505,6 +533,26 @@ function SelectionGroup({ title, items, picks, onToggle, onAll, children }) {
 			</div>
 		</fieldset>
 	);
+}
+
+/* Topic-merging helpers: H2 outline (the structural narrative spine)
+ * goes first, then subtopics that aren't already in the outline. */
+function normTopic(s) {
+	return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+function mergeTopics(h2Outline, subtopics) {
+	const seen = new Set();
+	const out = [];
+	const push = (item) => {
+		if (typeof item !== 'string') return;
+		const k = normTopic(item);
+		if (!k || seen.has(k)) return;
+		seen.add(k);
+		out.push(item.trim());
+	};
+	(Array.isArray(h2Outline) ? h2Outline : []).forEach(push);
+	(Array.isArray(subtopics) ? subtopics : []).forEach(push);
+	return out;
 }
 
 function DiagnosticsRow({ diag }) {
