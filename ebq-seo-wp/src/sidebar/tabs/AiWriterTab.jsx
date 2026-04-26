@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useMemo } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
 import { dispatch } from '@wordpress/data';
+import { parse as parseBlocks, rawHandler } from '@wordpress/blocks';
 import { Section, Button, EmptyState, Pill, NeedsSetup } from '../components/primitives';
 import { IconSparkle } from '../components/icons';
 import { useEditorContext, usePostMeta, publicConfig } from '../hooks/useEditorContext';
@@ -77,20 +78,26 @@ export default function AiWriterTab() {
 		() => sections.filter((s) => approved[s.id]),
 		[sections, approved],
 	);
+	const allApproved = sections.length > 0 && approvedSections.length === sections.length;
+	const noneApproved = approvedSections.length === 0;
 
-	const handleToggle = (id) => setApproved((a) => ({ ...a, [id]: !a[id] }));
-	const handleAll = (val) => {
-		const next = {};
-		sections.forEach((s) => { next[s.id] = val; });
-		setApproved(next);
-	};
+	const handleToggle = useCallback((id) => {
+		setApproved((a) => ({ ...a, [id]: !a[id] }));
+	}, []);
+	const handleAll = useCallback((val) => {
+		setApproved(() => {
+			const next = {};
+			(state.data?.sections || []).forEach((s) => { next[s.id] = val; });
+			return next;
+		});
+	}, [state.data]);
 
 	const handleApply = useCallback(() => {
 		if (approvedSections.length === 0) return;
 		setApplyState({ status: 'pending', message: '' });
 		try {
-			const merged = mergeApprovedSections(ctx.content || '', approvedSections);
-			writeContentToEditor(merged);
+			const plan = buildMergePlan(ctx.content || '', approvedSections);
+			writeContentToEditor(plan);
 			setApplyState({
 				status: 'ok',
 				message: sprintf(
@@ -181,15 +188,25 @@ export default function AiWriterTab() {
 							<p className="ebq-help" style={{ marginTop: 0 }}>{state.data.summary}</p>
 						) : null}
 
-						<div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+						<div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
 							<SourcesUsedRow used={state.data.sources_used} />
 							<div style={{ flex: 1 }} />
-							<button type="button" className="ebq-btn ebq-btn--ghost ebq-btn--sm" onClick={() => handleAll(true)}>
+							<Button
+								size="sm"
+								variant="ghost"
+								onClick={() => handleAll(true)}
+								disabled={allApproved}
+							>
 								{__('Approve all', 'ebq-seo')}
-							</button>
-							<button type="button" className="ebq-btn ebq-btn--ghost ebq-btn--sm" onClick={() => handleAll(false)}>
+							</Button>
+							<Button
+								size="sm"
+								variant="ghost"
+								onClick={() => handleAll(false)}
+								disabled={noneApproved}
+							>
 								{__('Reject all', 'ebq-seo')}
-							</button>
+							</Button>
 						</div>
 
 						{sections.map((s) => (
@@ -266,15 +283,22 @@ function SectionProposal({ section, approved, onToggle }) {
 				background: approved ? 'transparent' : 'rgba(0,0,0,0.02)',
 			}}
 		>
-			<label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+			<div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
 				<input
 					type="checkbox"
 					checked={approved}
 					onChange={onToggle}
-					style={{ marginTop: 3 }}
+					style={{ marginTop: 3, cursor: 'pointer' }}
+					aria-label={approved ? __('Reject this section', 'ebq-seo') : __('Approve this section', 'ebq-seo')}
 				/>
 				<div style={{ flex: 1, minWidth: 0 }}>
-					<div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+					<div
+						style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', cursor: 'pointer' }}
+						onClick={onToggle}
+						role="button"
+						tabIndex={0}
+						onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onToggle(); } }}
+					>
 						<Pill tone={kindTone}>{kindLabel}</Pill>
 						<strong style={{ fontSize: 12 }}>{section.title}</strong>
 						{(section.source_tags || []).map((t) => (
@@ -299,7 +323,7 @@ function SectionProposal({ section, approved, onToggle }) {
 						<HtmlBlock label={__('Proposed', 'ebq-seo')} html={section.proposed_html} tone="good" />
 					)}
 				</div>
-			</label>
+			</div>
 		</div>
 	);
 }
@@ -336,31 +360,39 @@ function HtmlBlock({ label, html, tone }) {
 /* ────────────────── apply helpers ──────────────────────────── */
 
 /**
- * Merge approved sections into the post HTML.
- *  - replace → overrides everything (only one is honored; first wins)
- *  - edit    → naive substring swap of section.current_html → proposed_html
- *  - add     → appended in the order they appear
- * If an edit's current_html doesn't match the post (e.g. block markup
- * differs from the plain-text excerpt the model worked from), we
- * gracefully fall back to appending the proposed HTML so the user
- * doesn't lose the proposal.
+ * Build the HTML string we'll feed back into the editor.
+ *  - replace → overrides everything (first one wins)
+ *  - edit    → substring swap of section.current_html → proposed_html
+ *  - add     → appended in order
+ * Edits whose current_html can't be located (Gutenberg block markers
+ * almost always disagree with the model's plain-text excerpt) fall
+ * back to append so the proposal isn't silently dropped.
+ *
+ * Returns an object with the merged HTML plus the slice that's PURELY
+ * additive (the appended/replace HTML) so the Gutenberg path can insert
+ * those as fresh blocks rather than re-parsing the whole post.
  */
-function mergeApprovedSections(currentHtml, sections) {
+function buildMergePlan(currentHtml, sections) {
 	const replace = sections.find((s) => s.kind === 'replace');
 	if (replace) {
-		return String(replace.proposed_html || '');
+		return {
+			mode: 'replace',
+			html: String(replace.proposed_html || ''),
+			additiveHtml: String(replace.proposed_html || ''),
+			editedBaseHtml: '',
+		};
 	}
 
-	let next = String(currentHtml || '');
+	let editedBase = String(currentHtml || '');
 	const appended = [];
 	for (const s of sections) {
 		if (s.kind === 'edit' && s.current_html) {
-			const idx = next.indexOf(s.current_html);
+			const idx = editedBase.indexOf(s.current_html);
 			if (idx !== -1) {
-				next = next.slice(0, idx) + (s.proposed_html || '') + next.slice(idx + s.current_html.length);
+				editedBase = editedBase.slice(0, idx) + (s.proposed_html || '') + editedBase.slice(idx + s.current_html.length);
 				continue;
 			}
-			// Fallback: couldn't locate → append.
+			// Fallback: couldn't locate the verbatim slice → append instead.
 			appended.push(s.proposed_html || '');
 			continue;
 		}
@@ -368,16 +400,38 @@ function mergeApprovedSections(currentHtml, sections) {
 			appended.push(s.proposed_html || '');
 		}
 	}
-	if (appended.length) {
-		next = next.replace(/\s+$/, '') + '\n\n' + appended.join('\n\n');
-	}
-	return next;
+
+	const additiveHtml = appended.join('\n\n');
+	const html = additiveHtml
+		? editedBase.replace(/\s+$/, '') + '\n\n' + additiveHtml
+		: editedBase;
+
+	return { mode: 'merge', html, additiveHtml, editedBaseHtml: editedBase };
 }
 
-/** Push merged HTML into whichever editor is active. */
-function writeContentToEditor(html) {
+/**
+ * Push the change into whichever editor is active.
+ *
+ * Gutenberg quirk: `editPost({ content })` updates the post.content
+ * attribute but the block-editor canonical state is the BLOCK TREE, not
+ * the content string. So when we previously appended raw HTML to
+ * `content`, the block tree was never re-parsed — only the originally
+ * inserted single block remained, hence "only one section applies".
+ *
+ * The fix is to operate on blocks directly:
+ *   - mode=replace → resetBlocks(parsed full HTML)
+ *   - mode=merge   → keep existing blocks, build new blocks from the
+ *                    edited-base HTML where edits happened, then APPEND
+ *                    rawHandler-converted blocks for the additive HTML.
+ *     Practically: we re-parse the merged HTML once (block markers in the
+ *     existing portion preserve those blocks; raw HTML at the tail gets
+ *     converted to Heading / Paragraph / List blocks via rawHandler).
+ */
+function writeContentToEditor(plan) {
 	const isClassic = typeof window !== 'undefined' && window.__EBQ_CLASSIC__ === true;
+
 	if (isClassic) {
+		const html = plan.html;
 		const tm = window.tinymce;
 		if (tm && tm.activeEditor && !tm.activeEditor.isHidden()) {
 			tm.activeEditor.setContent(html);
@@ -390,11 +444,27 @@ function writeContentToEditor(html) {
 		}
 		return;
 	}
-	// Gutenberg: stage the change in core/editor; user clicks Save/Update.
-	const editor = dispatch('core/editor');
-	if (editor && typeof editor.editPost === 'function') {
-		editor.editPost({ content: html });
+
+	// Gutenberg path.
+	const blockEditor = dispatch('core/block-editor');
+	if (!blockEditor || typeof blockEditor.resetBlocks !== 'function') {
+		throw new Error(__('Block editor unavailable.', 'ebq-seo'));
+	}
+
+	if (plan.mode === 'replace') {
+		const parsed = parseBlocks(plan.html);
+		blockEditor.resetBlocks(parsed);
 		return;
 	}
-	throw new Error(__('Editor store unavailable.', 'ebq-seo'));
+
+	// Merge mode. Re-parse the edited base (block markers preserve those
+	// blocks). For the additive tail (raw HTML, no block markers) use
+	// rawHandler so headings/paragraphs/lists become proper blocks instead
+	// of one giant Classic block.
+	const baseBlocks = plan.editedBaseHtml ? parseBlocks(plan.editedBaseHtml) : [];
+	const additiveBlocks = plan.additiveHtml
+		? rawHandler({ HTML: plan.additiveHtml })
+		: [];
+	const merged = [...baseBlocks, ...additiveBlocks];
+	blockEditor.resetBlocks(merged);
 }

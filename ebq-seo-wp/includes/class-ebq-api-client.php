@@ -242,10 +242,10 @@ final class EBQ_Api_Client
         if ($current_html !== '') $body['current_html'] = $current_html;
         if ($country !== '')      $body['country']      = $country;
         if ($language !== '')     $body['language']     = $language;
-        // Cold path can chain Serper + brief LLM + topical-gaps LLM + writer
-        // LLM end-to-end. Brief alone runs ~45s; writer adds another ~30–50s.
-        // 110s leaves a couple of seconds of headroom under the 120s ceiling.
-        return $this->request('POST', sprintf('/api/v1/posts/%s/ai-writer', rawurlencode($post_id)), $body, 110);
+        // Cold path: Serper + brief LLM (~45s) + topical-gaps LLM (~30s) +
+        // writer LLM (up to 90s for the larger 8k-token output budget).
+        // 120s is the request() clamp ceiling; we ride it.
+        return $this->request('POST', sprintf('/api/v1/posts/%s/ai-writer', rawurlencode($post_id)), $body, 120);
     }
 
     public function ai_content_brief(string $post_id, string $focus_keyword, string $country = '', string $language = ''): array

@@ -32,12 +32,16 @@ class AiWriterService
     private const CACHE_TTL_SEC = 60 * 60 * 24;
 
     /**
-     * Capped at 5 (was 8). With each section returning 100–300 words of
-     * HTML plus title + rationale + tags, 5 sections ≈ 2.5–4k output
-     * tokens which fits comfortably under the model's `max_tokens` budget
-     * without truncating the JSON mid-output.
+     * 6 sections × up to 600 words each ≈ 4.5–6k output tokens, comfortably
+     * under the 8k `max_tokens` budget below. Bumped from the earlier
+     * conservative cap (5×250 words) so writers can ship richer proposals
+     * without hitting the truncation edge case that produces
+     * `llm_parse_failed`.
      */
-    private const MAX_SECTIONS = 5;
+    private const MAX_SECTIONS = 6;
+
+    /** Per-section HTML cap (chars). 6000 ≈ 900 words of prose. */
+    private const SECTION_HTML_CAP = 6000;
 
     public function __construct(
         private readonly LlmClient $llm,
@@ -71,6 +75,11 @@ class AiWriterService
         $hasBrief = $brief !== null && ! empty($brief['subtopics'] ?? []);
         $hasGaps = $gaps !== null && ! empty($gaps['missing'] ?? []);
         $hasContent = mb_strlen($currentText) >= 100;
+        // Look at the raw HTML (block markers and all) for an <h1> — the
+        // strip_tags'd $currentText loses tag info. Editor themes render the
+        // post title as H1, so most published posts won't have one inside the
+        // content; the writer should add one when missing.
+        $hasH1 = (bool) preg_match('/<h1\b/i', (string) ($input['current_html'] ?? ''));
 
         if (! $hasBrief && ! $hasGaps && ! $hasContent) {
             return [
@@ -96,16 +105,16 @@ class AiWriterService
             return $cached;
         }
 
-        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps);
-        // 4000 tokens = ~3000 words output. Enough headroom for 5 sections
-        // each with a heading + 200-word body + rationale + tags + JSON
-        // delimiters. Anything tighter risks the model truncating mid-JSON,
-        // which trips strict decode → `llm_parse_failed`.
+        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1);
+        // 8000 tokens ≈ 6000 words. Lets the model deliver fuller, ready-
+        // to-publish sections without hitting the mid-JSON truncation that
+        // surfaces as `llm_parse_failed`. Mistral Small supports up to 32k
+        // context, so this is well within budget.
         $response = $this->llm->completeJson($messages, [
             'temperature' => 0.5,
-            'max_tokens' => 4000,
+            'max_tokens' => 8000,
             'json_object' => true,
-            'timeout' => 60,
+            'timeout' => 90,
         ]);
 
         if (! is_array($response) || ! isset($response['sections']) || ! is_array($response['sections'])) {
@@ -152,7 +161,7 @@ class AiWriterService
     /**
      * @return list<array{role: string, content: string}>
      */
-    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps): array
+    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1): array
     {
         $briefBlock = '(none)';
         if (is_array($brief) && ! empty($brief)) {
@@ -181,37 +190,47 @@ class AiWriterService
         }
 
         $currentBlock = $currentText !== ''
-            ? mb_substr($currentText, 0, 12000)
+            ? mb_substr($currentText, 0, 24000)
             : '(empty post)';
 
         $system = <<<'SYS'
-You are a senior SEO editor proposing surgical, reviewable content changes.
+You are a senior SEO editor proposing publish-ready content changes the
+user can review and approve one section at a time.
 
 Output rules (STRICT — non-compliance breaks the consumer):
 - Return ONE JSON object only. No prose, no markdown fences, no commentary.
 - Top-level keys: "summary" (string) and "sections" (array).
-- Generate AT MOST 5 sections. Fewer is better than padded.
-- proposed_html: valid HTML, ≤ 250 words per section, only <h2>, <h3>,
-  <p>, <ul>, <ol>, <li>, <strong>, <em>, <a> tags. No inline styles,
-  no <script>, no markdown.
+- Generate UP TO 6 sections. Aim for substantive, ready-to-ship sections,
+  not stubs. 300–600 words of body per section is ideal; up to 900 if the
+  topic genuinely warrants depth. Don't pad — but don't shy away from
+  detail when the brief or gap topic deserves it.
+- proposed_html: valid HTML using <h1>, <h2>, <h3>, <p>, <ul>, <ol>,
+  <li>, <strong>, <em>, <a>. No inline styles, no <script>, no markdown,
+  no <html>/<body>/<head>.
+- H1 RULE: the post says HAS_H1=%H1_FLAG%. When HAS_H1=false, the FIRST
+  add (or the replace, if any) MUST start with one <h1> that includes the
+  focus keyword naturally. When HAS_H1=true, do NOT introduce another
+  <h1> in any section.
 - kind ∈ {"add","edit","replace"}.
-   • "add"     — new section the post is missing.
+   • "add"     — new section the post is missing. Lead with an <h2>.
    • "edit"    — rewrite an existing passage. current_html MUST be a
-                 verbatim substring of the post (copy-paste exact, do
-                 not paraphrase). If you cannot copy a verbatim slice,
+                 verbatim substring of the source post (copy-paste exact,
+                 do not paraphrase). If you cannot copy a verbatim slice,
                  use kind="add" instead.
    • "replace" — full post replacement. Use ONLY when the post is empty
                  or fundamentally unsalvageable. Maximum one per response.
-- source_tags: subset of {"brief","gaps","content"} indicating which
-  inputs drove the change.
-- rationale: one short sentence.
-- title: one short phrase shown to the reviewer.
+- source_tags: non-empty subset of {"brief","gaps","content"} indicating
+  which inputs drove the change.
+- rationale: one short sentence — the reader benefit or ranking gain.
+- title: one short phrase shown in the reviewer card.
 
-If the post is empty, return a single "replace" section structured around
-the brief's outline / gap topics.
-If brief and gaps are both missing, propose "edit" sections that tighten
-weak passages of the existing post.
+Write in the same voice and reading level as the existing post when one is
+provided. When the post is empty, default to clear, conversational expert
+tone. Always respect the brief's recommended depth and target keyword
+prominence — the focus keyword should appear naturally in the H1 (when
+you generate one) or in the opening paragraph of any "add" section.
 SYS;
+        $system = str_replace('%H1_FLAG%', $hasH1 ? 'true' : 'false', $system);
 
         $user = <<<USER
 Target keyword: "{$keyword}"
@@ -299,8 +318,8 @@ USER;
                 'title' => mb_substr($title, 0, 120),
                 'kind' => $kind,
                 'anchor' => $anchor !== '' ? mb_substr($anchor, 0, 200) : null,
-                'current_html' => $currentHtml !== '' ? mb_substr($currentHtml, 0, 6000) : null,
-                'proposed_html' => mb_substr($proposed, 0, 8000),
+                'current_html' => $currentHtml !== '' ? mb_substr($currentHtml, 0, self::SECTION_HTML_CAP) : null,
+                'proposed_html' => mb_substr($proposed, 0, self::SECTION_HTML_CAP),
                 'rationale' => mb_substr(trim((string) ($item['rationale'] ?? '')), 0, 400),
                 'source_tags' => $tags,
             ];
