@@ -104,25 +104,23 @@ class AiWriterService
         // content; the writer should add one when missing.
         $hasH1 = (bool) preg_match('/<h1\b/i', (string) ($input['current_html'] ?? ''));
 
-        if (! $hasBrief && ! $hasGaps && ! $hasContent) {
-            return [
-                'ok' => false,
-                'error' => 'no_inputs',
-                'message' => 'Generate a brief, run topical-gap analysis, or write some content first — the AI writer needs at least one to work from.',
-            ];
-        }
+        // No hard guard on inputs — the writer can produce a useful first
+        // draft from just the focus keyword (and any user-curated
+        // selection from the plan step). Brief / gaps / existing content
+        // make output richer and more grounded, but they are NOT required.
+        // The prompt's all-empty case (see below) handles graceful
+        // degradation.
 
         // Cache version — bump when the prompt or output shape changes so
         // existing cached results don't pin users to a stale generation.
-        // v8: user selection (selected.h1, selected.h2_outline,
-        //     selected.subtopics, selected.paa, selected.gap_topics,
-        //     selected.competitor_subtopics) keyed in so different
-        //     selections produce different generations.
+        // v9: dropped the no_inputs hard guard; prompt now produces a
+        //     scaffold even when brief / gaps / content are all empty,
+        //     using only the focus keyword + user-curated selection.
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
         $cacheKey = sprintf(
-            'ai_writer_v8:%d:%d:%s:%s:%s:%s:%d:%d:%s',
+            'ai_writer_v9:%d:%d:%s:%s:%s:%s:%d:%d:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -346,6 +344,17 @@ tone. Respect the brief's recommended depth and target keyword
 prominence — the focus keyword should appear naturally in the H1 (when
 you generate one) or the opening paragraph of any "add" section, and
 again in at least one <h2> within the first three sections.
+
+INPUT-SCARCITY FALLBACK: when CONTENT BRIEF, TOPICAL GAPS, and CURRENT
+POST CONTENT are ALL marked "(none)" / "(empty post)", you still produce
+a useful first draft using only the target keyword and any user-curated
+items in the user message (H1 to use, topics selected, etc). In that
+case, return ONE "replace" section that scaffolds a complete article:
+H1 (if not yet on page) → 2–4 sentence intro paragraph → 6–10 H2
+sections covering the keyword's typical search intent (problem → core
+explanation → how-to / comparison → FAQs → next steps), each followed
+by 2–4 paragraphs of substantive prose. Do NOT refuse — the absence of
+brief / gaps means richer output is impossible, not that no output is.
 SYS;
         $system = str_replace('%H1_FLAG%', $hasH1 ? 'true' : 'false', $system);
 

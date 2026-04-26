@@ -425,7 +425,7 @@ function SelectionPanel({ plan, lists, setLists, pick, setPick, onGenerate }) {
 		<div className="ebq-aiw-groups">
 			{!briefAvail && !gapsAvail ? (
 				<p className="ebq-aiw-empty">
-					{__('No brief or gaps data available — try generating those tabs first, or just click Generate to let the writer work from your existing post.', 'ebq-seo')}
+					{__('No brief or gaps data for this keyword. Click Generate anyway — the writer will scaffold a fresh article from the focus keyword. Output is richer once Search Console accumulates query data for the page.', 'ebq-seo')}
 				</p>
 			) : null}
 
