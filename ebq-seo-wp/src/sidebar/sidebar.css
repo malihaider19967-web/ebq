@@ -873,6 +873,65 @@
 	flex-wrap: wrap;
 }
 
+/* Multi-item recommendation list (RecommendationEngine output). Each row
+ * has a severity stripe, a one-line title, the "why" reasoning, and the
+ * actionable "fix". Compact density tuned for the sidebar popover. */
+.ebq-check-card__items {
+	list-style: none;
+	margin: 4px 0 0;
+	padding: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.ebq-check-card__item {
+	padding: 6px 8px;
+	background: var(--ebq-bg-subtle);
+	border-radius: var(--ebq-r-1);
+	border-left: 2px solid var(--ebq-text-faint);
+}
+.ebq-check-card__item--critical { border-left-color: var(--ebq-bad); }
+.ebq-check-card__item--warning  { border-left-color: var(--ebq-warn); }
+.ebq-check-card__item--serp_gap { border-left-color: var(--ebq-accent); }
+.ebq-check-card__item--info     { border-left-color: var(--ebq-text-soft); }
+.ebq-check-card__item-head {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 2px;
+}
+.ebq-check-card__item-head strong {
+	font-size: 11.5px;
+	font-weight: 700;
+	color: var(--ebq-text);
+	line-height: 1.3;
+}
+.ebq-check-card__item-dot {
+	width: 7px; height: 7px;
+	border-radius: 50%;
+	flex-shrink: 0;
+	background: var(--ebq-text-faint);
+}
+.ebq-check-card__item-dot--critical { background: var(--ebq-bad); }
+.ebq-check-card__item-dot--warning  { background: var(--ebq-warn); }
+.ebq-check-card__item-dot--serp_gap { background: var(--ebq-accent); }
+.ebq-check-card__item-dot--info     { background: var(--ebq-text-soft); }
+.ebq-check-card__item-why,
+.ebq-check-card__item-fix {
+	margin: 2px 0 0;
+	font-size: 11px;
+	line-height: 1.45;
+	color: var(--ebq-text-soft);
+}
+.ebq-check-card__item-fix {
+	color: var(--ebq-text);
+}
+.ebq-check-card__item-fix span {
+	font-weight: 700;
+	color: var(--ebq-good);
+	margin-right: 3px;
+}
+
 /* ─── Suggestion buttons (focus keyphrase from GSC) ───────────── */
 
 .ebq-suggestions {

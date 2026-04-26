@@ -233,10 +233,18 @@ final class EBQ_Api_Client
         // EBQ HQ admin endpoints are user-driven dashboards — cache hides
         // newly-added keywords / fresh syncs and breaks the "I clicked Save,
         // why didn't it appear?" expectation. Skip the transient layer for
-        // anything under /api/v1/hq/ so the UI is always live. Editor-side
-        // sidebar calls (per-post insights, suggestions) still benefit from
-        // the 5-minute cache.
-        $skip_cache = str_starts_with($path, '/api/v1/hq/');
+        // anything under /api/v1/hq/ so the UI is always live.
+        //
+        // Also skip for endpoints whose response payload itself reports a
+        // queue/audit state (seo-score, topical-gaps). These flip from
+        // `queued` → `running` → `ready` over a span of 30–90s; caching the
+        // first response would pin "refreshing" in the editor for up to 5
+        // minutes even after the upstream audit finishes — which was the
+        // actual cause of the "stuck on re-auditing" symptom (LSCache was
+        // a red herring; the stale data lived in WP transients all along).
+        $skip_cache = str_starts_with($path, '/api/v1/hq/')
+            || str_contains($path, '/seo-score')
+            || str_contains($path, '/topical-gaps');
         // Cache key is namespaced by the current version (incremented on
         // every write). This invalidates ALL cached entries atomically
         // regardless of where the cache backend stores them — safe across

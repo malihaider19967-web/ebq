@@ -202,8 +202,11 @@ class LiveSeoScoreService
         $factors = [];
         $rankBasis = $kwRank ?? $avgPos ?? 100.0;
 
-        // GSC-derived (always available once we have impressions)
-        $factors[] = $this->factorRank($kwRank, $avgPos, $focusKeyword, $rankBasis);
+        // GSC-derived (always available once we have impressions). Rank
+        // takes the audit so it can discount when SERP features dominate
+        // the query (an organic #5 sometimes hides below an answer box +
+        // PAA + image pack — that needs to read as worse than rank alone).
+        $factors[] = $this->factorRank($kwRank, $avgPos, $focusKeyword, $rankBasis, $auditReady ? $latestAudit : null);
         $factors[] = $this->factorCtr($avgCtr ?? 0.0, $rankBasis);
         $factors[] = $this->factorCoverage($coverage);
         $factors[] = $this->factorCannibalization($cannibalized);
@@ -223,6 +226,8 @@ class LiveSeoScoreService
             $factors[] = $this->factorOnPageSeo($latestAudit);
             $factors[] = $this->factorTechnicalHealth($latestAudit);
             $factors[] = $this->factorContentQuality($latestAudit);
+            $factors[] = $this->factorKeywordAlignment($latestAudit, $focusKeyword);
+            $factors[] = $this->factorRecommendations($latestAudit);
         } else {
             $msg = $auditState['status'] === 'running'
                 ? 'Audit running — refreshes when complete.'
@@ -234,6 +239,8 @@ class LiveSeoScoreService
             $factors[] = $this->pendingFactor('on_page_seo', 'On-page SEO', $msg);
             $factors[] = $this->pendingFactor('technical_health', 'Technical health', $msg);
             $factors[] = $this->pendingFactor('content_quality', 'Content quality', $msg);
+            $factors[] = $this->pendingFactor('keyword_alignment', 'Keyword placement', $msg);
+            $factors[] = $this->pendingFactor('recommendations', 'Top fixes', $msg);
         }
 
         // Tracked nudge
@@ -387,26 +394,56 @@ class LiveSeoScoreService
      *                          Factors
      * ──────────────────────────────────────────────────────────── */
 
-    private function factorRank(?float $kwRank, ?float $avgPos, ?string $focusKeyword, float $rankBasis): array
+    private function factorRank(?float $kwRank, ?float $avgPos, ?string $focusKeyword, float $rankBasis, ?PageAuditReport $audit = null): array
     {
         $score = $this->positionScore($rankBasis);
+
+        // SERP-features discount: an organic #5 can be invisible below the
+        // fold once Google adds an answer box + PAA + image pack + sitelinks.
+        // The audit benchmark already records `your_serp.organic_sample_size`
+        // — when that's well below 10 it means the SERP page is dominated
+        // by feature blocks that pushed organic results down. Score reads
+        // as worse than the raw position implies.
+        $serpDiscount = 0;
+        $serpDiscountReason = null;
+        if ($audit && is_array($audit->result)) {
+            $yourSerp = data_get($audit->result, 'benchmark.your_serp', null);
+            if (is_array($yourSerp) && isset($yourSerp['organic_sample_size']) && is_numeric($yourSerp['organic_sample_size'])) {
+                $organicCount = (int) $yourSerp['organic_sample_size'];
+                if ($organicCount > 0 && $organicCount < 8) {
+                    // 7 organic = -5, 6 = -10, 5 = -15, 4 = -20, etc.
+                    $serpDiscount = min(25, (8 - $organicCount) * 5);
+                    $serpDiscountReason = sprintf(
+                        'SERP features dominate this query (only %d organic results visible above the fold) — your rank reads worse than the raw position.',
+                        $organicCount
+                    );
+                }
+            }
+        }
+        $score = max(0, $score - $serpDiscount);
+
+        $detail = $kwRank !== null
+            ? sprintf('Position %.1f for "%s"', $kwRank, $focusKeyword)
+            : sprintf('Avg position %.1f across all queries', $rankBasis);
+        if ($serpDiscountReason !== null) {
+            $detail .= ' · features visible: ' . abs($serpDiscount) . '% penalty';
+        }
 
         return [
             'key' => 'rank',
             'label' => $kwRank !== null ? 'Focus-keyword rank' : 'Average page rank',
             'score' => $score,
-            'weight' => 22,
-            'detail' => $kwRank !== null
-                ? sprintf('Position %.1f for "%s"', $kwRank, $focusKeyword)
-                : sprintf('Avg position %.1f across all queries', $rankBasis),
+            'weight' => 18,
+            'detail' => $detail,
             'recommendation' => $score < 65
-                ? ($kwRank !== null
-                    ? sprintf(
-                        'Add internal links pointing to this page using "%s" as anchor text and place the keyphrase in an H2/H3. Strengthen on-page topical depth to climb out of position %.0f.',
-                        $focusKeyword !== null && $focusKeyword !== '' ? $focusKeyword : 'your focus keyphrase',
-                        $rankBasis
-                    )
-                    : 'Set a focus keyphrase so the page can be scored on a specific query, then strengthen on-page placement and internal links for it.')
+                ? trim(($serpDiscountReason !== null ? $serpDiscountReason . ' ' : '') .
+                    ($kwRank !== null
+                        ? sprintf(
+                            'Add internal links pointing to this page using "%s" as anchor text and place the keyphrase in an H2/H3. Strengthen on-page topical depth to climb out of position %.0f.',
+                            $focusKeyword !== null && $focusKeyword !== '' ? $focusKeyword : 'your focus keyphrase',
+                            $rankBasis
+                        )
+                        : 'Set a focus keyphrase so the page can be scored on a specific query, then strengthen on-page placement and internal links for it.'))
                 : null,
         ];
     }
@@ -420,7 +457,7 @@ class LiveSeoScoreService
             'key' => 'ctr',
             'label' => 'Click-through rate',
             'score' => $score,
-            'weight' => 8,
+            'weight' => 6,
             'detail' => sprintf('CTR %.2f%% (expected %.2f%% for rank %.0f)', $actualCtr * 100, $expected * 100, $rankBasis),
             'recommendation' => $score < 65
                 ? 'Rewrite the SEO title and meta description so the snippet earns more clicks: lead with the keyphrase, add a year or specific number, and answer the searcher\'s intent in plain language.'
@@ -436,7 +473,7 @@ class LiveSeoScoreService
             'key' => 'coverage',
             'label' => 'Topical coverage',
             'score' => $score,
-            'weight' => 8,
+            'weight' => 6,
             'detail' => sprintf('Ranks for %d distinct queries in the top 100', $coverage),
             'recommendation' => $score < 65
                 ? 'Add 1–2 sections covering related sub-questions and long-tail variants. Use the "Topical gaps vs. top SERP" panel for specific subtopic ideas competitors cover.'
@@ -450,7 +487,7 @@ class LiveSeoScoreService
             'key' => 'cannibalization',
             'label' => 'No cannibalization',
             'score' => $cannibalized ? 30 : 100,
-            'weight' => 6,
+            'weight' => 4,
             'detail' => $cannibalized
                 ? 'Another URL on this site is also ranking for the focus keyword.'
                 : 'No competing pages on the site for this query.',
@@ -515,7 +552,7 @@ class LiveSeoScoreService
             'key' => 'backlinks',
             'label' => 'Backlinks',
             'score' => $score,
-            'weight' => 6,
+            'weight' => 4,
             'detail' => sprintf('%d referring domain%s', $referringDomains, $referringDomains === 1 ? '' : 's'),
             'recommendation' => $score < 65
                 ? 'Run prospecting from HQ → Backlinks. Find sites linking to top-ranking competitors but not to you and pitch a relevant resource on this page.'
@@ -632,7 +669,7 @@ class LiveSeoScoreService
             'key' => 'on_page_seo',
             'label' => 'On-page SEO',
             'score' => $score,
-            'weight' => 9,
+            'weight' => 6,
             'detail' => $detail,
             'recommendation' => $score < 65
                 ? 'Fix the on-page basics: ' . ($issues === [] ? 'tighten title, meta, H1, and schema.' : implode('; ', $issues) . '.')
@@ -737,9 +774,169 @@ class LiveSeoScoreService
             'key' => 'content_quality',
             'label' => 'Content quality',
             'score' => $score,
-            'weight' => 7,
+            'weight' => 5,
             'detail' => implode(' · ', $bits),
             'recommendation' => $recs === [] ? null : implode(' ', $recs),
+        ];
+    }
+
+    /**
+     * "Does Google see your focus keyword where it matters?" — split out
+     * from on_page_seo so the user gets a direct read on placement strategy.
+     * Driven by `KeywordStrategyAnalyzer.power_placement` (title / H1 / meta)
+     * which the audit already computes per page.
+     *
+     * MOAT note: power_placement is computed server-side against the live
+     * fetched HTML, then cross-referenced with GSC's confirmed primary
+     * query for the URL. The plugin can't reproduce the GSC half offline.
+     */
+    private function factorKeywordAlignment(PageAuditReport $audit, ?string $focusKeyword): array
+    {
+        $kw = is_array($audit->result['keywords'] ?? null) ? $audit->result['keywords'] : [];
+        $available = (bool) ($kw['available'] ?? false);
+
+        if (! $available) {
+            $reason = is_string($kw['reason'] ?? null) ? $kw['reason'] : 'Not enough Search Console data yet to align placement.';
+            return [
+                'key' => 'keyword_alignment',
+                'label' => 'Keyword placement',
+                'score' => 50,
+                'weight' => 7,
+                'detail' => $reason,
+                'recommendation' => 'Once Google starts surfacing impressions for this URL, EBQ will check whether your focus keyphrase appears in the title, H1, and meta description — the three slots that move the needle most.',
+            ];
+        }
+
+        $power = is_array($kw['power_placement'] ?? null) ? $kw['power_placement'] : [];
+        $coverage = is_array($kw['coverage'] ?? null) ? $kw['coverage'] : [];
+        $accidental = is_array($kw['accidental'] ?? null) ? $kw['accidental'] : [];
+
+        $inTitle = (bool) ($power['in_title'] ?? false);
+        $inH1 = (bool) ($power['in_h1'] ?? false);
+        $inMeta = (bool) ($power['in_meta_description'] ?? false);
+
+        // Title (40%) + H1 (30%) + Meta (15%) — the three power slots.
+        // Body presence (15%) — penalty when keyword is absent from prose,
+        // bonus baseline when present (since coverage analyzer would flag it).
+        $titlePts = $inTitle ? 100 : 0;
+        $h1Pts = $inH1 ? 100 : 0;
+        $metaPts = $inMeta ? 100 : 0;
+        // `coverage` returns a `body_hit` map by query — true when the
+        // primary keyword is found in the rendered body text.
+        $bodyHit = (bool) data_get($coverage, 'body_hit_primary', true);
+        $bodyPts = $bodyHit ? 100 : 30;
+
+        $score = (int) round($titlePts * 0.40 + $h1Pts * 0.30 + $metaPts * 0.15 + $bodyPts * 0.15);
+
+        // Watch for accidental over-indexing: density on a non-target term
+        // crowding out the focus keyword. KE returns a `runner_up` we can
+        // surface to the user as a "you're accidentally ranking for this
+        // instead" signal.
+        $runnerUpQuery = is_string($accidental['runner_up_query'] ?? null) ? $accidental['runner_up_query'] : null;
+
+        $missing = [];
+        if (! $inTitle) $missing[] = 'SEO title';
+        if (! $inH1)    $missing[] = 'H1';
+        if (! $inMeta)  $missing[] = 'meta description';
+        if (! $bodyHit) $missing[] = 'body copy';
+
+        $detail = $missing === []
+            ? 'Focus keyphrase appears in title, H1, meta, and body.'
+            : sprintf('Missing from: %s.', implode(', ', $missing));
+        if ($runnerUpQuery !== null && $runnerUpQuery !== '') {
+            $detail .= sprintf(' Runner-up term in this content: "%s".', $runnerUpQuery);
+        }
+
+        $recommendation = null;
+        if ($score < 90 && $missing !== []) {
+            $kwText = $focusKeyword !== null && $focusKeyword !== '' ? '"' . $focusKeyword . '"' : 'the focus keyphrase';
+            $recommendation = sprintf(
+                'Place %s in the missing slot%s: %s. Title and H1 carry the most weight; meta description influences CTR (which loops back into rank).',
+                $kwText,
+                count($missing) === 1 ? '' : 's',
+                implode(' + ', $missing),
+            );
+        }
+
+        return [
+            'key' => 'keyword_alignment',
+            'label' => 'Keyword placement',
+            'score' => $score,
+            'weight' => 7,
+            'detail' => $detail,
+            'recommendation' => $recommendation,
+        ];
+    }
+
+    /**
+     * Surfaces the top items from `RecommendationEngine` directly as
+     * actionable cards. Each entry has title + why + fix already authored
+     * by the engine — no LLM call, just smart prioritization.
+     *
+     * The factor's score blends the severity mix: lots of `critical` items
+     * crater the score, mostly `info`/`good` keeps it high. Items list (top
+     * 5) gets rendered as a bulleted breakdown in the popover so the user
+     * has a concrete punch list right next to the score.
+     *
+     * MOAT note: the recommendation rules sit in PHP on EBQ — competitors
+     * see only the rendered list, not the heuristics. Same for severity
+     * weighting and ordering.
+     */
+    private function factorRecommendations(PageAuditReport $audit): array
+    {
+        $recs = is_array($audit->result['recommendations'] ?? null) ? $audit->result['recommendations'] : [];
+
+        $counts = ['critical' => 0, 'warning' => 0, 'serp_gap' => 0, 'info' => 0, 'good' => 0];
+        foreach ($recs as $r) {
+            $sev = is_array($r) && isset($r['severity']) ? (string) $r['severity'] : 'info';
+            if (isset($counts[$sev])) $counts[$sev]++;
+        }
+
+        // 100 baseline; each critical −15, warning −5, serp_gap −3, info −1.
+        // `good` never penalizes (it's a positive ack from the engine).
+        $score = 100
+            - ($counts['critical'] * 15)
+            - ($counts['warning']  * 5)
+            - ($counts['serp_gap'] * 3)
+            - ($counts['info']     * 1);
+        $score = max(0, min(100, $score));
+
+        // Take the top 5 actionable items (RecommendationEngine already
+        // sorts critical → warning → serp_gap → info → good). Skip `good`
+        // — those are positive acks, not "do this" items.
+        $items = [];
+        foreach ($recs as $r) {
+            if (! is_array($r)) continue;
+            $sev = (string) ($r['severity'] ?? 'info');
+            if ($sev === 'good') continue;
+            $items[] = [
+                'severity' => $sev,
+                'section' => (string) ($r['section'] ?? ''),
+                'title' => (string) ($r['title'] ?? ''),
+                'why' => (string) ($r['why'] ?? ''),
+                'fix' => (string) ($r['fix'] ?? ''),
+            ];
+            if (count($items) >= 5) break;
+        }
+
+        $detail = $items === []
+            ? 'No actionable recommendations — the audit engine is happy with this page.'
+            : sprintf(
+                '%d critical, %d warning, %d minor — top %d shown.',
+                $counts['critical'],
+                $counts['warning'],
+                $counts['serp_gap'] + $counts['info'],
+                count($items),
+            );
+
+        return [
+            'key' => 'recommendations',
+            'label' => 'Top fixes',
+            'score' => $score,
+            'weight' => 8,
+            'detail' => $detail,
+            'recommendation' => null,
+            'items' => $items,
         ];
     }
 

@@ -212,7 +212,7 @@ export function ScoreBadge({ kind = 'offline', score = 0, displayScore, label, c
  * of the SEO panel a row came from. The left stripe is always tinted by
  * `level` (good / warn / bad / mute).
  */
-export function CheckCard({ kind = 'offline', level = 'mute', label, score, detail, recommendation, action, icon }) {
+export function CheckCard({ kind = 'offline', level = 'mute', label, score, detail, recommendation, action, icon, items }) {
 	const cardLevel = level === 'ok' ? 'warn' : level;
 	const cls = `ebq-check-card ebq-check-card--${kind} ebq-check-card--${cardLevel}`;
 	return (
@@ -229,6 +229,23 @@ export function CheckCard({ kind = 'offline', level = 'mute', label, score, deta
 				</div>
 				{detail ? <p className="ebq-check-card__detail">{detail}</p> : null}
 				{recommendation ? <p className="ebq-check-card__recommend">{recommendation}</p> : null}
+				{Array.isArray(items) && items.length ? (
+					<ul className="ebq-check-card__items">
+						{items.map((it, i) => {
+							const sev = it.severity || 'info';
+							return (
+								<li key={i} className={`ebq-check-card__item ebq-check-card__item--${sev}`}>
+									<div className="ebq-check-card__item-head">
+										<span className={`ebq-check-card__item-dot ebq-check-card__item-dot--${sev}`} aria-hidden />
+										<strong>{it.title}</strong>
+									</div>
+									{it.why ? <p className="ebq-check-card__item-why">{it.why}</p> : null}
+									{it.fix ? <p className="ebq-check-card__item-fix"><span>Fix:</span> {it.fix}</p> : null}
+								</li>
+							);
+						})}
+					</ul>
+				) : null}
 				{action ? <div className="ebq-check-card__action">{action}</div> : null}
 			</div>
 		</div>

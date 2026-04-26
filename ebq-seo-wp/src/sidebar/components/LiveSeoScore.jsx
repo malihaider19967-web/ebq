@@ -242,6 +242,7 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected }) {
 									score={isPending ? null : f.score}
 									detail={f.detail}
 									recommendation={f.recommendation || null}
+									items={Array.isArray(f.items) ? f.items : null}
 									action={actionEl}
 								/>
 							);
