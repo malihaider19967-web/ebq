@@ -275,7 +275,8 @@ class PluginInsightsController extends Controller
         $postModifiedAt = null;
         if ($postModifiedRaw !== '') {
             try {
-                $postModifiedAt = \Carbon\Carbon::parse($postModifiedRaw);
+                // Use Laravel's Carbon wrapper — matches the service's type hint.
+                $postModifiedAt = \Illuminate\Support\Carbon::parse($postModifiedRaw);
             } catch (\Throwable) {
                 $postModifiedAt = null;
             }
