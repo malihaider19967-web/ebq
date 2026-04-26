@@ -113,15 +113,18 @@ class AiWriterService
 
         // Cache version — bump when the prompt or output shape changes so
         // existing cached results don't pin users to a stale generation.
-        // v11: strict mode now hard-forbids kind="replace" and removes the
-        //      input-scarcity fallback paragraph that was tempting the
-        //      model to produce one consolidated "replace" section even
-        //      with a curated selection.
+        // v12: expanded allowed-tag palette (tables, blockquote, dl/dt/dd,
+        //      pre/code) with explicit "use only when topic warrants"
+        //      guidance.
+        // v13: schema_suggestions added — primary type derived from
+        //      brief.suggested_schema_type, content-derived FAQPage
+        //      when Q&A pairs exist, plus auto-emitted informational
+        //      entries (Organization, WebSite, WebPage, BreadcrumbList).
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
         $cacheKey = sprintf(
-            'ai_writer_v11:%d:%d:%s:%s:%s:%s:%d:%d:%s',
+            'ai_writer_v13:%d:%d:%s:%s:%s:%s:%d:%d:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -205,6 +208,13 @@ class AiWriterService
             $linkCount += preg_match_all('/<a\s+href=/i', (string) ($section['proposed_html'] ?? ''));
         }
 
+        // Auto-build schema suggestions from the generated sections — the
+        // user picks which to apply and the plugin writes them into
+        // _ebq_schemas. Multiple types stack: Article is always offered
+        // (default page schema), FAQPage joins when Q&A patterns are
+        // detected, etc.
+        $schemaSuggestions = $this->buildSchemaSuggestions($sections, $brief, $excludeUrl);
+
         $result = [
             'ok' => true,
             'summary' => mb_substr((string) ($response['summary'] ?? ''), 0, 600),
@@ -221,6 +231,7 @@ class AiWriterService
                 'gaps_available' => $availableGapsCount,
                 'sections_returned' => count($sections),
             ],
+            'schema_suggestions' => $schemaSuggestions,
             'cached' => false,
             'generated_at' => Carbon::now()->toIso8601String(),
         ];
@@ -326,9 +337,32 @@ Output rules (STRICT — non-compliance breaks the consumer):
     <a href="https://example.com/protein-guide">vegan protein</a>
     guide.</p>
   Failing to include any internal_link is a failure of the task.
-- proposed_html: valid HTML using <h1>, <h2>, <h3>, <p>, <ul>, <ol>,
-  <li>, <strong>, <em>, <a>. No inline styles, no <script>, no markdown,
-  no <html>/<body>/<head>.
+- proposed_html: valid HTML using a focused tag palette designed to
+  support content density without inviting visual cruft. Allowed tags:
+    Structural:    <h1>, <h2>, <h3>
+    Prose:         <p>, <strong>, <em>, <a>
+    Lists:         <ul>, <ol>, <li>
+    Definitions:   <dl>, <dt>, <dd>
+    Callouts:      <blockquote>
+    Tables:        <table>, <thead>, <tbody>, <tr>, <th>, <td>
+    Code:          <code>, <pre>
+  No inline styles, no <script>, no <iframe>, no markdown, no
+  <html>/<body>/<head>, no <img>.
+
+- RICH ELEMENTS — use when (and only when) they materially help the
+  reader:
+    • <table> — for comparisons, specs, before/after, plan tiers,
+                feature matrices, schedules, nutrition / dosage tables.
+                Always include a <thead> with <th> column headers.
+                Don't fake a list with a single-column table.
+    • <dl><dt><dd> — for glossaries / "Term — definition" patterns.
+    • <blockquote> — for cited expert quotes, study findings, key
+                takeaways the reader should remember. Not for filler.
+    • <pre><code> — for code, commands, structured data (JSON/YAML/CSV)
+                where exact formatting matters.
+  Default to <p> + <ul>/<ol>. Reach for the rich elements only when
+  the topic genuinely benefits — a forced comparison table is worse
+  than three good paragraphs.
 - H1 RULE: the post says HAS_H1=%H1_FLAG%. When HAS_H1=false, the FIRST
   add (or the replace, if any) MUST start with one <h1> that includes
   the focus keyword naturally, IMMEDIATELY FOLLOWED by an intro <p>
@@ -515,6 +549,321 @@ USER;
         }
 
         return [$brief, $gaps];
+    }
+
+    /**
+     * Build the full schema stack appropriate for this page. Three tiers:
+     *
+     *  1. Primary content schema — chosen from the brief's
+     *     suggested_schema_type. Article / Product / Recipe / Event /
+     *     LocalBusiness / Course / Review / Service / Person etc.
+     *
+     *  2. Content-derived schemas — added when the generated sections
+     *     show signals for them: FAQPage when Q&A pairs exist, Review
+     *     when a review/comparison frame is detected, etc. These are
+     *     stand-alone schemas the user opts into.
+     *
+     *  3. Auto-emitted informational entries — Organization, WebSite,
+     *     WebPage, BreadcrumbList. These are emitted on every page by
+     *     EBQ_Schema_Output already, so the user can't toggle them, but
+     *     showing them in the UI completes the schema-graph picture
+     *     ("an article page typically has Article + BreadcrumbList +
+     *     Organization") — gives the user confidence the full graph is
+     *     in place without making them configure each piece.
+     *
+     * Each entry is shaped to drop straight into `_ebq_schemas` post
+     * meta on apply (template + data + enabled).
+     *
+     * @param  list<array<string, mixed>>  $sections
+     * @return list<array<string, mixed>>
+     */
+    private function buildSchemaSuggestions(array $sections, ?array $brief, string $url): array
+    {
+        $headline = $this->extractHeadline($brief, $sections);
+        $primaryType = $this->normalizeSchemaType((string) ($brief['suggested_schema_type'] ?? 'Article'));
+
+        $out = [];
+
+        // ── 1. Primary schema (user-configurable) ─────────────────────
+        $primary = $this->buildPrimarySchema($primaryType, $headline, $url);
+        if ($primary !== null) {
+            $out[] = $primary;
+        }
+
+        // ── 2. Content-derived schemas ────────────────────────────────
+        $faqPairs = $this->extractFaqPairs($sections);
+        if (count($faqPairs) >= 2) {
+            $out[] = [
+                'template' => 'faq',
+                'type' => 'FAQPage',
+                'label' => 'FAQ Page',
+                'auto_emitted' => false,
+                'rationale' => sprintf(
+                    '%d Q&A pair%s detected — sections starting with a "?" headline followed by a direct answer.',
+                    count($faqPairs),
+                    count($faqPairs) === 1 ? '' : 's',
+                ),
+                'data' => ['questions' => $faqPairs],
+                'jsonld' => [
+                    '@context' => 'https://schema.org',
+                    '@type' => 'FAQPage',
+                    'mainEntity' => array_map(static fn (array $p) => [
+                        '@type' => 'Question',
+                        'name' => $p['question'],
+                        'acceptedAnswer' => [
+                            '@type' => 'Answer',
+                            'text' => $p['answer'],
+                        ],
+                    ], $faqPairs),
+                ],
+            ];
+        }
+
+        // ── 3. Auto-emitted informational entries ────────────────────
+        // These are emitted by EBQ_Schema_Output on every page. Showing
+        // them here lets the user see the full schema graph their page
+        // ends up with — Article isn't alone; it's surrounded by
+        // BreadcrumbList + Organization etc.
+        $out[] = [
+            'template' => '_organization',
+            'type' => 'Organization',
+            'label' => 'Organization (publisher)',
+            'auto_emitted' => true,
+            'rationale' => 'Site identity. Emitted automatically by EBQ on every page — no action needed.',
+            'data' => [],
+            'jsonld' => null,
+        ];
+        $out[] = [
+            'template' => '_website',
+            'type' => 'WebSite',
+            'label' => 'WebSite',
+            'auto_emitted' => true,
+            'rationale' => 'Site root + sitelinks search box. Emitted automatically.',
+            'data' => [],
+            'jsonld' => null,
+        ];
+        $out[] = [
+            'template' => '_webpage',
+            'type' => 'WebPage',
+            'label' => 'WebPage',
+            'auto_emitted' => true,
+            'rationale' => 'Page node. Emitted automatically and bound to the post.',
+            'data' => [],
+            'jsonld' => null,
+        ];
+        $out[] = [
+            'template' => '_breadcrumb',
+            'type' => 'BreadcrumbList',
+            'label' => 'BreadcrumbList',
+            'auto_emitted' => true,
+            'rationale' => 'Home → ancestors → current. Emitted automatically on singular and term-archive pages.',
+            'data' => [],
+            'jsonld' => null,
+        ];
+
+        return $out;
+    }
+
+    /**
+     * @return string  Lowercase template id matching EBQ_Schema_Templates::all().
+     */
+    private function normalizeSchemaType(string $type): string
+    {
+        $map = [
+            'Article'         => 'article',
+            'BlogPosting'     => 'article',
+            'NewsArticle'     => 'article',
+            'Product'         => 'product',
+            'Event'           => 'event',
+            'Recipe'          => 'recipe',
+            'LocalBusiness'   => 'local_business',
+            'Restaurant'      => 'local_business',
+            'Course'          => 'course',
+            'Review'          => 'review',
+            'Service'         => 'service',
+            'Book'            => 'book',
+            'JobPosting'      => 'job_posting',
+            'VideoObject'     => 'video',
+            'SoftwareApplication' => 'software',
+            'Person'          => 'person',
+        ];
+        return $map[$type] ?? 'article';
+    }
+
+    /**
+     * Build the primary schema entry for the page based on the brief's
+     * suggested type. Falls back to Article when the type isn't one we
+     * have a template for. Specific types (Product, LocalBusiness,
+     * Recipe etc.) include reasonable empty-state stubs the user fills
+     * in via the schema editor — we don't fabricate prices, hours, or
+     * ratings the AI can't verify.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function buildPrimarySchema(string $template, string $headline, string $url): ?array
+    {
+        $base = static fn (string $tpl, string $type, string $label, string $rationale, array $data, array $jsonld): array => [
+            'template' => $tpl,
+            'type' => $type,
+            'label' => $label,
+            'auto_emitted' => false,
+            'rationale' => $rationale,
+            'data' => array_filter($data, static fn ($v) => $v !== '' && $v !== null),
+            'jsonld' => array_filter($jsonld, static fn ($v) => $v !== null && $v !== ''),
+        ];
+
+        switch ($template) {
+            case 'article':
+                return $base(
+                    'article', 'Article', 'Article',
+                    'Default content schema for blog posts and articles. Surfaces the headline + url to search engines.',
+                    ['headline' => $headline],
+                    ['@context' => 'https://schema.org', '@type' => 'Article', 'headline' => $headline, 'url' => $url],
+                );
+            case 'product':
+                return $base(
+                    'product', 'Product', 'Product',
+                    'Page describes a product. Add price, brand, SKU, and reviews in the schema editor for rich-result eligibility.',
+                    ['name' => $headline],
+                    ['@context' => 'https://schema.org', '@type' => 'Product', 'name' => $headline, 'url' => $url],
+                );
+            case 'recipe':
+                return $base(
+                    'recipe', 'Recipe', 'Recipe',
+                    'Cooking content. Fill prep/cook time, ingredients and instructions in the schema editor for recipe rich-results.',
+                    ['name' => $headline],
+                    ['@context' => 'https://schema.org', '@type' => 'Recipe', 'name' => $headline, 'url' => $url],
+                );
+            case 'event':
+                return $base(
+                    'event', 'Event', 'Event',
+                    'Event page — start/end dates, location, and ticketing fill in the schema editor.',
+                    ['name' => $headline],
+                    ['@context' => 'https://schema.org', '@type' => 'Event', 'name' => $headline, 'url' => $url],
+                );
+            case 'local_business':
+                return $base(
+                    'local_business', 'LocalBusiness', 'Local Business',
+                    'Storefront or service-area business. Add address, opening hours, telephone, and aggregate rating in the schema editor.',
+                    ['name' => $headline],
+                    ['@context' => 'https://schema.org', '@type' => 'LocalBusiness', 'name' => $headline, 'url' => $url],
+                );
+            case 'course':
+                return $base(
+                    'course', 'Course', 'Course',
+                    'Educational content. Add provider + description for course rich-results.',
+                    ['name' => $headline],
+                    ['@context' => 'https://schema.org', '@type' => 'Course', 'name' => $headline, 'url' => $url],
+                );
+            case 'review':
+                return $base(
+                    'review', 'Review', 'Review',
+                    'The page reviews a product / book / movie. Add itemReviewed + rating in the schema editor.',
+                    ['name' => $headline],
+                    ['@context' => 'https://schema.org', '@type' => 'Review', 'name' => $headline, 'url' => $url],
+                );
+            case 'service':
+                return $base(
+                    'service', 'Service', 'Service',
+                    'Page describes a service. Add provider + serviceType for service rich-results.',
+                    ['name' => $headline],
+                    ['@context' => 'https://schema.org', '@type' => 'Service', 'name' => $headline, 'url' => $url],
+                );
+            case 'book':
+                return $base(
+                    'book', 'Book', 'Book',
+                    'The page is about a book. Add author + ISBN for book rich-results.',
+                    ['name' => $headline],
+                    ['@context' => 'https://schema.org', '@type' => 'Book', 'name' => $headline, 'url' => $url],
+                );
+            case 'job_posting':
+                return $base(
+                    'job_posting', 'JobPosting', 'Job Posting',
+                    'Open position. Add hiringOrganization + jobLocation in the schema editor.',
+                    ['title' => $headline],
+                    ['@context' => 'https://schema.org', '@type' => 'JobPosting', 'title' => $headline, 'url' => $url],
+                );
+            case 'video':
+                return $base(
+                    'video', 'VideoObject', 'Video',
+                    'Page features a video. Add contentUrl + duration in the schema editor.',
+                    ['name' => $headline],
+                    ['@context' => 'https://schema.org', '@type' => 'VideoObject', 'name' => $headline, 'url' => $url],
+                );
+            case 'software':
+                return $base(
+                    'software', 'SoftwareApplication', 'Software',
+                    'Software / app page. Add operatingSystem + applicationCategory.',
+                    ['name' => $headline],
+                    ['@context' => 'https://schema.org', '@type' => 'SoftwareApplication', 'name' => $headline, 'url' => $url],
+                );
+            case 'person':
+                return $base(
+                    'person', 'Person', 'Person',
+                    'Page is about a person (bio / profile). Add jobTitle + sameAs for entity disambiguation.',
+                    ['name' => $headline],
+                    ['@context' => 'https://schema.org', '@type' => 'Person', 'name' => $headline, 'url' => $url],
+                );
+            default:
+                // Unknown types fall back to article for safety.
+                return $this->buildPrimarySchema('article', $headline, $url);
+        }
+    }
+
+    /**
+     * Pull the page headline from the brief's suggested H1 if present;
+     * otherwise scan the generated sections for an <h1>.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     */
+    private function extractHeadline(?array $brief, array $sections): string
+    {
+        if (is_string($brief['suggested_h1'] ?? null) && trim($brief['suggested_h1']) !== '') {
+            return trim((string) $brief['suggested_h1']);
+        }
+        foreach ($sections as $s) {
+            $html = (string) ($s['proposed_html'] ?? '');
+            if (preg_match('/<h1[^>]*>(.*?)<\/h1>/is', $html, $m)) {
+                return trim(strip_tags($m[1]));
+            }
+        }
+        return '';
+    }
+
+    /**
+     * Extract Q&A pairs from generated sections. A section qualifies when
+     * its first <h2> ends with "?" and is followed by a non-trivial <p>.
+     * Rich-element sections (table-led, code-led) are skipped.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     * @return list<array{question: string, answer: string}>
+     */
+    private function extractFaqPairs(array $sections): array
+    {
+        $pairs = [];
+        foreach ($sections as $s) {
+            if (($s['kind'] ?? '') !== 'add') {
+                continue;
+            }
+            $html = (string) ($s['proposed_html'] ?? '');
+            if (! preg_match('/<h2[^>]*>(.*?)<\/h2>\s*(?:<h3[^>]*>.*?<\/h3>\s*)*<p[^>]*>(.*?)<\/p>/is', $html, $m)) {
+                continue;
+            }
+            $question = trim(strip_tags($m[1]));
+            $answer = trim(strip_tags($m[2]));
+            if (! str_ends_with($question, '?')) {
+                continue;
+            }
+            if (mb_strlen($question) < 5 || mb_strlen($answer) < 20) {
+                continue;
+            }
+            $pairs[] = ['question' => $question, 'answer' => $answer];
+            if (count($pairs) >= 12) {
+                break;
+            }
+        }
+
+        return $pairs;
     }
 
     /**

@@ -357,6 +357,10 @@ export default function AiWriterTab() {
 								</span>
 							) : null}
 						</div>
+						{data.schema_suggestions?.length ? (
+							<SchemaSuggestionsCard suggestions={data.schema_suggestions} />
+						) : null}
+
 						{data.cached ? (
 							<p className="ebq-aiw-apply__cached">
 								{__('Cached for 24h — re-clicks within today are free.', 'ebq-seo')}
@@ -887,4 +891,160 @@ function writeContentToEditor(plan) {
 		throw new Error(__('Nothing to apply.', 'ebq-seo'));
 	}
 	blockEditor.resetBlocks([...liveBlocks, ...newBlocks]);
+}
+
+/* ────────────────── schema suggestions ──────────────────────── */
+
+/**
+ * Renders the auto-built schema stack from the writer response. Two
+ * tiers visible:
+ *   - User-configurable suggestions: checkboxes; user picks which to
+ *     write into the post's `_ebq_schemas` meta on Apply.
+ *   - Auto-emitted entries: read-only badges. They're rendered by
+ *     EBQ_Schema_Output on every page already; surfaced here so the
+ *     user sees the full schema graph.
+ */
+function SchemaSuggestionsCard({ suggestions }) {
+	const list = Array.isArray(suggestions) ? suggestions : [];
+	const configurable = list.filter((s) => !s.auto_emitted);
+	const auto = list.filter((s) => s.auto_emitted);
+
+	const initialPicks = useMemo(
+		() => Object.fromEntries(configurable.map((s) => [s.template, true])),
+		[configurable.map((s) => s.template).join('|')],
+	);
+	const [picks, setPicks] = useState(initialPicks);
+	const [expanded, setExpanded] = useState({});
+	const [applyMsg, setApplyMsg] = useState({ kind: '', text: '' });
+
+	const toggle = (template) => setPicks((p) => ({ ...p, [template]: !p[template] }));
+	const toggleExpanded = (template) => setExpanded((e) => ({ ...e, [template]: !e[template] }));
+
+	const apply = useCallback(() => {
+		const isClassic = typeof window !== 'undefined' && window.__EBQ_CLASSIC__ === true;
+		const chosen = configurable.filter((s) => picks[s.template]);
+		if (chosen.length === 0) {
+			setApplyMsg({ kind: 'bad', text: __('Pick at least one schema first.', 'ebq-seo') });
+			return;
+		}
+
+		try {
+			let existingRaw = '';
+			if (isClassic) {
+				const inp = document.querySelector('form#post input[name="ebq_schemas"], form#post textarea[name="ebq_schemas"]');
+				existingRaw = inp ? String(inp.value || '') : '';
+			} else {
+				const meta = select('core/editor')?.getEditedPostAttribute?.('meta') || {};
+				existingRaw = String(meta._ebq_schemas || '');
+			}
+			let existing = [];
+			try { existing = existingRaw ? JSON.parse(existingRaw) : []; } catch { existing = []; }
+			if (!Array.isArray(existing)) existing = [];
+
+			const next = [...existing];
+			const seenTemplates = new Set(existing.map((e) => e?.template).filter(Boolean));
+			let added = 0;
+			for (const s of chosen) {
+				if (seenTemplates.has(s.template)) continue; // don't duplicate by template
+				next.push({
+					id: 'aiw_' + s.template + '_' + Math.random().toString(36).slice(2, 8),
+					template: s.template,
+					type: s.type,
+					data: s.data || {},
+					enabled: true,
+				});
+				seenTemplates.add(s.template);
+				added++;
+			}
+
+			const serialized = JSON.stringify(next);
+			if (isClassic) {
+				const inp = document.querySelector('form#post input[name="ebq_schemas"], form#post textarea[name="ebq_schemas"]');
+				if (inp) {
+					inp.value = serialized;
+					inp.dispatchEvent(new Event('input', { bubbles: true }));
+				}
+			} else {
+				dispatch('core/editor').editPost({ meta: { _ebq_schemas: serialized } });
+			}
+
+			setApplyMsg({
+				kind: 'good',
+				text: added === 0
+					? __('Selected schema(s) are already configured on this post.', 'ebq-seo')
+					: sprintf(__('Added %d schema entr(ies). Save / Update the post to publish.', 'ebq-seo'), added),
+			});
+		} catch (e) {
+			setApplyMsg({ kind: 'bad', text: e?.message || 'Apply failed' });
+		}
+	}, [configurable, picks]);
+
+	if (list.length === 0) return null;
+	const chosenCount = configurable.filter((s) => picks[s.template]).length;
+
+	return (
+		<div className="ebq-aiw-schema">
+			<div className="ebq-aiw-schema__head">
+				<span className="ebq-aiw-schema__title">
+					<IconSparkle /> {__('Suggested schema', 'ebq-seo')}
+				</span>
+				<span className="ebq-aiw-schema__sub">
+					{__('JSON-LD that matches what was generated. Pick which to apply.', 'ebq-seo')}
+				</span>
+			</div>
+
+			{configurable.map((s) => (
+				<div key={s.template} className="ebq-aiw-schema__row">
+					<label className="ebq-aiw-schema__head-row">
+						<input
+							type="checkbox"
+							className="ebq-aiw-schema__check"
+							checked={!!picks[s.template]}
+							onChange={() => toggle(s.template)}
+						/>
+						<span className="ebq-aiw-schema__type">{s.label}</span>
+						<span className="ebq-aiw-schema__type-pill">{s.type}</span>
+						<button
+							type="button"
+							className="ebq-aiw-schema__expand"
+							onClick={(e) => { e.preventDefault(); toggleExpanded(s.template); }}
+							aria-expanded={!!expanded[s.template]}
+						>
+							{expanded[s.template] ? __('Hide JSON-LD', 'ebq-seo') : __('Show JSON-LD', 'ebq-seo')}
+						</button>
+					</label>
+					<p className="ebq-aiw-schema__why">{s.rationale}</p>
+					{expanded[s.template] && s.jsonld ? (
+						<pre className="ebq-aiw-schema__code">{JSON.stringify(s.jsonld, null, 2)}</pre>
+					) : null}
+				</div>
+			))}
+
+			{auto.length ? (
+				<div className="ebq-aiw-schema__auto">
+					<div className="ebq-aiw-schema__auto-title">
+						{__('Already in the schema graph (auto-emitted)', 'ebq-seo')}
+					</div>
+					<div className="ebq-aiw-schema__auto-list">
+						{auto.map((s) => (
+							<span key={s.template} className="ebq-aiw-schema__auto-pill" title={s.rationale}>
+								{s.label}
+							</span>
+						))}
+					</div>
+				</div>
+			) : null}
+
+			<div className="ebq-aiw-schema__apply">
+				<Button variant="primary" size="sm" onClick={apply} disabled={chosenCount === 0}>
+					{sprintf(__('Apply %d schema(s)', 'ebq-seo'), chosenCount)}
+				</Button>
+				{applyMsg.text ? (
+					<span className={`ebq-aiw-schema__msg ebq-aiw-schema__msg--${applyMsg.kind}`}>
+						{applyMsg.text}
+					</span>
+				) : null}
+			</div>
+		</div>
+	);
 }
