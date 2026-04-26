@@ -355,6 +355,17 @@ final class EBQ_Api_Client
             return ['ok' => false, 'error' => 'http_' . $code, 'body' => is_string($body) ? mb_substr($body, 0, 500) : ''];
         }
 
+        // Auto-sync subscription tier from any response that carries it.
+        // This means the editor picks up upgrades / downgrades the next time
+        // it hits ANY endpoint — no reconnect required. Whitelist values so
+        // a malformed payload can't poison the option.
+        if (isset($decoded['tier']) && is_string($decoded['tier'])) {
+            $tier = strtolower(trim($decoded['tier']));
+            if (in_array($tier, ['free', 'pro'], true) && $tier !== (string) get_option('ebq_site_tier', 'free')) {
+                update_option('ebq_site_tier', $tier);
+            }
+        }
+
         // Cache only useful, complete responses. Never cache:
         //   - Explicit failures (`ok: false`)
         //   - Responses carrying a `diagnostic` flag (means the upstream

@@ -291,6 +291,10 @@ class PluginInsightsController extends Controller
             'external_post_id' => $externalPostId,
             'url' => $url,
             'focus_keyword' => $kw,
+            // Tier is echoed on every response so the WP plugin's local
+            // option stays in sync with EBQ-side billing changes — without
+            // requiring the user to reconnect the site after upgrading.
+            'tier' => $website->tier,
             'live' => $payload,
         ]);
     }
