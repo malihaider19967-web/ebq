@@ -103,10 +103,16 @@ class TopicalGapService
             ],
         ];
 
+        // Larger budgets than the original — competitor-block + 6000-char
+        // user excerpt routinely produces 1500-token JSON, and Mistral in
+        // strict-JSON mode is noticeably slower than free-text mode. Old
+        // 18s / 1200tok combo was the actual cause of "AI returned
+        // malformed output" — responses were getting truncated mid-JSON,
+        // which then failed strict decode with no recovery path.
         $decoded = $this->llm->completeJson($messages, [
             'temperature' => 0.15,
-            'max_tokens' => 1200,
-            'timeout' => 18,
+            'max_tokens' => 2200,
+            'timeout' => 28,
         ]);
 
         if (! is_array($decoded)) {

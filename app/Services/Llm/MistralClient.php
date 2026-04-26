@@ -42,7 +42,11 @@ final class MistralClient implements LlmClient
         }
 
         $model = (string) ($options['model'] ?? $this->defaultModel);
-        $timeout = max(2, min(30, (int) ($options['timeout'] ?? 12)));
+        // Ceiling raised from 30→60s. JSON-mode requests are noticeably
+        // slower than free-text (token-by-token grammar checking), and
+        // long-context tasks like content briefs / topical gaps can need
+        // 30–45s. Floor stays at 2s; nobody calls intentionally short.
+        $timeout = max(2, min(60, (int) ($options['timeout'] ?? 12)));
 
         $body = [
             'model' => $model,
@@ -109,8 +113,85 @@ final class MistralClient implements LlmClient
     {
         $options['json_object'] = true;
         $result = $this->complete($messages, $options);
-        if (! ($result['ok'] ?? false)) return null;
-        $decoded = json_decode((string) $result['content'], true);
+        if (! ($result['ok'] ?? false)) {
+            Log::warning('Mistral completeJson: complete() returned ok=false', [
+                'error' => $result['error'] ?? 'unknown',
+                'model' => $result['model'] ?? '',
+            ]);
+            return null;
+        }
+
+        $raw = (string) $result['content'];
+        $decoded = $this->tolerantJsonDecode($raw);
+        if ($decoded === null) {
+            Log::warning('Mistral completeJson: parse failed', [
+                'model' => $result['model'] ?? '',
+                'raw_preview' => mb_substr($raw, 0, 800),
+                'raw_length' => mb_strlen($raw),
+                'usage' => $result['usage'] ?? null,
+            ]);
+        }
+        return $decoded;
+    }
+
+    /**
+     * Tolerates the four ways an LLM-in-JSON-mode can still return text
+     * that the standard `json_decode` chokes on:
+     *
+     *   1. Markdown code fences: ```json\n{...}\n```
+     *   2. Leading/trailing commentary ("Sure, here's the JSON: {...}")
+     *   3. Bare object embedded in a longer string
+     *   4. Trailing commas (not strict JSON but common in LLM output)
+     *
+     * Strategy: try strict decode → strip code fences → extract first
+     * balanced `{...}` block → strip trailing commas → strict decode again.
+     * Returns null only when no recoverable JSON object can be found.
+     */
+    private function tolerantJsonDecode(string $raw): ?array
+    {
+        $trimmed = trim($raw);
+        if ($trimmed === '') return null;
+
+        // (1) Strict decode happy path.
+        $decoded = json_decode($trimmed, true);
+        if (is_array($decoded)) return $decoded;
+
+        // (2) Strip markdown code fences (```json … ``` or ``` … ```).
+        $stripped = preg_replace('/^```(?:json|JSON)?\s*\n?(.+?)\n?```$/sm', '$1', $trimmed);
+        if (is_string($stripped) && $stripped !== $trimmed) {
+            $decoded = json_decode(trim($stripped), true);
+            if (is_array($decoded)) return $decoded;
+            $trimmed = trim($stripped);
+        }
+
+        // (3) Extract the first balanced { ... } block (handles leading
+        //     commentary like "Here you go: { ... }").
+        $start = strpos($trimmed, '{');
+        if ($start === false) return null;
+        $depth = 0;
+        $inString = false;
+        $escape = false;
+        $end = -1;
+        $len = strlen($trimmed);
+        for ($i = $start; $i < $len; $i++) {
+            $ch = $trimmed[$i];
+            if ($escape) { $escape = false; continue; }
+            if ($ch === '\\' && $inString) { $escape = true; continue; }
+            if ($ch === '"') { $inString = ! $inString; continue; }
+            if ($inString) continue;
+            if ($ch === '{') $depth++;
+            elseif ($ch === '}') {
+                $depth--;
+                if ($depth === 0) { $end = $i; break; }
+            }
+        }
+        if ($end === -1) return null;
+        $candidate = substr($trimmed, $start, $end - $start + 1);
+
+        // (4) Strip trailing commas before } or ] — common LLM artifact.
+        $candidate = preg_replace('/,(\s*[\]}])/', '$1', $candidate) ?? $candidate;
+
+        $decoded = json_decode($candidate, true);
         return is_array($decoded) ? $decoded : null;
     }
 }
