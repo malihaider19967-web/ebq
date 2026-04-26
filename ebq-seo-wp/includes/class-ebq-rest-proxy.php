@@ -783,7 +783,8 @@ final class EBQ_Rest_Proxy
         if (! $url) {
             return new WP_REST_Response(['ok' => false, 'error' => 'post_not_found'], 404);
         }
-        return new WP_REST_Response(EBQ_Plugin::api_client()->entity_coverage((string) $post_id, $url), 200);
+        $check_only = filter_var($request->get_param('check_only'), FILTER_VALIDATE_BOOLEAN);
+        return new WP_REST_Response(EBQ_Plugin::api_client()->entity_coverage((string) $post_id, $url, $check_only), 200);
     }
 
     public function internal_link_suggestions(WP_REST_Request $request): WP_REST_Response

@@ -218,9 +218,11 @@ final class EBQ_Api_Client
         return $this->request('POST', '/api/v1/hq/outreach-prospects/auto-discover?days=' . $days);
     }
 
-    public function entity_coverage(string $post_id, string $url): array
+    public function entity_coverage(string $post_id, string $url, bool $check_only = false): array
     {
-        return $this->get(sprintf('/api/v1/posts/%s/entity-coverage', rawurlencode($post_id)), ['url' => $url]);
+        $args = ['url' => $url];
+        if ($check_only) $args['check_only'] = '1';
+        return $this->get(sprintf('/api/v1/posts/%s/entity-coverage', rawurlencode($post_id)), $args);
     }
 
     public function ai_content_brief(string $post_id, string $focus_keyword, string $country = '', string $language = ''): array

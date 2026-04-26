@@ -60,6 +60,27 @@ class EntityCoverageService
      */
     public function analyze(Website $website, string $url): array
     {
+        return $this->run($website, $url, false);
+    }
+
+    /**
+     * Cheap dependency-only check used by the editor sidebar to decide
+     * whether to render the "Analyze entity coverage" button at all.
+     * Returns the same response shape as `analyze()` minus the actual
+     * entity lists — sets `ready: true` when all preconditions are met,
+     * or returns the standard `unavailable` shape with a `reason` when
+     * something's missing. Critically: NEVER calls the LLM. Safe to fire
+     * on every editor mount without burning Mistral tokens.
+     *
+     * @return array{ok: bool, ready?: bool, reason?: string, ...}
+     */
+    public function preflight(Website $website, string $url): array
+    {
+        return $this->run($website, $url, true);
+    }
+
+    private function run(Website $website, string $url, bool $preflightOnly): array
+    {
         if (! $this->llm->isAvailable()) {
             return $this->unavailable('llm_not_configured');
         }
@@ -80,6 +101,18 @@ class EntityCoverageService
             return $this->unavailable('no_body_text');
         }
         $body = mb_substr($body, 0, self::MAX_BODY_CHARS);
+
+        // Preflight short-circuit — all deps satisfied, return the
+        // cheap "go ahead and analyze" signal without invoking the LLM.
+        if ($preflightOnly) {
+            return [
+                'ok' => true,
+                'ready' => true,
+                'yours' => [],
+                'competitors' => [],
+                'missing' => [],
+            ];
+        }
 
         $competitors = data_get($audit->result, 'benchmark.competitors', []);
         $competitorBlock = '';

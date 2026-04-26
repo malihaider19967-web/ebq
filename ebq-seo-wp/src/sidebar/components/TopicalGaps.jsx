@@ -65,21 +65,36 @@ export default function TopicalGaps({ postId, focusKeyword, content, isConnected
 			}
 		>
 			{state.status === 'idle' ? (
-				<>
-					<p className="ebq-help" style={{ marginTop: 0 }}>
-						{__('We scrape the top 5 results for your focus keyphrase and ask AI to extract the subtopics they cover. Anything they cover and you don\'t becomes a writing prompt.', 'ebq-seo')}
-					</p>
-					<Button variant="primary" onClick={analyze} disabled={!canRun}>
-						<IconSparkle /> {__('Analyze top 5 SERP results', 'ebq-seo')}
-					</Button>
-					{!canRun ? (
-						<p className="ebq-help" style={{ marginTop: 6 }}>
-							{!focusKeyword || focusKeyword.trim().length < 2
-								? __('Set a focus keyphrase first.', 'ebq-seo')
-								: __('Write at least 200 characters of content first.', 'ebq-seo')}
+				canRun ? (
+					<>
+						<p className="ebq-help" style={{ marginTop: 0 }}>
+							{__('We scrape the top 5 results for your focus keyphrase and ask AI to extract the subtopics they cover. Anything they cover and you don\'t becomes a writing prompt.', 'ebq-seo')}
 						</p>
-					) : null}
-				</>
+						<Button variant="primary" onClick={analyze}>
+							<IconSparkle /> {__('Analyze top 5 SERP results', 'ebq-seo')}
+						</Button>
+					</>
+				) : (() => {
+					// Pre-flight: client-side dependency check. Surface the
+					// missing piece as a NeedsSetup card and DON'T render the
+					// action button — clicking it would just fail server-side.
+					// Hidden button + visible card = clearer than a disabled
+					// button + small grey help text.
+					const cfg = publicConfig();
+					const reason = (!focusKeyword || focusKeyword.trim().length < 2)
+						? 'missing_focus_keyword'
+						: 'content_too_short';
+					const setup = topicalGapsUnavailable(reason, cfg);
+					return (
+						<NeedsSetup
+							feature={setup.feature}
+							why={setup.why}
+							fix={setup.fix}
+							action={setup.action}
+							tone={setup.tone}
+						/>
+					);
+				})()
 			) : null}
 
 			{state.status === 'loading' ? (

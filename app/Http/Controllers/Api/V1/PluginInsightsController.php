@@ -433,7 +433,15 @@ class PluginInsightsController extends Controller
         if ($url === '') {
             return response()->json(['ok' => false, 'error' => 'missing_url'], 400);
         }
-        $payload = $service->analyze($website, $url);
+        // ?check_only=1 → cheap dependency-only check (no LLM call).
+        // Used by the editor sidebar to decide whether to render the
+        // "Analyze entity coverage" button at all. Without this flag the
+        // sidebar would either burn LLM tokens on every mount, or rely
+        // on a heuristic that gets the dependency-status answer wrong.
+        $checkOnly = filter_var($request->query('check_only', false), FILTER_VALIDATE_BOOLEAN);
+        $payload = $checkOnly
+            ? $service->preflight($website, $url)
+            : $service->analyze($website, $url);
         return response()->json([
             'external_post_id' => $externalPostId,
             'url' => $url,

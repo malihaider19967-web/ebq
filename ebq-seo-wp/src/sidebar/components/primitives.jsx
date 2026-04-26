@@ -175,6 +175,11 @@ export function ScoreBadge({ kind = 'offline', score = 0, displayScore, label, c
 		? (level === 'good' ? 'var(--ebq-good)' : level === 'warn' ? 'var(--ebq-warn)' : 'var(--ebq-bad)')
 		: 'var(--ebq-accent)';
 	const cls = `ebq-scorebadge ebq-scorebadge--${kind}${onClick ? ' is-clickable' : ''}`;
+	// Caption is line-clamped to 2 lines visually; use `title` so the full
+	// message reveals on hover. Required for explanations like the GSC
+	// "give Google a few days to crawl + impressions to accrue" copy that
+	// gets truncated at the badge size.
+	const captionStr = typeof caption === 'string' ? caption : '';
 	const inner = (
 		<>
 			<div className="ebq-scorebadge__ring" style={{ '--p': safeScore, '--col': colorVar }}>
@@ -185,19 +190,19 @@ export function ScoreBadge({ kind = 'offline', score = 0, displayScore, label, c
 					{badge ? <span className="ebq-scorebadge__badge">{badge}</span> : null}
 					<span>{label}</span>
 				</p>
-				<p className="ebq-scorebadge__caption">{caption}</p>
+				<p className="ebq-scorebadge__caption" title={captionStr}>{caption}</p>
 			</div>
 			{trailing ? <span className="ebq-scorebadge__trailing">{trailing}</span> : null}
 		</>
 	);
 	if (onClick) {
 		return (
-			<button type="button" className={cls} onClick={onClick} aria-expanded={ariaExpanded} aria-haspopup="dialog">
+			<button type="button" className={cls} onClick={onClick} aria-expanded={ariaExpanded} aria-haspopup="dialog" title={captionStr}>
 				{inner}
 			</button>
 		);
 	}
-	return <div className={cls}>{inner}</div>;
+	return <div className={cls} title={captionStr}>{inner}</div>;
 }
 
 /* ─── Check card (unified offline + live factor row) ─────────── */

@@ -1,4 +1,4 @@
-import { useState, useCallback } from '@wordpress/element';
+import { useState, useCallback, useEffect } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
 import { Section, Button, EmptyState, Pill, NeedsSetup } from './primitives';
@@ -19,7 +19,39 @@ import { publicConfig } from '../hooks/useEditorContext';
  * per content-hash so re-clicks within a week are free.
  */
 export default function EntityCoverage({ postId, isConnected }) {
-	const [state, setState] = useState({ status: 'idle', data: null, error: null });
+	// `status: 'preflighting'` → checking dep status without invoking the LLM.
+	// `status: 'ready_to_run'` → deps satisfied, button is now visible.
+	// `status: 'unavailable'`  → dep missing, NeedsSetup card shown, no button.
+	// `status: 'loading'`      → user clicked Analyze, full LLM run in flight.
+	// `status: 'ready'`        → analysis complete, data rendered.
+	// `status: 'error'`        → analyze() failed after the user clicked.
+	const [state, setState] = useState({ status: 'preflighting', data: null, error: null });
+
+	// Cheap dep check on mount — server-side `?check_only=1` short-circuits
+	// before the LLM call. Lets us decide whether to render the button or
+	// the NeedsSetup card BEFORE burning Mistral tokens. Without this we'd
+	// either always show the button (and surprise the user with a failure)
+	// or always run the LLM (and waste credits when no audit exists).
+	useEffect(() => {
+		if (!isConnected || !postId) return;
+		setState({ status: 'preflighting', data: null, error: null });
+		apiFetch({ path: `/ebq/v1/entity-coverage/${postId}?check_only=1` })
+			.then((res) => {
+				const inner = res?.entities || {};
+				if (inner?.ok === true && inner?.ready === true) {
+					setState({ status: 'ready_to_run', data: null, error: null });
+				} else {
+					setState({
+						status: 'unavailable',
+						data: null,
+						error: inner?.reason || 'unavailable',
+					});
+				}
+			})
+			.catch((err) => {
+				setState({ status: 'unavailable', data: null, error: err?.message || 'preflight_failed' });
+			});
+	}, [postId, isConnected]);
 
 	const analyze = useCallback(() => {
 		setState({ status: 'loading', data: null, error: null });
@@ -62,7 +94,13 @@ export default function EntityCoverage({ postId, isConnected }) {
 				<Button size="sm" variant="ghost" onClick={analyze}>{__('Re-analyze', 'ebq-seo')}</Button>
 			) : null}
 		>
-			{state.status === 'idle' ? (
+			{state.status === 'preflighting' ? (
+				<p className="ebq-help" style={{ marginTop: 0 }}>
+					<span className="ebq-spinner" /> {__('Checking eligibility…', 'ebq-seo')}
+				</p>
+			) : null}
+
+			{state.status === 'ready_to_run' ? (
 				<>
 					<p className="ebq-help" style={{ marginTop: 0 }}>
 						{__('We extract people, brands, products, and concepts from your page and from the top-3 ranking competitors, then surface what they cover and you don\'t. Strongest signal for E-E-A-T improvements.', 'ebq-seo')}
@@ -72,6 +110,20 @@ export default function EntityCoverage({ postId, isConnected }) {
 					</Button>
 				</>
 			) : null}
+
+			{state.status === 'unavailable' ? (() => {
+				const cfg = publicConfig();
+				const setup = entityCoverageUnavailable(state.error || null, cfg);
+				return (
+					<NeedsSetup
+						feature={setup.feature}
+						why={setup.why}
+						fix={setup.fix}
+						action={setup.action}
+						tone={setup.tone}
+					/>
+				);
+			})() : null}
 
 			{state.status === 'loading' ? (
 				<p className="ebq-help"><span className="ebq-spinner" /> {__('Extracting entities… (10–20s)', 'ebq-seo')}</p>
