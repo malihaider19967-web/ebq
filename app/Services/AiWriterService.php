@@ -31,7 +31,13 @@ class AiWriterService
 {
     private const CACHE_TTL_SEC = 60 * 60 * 24;
 
-    private const MAX_SECTIONS = 8;
+    /**
+     * Capped at 5 (was 8). With each section returning 100–300 words of
+     * HTML plus title + rationale + tags, 5 sections ≈ 2.5–4k output
+     * tokens which fits comfortably under the model's `max_tokens` budget
+     * without truncating the JSON mid-output.
+     */
+    private const MAX_SECTIONS = 5;
 
     public function __construct(
         private readonly LlmClient $llm,
@@ -91,11 +97,15 @@ class AiWriterService
         }
 
         $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps);
+        // 4000 tokens = ~3000 words output. Enough headroom for 5 sections
+        // each with a heading + 200-word body + rationale + tags + JSON
+        // delimiters. Anything tighter risks the model truncating mid-JSON,
+        // which trips strict decode → `llm_parse_failed`.
         $response = $this->llm->completeJson($messages, [
             'temperature' => 0.5,
-            'max_tokens' => 2200,
+            'max_tokens' => 4000,
             'json_object' => true,
-            'timeout' => 50,
+            'timeout' => 60,
         ]);
 
         if (! is_array($response) || ! isset($response['sections']) || ! is_array($response['sections'])) {
@@ -103,9 +113,17 @@ class AiWriterService
                 'website_id' => $website->id,
                 'post_id' => $postId,
                 'keyword' => $keyword,
+                'response_type' => gettype($response),
+                'response_keys' => is_array($response) ? array_keys($response) : null,
             ]);
 
-            return ['ok' => false, 'error' => 'llm_parse_failed'];
+            return [
+                'ok' => false,
+                'error' => 'llm_parse_failed',
+                'message' => is_array($response)
+                    ? 'The model returned JSON but without a "sections" array — try regenerating; if it persists, the focus keyword may be too vague.'
+                    : 'The model response could not be parsed as JSON. Re-try once; if it persists, try a more specific focus keyword or shorter source content.',
+            ];
         }
 
         $sections = $this->normalizeSections($response['sections']);
@@ -167,32 +185,32 @@ class AiWriterService
             : '(empty post)';
 
         $system = <<<'SYS'
-You are a senior SEO editor. You propose specific, surgical content changes
-for a post around a target keyword. Each change is an INDEPENDENT, REVIEWABLE
-section the user can approve or reject one at a time.
+You are a senior SEO editor proposing surgical, reviewable content changes.
 
-Hard rules:
-- Output STRICT JSON only. No prose, no markdown fences.
-- Generate at most 8 sections. Quality over quantity.
-- Each section.kind ∈ {"add","edit","replace"}.
-   - "add"     = new section to append/insert that doesn't exist yet.
-   - "edit"    = rewrite an existing passage; provide its current_html so the
-                 reviewer can diff it. The current_html MUST be a verbatim
-                 substring of the post, NOT paraphrased.
-   - "replace" = wholesale replacement of the entire post (use sparingly,
-                 only when the post is empty/unsalvageable).
-- Each section.proposed_html MUST be valid, semantic HTML using <h2>, <h3>,
-  <p>, <ul>, <ol>, <li>, <strong>, <em>, <a>. No <html>/<body>/<head>, no
-  inline styles, no <script>, no markdown.
-- Each section MUST cite which input(s) drove it via source_tags ⊆
-  {"brief","gaps","content"}.
-- Title each section so the user knows at a glance what it covers.
-- Keep rationale to one short sentence — what the change accomplishes.
+Output rules (STRICT — non-compliance breaks the consumer):
+- Return ONE JSON object only. No prose, no markdown fences, no commentary.
+- Top-level keys: "summary" (string) and "sections" (array).
+- Generate AT MOST 5 sections. Fewer is better than padded.
+- proposed_html: valid HTML, ≤ 250 words per section, only <h2>, <h3>,
+  <p>, <ul>, <ol>, <li>, <strong>, <em>, <a> tags. No inline styles,
+  no <script>, no markdown.
+- kind ∈ {"add","edit","replace"}.
+   • "add"     — new section the post is missing.
+   • "edit"    — rewrite an existing passage. current_html MUST be a
+                 verbatim substring of the post (copy-paste exact, do
+                 not paraphrase). If you cannot copy a verbatim slice,
+                 use kind="add" instead.
+   • "replace" — full post replacement. Use ONLY when the post is empty
+                 or fundamentally unsalvageable. Maximum one per response.
+- source_tags: subset of {"brief","gaps","content"} indicating which
+  inputs drove the change.
+- rationale: one short sentence.
+- title: one short phrase shown to the reviewer.
 
-If the post is empty, generate a complete first draft as a single
-"replace" section structured around the brief's outline / gap topics.
-If both brief and gaps are missing AND the post has content, generate
-"edit" sections that tighten weak passages.
+If the post is empty, return a single "replace" section structured around
+the brief's outline / gap topics.
+If brief and gaps are both missing, propose "edit" sections that tighten
+weak passages of the existing post.
 SYS;
 
         $user = <<<USER

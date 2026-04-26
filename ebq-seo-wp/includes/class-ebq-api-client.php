@@ -135,7 +135,9 @@ final class EBQ_Api_Client
         if ($intent !== '') {
             $body['intent'] = $intent;
         }
-        return $this->request('POST', sprintf('/api/v1/posts/%s/rewrite-snippet', rawurlencode($post_id)), $body);
+        // Snippet rewrite is one Mistral call (~12–18s warm, up to ~30s cold);
+        // 45s gives comfortable headroom while still failing fast.
+        return $this->request('POST', sprintf('/api/v1/posts/%s/rewrite-snippet', rawurlencode($post_id)), $body, 45);
     }
 
     /** Intent registry — used by the picker UI in the editor sidebar. */
@@ -240,7 +242,10 @@ final class EBQ_Api_Client
         if ($current_html !== '') $body['current_html'] = $current_html;
         if ($country !== '')      $body['country']      = $country;
         if ($language !== '')     $body['language']     = $language;
-        return $this->request('POST', sprintf('/api/v1/posts/%s/ai-writer', rawurlencode($post_id)), $body);
+        // Cold path can chain Serper + brief LLM + topical-gaps LLM + writer
+        // LLM end-to-end. Brief alone runs ~45s; writer adds another ~30–50s.
+        // 110s leaves a couple of seconds of headroom under the 120s ceiling.
+        return $this->request('POST', sprintf('/api/v1/posts/%s/ai-writer', rawurlencode($post_id)), $body, 110);
     }
 
     public function ai_content_brief(string $post_id, string $focus_keyword, string $country = '', string $language = ''): array
@@ -248,7 +253,9 @@ final class EBQ_Api_Client
         $body = ['focus_keyword' => $focus_keyword];
         if ($country !== '')  $body['country'] = $country;
         if ($language !== '') $body['language'] = $language;
-        return $this->request('POST', sprintf('/api/v1/posts/%s/content-brief', rawurlencode($post_id)), $body);
+        // Brief = Serper top-10 SERP (≤30s) + Mistral JSON (45s) + GSC join.
+        // 80s covers the cold path; warm cache returns in <500ms.
+        return $this->request('POST', sprintf('/api/v1/posts/%s/content-brief', rawurlencode($post_id)), $body, 80);
     }
 
     public function get_topical_gaps(string $post_id, string $url, string $focus_keyword, string $content, string $country = '', string $language = ''): array
@@ -261,10 +268,13 @@ final class EBQ_Api_Client
         if ($country !== '')  $body['country'] = $country;
         if ($language !== '') $body['language'] = $language;
 
+        // Topical-gaps = Serper top-5 SERP + 2 Mistral JSON calls (extract +
+        // compare). Cold path runs 40–60s; cached calls return immediately.
         return $this->request(
             'POST',
             sprintf('/api/v1/posts/%s/topical-gaps', rawurlencode($post_id)),
-            $body
+            $body,
+            80
         );
     }
 
@@ -412,8 +422,12 @@ final class EBQ_Api_Client
      * Non-GET requests for the HQ admin (POST keyword create, PATCH/DELETE,
      * recheck). Bypasses the read-cache and busts every cached entry on the
      * mutated namespace so the next GET reflects the change immediately.
+     *
+     * `$timeout` is per-call so AI endpoints (which may chain a Serper call
+     * + an LLM call server-side and take 30–60s on a cold cache) don't get
+     * killed by the snappy default that other mutating routes rely on.
      */
-    private function request(string $method, string $path, array $body = []): array
+    private function request(string $method, string $path, array $body = [], int $timeout = 12): array
     {
         if ($this->token === '') {
             return ['ok' => false, 'error' => 'not_connected'];
@@ -424,7 +438,7 @@ final class EBQ_Api_Client
 
         $args = [
             'method'  => $method,
-            'timeout' => 12,
+            'timeout' => max(5, min(120, $timeout)),
             'headers' => [
                 'Authorization' => 'Bearer ' . $this->token,
                 'Accept'        => 'application/json',
