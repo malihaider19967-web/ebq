@@ -143,6 +143,57 @@ class BacklinkFreshnessGate
     }
 
     /**
+     * Forget ALL known cached freshness sentinels.
+     *
+     * Without a Redis pattern-scan or tagged cache (which we deliberately
+     * don't depend on, so the gate works on every cache driver), the only
+     * portable way to enumerate sentinels is to derive the candidate
+     * domain list from the data tables that would ever have produced one:
+     *   - `competitor_backlinks.competitor_domain` (every competitor we've
+     *     ever fetched from KE)
+     *   - hosts of `backlinks.referring_page_url` + `target_page_url`
+     *
+     * Pass `$websiteId` to scope to one site; omit for a full cross-site
+     * sweep (use sparingly — flushes every connected site's KE freshness).
+     *
+     * Returns the count of domains whose sentinel was attempted-forgotten
+     * (Cache::forget always returns true; we report attempts not actual
+     * "had a key" because the gate is best-effort by design).
+     */
+    public function forgetAll(?int $websiteId = null): int
+    {
+        $domains = [];
+
+        // 1. Competitor side — explicit `competitor_domain` column.
+        CompetitorBacklink::query()
+            ->select('competitor_domain')->distinct()
+            ->get()
+            ->each(function ($row) use (&$domains) {
+                $d = $this->normalizeDomain((string) $row->competitor_domain);
+                if ($d !== '') $domains[$d] = true;
+            });
+
+        // 2. Own backlinks side — extract host from each URL. Scope by
+        //    website when a specific website was named.
+        $q = Backlink::query()->select('referring_page_url', 'target_page_url');
+        if ($websiteId !== null) $q->where('website_id', $websiteId);
+        $q->get()->each(function ($row) use (&$domains) {
+            foreach (['referring_page_url', 'target_page_url'] as $col) {
+                $host = parse_url((string) $row->$col, PHP_URL_HOST);
+                if (is_string($host) && $host !== '') {
+                    $domains[$this->normalizeDomain($host)] = true;
+                }
+            }
+        });
+
+        unset($domains['']);
+        foreach (array_keys($domains) as $d) {
+            Cache::forget($this->cacheKey($d));
+        }
+        return count($domains);
+    }
+
+    /**
      * Bare host, lowercased, www-stripped. Mirrors the input normalization
      * KE expects — no scheme, no path, no port.
      */
