@@ -198,7 +198,36 @@
 
 /* ─── Post column ────────────────────────────────────────────── */
 
-.column-ebq { width: 200px; }
+/* Lock the column width on BOTH header and body cells so WP's
+   table-layout:auto can't let our content push the title column narrow.
+   `box-sizing: border-box` + `overflow: hidden` make the constraint
+   actually bind regardless of inner content size. */
+.wp-list-table .column-ebq,
+.wp-list-table th.column-ebq,
+.wp-list-table td.column-ebq {
+	width: 200px !important;
+	max-width: 200px !important;
+	box-sizing: border-box;
+	overflow: hidden;
+}
+@media screen and (max-width: 1100px) {
+	/* Smaller admin viewports — give the title column more room. */
+	.wp-list-table .column-ebq,
+	.wp-list-table th.column-ebq,
+	.wp-list-table td.column-ebq {
+		width: 170px !important;
+		max-width: 170px !important;
+	}
+}
+@media screen and (max-width: 782px) {
+	/* WP collapses to mobile/responsive admin tables here — hide ours
+	   entirely; the title column needs every pixel on small screens. */
+	.wp-list-table .column-ebq,
+	.wp-list-table th.column-ebq,
+	.wp-list-table td.column-ebq {
+		display: none !important;
+	}
+}
 .ebq-col-cell { font-size: 12px; line-height: 1.4; min-height: 36px; }
 .ebq-col-cell .ebq-col-row { display: flex; align-items: center; gap: 6px; }
 .ebq-col-cell .ebq-col-rank {
@@ -478,7 +507,13 @@
 	display: flex;
 	flex-direction: column;
 	gap: 6px;
-	min-width: 160px;
+	/* No min-width — the parent <td> is already locked to the column
+	   width via the `td.column-ebq` rules above. Forcing a min-width
+	   here would let our content push past the column boundary and
+	   shrink the post title column. */
+	min-width: 0;
+	max-width: 100%;
+	overflow: hidden;
 }
 /* Score pills row — SEO + Readability sit side-by-side */
 .ebq-col-scores {
@@ -530,12 +565,23 @@
 	flex-wrap: wrap;
 	align-items: center;
 	gap: 4px;
-	max-width: 260px;
+	/* Was `max-width: 260px` which made the chips wider than the
+	   column itself (200px). Now bound to the parent cell. */
+	max-width: 100%;
+	min-width: 0;
 	padding: 3px 8px 3px 4px;
 	border-radius: 999px;
 	background: #f1f5f9;
 	cursor: help;
 	width: fit-content;
+}
+/* Long schema type names (e.g. "LocalBusiness") get truncated rather
+   than overflowing the column. Hover/title still shows the full set. */
+.ebq-col-schema {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 90px;
 }
 .ebq-col-schema-icon {
 	display: inline-grid;
