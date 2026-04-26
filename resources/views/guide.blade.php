@@ -134,6 +134,26 @@
                     ] as [$href, $label])
                         <li>
                             <a href="{{ $href }}" class="toc-link -ml-px block rounded-r border-l-2 border-transparent py-1.5 pl-4 pr-2 text-slate-600 transition hover:border-indigo-400 hover:bg-slate-100 hover:text-indigo-700">{{ $label }}</a>
+                            @if ($href === '#wordpress-plugin')
+                                <ul class="ml-4 mt-1 space-y-0.5 border-l border-slate-100 pl-2 text-[12px]">
+                                    @foreach ([
+                                        ['#wp-live-score', 'Live SEO score'],
+                                        ['#wp-ai-rewrites', 'AI snippet rewrites'],
+                                        ['#wp-content-brief', 'AI content brief'],
+                                        ['#wp-entity-coverage', 'Entity coverage'],
+                                        ['#wp-topical-gaps', 'Topical gaps'],
+                                        ['#wp-redirects-ai', 'AI redirect matcher'],
+                                        ['#wp-prospects', 'Backlink prospects'],
+                                        ['#wp-serp-features', 'SERP features'],
+                                        ['#wp-benchmarks', 'Network benchmarks'],
+                                        ['#wp-topical-authority', 'Topical authority'],
+                                        ['#wp-automatic', 'Automatic behaviors'],
+                                        ['#wp-pro-vs-free', 'Free vs Pro'],
+                                    ] as [$subHref, $subLabel])
+                                        <li><a href="{{ $subHref }}" class="block rounded px-2 py-0.5 text-slate-500 transition hover:text-indigo-700">{{ $subLabel }}</a></li>
+                                    @endforeach
+                                </ul>
+                            @endif
                         </li>
                     @endforeach
                 </ol>
@@ -1064,12 +1084,443 @@
                     @endforeach
                 </div>
 
+                {{-- ============ NEW: Live SEO score ============ --}}
+                <h3 id="wp-live-score" class="scroll-mt-24">Live SEO score (the centerpiece)</h3>
+                <p>The score next to every post is composed server-side from real data — Google Search Console performance, indexing status, backlinks, Core Web Vitals, and an EBQ-side page audit. It updates automatically every time you save the post. Free and Pro both get this.</p>
+                <div class="not-prose my-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <div class="grid gap-4 lg:grid-cols-2">
+                        <div class="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-4">
+                            <div class="flex items-center gap-3">
+                                <div class="relative grid h-14 w-14 place-items-center rounded-full" style="background: conic-gradient(#16a34a 78%, #e5e7eb 0);">
+                                    <div class="absolute inset-1 rounded-full bg-white"></div>
+                                    <span class="relative text-sm font-extrabold text-slate-900">78</span>
+                                </div>
+                                <div>
+                                    <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500"><span class="rounded bg-emerald-600 px-1.5 py-0.5 text-white">EBQ</span> · Live SEO score</p>
+                                    <p class="mt-1 text-sm font-semibold text-emerald-700">Good</p>
+                                </div>
+                            </div>
+                            <p class="mt-3 text-xs text-emerald-900">Composed from 13 real signals, refreshed automatically.</p>
+                        </div>
+                        <div class="rounded-xl border border-blue-200 bg-blue-50/40 p-4">
+                            <p class="text-[10px] font-bold uppercase tracking-[0.1em] text-slate-500"><span class="rounded bg-blue-600 px-1.5 py-0.5 text-white">Self-check</span> · On-page (offline)</p>
+                            <p class="mt-2 text-sm font-semibold text-blue-900">Local heuristics: title length, keyword in H1, meta length, etc.</p>
+                            <p class="mt-2 text-xs text-blue-900/80">Always works, even before EBQ is connected.</p>
+                        </div>
+                    </div>
+                    <div class="mt-5 grid gap-2 text-xs text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
+                        @foreach ([
+                            ['Focus-keyword rank', '22%', 'Position 7 for "vegan protein"'],
+                            ['Click-through rate', '6%', 'CTR 4.1% (expected 3.6%)'],
+                            ['Topical coverage', '6%', '14 distinct queries in top 100'],
+                            ['No cannibalization', '4%', 'No competing pages'],
+                            ['Google index status', '12%', 'Verdict: PASS · Submitted and indexed'],
+                            ['Backlinks', '4%', '23 referring domains'],
+                            ['Core Web Vitals', '10%', 'LCP 2,100ms · CLS 0.05'],
+                            ['Page performance', '6%', 'Mobile 87 / Desktop 93'],
+                            ['On-page SEO', '6%', 'Title 54 · Meta 142 · H1: 1'],
+                            ['Technical health', '6%', 'HTTP 200 · HTTPS · 312ms TTFB'],
+                            ['Content quality', '5%', '1,840 words · Flesch 64'],
+                            ['Keyword placement', '7%', 'In title, H1, meta, body'],
+                            ['Top fixes (RecommendationEngine)', '8%', 'Critical/warning items as actionable cards'],
+                        ] as [$factor, $weight, $detail])
+                            <div class="rounded-lg border border-slate-200 bg-white p-2.5">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-[11px] font-bold text-slate-900">{{ $factor }}</span>
+                                    <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-600">{{ $weight }}</span>
+                                </div>
+                                <p class="mt-1 text-[10px] text-slate-500">{{ $detail }}</p>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+                <p class="text-sm text-slate-600"><strong>Bonus intelligence:</strong> if Google features dominate the SERP for your keyword (answer box, People Also Ask, image pack pushed organic below the fold), the rank score is automatically discounted with an explanation. You see "your rank reads worse than the raw position" instead of a misleadingly high number.</p>
+
+                {{-- ============ NEW: AI Snippet Rewrites ============ --}}
+                <h3 id="wp-ai-rewrites" class="scroll-mt-24">AI title + meta rewrites <span class="ml-2 rounded bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700">PRO</span></h3>
+                <p>One click → 3 ranked rewrites with rationale. The model sees your current copy, the page body for intent grounding, and the top-3 competitor titles for differentiation. Apply title, meta, or both — straight into the post.</p>
+                <div class="not-prose my-6 rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50 to-white p-5 shadow-sm">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h4 class="text-sm font-bold text-purple-900">✨ AI snippet rewrites</h4>
+                        <span class="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] font-semibold text-slate-700">cached 7 days</span>
+                    </div>
+                    <div class="space-y-3">
+                        @foreach ([
+                            ['commercial', 'Best Vegan Protein Powder 2026: Top 12 Ranked', 'Backed by lab-tested protein content per scoop, plus our top picks for muscle gain and recovery.', 'Leads with year + ranking — captures comparison-shopper intent the competitor titles miss.'],
+                            ['guide', 'Vegan Protein Powder Guide: How to Pick (and Use) the Right One', 'Plant-based protein explained — pea, rice, soy, hemp — with daily-dose recommendations and lab-tested top picks.', 'Educational angle — wider funnel reach for "how to" queries the SERP currently underserves.'],
+                            ['comparison', 'Pea vs Rice vs Soy: Which Vegan Protein Wins in 2026?', 'Side-by-side: protein content, amino profile, digestibility, taste. Lab-tested. Plus our top 3 blends.', 'Comparison angle — strong CTR pull when SERP is dominated by single-product reviews.'],
+                        ] as [$angle, $title, $meta, $rationale])
+                            <div class="rounded-lg border border-purple-200 bg-white p-3 shadow-sm">
+                                <div class="mb-2 flex items-center justify-between">
+                                    <span class="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-purple-700">{{ $angle }}</span>
+                                    <span class="text-[10px] text-slate-400">Title {{ strlen($title) }} · Meta {{ strlen($meta) }}</span>
+                                </div>
+                                <p class="text-sm font-bold text-slate-900">{{ $title }}</p>
+                                <p class="mt-1 text-xs text-slate-600">{{ $meta }}</p>
+                                <p class="mt-2 text-[11px] italic text-slate-500">{{ $rationale }}</p>
+                                <div class="mt-2 flex gap-2">
+                                    <button class="rounded border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700">Use title</button>
+                                    <button class="rounded border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700">Use meta</button>
+                                    <button class="rounded bg-purple-600 px-2 py-1 text-[10px] font-semibold text-white">Use both</button>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- ============ NEW: Content Brief Tab ============ --}}
+                <h3 id="wp-content-brief" class="scroll-mt-24">AI content brief <span class="ml-2 rounded bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700">PRO</span></h3>
+                <p>New tab in the editor sidebar. Type a target keyword → EBQ scrapes the top 10 SERP, runs the LLM, and returns a writer-ready brief: subtopics to cover, recommended depth, schema type, H2 outline, must-have entities, "people also ask", and internal-link targets pulled from your own GSC data.</p>
+                <div class="not-prose my-6 rounded-2xl border border-purple-200 bg-white p-5 shadow-sm">
+                    <div class="mb-4 grid grid-cols-3 gap-3">
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center">
+                            <div class="text-2xl font-extrabold text-slate-900">1,800</div>
+                            <div class="text-[10px] uppercase tracking-wider text-slate-500">words target</div>
+                        </div>
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center">
+                            <div class="text-2xl font-extrabold text-slate-900">Article</div>
+                            <div class="text-[10px] uppercase tracking-wider text-slate-500">schema</div>
+                        </div>
+                        <div class="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center">
+                            <div class="text-2xl font-extrabold text-slate-900">12</div>
+                            <div class="text-[10px] uppercase tracking-wider text-slate-500">subtopics</div>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <h4 class="text-xs font-bold text-slate-900">Suggested H2 outline</h4>
+                        <ol class="mt-1 list-decimal pl-5 text-xs text-slate-700">
+                            <li>What makes a vegan protein "complete"</li>
+                            <li>The 4 main plant protein sources compared</li>
+                            <li>How to pick the right one for your goal</li>
+                            <li>Lab-tested top picks for 2026</li>
+                            <li>Daily dosage and timing</li>
+                            <li>Common allergens and mixing tips</li>
+                        </ol>
+                    </div>
+                    <div class="mb-3">
+                        <h4 class="text-xs font-bold text-slate-900">Subtopics to cover</h4>
+                        <div class="mt-1 flex flex-wrap gap-1.5">
+                            @foreach (['amino acid profile', 'pea protein', 'rice protein', 'soy protein', 'hemp protein', 'BCAA content', 'leucine threshold', 'digestibility', 'protein blends', 'allergens', 'taste', 'mixability'] as $t)
+                                <span class="rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-[10px] text-purple-900">{{ $t }}</span>
+                            @endforeach
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-xs font-bold text-slate-900">Internal link targets (from your GSC)</h4>
+                        <ul class="mt-1 space-y-1 text-[11px]">
+                            <li class="rounded border border-slate-200 bg-slate-50 p-2"><a class="font-semibold text-blue-700">/blog/best-protein-bars-2026</a><span class="ml-2 text-slate-500">anchor: "best protein bars" · 142 clicks/30d</span></li>
+                            <li class="rounded border border-slate-200 bg-slate-50 p-2"><a class="font-semibold text-blue-700">/recipes/vegan-protein-shake</a><span class="ml-2 text-slate-500">anchor: "vegan protein shake" · 89 clicks/30d</span></li>
+                        </ul>
+                    </div>
+                </div>
+
+                {{-- ============ NEW: Entity Coverage ============ --}}
+                <h3 id="wp-entity-coverage" class="scroll-mt-24">Entity coverage (E-E-A-T)</h3>
+                <p>Inside the editor's SEO tab. Click "Analyze entity coverage" → EBQ extracts the people, brands, products, and concepts your page mentions, compares against the top-3 competitors, and lists what they cover that you don't — with one-line "why this matters" rationales.</p>
+                <div class="not-prose my-6 rounded-2xl border border-amber-200 bg-amber-50/40 p-5 shadow-sm">
+                    <div class="mb-4 grid grid-cols-3 gap-3">
+                        <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-center">
+                            <div class="text-2xl font-extrabold text-emerald-700">14</div>
+                            <div class="text-[10px] uppercase tracking-wider text-emerald-700">you cover</div>
+                        </div>
+                        <div class="rounded-lg border border-amber-300 bg-amber-100 p-3 text-center">
+                            <div class="text-2xl font-extrabold text-amber-700">5</div>
+                            <div class="text-[10px] uppercase tracking-wider text-amber-700">missing vs top 3</div>
+                        </div>
+                        <div class="rounded-lg border border-slate-200 bg-white p-3 text-center">
+                            <div class="text-2xl font-extrabold text-slate-700">19</div>
+                            <div class="text-[10px] uppercase tracking-wider text-slate-500">competitor entities</div>
+                        </div>
+                    </div>
+                    <h4 class="text-xs font-bold text-slate-900">Entities to add</h4>
+                    <ul class="mt-2 space-y-2">
+                        @foreach ([
+                            ['NSF Certified for Sport', 'concept', 'A trust signal competitors mention to credential their lab-test claims — adds authority signals Google associates with E-E-A-T.'],
+                            ['Examine.com', 'org', 'Top competitor cites this independent supplement research site as their evidence base. Citing recognized authorities boosts topical authority.'],
+                            ['leucine threshold', 'concept', 'Competitors discuss the 2.5g leucine threshold for muscle protein synthesis. Missing means your content reads as less expert.'],
+                        ] as [$entity, $type, $why])
+                            <li class="rounded-lg border border-amber-200 bg-white p-3">
+                                <div class="flex items-center gap-2">
+                                    <strong class="text-sm text-slate-900">{{ $entity }}</strong>
+                                    <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">{{ $type }}</span>
+                                </div>
+                                <p class="mt-1 text-[11px] text-slate-600">{{ $why }}</p>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+
+                {{-- ============ NEW: Topical Gaps ============ --}}
+                <h3 id="wp-topical-gaps" class="scroll-mt-24">Topical gaps vs the top SERP</h3>
+                <p>Manual trigger inside the SEO tab. EBQ scrapes the top-5 ranking pages for your focus keyword, asks the model to extract subtopics from each side, and returns the missing ones with competitor source links. The "where do I expand my draft?" answer in 15 seconds.</p>
+                <div class="not-prose my-6 rounded-2xl border border-rose-200 bg-rose-50/40 p-5 shadow-sm">
+                    <div class="mb-3 grid grid-cols-3 gap-3 text-center">
+                        <div class="rounded bg-white p-2"><div class="text-xl font-extrabold text-emerald-700">8</div><div class="text-[10px] text-slate-500">subtopics you cover</div></div>
+                        <div class="rounded bg-white p-2"><div class="text-xl font-extrabold text-rose-600">4</div><div class="text-[10px] text-slate-500">missing vs top 5</div></div>
+                        <div class="rounded bg-white p-2"><div class="text-xl font-extrabold text-slate-700">12</div><div class="text-[10px] text-slate-500">competitor subtopics</div></div>
+                    </div>
+                    <h4 class="text-xs font-bold text-slate-900">Subtopics to add</h4>
+                    <ul class="mt-2 space-y-2 text-xs">
+                        @foreach ([
+                            ['Allergen labeling standards', 'Top 3 ranking competitors devote a section to FDA / EU allergen labels. Adding this answers a buyer-anxiety question that drives bounces.'],
+                            ['Heavy metal lab tests', 'Recurring concern in "people also ask" — competitors all address it; your draft doesn\'t.'],
+                            ['Cost per serving comparison', 'Direct purchase decision factor. Two competitors include calculators / tables.'],
+                        ] as [$topic, $why])
+                            <li class="rounded border border-rose-200 bg-white p-2">
+                                <strong class="text-slate-900">{{ $topic }}</strong>
+                                <p class="mt-1 text-[11px] text-slate-600">{{ $why }}</p>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+
+                {{-- ============ NEW: AI Redirect Matcher ============ --}}
+                <h3 id="wp-redirects-ai" class="scroll-mt-24">AI redirect suggestions from 404 logs</h3>
+                <p>The plugin captures front-end 404s on every page load (filtered for bots, admin, REST). An hourly background job ships them to EBQ where the LLM matches each broken URL to the best replacement page on your site — using your GSC inventory as the candidate list. You review in HQ → Redirects (AI) and apply with one click. The 301 serves immediately from the local rule store.</p>
+                <div class="not-prose my-6 rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
+                    <div class="space-y-3">
+                        @foreach ([
+                            ['/blog/old-vegan-guide', '/blog/vegan-protein-powder-guide', 88, 412, 'Same intent — both target the head query "vegan protein guide". Old slug from a 2023 rewrite.'],
+                            ['/products/protein/discontinued', '/products/protein/category', 76, 87, 'Discontinued SKU — closest replacement is the parent category page.'],
+                            ['/recipes/old-shake', '/recipes/vegan-protein-shake', 92, 28, 'Slug change tracked in GSC. Direct 1:1 match.'],
+                        ] as [$from, $to, $conf, $hits, $why])
+                            @php $tone = $conf >= 80 ? ['ring' => 'green', 'badge' => 'bg-emerald-100 text-emerald-700'] : ($conf >= 50 ? ['ring' => 'amber', 'badge' => 'bg-amber-100 text-amber-700'] : ['ring' => 'red', 'badge' => 'bg-rose-100 text-rose-700']); @endphp
+                            <div class="grid grid-cols-[80px_1fr_auto] items-center gap-4 rounded-lg border border-slate-200 bg-white p-3 shadow-sm" style="border-left: 3px solid {{ $tone['ring'] === 'green' ? '#16a34a' : ($tone['ring'] === 'amber' ? '#d97706' : '#dc2626') }};">
+                                <div class="text-center">
+                                    <div class="relative mx-auto grid h-12 w-12 place-items-center rounded-full" style="background: conic-gradient({{ $tone['ring'] === 'green' ? '#16a34a' : ($tone['ring'] === 'amber' ? '#d97706' : '#dc2626') }} {{ $conf }}%, #f1f5f9 0);">
+                                        <div class="absolute inset-1 rounded-full bg-white"></div>
+                                        <span class="relative text-sm font-extrabold text-slate-900">{{ $conf }}</span>
+                                    </div>
+                                    <div class="mt-1 text-[9px] uppercase tracking-wider text-slate-400">confidence</div>
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                                        <div>
+                                            <div class="text-[9px] uppercase tracking-wider text-slate-400">From</div>
+                                            <code class="block truncate rounded bg-slate-100 px-2 py-1 text-[11px] text-slate-900">{{ $from }}</code>
+                                        </div>
+                                        <span class="text-lg font-bold text-slate-400">→</span>
+                                        <div>
+                                            <div class="text-[9px] uppercase tracking-wider text-slate-400">To (editable)</div>
+                                            <input type="text" value="{{ $to }}" readonly class="block w-full truncate rounded border border-slate-300 bg-white px-2 py-1 font-mono text-[11px] text-slate-900">
+                                        </div>
+                                    </div>
+                                    <p class="mt-2 text-[11px] italic text-slate-500">{{ $why }}</p>
+                                    <div class="mt-1 flex gap-3 text-[10px] text-slate-500">
+                                        <span><strong class="text-slate-900">{{ $hits }}</strong> hits/30d</span>
+                                        <span class="rounded {{ $tone['badge'] }} px-2 py-0.5 font-bold">pending</span>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col gap-1.5">
+                                    <button class="rounded bg-blue-600 px-3 py-1 text-[10px] font-bold text-white">Apply</button>
+                                    <button class="rounded border border-slate-200 bg-white px-3 py-1 text-[10px] font-bold text-slate-700">Reject</button>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <p class="mt-4 text-xs text-slate-600">High-confidence (≥80%) suggestions can be applied in bulk with one click.</p>
+                </div>
+
+                {{-- ============ NEW: Backlink Prospects ============ --}}
+                <h3 id="wp-prospects" class="scroll-mt-24">Backlink prospecting (auto-discovered)</h3>
+                <p>EBQ pulls competitor domains from your recent page audits, finds referring domains that link to your competitors but NOT to you, and ranks them by domain authority. A nightly background job keeps the list fresh — you open the tab in the morning and see new prospects waiting. <strong>No manual competitor entry required.</strong></p>
+                <div class="not-prose my-6 rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
+                    <div class="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+                        <span class="font-semibold">✓</span> Auto-discovered <strong>12 competitors</strong> from your audits → <strong>47 total prospects</strong> (8 new this run).
+                    </div>
+                    <div class="mb-3 flex gap-2 text-[10px]">
+                        @foreach (['new · 8' => true, 'drafted · 3', 'contacted · 2', 'replied · 1', 'converted', 'declined', 'snoozed'] as $key => $val)
+                            @php $label = is_string($key) ? $key : $val; $active = $val === true; @endphp
+                            <span class="rounded-full {{ $active ? 'bg-blue-600 text-white' : 'border border-slate-200 text-slate-600' }} px-2 py-1 font-semibold">{{ $label }}</span>
+                        @endforeach
+                    </div>
+                    <table class="w-full text-xs">
+                        <thead class="border-b border-slate-200 text-left text-[10px] uppercase tracking-wider text-slate-500">
+                            <tr><th class="pb-2">Domain</th><th class="pb-2">DA</th><th class="pb-2">Linked to</th><th class="pb-2">Status</th><th class="pb-2">Action</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach ([
+                                ['plantbasedreviews.com', 78, 'competitor1.com, competitor2.com'],
+                                ['veganmuscle.org', 64, 'competitor1.com'],
+                                ['fitnessjournal.io', 52, 'competitor2.com, competitor3.com'],
+                            ] as [$d, $da, $links])
+                                <tr>
+                                    <td class="py-2"><a class="font-semibold text-blue-700">{{ $d }}</a></td>
+                                    <td class="py-2"><strong>{{ $da }}</strong></td>
+                                    <td class="py-2 text-slate-500">{{ $links }}</td>
+                                    <td class="py-2"><select class="rounded border border-slate-200 bg-white px-1.5 py-0.5 text-[10px]"><option>new</option></select></td>
+                                    <td class="py-2"><button class="rounded bg-purple-600 px-2 py-0.5 text-[10px] font-bold text-white">✨ Draft outreach</button></td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                    <p class="mt-3 text-xs text-slate-600">Click "Draft outreach" → AI writes a personalized 90-word email referencing why they linked to the competitor. <span class="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] font-bold text-purple-700">PRO</span> Status, notes, and drafts persist across sessions — real outreach kanban, not a re-compute tool.</p>
+                </div>
+
+                {{-- ============ NEW: SERP Features ============ --}}
+                <h3 id="wp-serp-features" class="scroll-mt-24">Live SERP features tracking</h3>
+                <p>For every keyword in your Rank Tracker, see which Google features appeared today and whether you OWN any of them (your domain inside the answer box, sitelinks, image pack). 30-day timeline shows feature volatility — anything that comes and goes is an outreach opportunity.</p>
+                <div class="not-prose my-6 rounded-2xl border border-indigo-200 bg-white p-5 shadow-sm">
+                    <div class="mb-4 grid grid-cols-4 gap-3">
+                        @foreach ([
+                            ['68%', 'with answer box', 'good'],
+                            ['54%', 'with PAA', 'good'],
+                            ['32%', 'with image pack', 'warn'],
+                            ['89%', 'any feature', 'good'],
+                        ] as [$pct, $label, $tone])
+                            <div class="rounded-lg border {{ $tone === 'good' ? 'border-emerald-200 bg-emerald-50' : 'border-amber-200 bg-amber-50' }} p-3 text-center">
+                                <div class="text-2xl font-extrabold text-slate-900">{{ $pct }}</div>
+                                <div class="text-[10px] uppercase tracking-wider text-slate-500">{{ $label }}</div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <table class="w-full text-xs">
+                        <thead class="border-b border-slate-200 text-left text-[10px] uppercase tracking-wider text-slate-500">
+                            <tr><th class="pb-2">Keyword</th><th class="pb-2">Features today</th><th class="pb-2">You own</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach ([
+                                ['vegan protein powder', ['Answer Box', 'PAA', 'Images'], ['Answer Box']],
+                                ['plant protein vs whey', ['PAA'], []],
+                                ['best protein bars', ['Images', 'Sitelinks'], ['Images']],
+                            ] as [$kw, $features, $owned])
+                                <tr>
+                                    <td class="py-2 font-semibold">{{ $kw }}</td>
+                                    <td class="py-2">@foreach ($features as $f)<span class="mr-1 rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-semibold text-indigo-800">{{ $f }}</span>@endforeach</td>
+                                    <td class="py-2">@if (count($owned))@foreach ($owned as $f)<span class="mr-1 rounded-full bg-emerald-700 px-2 py-0.5 text-[10px] font-bold text-white">✓ {{ $f }}</span>@endforeach @else <span class="text-slate-400">—</span> @endif</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                {{-- ============ NEW: Network Benchmarks ============ --}}
+                <h3 id="wp-benchmarks" class="scroll-mt-24">Network benchmarks (anonymous)</h3>
+                <p>Compare your site against the entire EBQ network (anonymized aggregate stats, minimum cohort size 5 for privacy). The percentile is the single most useful number on this screen — agencies use it to prove progress to clients without exposing competitor data.</p>
+                <div class="not-prose my-6 rounded-2xl border border-blue-200 bg-white p-5 shadow-sm">
+                    <div class="mb-4 flex items-center gap-4 rounded-xl bg-gradient-to-br from-blue-50 to-indigo-50 p-5">
+                        <div class="text-5xl font-extrabold text-blue-700">73<sup class="text-xl">th</sup></div>
+                        <div>
+                            <div class="text-sm font-semibold text-slate-900">percentile</div>
+                            <p class="mt-1 text-xs text-slate-600">Your site ranks better than <strong>73%</strong> of the 142 sites in the network cohort.</p>
+                        </div>
+                    </div>
+                    <div class="grid gap-3 sm:grid-cols-3">
+                        @foreach ([
+                            ['You', 'border-blue-300 bg-blue-50', [['Avg position', '8.4'], ['Median (p50)', '—'], ['Avg CTR', '4.1%'], ['Queries/30d', '847']]],
+                            ['Network avg', 'border-slate-200', [['Avg position', '14.2'], ['Median (p50)', '12.8'], ['Top 10% (p90)', '5.1'], ['Avg CTR', '2.8%'], ['n=142 sites', '']]],
+                            ['US cohort', 'border-slate-200', [['Avg position', '13.6'], ['Avg CTR', '3.0%'], ['n=87 sites', '']]],
+                        ] as [$label, $cls, $rows])
+                            <div class="rounded-lg border {{ $cls }} bg-white p-3">
+                                <div class="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">{{ $label }}</div>
+                                @foreach ($rows as [$k, $v])
+                                    <div class="flex justify-between py-0.5 text-[11px]"><span class="text-slate-500">{{ $k }}</span><strong class="text-slate-900">{{ $v }}</strong></div>
+                                @endforeach
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- ============ NEW: Topical Authority ============ --}}
+                <h3 id="wp-topical-authority" class="scroll-mt-24">Topical authority map</h3>
+                <p>EBQ clusters your GSC queries into topical groups, scores each by depth × traffic × position, and surfaces gaps. Low-authority high-impression clusters are explicit content opportunities — write a definitive page for them.</p>
+                <div class="not-prose my-6 rounded-2xl border border-amber-200 bg-white p-5 shadow-sm">
+                    <div class="mb-4 rounded-lg border-l-4 border-amber-400 bg-amber-50 p-3">
+                        <h4 class="text-xs font-bold text-amber-900">⚡ Content opportunities</h4>
+                        <ul class="mt-2 space-y-2 text-xs">
+                            <li><strong class="text-slate-900">protein bar reviews</strong><p class="text-slate-600">Cluster averages position 31.2 on 4,200 impressions/90d — write a definitive page targeting "best protein bars" plus 2–3 related queries.</p></li>
+                        </ul>
+                    </div>
+                    <table class="w-full text-xs">
+                        <thead class="border-b border-slate-200 text-left text-[10px] uppercase tracking-wider text-slate-500">
+                            <tr><th class="pb-2">Cluster</th><th class="pb-2">Authority</th><th class="pb-2">Avg pos</th><th class="pb-2">Clicks/90d</th><th class="pb-2">Pages</th></tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach ([
+                                ['vegan protein powder', 84, '3.2', 4180, 6, 'good'],
+                                ['plant protein recipes', 71, '6.8', 2104, 8, 'good'],
+                                ['protein bars 2026', 32, '31.2', 87, 1, 'bad'],
+                            ] as [$label, $score, $pos, $clicks, $pages, $tone])
+                                <tr>
+                                    <td class="py-2 font-semibold">{{ $label }}</td>
+                                    <td class="py-2"><span class="rounded {{ $tone === 'good' ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700' }} px-2 py-0.5 font-bold">{{ $score }}</span></td>
+                                    <td class="py-2 font-mono">{{ $pos }}</td>
+                                    <td class="py-2 font-mono">{{ $clicks }}</td>
+                                    <td class="py-2 font-mono">{{ $pages }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                {{-- ============ NEW: Behind the scenes ============ --}}
+                <h3 id="wp-automatic" class="scroll-mt-24">What happens automatically (no clicks needed)</h3>
+                <div class="not-prose my-6 grid gap-3 sm:grid-cols-2">
+                    @foreach ([
+                        ['🔁', 'Re-audit on post update', 'Edit a post → on next save the live score detects you changed it (compares post_modified to last audit timestamp) and queues a fresh audit. The breakdown auto-refreshes via polling — no manual reload.'],
+                        ['🔗', 'Backlinks sync from Keywords Everywhere', 'Once per month per domain, EBQ pulls fresh backlinks via the Keywords Everywhere API. Universal freshness gate prevents duplicate billing across competitor / own / page-audit code paths.'],
+                        ['🧭', '404 capture + redirect matching', 'Plugin tracks front-end 404s (filtered for bots), ships them hourly to EBQ. AI matches each broken URL to the best replacement on your site. You review + apply in HQ.'],
+                        ['🎯', 'Auto-discover backlink prospects', 'Nightly background job pulls competitor domains from your recent audits, runs prospect-discovery against each, and adds new prospects to your kanban. You wake up to a refreshed outreach list.'],
+                        ['📊', 'Lite-mode editor audits', 'When the live score auto-queues an audit (because you opened a post that was never audited), it runs in lite mode — skips link-checking + competitor SERP fetches. Completes in 15–30s instead of 60–120s.'],
+                        ['⚡', 'Reactive Pro tier sync', 'Upgrade or downgrade in EBQ → next API response in the editor flips the UI within one save. No reconnect required.'],
+                    ] as [$icon, $title, $desc])
+                        <div class="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                            <div class="mb-1 flex items-center gap-2">
+                                <span class="text-lg">{{ $icon }}</span>
+                                <h4 class="text-sm font-semibold text-slate-900">{{ $title }}</h4>
+                            </div>
+                            <p class="text-xs leading-5 text-slate-600">{{ $desc }}</p>
+                        </div>
+                    @endforeach
+                </div>
+
+                {{-- ============ NEW: Pro vs Free ============ --}}
+                <h3 id="wp-pro-vs-free" class="scroll-mt-24">Free vs Pro</h3>
+                <div class="not-prose my-6 overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+                    <table class="w-full text-sm">
+                        <thead class="border-b border-slate-200 bg-slate-50 text-left text-[11px] uppercase tracking-wider text-slate-500">
+                            <tr>
+                                <th class="px-4 py-2.5 font-semibold">Feature</th>
+                                <th class="px-4 py-2.5 text-center font-semibold">Free</th>
+                                <th class="px-4 py-2.5 text-center font-semibold text-purple-700">Pro</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-slate-700">
+                            @foreach ([
+                                ['Live SEO score (13 factors + audit)', '✓', '✓'],
+                                ['Topical gaps vs top 5 SERP', '✓', '✓'],
+                                ['Entity coverage analysis', '✓', '✓'],
+                                ['Editor sidebar + post-list scores', '✓', '✓'],
+                                ['HQ — overview, pages, keywords, insights', '✓', '✓'],
+                                ['Rank Tracker', '✓', '✓'],
+                                ['Live SERP features tracking', '✓', '✓'],
+                                ['Network benchmarks', '✓', '✓'],
+                                ['Topical authority map', '✓', '✓'],
+                                ['AI redirect suggestions from 404s', '✓', '✓'],
+                                ['Backlink prospect discovery + persisted kanban', '✓', '✓'],
+                                ['AI title + meta rewrites', '—', '✓'],
+                                ['AI content brief tab', '—', '✓'],
+                                ['AI outreach email drafting', '—', '✓'],
+                            ] as [$feature, $free, $pro])
+                                <tr class="hover:bg-slate-50">
+                                    <td class="px-4 py-2.5">{{ $feature }}</td>
+                                    <td class="px-4 py-2.5 text-center {{ $free === '—' ? 'text-slate-300' : 'text-emerald-600' }} font-bold">{{ $free }}</td>
+                                    <td class="px-4 py-2.5 text-center {{ $pro === '—' ? 'text-slate-300' : 'text-emerald-600' }} font-bold">{{ $pro }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
                 <h3>Before you hit publish</h3>
                 <div class="not-prose my-6 rounded-xl border border-emerald-200 bg-emerald-50/50 p-5 shadow-sm">
                     <ul class="space-y-2 text-sm text-emerald-900">
-                        <li class="flex items-start gap-2"><span class="mt-0.5">✓</span><span>SEO score is healthy for your target keyword.</span></li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5">✓</span><span>Live SEO score is healthy for your target keyword.</span></li>
                         <li class="flex items-start gap-2"><span class="mt-0.5">✓</span><span>Title and description look good in preview and are not too long.</span></li>
-                        <li class="flex items-start gap-2"><span class="mt-0.5">✓</span><span>No major warnings in Insights tab for this page.</span></li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5">✓</span><span>"Top fixes" factor has no critical items remaining.</span></li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5">✓</span><span>Keyword placement factor confirms focus keyphrase is in title, H1, meta, and body.</span></li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5">✓</span><span>Entity-coverage analysis surfaces no must-add entities.</span></li>
+                        <li class="flex items-start gap-2"><span class="mt-0.5">✓</span><span>Topical gaps panel returns "no gaps found" or you've added the missing subtopics.</span></li>
                         <li class="flex items-start gap-2"><span class="mt-0.5">✓</span><span>Canonical and robots settings match the page purpose.</span></li>
                     </ul>
                 </div>
