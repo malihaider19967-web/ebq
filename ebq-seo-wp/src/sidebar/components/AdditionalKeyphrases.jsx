@@ -44,15 +44,10 @@ export default function AdditionalKeyphrases({ value, onChange, onShowRelated, r
 
 	return (
 		<div className="ebq-additional">
-			<div className="ebq-row ebq-row--between" style={{ marginBottom: 2 }}>
-				<span className="ebq-text-xs ebq-text-soft">
-					{__('Additional keyphrases', 'ebq-seo')}
-					<span className="ebq-text-faint" style={{ marginLeft: 4 }}>
-						({list.length})
-					</span>
-				</span>
-			</div>
-
+			{/* Inline header dropped — the parent Section title now reads
+			    "Add additional keyphrases to expand topical coverage", so a
+			    second "Additional keyphrases (N)" label here was redundant.
+			    The row count is implicit from the visible inputs. */}
 			{list.map((kw, idx) => {
 				const trimmed = (kw || '').trim();
 				const canShowRelated = !!onShowRelated && relatedAvailable;

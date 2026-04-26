@@ -67,7 +67,7 @@ export default function BriefTab() {
 					>
 						<a
 							className="ebq-btn ebq-btn--primary ebq-btn--sm"
-							href={cfg.appBase ? `${cfg.appBase}/billing` : '#'}
+							href={cfg.appBase ? `${cfg.appBase}/settings` : '#'}
 							target="_blank"
 							rel="noopener noreferrer"
 						>

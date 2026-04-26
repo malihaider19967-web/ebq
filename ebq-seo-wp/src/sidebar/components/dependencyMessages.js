@@ -38,7 +38,7 @@ export function liveScoreUnavailable(reason, cfg) {
 				feature: t('Live SEO score', 'Live SEO score'),
 				why: t('Google Search Console hasn\'t recorded any impressions for this URL yet.', 'Google Search Console hasn\'t recorded any impressions for this URL yet.'),
 				fix: t('Make sure Search Console is connected to your EBQ workspace and the page is indexed. New pages typically appear in GSC 3–7 days after Google first crawls them.', 'Make sure Search Console is connected to your EBQ workspace and the page is indexed. New pages typically appear in GSC 3–7 days after Google first crawls them.'),
-				action: cfg.appBase ? { label: t('Check Search Console connection', 'Check Search Console connection'), url: cfg.appBase + '/settings/integrations' } : null,
+				action: cfg.appBase ? { label: t('Open EBQ settings', 'Open EBQ settings'), url: cfg.appBase + '/settings' } : null,
 				tone: 'info',
 			};
 	}
@@ -66,7 +66,7 @@ export function topicalGapsUnavailable(reason, cfg) {
 				feature: t('Topical gaps vs. top SERP', 'Topical gaps vs. top SERP'),
 				why: t('AI gap analysis isn\'t configured on this EBQ workspace.', 'AI gap analysis isn\'t configured on this EBQ workspace.'),
 				fix: t('Ask your EBQ admin to add an LLM API key in EBQ → Settings → AI integrations.', 'Ask your EBQ admin to add an LLM API key in EBQ → Settings → AI integrations.'),
-				action: cfg.appBase ? { label: t('Open EBQ settings', 'Open EBQ settings'), url: cfg.appBase + '/settings/integrations' } : null,
+				action: cfg.appBase ? { label: t('Open EBQ settings', 'Open EBQ settings'), url: cfg.appBase + '/settings' } : null,
 				tone: 'warn',
 			};
 		case 'no_serp_data':
@@ -101,7 +101,7 @@ export function entityCoverageUnavailable(reason, cfg) {
 				feature: t('Entity coverage (E-E-A-T)', 'Entity coverage (E-E-A-T)'),
 				why: t('We need a completed page audit for this URL to compare your entities against competitors\'.', 'We need a completed page audit for this URL to compare your entities against competitors\'.'),
 				fix: t('Trigger an audit from EBQ HQ → Page Audits for this page (the editor\'s auto-audit runs in lite mode and skips the competitor SERP fetch this analysis needs).', 'Trigger an audit from EBQ HQ → Page Audits for this page (the editor\'s auto-audit runs in lite mode and skips the competitor SERP fetch this analysis needs).'),
-				action: cfg.appBase ? { label: t('Open Page Audits in EBQ', 'Open Page Audits in EBQ'), url: cfg.appBase + '/page-audits' } : null,
+				action: cfg.appBase ? { label: t('Open Page Audits in EBQ', 'Open Page Audits in EBQ'), url: cfg.appBase + '/custom-audit' } : null,
 				tone: 'info',
 			};
 		case 'no_body_text':
@@ -109,7 +109,7 @@ export function entityCoverageUnavailable(reason, cfg) {
 				feature: t('Entity coverage (E-E-A-T)', 'Entity coverage (E-E-A-T)'),
 				why: t('The audit on file has no extracted body text — possibly because the page was empty when audited or the audit fetched a redirect/blocked response.', 'The audit on file has no extracted body text — possibly because the page was empty when audited or the audit fetched a redirect/blocked response.'),
 				fix: t('Re-run the audit from EBQ HQ → Page Audits after the page has real content live.', 'Re-run the audit from EBQ HQ → Page Audits after the page has real content live.'),
-				action: cfg.appBase ? { label: t('Open Page Audits in EBQ', 'Open Page Audits in EBQ'), url: cfg.appBase + '/page-audits' } : null,
+				action: cfg.appBase ? { label: t('Open Page Audits in EBQ', 'Open Page Audits in EBQ'), url: cfg.appBase + '/custom-audit' } : null,
 				tone: 'warn',
 			};
 		case 'llm_not_configured':
@@ -117,7 +117,7 @@ export function entityCoverageUnavailable(reason, cfg) {
 				feature: t('Entity coverage (E-E-A-T)', 'Entity coverage (E-E-A-T)'),
 				why: t('AI extraction isn\'t configured on this EBQ workspace.', 'AI extraction isn\'t configured on this EBQ workspace.'),
 				fix: t('Ask your EBQ admin to add an LLM API key in EBQ → Settings → AI integrations.', 'Ask your EBQ admin to add an LLM API key in EBQ → Settings → AI integrations.'),
-				action: cfg.appBase ? { label: t('Open EBQ settings', 'Open EBQ settings'), url: cfg.appBase + '/settings/integrations' } : null,
+				action: cfg.appBase ? { label: t('Open EBQ settings', 'Open EBQ settings'), url: cfg.appBase + '/settings' } : null,
 				tone: 'warn',
 			};
 		case 'llm_parse_failed':

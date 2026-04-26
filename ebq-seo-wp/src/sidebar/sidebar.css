@@ -2287,6 +2287,46 @@
 }
 .ebq-tier-cta a:hover { text-decoration: underline; }
 
+/* Intent picker bar — sits above the rewrite cards in the modal.
+   The user flips angles here without leaving the dialog; the server
+   caches per (post × intent) so flipping is free after the first call. */
+.ebq-ai-intent-bar {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	padding: 10px 12px;
+	margin-bottom: 12px;
+	border-radius: var(--ebq-r-2);
+	background: color-mix(in srgb, var(--ebq-accent) 6%, var(--ebq-bg-subtle));
+	border: 1px solid color-mix(in srgb, var(--ebq-accent) 20%, var(--ebq-border-soft));
+}
+.ebq-ai-intent-bar__label {
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--ebq-text);
+	text-transform: uppercase;
+	letter-spacing: .04em;
+}
+.ebq-ai-intent-bar__select {
+	flex: 1;
+	min-width: 180px;
+	border: 1px solid var(--ebq-border-soft);
+	border-radius: 4px;
+	background: var(--ebq-bg);
+	padding: 4px 8px;
+	font-size: 12px;
+	color: var(--ebq-text);
+}
+.ebq-ai-intent-bar__select:disabled { opacity: .55; cursor: wait; }
+.ebq-ai-intent-bar__desc {
+	flex-basis: 100%;
+	margin: 0;
+	font-size: 11px;
+	color: var(--ebq-text-soft);
+	line-height: 1.4;
+}
+
 .ebq-ai-rewrites { display: flex; flex-direction: column; gap: 10px; }
 .ebq-ai-rewrite {
 	border: 1px solid var(--ebq-border-soft);

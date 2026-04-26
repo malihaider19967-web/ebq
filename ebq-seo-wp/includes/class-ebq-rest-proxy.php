@@ -37,6 +37,7 @@ final class EBQ_Rest_Proxy
         '/ebq/v1/internal-link-suggestions',
         '/ebq/v1/track-keyword',
         '/ebq/v1/rewrite-snippet',
+        '/ebq/v1/rewrite-intents',
         '/ebq/v1/content-brief',
         '/ebq/v1/redirect-suggestions',
         '/ebq/v1/hq/serp-features',
@@ -147,6 +148,12 @@ final class EBQ_Rest_Proxy
             'args' => [
                 'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
             ],
+        ]);
+
+        register_rest_route('ebq/v1', '/rewrite-intents', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'rewrite_intents'],
         ]);
 
         register_rest_route('ebq/v1', '/content-brief/(?P<id>\d+)', [
@@ -646,10 +653,17 @@ final class EBQ_Rest_Proxy
             (string) ($body['current_title'] ?? ''),
             (string) ($body['current_meta'] ?? ''),
             (string) ($body['content_excerpt'] ?? ''),
-            is_array($body['competitor_titles'] ?? null) ? $body['competitor_titles'] : []
+            is_array($body['competitor_titles'] ?? null) ? $body['competitor_titles'] : [],
+            (string) ($body['intent'] ?? '')
         );
 
         return new WP_REST_Response($payload, 200);
+    }
+
+    /** Intent registry passthrough — drives the rewrite picker UI. */
+    public function rewrite_intents(WP_REST_Request $request): WP_REST_Response
+    {
+        return new WP_REST_Response(EBQ_Plugin::api_client()->ai_rewrite_intents(), 200);
     }
 
     /**

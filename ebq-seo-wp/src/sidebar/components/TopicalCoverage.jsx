@@ -2,7 +2,7 @@ import { __, sprintf } from '@wordpress/i18n';
 import { useMemo, Fragment } from '@wordpress/element';
 
 import { IconCheck, IconCross } from './icons';
-import { Section, EmptyState, Pill } from './primitives';
+import { Section, NeedsSetup, Pill } from './primitives';
 import { IconSparkle } from './icons';
 import { containsPhrase, htmlToPlain, firstParagraph, extractHeadings, extractImages } from '../analysis/text';
 
@@ -65,10 +65,11 @@ export default function TopicalCoverage({ focusKeyword, additional, postTitle, s
 	if (phrases.length === 0) {
 		return (
 			<Section title={__('Topical coverage', 'ebq-seo')} icon={<IconSparkle />}>
-				<EmptyState
-					icon={<IconSparkle />}
-					title={__('Add additional keyphrases to expand topical coverage', 'ebq-seo')}
-					sub={__('Each one factors into the overall SEO score. Title and H1 are reserved for the focus keyphrase — additional ones score on body, subheadings, intro, and image alt.', 'ebq-seo')}
+				<NeedsSetup
+					feature={__('Topical coverage', 'ebq-seo')}
+					why={__('Add additional keyphrases to expand topical coverage. Each one factors into the overall SEO score — title and H1 are reserved for the focus keyphrase, additional ones score on body, subheadings, intro, and image alt.', 'ebq-seo')}
+					fix={__('Add at least one additional keyphrase in the section above, then come back here.', 'ebq-seo')}
+					tone="info"
 				/>
 			</Section>
 		);

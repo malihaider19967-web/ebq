@@ -1,7 +1,7 @@
 import { __, sprintf } from '@wordpress/i18n';
 import { useMemo, useState } from '@wordpress/element';
 
-import { Section, TextField, TextArea, CharGauge, ScoreBadge, EmptyState, Pill, Button } from '../components/primitives';
+import { Section, TextField, TextArea, CharGauge, ScoreBadge, EmptyState, Pill, Button, NeedsSetup } from '../components/primitives';
 import { IconSearch, IconChart, IconSparkle } from '../components/icons';
 import SnippetPreview from '../components/SnippetPreview';
 import AssessmentList from '../components/AssessmentList';
@@ -32,6 +32,11 @@ export default function SeoTab() {
 	// tier. So upgrading in EBQ flips the editor UI without a reload.
 	const tier = useTier();
 	const [previewMode, setPreviewMode] = useState('desktop');
+	// Live-score dependency-blocked state. LiveSeoScore forwards its
+	// NeedsSetup card via onSetupChange so we can render it OUTSIDE the
+	// score-stack (full-width row below) — keeping the live + offline
+	// score badges the same height in the matched-pair top row.
+	const [liveSetup, setLiveSetup] = useState(null);
 	// `relatedTarget` doubles as the open/closed flag: null when closed,
 	// `{ kind: 'focus' | 'additional', index?: number, keyword: string }`
 	// when the modal is open. The kind decides which post-meta slot a
@@ -103,8 +108,19 @@ export default function SeoTab() {
 					postId={ctx.postId}
 					focusKeyword={focusKeyword}
 					isConnected={cfg.isConnected}
+					onSetupChange={setLiveSetup}
 				/>
 			</div>
+
+			{liveSetup ? (
+				<NeedsSetup
+					feature={liveSetup.feature}
+					why={liveSetup.why}
+					fix={liveSetup.fix}
+					action={liveSetup.action}
+					tone={liveSetup.tone}
+				/>
+			) : null}
 
 			<Section title={__('Focus keyphrase', 'ebq-seo')} icon={<IconChart />}>
 				<KeyphraseInput
@@ -133,12 +149,24 @@ export default function SeoTab() {
 			</Section>
 
 			<Section title={__('Additional keyphrases', 'ebq-seo')} icon={<IconSparkle />}>
-				<AdditionalKeyphrases
-					value={additionalRaw}
-					onChange={(v) => set('_ebq_additional_keywords', v)}
-					relatedAvailable={!!focusKeyword && focusKeyword.trim().length >= 3}
-					onShowRelated={(index) => setRelatedTarget({ kind: 'additional', index, keyword: focusKeyword })}
-				/>
+				<p className="ebq-help" style={{ marginTop: 0 }}>
+					{__('Add additional keyphrases to expand topical coverage. Each one factors into the overall SEO score — title and H1 are reserved for the focus keyphrase, additional ones score on body, subheadings, intro, and image alt.', 'ebq-seo')}
+				</p>
+				{(!focusKeyword || focusKeyword.trim().length < 2) ? (
+					<NeedsSetup
+						feature={__('Additional keyphrases', 'ebq-seo')}
+						why={__('A focus keyphrase is required first — additional keyphrases are scored alongside it (on body copy, subheadings, intro paragraph, and image alt text), not instead of it.', 'ebq-seo')}
+						fix={__('Set the focus keyphrase in the section above, then come back here to add supporting keyphrases.', 'ebq-seo')}
+						tone="info"
+					/>
+				) : (
+					<AdditionalKeyphrases
+						value={additionalRaw}
+						onChange={(v) => set('_ebq_additional_keywords', v)}
+						relatedAvailable={!!focusKeyword && focusKeyword.trim().length >= 3}
+						onShowRelated={(index) => setRelatedTarget({ kind: 'additional', index, keyword: focusKeyword })}
+					/>
+				)}
 			</Section>
 
 			<Section
@@ -217,7 +245,7 @@ export default function SeoTab() {
 							<IconSparkle />{' '}
 							{__('AI title + meta rewrites are on Pro.', 'ebq-seo')}{' '}
 							<a
-								href={cfg.appBase ? `${cfg.appBase}/billing` : '#'}
+								href={cfg.appBase ? `${cfg.appBase}/settings` : '#'}
 								target="_blank"
 								rel="noopener noreferrer"
 							>

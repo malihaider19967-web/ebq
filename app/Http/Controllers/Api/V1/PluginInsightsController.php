@@ -355,6 +355,14 @@ class PluginInsightsController extends Controller
             ], 402);
         }
 
+        // Build the intent whitelist dynamically from the service's
+        // registry — single source of truth so adding a new intent only
+        // requires editing the service.
+        $intentKeys = array_merge(
+            [\App\Services\AiSnippetRewriterService::INTENT_AUTO],
+            \App\Services\AiSnippetRewriterService::intentKeys(),
+        );
+
         $data = $request->validate([
             'focus_keyword' => 'required|string|min:2|max:200',
             'current_title' => 'nullable|string|max:200',
@@ -362,6 +370,7 @@ class PluginInsightsController extends Controller
             'content_excerpt' => 'required|string|min:50|max:8000',
             'competitor_titles' => 'nullable|array|max:5',
             'competitor_titles.*' => 'string|max:200',
+            'intent' => 'nullable|string|in:' . implode(',', $intentKeys),
         ]);
 
         $payload = $service->rewrite((int) $externalPostId, [
@@ -370,6 +379,7 @@ class PluginInsightsController extends Controller
             'current_meta' => $data['current_meta'] ?? '',
             'content_excerpt' => $data['content_excerpt'],
             'competitor_titles' => $data['competitor_titles'] ?? [],
+            'intent' => $data['intent'] ?? \App\Services\AiSnippetRewriterService::INTENT_AUTO,
         ]);
 
         return response()->json([
@@ -377,6 +387,28 @@ class PluginInsightsController extends Controller
             'tier' => $website->tier,
             'rewrite' => $payload,
         ]);
+    }
+
+    /**
+     * Lightweight registry of available AI snippet rewrite intents.
+     * Powers the picker UI in the editor sidebar — single source of
+     * truth so new intents added to the service auto-appear in the UI.
+     *   GET /api/v1/posts/rewrite-intents
+     */
+    public function rewriteIntents(): JsonResponse
+    {
+        $registry = \App\Services\AiSnippetRewriterService::INTENTS;
+        $intents = [
+            ['key' => \App\Services\AiSnippetRewriterService::INTENT_AUTO, 'label' => 'Auto · 3 angles', 'desc' => 'Let the model pick three different angles for you.'],
+        ];
+        foreach ($registry as $key => $meta) {
+            $intents[] = [
+                'key'   => $key,
+                'label' => $meta['label'],
+                'desc'  => $meta['desc'],
+            ];
+        }
+        return response()->json(['intents' => $intents]);
     }
 
     /**

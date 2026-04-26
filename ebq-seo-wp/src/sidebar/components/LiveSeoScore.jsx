@@ -27,7 +27,7 @@ import { publicConfig } from '../hooks/useEditorContext';
 // editor. Audit-side: editor-triggered audits run in lite mode (~15–30s).
 const POLL_INTERVAL_MS = 6000;
 
-export default function LiveSeoScore({ postId, focusKeyword, isConnected }) {
+export default function LiveSeoScore({ postId, focusKeyword, isConnected, onSetupChange }) {
 	const [state, setState] = useState({ status: 'idle', data: null, error: null });
 	const [open, setOpen] = useState(false);
 	const debounceRef = useRef(null);
@@ -182,6 +182,20 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected }) {
 	const setRef = (el) => { anchorRef.current = el; };
 	const isAuditPending = auditStatus === 'queued' || auditStatus === 'running' || auditStatus === 'refreshing';
 
+	// Forward the setup card to the parent (SeoTab) so it can render
+	// below the score-stack as a full-width row. We deliberately don't
+	// render it inside this component's wrapper because the wrapper is
+	// a flex item in the score-stack — adding content here makes the
+	// live card taller than the offline card, which breaks the matched-
+	// pair design contract.
+	useEffect(() => {
+		if (typeof onSetupChange === 'function') {
+			onSetupChange(setupCard || null);
+		}
+		// We intentionally serialize setupCard to a stable key so React
+		// doesn't re-fire the callback on every render with the same data.
+	}, [onSetupChange, setupCard?.feature, setupCard?.why, setupCard?.tone]);
+
 	return (
 		<>
 			<div ref={setRef} style={{ width: '100%', position: 'relative' }}>
@@ -196,15 +210,11 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected }) {
 					ariaExpanded={open}
 					trailing={isAuditPending ? <span className="ebq-spinner" aria-hidden /> : null}
 				/>
-				{setupCard ? (
-					<NeedsSetup
-						feature={setupCard.feature}
-						why={setupCard.why}
-						fix={setupCard.fix}
-						action={setupCard.action}
-						tone={setupCard.tone}
-					/>
-				) : null}
+				{/* NeedsSetup renders OUTSIDE the score-stack flex item — see
+				    the useEffect below, which forwards setupCard to the parent
+				    via onSetupChange. Keeping it inside this wrapper made the
+				    live cell taller than the offline cell, breaking the
+				    "matched-pair" visual contract those two cards have. */}
 			</div>
 
 			{open && data && data.available !== false ? createPortal(

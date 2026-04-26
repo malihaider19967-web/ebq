@@ -1,4 +1,4 @@
-import { useState, useCallback } from '@wordpress/element';
+import { useState, useCallback, useEffect, useRef } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
 import { Button } from './primitives';
@@ -6,22 +6,19 @@ import { IconSparkle } from './icons';
 import Modal from './Modal';
 
 /**
- * "Improve with AI" — Pro-tier-only action that asks EBQ for 3 ranked
- * title + meta-description rewrites with rationales. Each rewrite shows
- * the angle (commercial / informational / curiosity / etc.) so the user
- * can pick by intent, not just by which one looks shiniest.
+ * "Improve with AI" — Pro-tier-only action.
  *
- * Tier gating
- * ───────────
- * The button itself only renders for `tier === 'pro'`. The `<Section>`
- * caller decides whether to show the upsell CTA in its place. This way
- * the editor never has a non-functional button visible.
+ * Two modes:
+ *   - **Auto** (default) — model picks 3 different angles for the user.
+ *     Same behaviour as the original release.
+ *   - **Single intent** — user picks ONE intent from the registry
+ *     (list-based, problem-solution, beginner-friendly, question-based,
+ *     benefit-driven, authority/expert, freshness/updated, use-case
+ *     focused, myth-busting, comparison-with-verdict, plus the original
+ *     5). Backend returns 3 distinct VARIATIONS of that single intent.
  *
- * Cost guard
- * ──────────
- * Server caches per (post × content-hash × keyword × top-3) for 7 days,
- * so re-clicks within a week are free. We surface that to the user
- * explicitly ("cached") so power users learn the behavior.
+ * Per-intent results are cached server-side 7 days, so flipping intents
+ * back and forth is free after the first generation.
  */
 export default function AiRewriteSnippet({
 	postId,
@@ -34,7 +31,16 @@ export default function AiRewriteSnippet({
 	onApplyMeta,
 }) {
 	const [open, setOpen] = useState(false);
+	// `intentsState` holds the registry pulled once on first open. We
+	// don't fetch this until the modal opens to avoid an extra API call
+	// on pages where the user never clicks "Improve with AI".
+	const [intentsState, setIntentsState] = useState({ status: 'idle', list: [] });
+	const [intent, setIntent] = useState('auto');
 	const [state, setState] = useState({ status: 'idle', data: null, error: null });
+	// Track which (intent → result) we've already fetched so re-selecting
+	// an intent shows a fresh-data spinner only the first time per modal
+	// session. Re-clicks within a week hit the server-side 7d cache.
+	const seenIntents = useRef(new Set());
 
 	const canRequest =
 		!!focusKeyword &&
@@ -42,7 +48,7 @@ export default function AiRewriteSnippet({
 		!!contentExcerpt &&
 		String(contentExcerpt).length >= 50;
 
-	const fetchRewrites = useCallback(() => {
+	const fetchRewrites = useCallback((forIntent) => {
 		setState({ status: 'loading', data: null, error: null });
 		apiFetch({
 			path: `/ebq/v1/rewrite-snippet/${postId}`,
@@ -53,6 +59,7 @@ export default function AiRewriteSnippet({
 				current_meta: currentMeta || '',
 				content_excerpt: String(contentExcerpt || '').slice(0, 6000),
 				competitor_titles: (competitorTitles || []).slice(0, 5),
+				intent: forIntent || 'auto',
 			},
 		})
 			.then((res) => {
@@ -65,6 +72,7 @@ export default function AiRewriteSnippet({
 					});
 				} else if (Array.isArray(inner.rewrites) && inner.rewrites.length) {
 					setState({ status: 'ready', data: inner, error: null });
+					seenIntents.current.add(forIntent || 'auto');
 				} else {
 					setState({ status: 'error', data: null, error: 'No rewrites returned' });
 				}
@@ -74,12 +82,43 @@ export default function AiRewriteSnippet({
 			});
 	}, [postId, focusKeyword, currentTitle, currentMeta, contentExcerpt, competitorTitles]);
 
+	// Pull the intent registry once, on first modal open. Cheap call;
+	// its only purpose is keeping the picker labels in sync with the
+	// server-side INTENTS map without hardcoding a copy here.
+	useEffect(() => {
+		if (!open || intentsState.status !== 'idle') return;
+		setIntentsState({ status: 'loading', list: [] });
+		apiFetch({ path: '/ebq/v1/rewrite-intents' })
+			.then((res) => {
+				const list = Array.isArray(res?.intents) ? res.intents : [];
+				setIntentsState({ status: 'ready', list });
+			})
+			.catch(() => {
+				// Fallback: bare 'auto' option so the modal still works
+				// even if the registry call fails (network blip / old
+				// backend). User can still get auto-mode rewrites.
+				setIntentsState({
+					status: 'ready',
+					list: [{ key: 'auto', label: __('Auto · 3 angles', 'ebq-seo'), desc: '' }],
+				});
+			});
+	}, [open, intentsState.status]);
+
 	const handleOpen = () => {
 		setOpen(true);
 		if (state.status === 'idle' || state.status === 'error') {
-			fetchRewrites();
+			fetchRewrites(intent);
 		}
 	};
+
+	const handleIntentChange = (e) => {
+		const next = e.target.value;
+		setIntent(next);
+		fetchRewrites(next);
+	};
+
+	// Build a stable selected-intent description for the helper line.
+	const selectedIntent = intentsState.list.find((i) => i.key === intent);
 
 	return (
 		<>
@@ -92,7 +131,7 @@ export default function AiRewriteSnippet({
 				aria-expanded={open}
 				title={
 					canRequest
-						? __('Generate 3 AI-written title + meta options', 'ebq-seo')
+						? __('Generate AI title + meta options across 15 intents', 'ebq-seo')
 						: __('Set a focus keyphrase + add some content first', 'ebq-seo')
 				}
 			>
@@ -105,10 +144,41 @@ export default function AiRewriteSnippet({
 				title={__('AI snippet rewrites', 'ebq-seo')}
 				size="md"
 			>
+				{/* Intent picker — sits above the rewrites so the user can
+				    flip angles without leaving the modal. Auto stays at top. */}
+				<div className="ebq-ai-intent-bar">
+					<label className="ebq-ai-intent-bar__label" htmlFor="ebq-ai-intent">
+						{__('Intent', 'ebq-seo')}
+					</label>
+					<select
+						id="ebq-ai-intent"
+						className="ebq-ai-intent-bar__select"
+						value={intent}
+						onChange={handleIntentChange}
+						disabled={intentsState.status !== 'ready' || state.status === 'loading'}
+					>
+						{intentsState.list.map((i) => (
+							<option key={i.key} value={i.key} title={i.desc || ''}>
+								{i.label}
+							</option>
+						))}
+					</select>
+					{selectedIntent?.desc && intent !== 'auto' ? (
+						<p className="ebq-ai-intent-bar__desc">{selectedIntent.desc}</p>
+					) : intent === 'auto' && selectedIntent?.desc ? (
+						<p className="ebq-ai-intent-bar__desc">{selectedIntent.desc}</p>
+					) : null}
+				</div>
+
 				{state.status === 'loading' ? (
 					<p className="ebq-help">
 						<span className="ebq-spinner" />{' '}
-						{__('Asking the model for 3 ranked rewrites…', 'ebq-seo')}
+						{intent === 'auto'
+							? __('Asking the model for 3 ranked rewrites…', 'ebq-seo')
+							: sprintf(
+								__('Generating 3 "%s" variations…', 'ebq-seo'),
+								selectedIntent?.label || intent,
+							)}
 					</p>
 				) : null}
 
@@ -117,7 +187,7 @@ export default function AiRewriteSnippet({
 						<p className="ebq-help" style={{ color: 'var(--ebq-bad-text)' }}>
 							{state.error}
 						</p>
-						<Button size="sm" onClick={fetchRewrites}>
+						<Button size="sm" onClick={() => fetchRewrites(intent)}>
 							{__('Retry', 'ebq-seo')}
 						</Button>
 					</>

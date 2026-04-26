@@ -32,6 +32,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/posts/{externalPostId}/rewrite-snippet', [PluginInsightsController::class, 'rewriteSnippet'])
             ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
             ->name('api.v1.posts.rewrite-snippet');
+        Route::get('/posts/rewrite-intents', [PluginInsightsController::class, 'rewriteIntents'])
+            ->name('api.v1.posts.rewrite-intents');
         Route::post('/posts/{externalPostId}/content-brief', [PluginInsightsController::class, 'contentBrief'])
             ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
             ->name('api.v1.posts.content-brief');

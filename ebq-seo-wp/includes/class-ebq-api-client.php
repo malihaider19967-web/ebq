@@ -123,7 +123,7 @@ final class EBQ_Api_Client
      * ranked title + meta rewrites with rationales, or a 402-tier_required
      * payload that the plugin renders as an upgrade CTA.
      */
-    public function ai_rewrite_snippet(string $post_id, string $focus_keyword, string $current_title, string $current_meta, string $content_excerpt, array $competitor_titles = []): array
+    public function ai_rewrite_snippet(string $post_id, string $focus_keyword, string $current_title, string $current_meta, string $content_excerpt, array $competitor_titles = [], string $intent = ''): array
     {
         $body = [
             'focus_keyword' => $focus_keyword,
@@ -132,7 +132,16 @@ final class EBQ_Api_Client
             'content_excerpt' => $content_excerpt,
             'competitor_titles' => array_values(array_slice(array_filter(array_map('strval', $competitor_titles)), 0, 5)),
         ];
+        if ($intent !== '') {
+            $body['intent'] = $intent;
+        }
         return $this->request('POST', sprintf('/api/v1/posts/%s/rewrite-snippet', rawurlencode($post_id)), $body);
+    }
+
+    /** Intent registry — used by the picker UI in the editor sidebar. */
+    public function ai_rewrite_intents(): array
+    {
+        return $this->get('/api/v1/posts/rewrite-intents', []);
     }
 
     /**
