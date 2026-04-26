@@ -37,6 +37,9 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/posts/{externalPostId}/content-brief', [PluginInsightsController::class, 'contentBrief'])
             ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
             ->name('api.v1.posts.content-brief');
+        Route::post('/posts/{externalPostId}/ai-writer', [PluginInsightsController::class, 'aiWriter'])
+            ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
+            ->name('api.v1.posts.ai-writer');
         Route::get('/posts/{externalPostId}/entity-coverage', [PluginInsightsController::class, 'entityCoverage'])
             ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
             ->name('api.v1.posts.entity-coverage');

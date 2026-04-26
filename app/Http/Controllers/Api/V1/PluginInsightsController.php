@@ -8,6 +8,7 @@ use App\Models\RedirectSuggestion;
 use App\Models\Website;
 use App\Services\AiContentBriefService;
 use App\Services\AiSnippetRewriterService;
+use App\Services\AiWriterService;
 use App\Services\EntityCoverageService;
 use App\Services\LiveSeoScoreService;
 use App\Services\PluginInsightResolver;
@@ -448,6 +449,94 @@ class PluginInsightsController extends Controller
             'focus_keyword' => $data['focus_keyword'],
             'tier' => $website->tier,
             'brief' => $payload,
+        ]);
+    }
+
+    /**
+     * AI Writer — produces section-level proposals (add / edit / replace)
+     * for a post using whatever inputs are available: existing content,
+     * the AI content brief, and the topical-gap analysis. The user
+     * approves per section in the sidebar and the plugin writes the merged
+     * HTML back via WP core's REST API.
+     *
+     * Pro tier only. Brief + gaps are silently fetched here so the writer
+     * has the richest possible context — both services have their own 7d
+     * caches, so this is cheap on repeat clicks.
+     *
+     *   POST /api/v1/posts/{externalPostId}/ai-writer
+     *   body: { focus_keyword, current_html?, country?, language? }
+     */
+    public function aiWriter(
+        Request $request,
+        string $externalPostId,
+        AiWriterService $writer,
+        AiContentBriefService $briefService,
+        TopicalGapService $gapService,
+    ): JsonResponse {
+        $website = $this->resolveWebsite($request);
+        if (! $website->isPro()) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'tier_required',
+                'tier' => $website->tier,
+                'required_tier' => Website::TIER_PRO,
+                'message' => 'AI Writer is available on Pro. Upgrade to unlock.',
+            ], 402);
+        }
+
+        $data = $request->validate([
+            'focus_keyword' => 'required|string|min:2|max:200',
+            'current_html' => 'nullable|string|max:200000',
+            'country' => 'nullable|string|size:2',
+            'language' => 'nullable|string|min:2|max:10',
+        ]);
+
+        $keyword = (string) $data['focus_keyword'];
+        $currentHtml = (string) ($data['current_html'] ?? '');
+        $country = isset($data['country']) ? (string) $data['country'] : null;
+        $language = isset($data['language']) ? (string) $data['language'] : null;
+
+        // Silent best-effort prefetch. Both services cache for 7d, so this
+        // costs nothing when the user has already opened Brief / Topical
+        // Gaps tabs in this drafting session.
+        $brief = null;
+        try {
+            $briefRes = $briefService->brief($website, (int) $externalPostId, [
+                'focus_keyword' => $keyword,
+                'country' => $country,
+                'language' => $language,
+            ]);
+            if (is_array($briefRes) && ($briefRes['ok'] ?? false) === true && is_array($briefRes['brief'] ?? null)) {
+                $brief = $briefRes['brief'];
+            }
+        } catch (\Throwable $e) {
+            // Silent — writer can proceed without brief.
+        }
+
+        $gaps = null;
+        try {
+            $currentText = trim(strip_tags($currentHtml));
+            if (mb_strlen($currentText) >= 200) {
+                $gapRes = $gapService->analyze($website, $keyword, $currentText, $country, $language);
+                if (is_array($gapRes) && ($gapRes['available'] ?? false) === true) {
+                    $gaps = $gapRes;
+                }
+            }
+        } catch (\Throwable $e) {
+            // Silent.
+        }
+
+        $payload = $writer->draft($website, (int) $externalPostId, [
+            'focus_keyword' => $keyword,
+            'current_html' => $currentHtml,
+            'brief' => $brief,
+            'gaps' => $gaps,
+        ]);
+
+        return response()->json([
+            'external_post_id' => $externalPostId,
+            'tier' => $website->tier,
+            'writer' => $payload,
         ]);
     }
 

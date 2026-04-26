@@ -234,6 +234,15 @@ final class EBQ_Api_Client
         return $this->get(sprintf('/api/v1/posts/%s/entity-coverage', rawurlencode($post_id)), $args);
     }
 
+    public function ai_writer(string $post_id, string $focus_keyword, string $current_html, string $country = '', string $language = ''): array
+    {
+        $body = ['focus_keyword' => $focus_keyword];
+        if ($current_html !== '') $body['current_html'] = $current_html;
+        if ($country !== '')      $body['country']      = $country;
+        if ($language !== '')     $body['language']     = $language;
+        return $this->request('POST', sprintf('/api/v1/posts/%s/ai-writer', rawurlencode($post_id)), $body);
+    }
+
     public function ai_content_brief(string $post_id, string $focus_keyword, string $country = '', string $language = ''): array
     {
         $body = ['focus_keyword' => $focus_keyword];

@@ -39,6 +39,7 @@ final class EBQ_Rest_Proxy
         '/ebq/v1/rewrite-snippet',
         '/ebq/v1/rewrite-intents',
         '/ebq/v1/content-brief',
+        '/ebq/v1/ai-writer',
         '/ebq/v1/redirect-suggestions',
         '/ebq/v1/hq/serp-features',
         '/ebq/v1/hq/benchmarks',
@@ -160,6 +161,15 @@ final class EBQ_Rest_Proxy
             'methods' => 'POST',
             'permission_callback' => [$this, 'can_edit'],
             'callback' => [$this, 'content_brief'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+            ],
+        ]);
+
+        register_rest_route('ebq/v1', '/ai-writer/(?P<id>\d+)', [
+            'methods' => 'POST',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'ai_writer'],
             'args' => [
                 'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
             ],
@@ -669,6 +679,28 @@ final class EBQ_Rest_Proxy
     public function rewrite_intents(WP_REST_Request $request): WP_REST_Response
     {
         return new WP_REST_Response(EBQ_Plugin::api_client()->ai_rewrite_intents(), 200);
+    }
+
+    /**
+     * AI Writer — generates section-level proposals (add/edit/replace) for a
+     * post using whatever inputs are available (existing content + brief +
+     * topical gaps). Pro-tier gated by EBQ.
+     */
+    public function ai_writer(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $body = $request->get_json_params();
+        if (! is_array($body)) $body = $request->get_params();
+
+        $payload = EBQ_Plugin::api_client()->ai_writer(
+            (string) $post_id,
+            (string) ($body['focus_keyword'] ?? ''),
+            (string) ($body['current_html'] ?? ''),
+            (string) ($body['country'] ?? ''),
+            (string) ($body['language'] ?? '')
+        );
+
+        return new WP_REST_Response($payload, 200);
     }
 
     /**
