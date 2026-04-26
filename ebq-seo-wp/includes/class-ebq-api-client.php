@@ -140,6 +140,38 @@ final class EBQ_Api_Client
      * Returns subtopics, recommended word count, schema type, outline,
      * and internal-link targets pulled from this site's GSC footprint.
      */
+    /**
+     * Ship a batch of 404 paths to EBQ for AI-suggested redirect matching.
+     * Called by EBQ_404_Tracker on the hourly cron drain.
+     *
+     * @param  list<array{path: string, hits: int}>  $paths
+     */
+    public function report_404s(array $paths): array
+    {
+        return $this->request('POST', '/api/v1/posts/report-404s', ['paths' => $paths]);
+    }
+
+    /**
+     * Pull the current redirect-suggestion list (pending / applied / rejected).
+     * Used by the HQ admin tab.
+     */
+    public function get_redirect_suggestions(string $status = 'pending'): array
+    {
+        $args = ['status' => $status];
+        return $this->get('/api/v1/redirect-suggestions', $args);
+    }
+
+    /**
+     * Apply or reject a single redirect suggestion. On 'apply' the WP-side
+     * caller should ALSO write the rule into EBQ_Redirects so it's served
+     * locally — the EBQ status flip just records the decision so we won't
+     * re-suggest.
+     */
+    public function decide_redirect_suggestion(int $id, string $action): array
+    {
+        return $this->request('POST', sprintf('/api/v1/redirect-suggestions/%d/decide', $id), ['action' => $action]);
+    }
+
     public function ai_content_brief(string $post_id, string $focus_keyword, string $country = '', string $language = ''): array
     {
         $body = ['focus_keyword' => $focus_keyword];

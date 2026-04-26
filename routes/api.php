@@ -73,6 +73,12 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/insights/{type}', [PluginHqController::class, 'insights'])
                 ->where('type', '[a-z_]+')
                 ->name('insights');
+
+            // Phase 3 — network-effect features
+            Route::get('/serp-features', [PluginHqController::class, 'serpFeatures'])->name('serp-features');
+            Route::post('/backlink-prospects', [PluginHqController::class, 'backlinkProspects'])->name('backlink-prospects');
+            Route::post('/backlink-prospects/draft', [PluginHqController::class, 'backlinkOutreachDraft'])->name('backlink-prospects.draft');
+            Route::get('/benchmarks', [PluginHqController::class, 'crossSiteBenchmarks'])->name('benchmarks');
         });
     });
 });

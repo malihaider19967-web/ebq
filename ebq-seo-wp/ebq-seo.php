@@ -49,6 +49,7 @@ require_once EBQ_SEO_PATH . 'includes/class-ebq-analysis-cache.php';
 // v2.1 — Redirects
 require_once EBQ_SEO_PATH . 'includes/class-ebq-redirects.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-redirects-auto.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-404-tracker.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-redirects-admin.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-redirects-importer.php';
 // Migration tools (Yoast / Rank Math → EBQ post meta + schemas + breadcrumbs)

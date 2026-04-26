@@ -43,6 +43,7 @@ final class EBQ_Plugin
         // v2.1 Redirects
         (new EBQ_Redirects())->register();
         (new EBQ_Redirects_Auto())->register();
+        (new EBQ_404_Tracker())->register();
         (new EBQ_Redirects_Admin())->register();
         (new EBQ_Redirects_Importer())->register();
 

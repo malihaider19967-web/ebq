@@ -8,7 +8,10 @@ use App\Models\PageIndexingStatus;
 use App\Models\RankTrackingKeyword;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
+use App\Services\BacklinkProspectingService;
+use App\Services\CrossSiteBenchmarkService;
 use App\Services\ReportDataService;
+use App\Services\SerpFeatureTrackerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -686,6 +689,80 @@ class PluginHqController extends Controller
             'website_domain' => $website->domain,
             'payload' => $payload,
         ]);
+    }
+
+    /**
+     * Phase 3 #6 — SERP-feature presence timeline for tracked keywords.
+     *   GET /api/v1/hq/serp-features?days=30
+     */
+    public function serpFeatures(Request $request, SerpFeatureTrackerService $service): JsonResponse
+    {
+        $website = $this->website($request);
+        $days = max(1, min(365, (int) $request->query('days', 30)));
+        return response()->json($service->forWebsite($website, $days));
+    }
+
+    /**
+     * Phase 3 #10 — Backlink prospecting. Caller passes competitor
+     * domains (typically pulled from the Pages tab's audit benchmarks).
+     *   POST /api/v1/hq/backlink-prospects
+     *   body: { competitors: ["domain1.com", "domain2.com"] }
+     */
+    public function backlinkProspects(Request $request, BacklinkProspectingService $service): JsonResponse
+    {
+        $website = $this->website($request);
+        $data = $request->validate([
+            'competitors' => 'required|array|min:1|max:20',
+            'competitors.*' => 'string|max:255',
+        ]);
+        return response()->json($service->prospect($website, $data['competitors']));
+    }
+
+    /**
+     * Pro-tier draft outreach for a single prospect.
+     *   POST /api/v1/hq/backlink-prospects/draft
+     *   body: { prospect: {...}, our_page_url, our_page_title, our_page_summary }
+     */
+    public function backlinkOutreachDraft(Request $request, BacklinkProspectingService $service): JsonResponse
+    {
+        $website = $this->website($request);
+        if (! $website->isPro()) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'tier_required',
+                'tier' => $website->tier,
+                'required_tier' => Website::TIER_PRO,
+                'message' => 'AI outreach drafting is on Pro.',
+            ], 402);
+        }
+
+        $data = $request->validate([
+            'prospect' => 'required|array',
+            'prospect.domain' => 'required|string|max:255',
+            'prospect.linked_to' => 'nullable|array',
+            'our_page_url' => 'required|string|max:2048',
+            'our_page_title' => 'nullable|string|max:300',
+            'our_page_summary' => 'nullable|string|max:2000',
+        ]);
+
+        return response()->json($service->draftOutreach($data['prospect'], [
+            'our_page_url' => $data['our_page_url'],
+            'our_page_title' => $data['our_page_title'] ?? '',
+            'our_page_summary' => $data['our_page_summary'] ?? '',
+        ]));
+    }
+
+    /**
+     * Phase 3 #7 — Cross-site anonymized benchmarks. Compares this
+     * site's GSC averages against the global EBQ network cohort and
+     * (optionally) a per-country cohort.
+     *   GET /api/v1/hq/benchmarks?country=us
+     */
+    public function crossSiteBenchmarks(Request $request, CrossSiteBenchmarkService $service): JsonResponse
+    {
+        $website = $this->website($request);
+        $country = (string) $request->query('country', '');
+        return response()->json($service->forWebsite($website, $country !== '' ? $country : null));
     }
 
     /* ─── Helpers ──────────────────────────────────────────── */

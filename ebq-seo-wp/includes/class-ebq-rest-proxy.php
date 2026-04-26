@@ -38,6 +38,7 @@ final class EBQ_Rest_Proxy
         '/ebq/v1/track-keyword',
         '/ebq/v1/rewrite-snippet',
         '/ebq/v1/content-brief',
+        '/ebq/v1/redirect-suggestions',
     ];
 
     public function register(): void
@@ -146,6 +147,21 @@ final class EBQ_Rest_Proxy
             'methods' => 'POST',
             'permission_callback' => [$this, 'can_edit'],
             'callback' => [$this, 'content_brief'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+            ],
+        ]);
+
+        register_rest_route('ebq/v1', '/redirect-suggestions', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'redirect_suggestions_list'],
+        ]);
+
+        register_rest_route('ebq/v1', '/redirect-suggestions/(?P<id>\d+)/decide', [
+            'methods' => 'POST',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'redirect_suggestions_decide'],
             'args' => [
                 'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
             ],
@@ -594,6 +610,56 @@ final class EBQ_Rest_Proxy
             (string) ($body['language'] ?? '')
         );
 
+        return new WP_REST_Response($payload, 200);
+    }
+
+    /**
+     * Pull the EBQ-side redirect suggestion list. Read-only proxy.
+     */
+    public function redirect_suggestions_list(WP_REST_Request $request): WP_REST_Response
+    {
+        $status = (string) ($request->get_param('status') ?: 'pending');
+        $payload = EBQ_Plugin::api_client()->get_redirect_suggestions($status);
+        return new WP_REST_Response($payload, 200);
+    }
+
+    /**
+     * Apply or reject a single suggestion. On 'apply' we ALSO write the
+     * 301 rule into the local EBQ_Redirects store so it serves immediately
+     * — the EBQ status flip just records the user's decision so the
+     * matcher won't re-suggest.
+     */
+    public function redirect_suggestions_decide(WP_REST_Request $request): WP_REST_Response
+    {
+        $id = (int) $request->get_param('id');
+        $body = $request->get_json_params();
+        if (! is_array($body)) $body = $request->get_params();
+        $action = (string) ($body['action'] ?? '');
+        if (! in_array($action, ['apply', 'reject'], true)) {
+            return new WP_REST_Response(['ok' => false, 'error' => 'invalid_action'], 400);
+        }
+
+        // For 'apply' the client passes the source + destination paths so
+        // we can write the local rule. We trust client values because the
+        // route is already capability-gated to manage_options.
+        if ($action === 'apply' && class_exists('EBQ_Redirects')) {
+            $source = (string) ($body['source_path'] ?? '');
+            $destination = (string) ($body['suggested_destination'] ?? '');
+            if ($source !== '' && $destination !== '') {
+                $redirects = new EBQ_Redirects();
+                if ($redirects->find_by_source($source) === null) {
+                    $redirects->upsert([
+                        'source' => $source,
+                        'target' => $destination,
+                        'type' => EBQ_Redirects::TYPE_301,
+                        'regex' => false,
+                        'notes' => __('Created from EBQ AI redirect suggestion.', 'ebq-seo'),
+                    ]);
+                }
+            }
+        }
+
+        $payload = EBQ_Plugin::api_client()->decide_redirect_suggestion($id, $action);
         return new WP_REST_Response($payload, 200);
     }
 
