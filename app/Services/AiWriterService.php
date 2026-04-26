@@ -120,11 +120,14 @@ class AiWriterService
         //      brief.suggested_schema_type, content-derived FAQPage
         //      when Q&A pairs exist, plus auto-emitted informational
         //      entries (Organization, WebSite, WebPage, BreadcrumbList).
+        // v14: strict-mode count rule rewritten to use the UNION of
+        //      outline + subtopics + paa + gap as input list, so
+        //      outline-origin picks aren't silently excluded from N.
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
         $cacheKey = sprintf(
-            'ai_writer_v13:%d:%d:%s:%s:%s:%s:%d:%d:%s',
+            'ai_writer_v14:%d:%d:%s:%s:%s:%s:%d:%d:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -190,6 +193,46 @@ class AiWriterService
                     'website_id' => $website->id,
                     'post_id' => $postId,
                     'dropped' => $dropped,
+                ]);
+            }
+
+            // Diagnostics: did the model actually produce N sections?
+            // Compute the expected N (union of outline + subtopics + paa
+            // + gap missing) and warn if the add-section count doesn't
+            // match. The frontend already shows the inputs, so a
+            // mismatch is recoverable by Regenerate; we just log so the
+            // root cause is visible.
+            $unionSeen = [];
+            $countItems = static function (array $list) use (&$unionSeen): void {
+                foreach ($list as $v) {
+                    if (! is_string($v)) {
+                        continue;
+                    }
+                    $k = mb_strtolower(trim($v));
+                    if ($k !== '') {
+                        $unionSeen[$k] = true;
+                    }
+                }
+            };
+            $countItems((array) ($brief['suggested_outline'] ?? []));
+            $countItems((array) ($brief['subtopics'] ?? []));
+            $countItems((array) ($brief['people_also_ask'] ?? []));
+            foreach ((array) ($gaps['missing'] ?? []) as $m) {
+                if (is_array($m) && is_string($m['topic'] ?? null)) {
+                    $k = mb_strtolower(trim($m['topic']));
+                    if ($k !== '') {
+                        $unionSeen[$k] = true;
+                    }
+                }
+            }
+            $expectedN = count($unionSeen);
+            $addCount = count(array_filter($sections, static fn (array $s) => ($s['kind'] ?? '') === 'add'));
+            if ($expectedN > 0 && $addCount !== $expectedN) {
+                Log::info('AiWriterService: strict-mode section count mismatch', [
+                    'website_id' => $website->id,
+                    'post_id' => $postId,
+                    'expected_N' => $expectedN,
+                    'got_add_sections' => $addCount,
                 ]);
             }
         }
@@ -397,7 +440,7 @@ again in at least one <h2> within the first three sections.
 %SCARCITY_FALLBACK%
 SYS;
         $sectionCountRule = $strictSelection
-            ? "STRICT-SELECTION MODE — the user curated their inputs in a prior step. Follow these rules exactly:\n  (1) Count N = total items in the brief's `subtopics` + `people_also_ask` arrays + the gap analysis's `missing` array. (Do NOT count `must_have_entities`, `top_serp_titles`, or internal_links — those are CONTEXT, not section drivers.)\n  (2) Generate EXACTLY N sections of kind=\"add\", one per input item, in input order. Each section's <h2> uses or closely paraphrases its source item.\n  (3) NEVER use kind=\"replace\" in strict mode, EVEN WHEN THE POST IS EMPTY. Always emit N add sections instead.\n  (4) Do NOT invent new topics, do NOT pad with extra sections, do NOT split an input into multiple sections, do NOT merge two inputs into one section. One input → one section.\n  (5) Optionally append `edit` sections for weak passages of the existing post (improvements). These do NOT count toward N and are extra, not substitutes."
+            ? "STRICT-SELECTION MODE — the user curated their inputs in a prior step. Follow these rules exactly:\n  (1) Build the INPUT LIST as the case-insensitive UNION of all items in: `suggested_outline` + `subtopics` + `people_also_ask` + the gap analysis's `missing` array. Deduplicate so the same string never appears twice. Call its size N.\n      (Do NOT count `must_have_entities`, `top_serp_titles`, or internal_links — those are CONTEXT for prose, not section drivers.)\n  (2) Generate EXACTLY N sections of kind=\"add\", one per item in the input list, in this order: outline first, then subtopics, then people_also_ask, then gap topics. Each section's <h2> uses or closely paraphrases its source item.\n  (3) NEVER use kind=\"replace\" in strict mode, EVEN WHEN THE POST IS EMPTY. Always emit N add sections instead.\n  (4) Do NOT invent new topics, do NOT pad with extra sections, do NOT split an input into multiple sections, do NOT merge two inputs into one section. One input → one section.\n  (5) Optionally append `edit` sections for weak passages of the existing post (improvements). These do NOT count toward N and are extra, not substitutes.\n  (6) Verify before emitting: the number of `add` sections in your output must equal N exactly. If you produce N-1 or N+1, the response is invalid."
             : 'BETWEEN 12 AND 20 sections. Coverage is the point — produce one section per brief subtopic, one per topical gap, and one per "people also ask" question. Combining is allowed only when two inputs cover the same ground; otherwise each gets its own section. Returning fewer than 12 sections when richer inputs are available is a failure of the task.';
 
         $linkFallbackRule = $strictSelection
