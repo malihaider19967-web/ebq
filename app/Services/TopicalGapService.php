@@ -71,12 +71,22 @@ class TopicalGapService
         // We DELIBERATELY don't use Cache::remember here: that would cache
         // the failure tuple too (`available=false, reason=llm_parse_failed`,
         // etc.), pinning a transient error for 7 days even after the
-        // upstream issue clears. Instead: read the cache; on miss compute;
-        // only persist on success. Re-clicks during the failure window now
-        // actually retry instead of returning the bad cached result.
+        // upstream issue clears.
+        //
+        // Read-side: ALSO skip cached failures even if they exist. This
+        // matters because the previous version of this service used
+        // Cache::remember and persisted failures — those poisoned entries
+        // are still in cache for up to 7 days after the deploy. Treating a
+        // cached `available=false` as a miss makes the live retry path
+        // self-healing without requiring a manual cache flush.
         $cached = Cache::get($cacheKey);
-        if (is_array($cached)) {
+        if (is_array($cached) && ($cached['available'] ?? false) === true) {
             return $cached;
+        }
+        if (is_array($cached) && ($cached['available'] ?? false) === false) {
+            // Evict the poisoned entry so subsequent calls don't keep
+            // reading + discarding it on every request.
+            Cache::forget($cacheKey);
         }
 
         $result = $this->compute($website, $kw, $contentText, $country, $language);
