@@ -41,6 +41,9 @@ export default function AiWriterTab() {
 	// signal at different granularity. We track origin per item so the
 	// writer prompt still receives both buckets populated downstream.
 	const [pick, setPick] = useState({ h1: '', h1Mode: 'suggested', topics: {}, paa: {}, gap_topics: {}, competitor_subtopics: {} });
+	// Editable item lists — lifted out of `plan` so the user can rewrite
+	// individual suggestions inline before generation.
+	const [lists, setLists] = useState({ topics: [], paa: [], gap_topics: [], competitor_subtopics: [] });
 	const [data, setData] = useState(null); // writer response
 	// Per-section approval state, keyed by section.id. true = approved.
 	const [approved, setApproved] = useState({});
@@ -77,13 +80,29 @@ export default function AiWriterTab() {
 					inner.brief?.suggested_h2_outline,
 					inner.brief?.subtopics,
 				);
+				const seenAfterTopics = new Set(mergedTopics.map(normTopic));
+				const dropDup = (arr) => (Array.isArray(arr) ? arr.filter((v) => {
+					const k = normTopic(v);
+					if (!k || seenAfterTopics.has(k)) return false;
+					seenAfterTopics.add(k);
+					return true;
+				}) : []);
+				const paaList = dropDup(inner.brief?.people_also_ask);
+				const gapTopicsList = dropDup(inner.gaps?.missing_subtopics);
+				const competitorList = dropDup(inner.gaps?.competitor_subtopics);
+				setLists({
+					topics: mergedTopics,
+					paa: paaList,
+					gap_topics: gapTopicsList,
+					competitor_subtopics: competitorList,
+				});
 				setPick({
 					h1: (inner.brief?.suggested_h1 || ''),
 					h1Mode: 'suggested',
 					topics: tickAll(mergedTopics),
-					paa: tickAll(inner.brief?.people_also_ask),
-					gap_topics: tickAll(inner.gaps?.missing_subtopics),
-					competitor_subtopics: tickAll(inner.gaps?.competitor_subtopics),
+					paa: tickAll(paaList),
+					gap_topics: tickAll(gapTopicsList),
+					competitor_subtopics: tickAll(competitorList),
 				});
 				setStep('selecting');
 			})
@@ -226,7 +245,7 @@ export default function AiWriterTab() {
 	const goBackToSelection = () => { setStep('selecting'); };
 
 	return (
-		<div className="ebq-stack">
+		<div className="ebq-stack ebq-aiw">
 			<Section
 				title={__('AI Writer', 'ebq-seo')}
 				icon={<IconSparkle />}
@@ -235,76 +254,80 @@ export default function AiWriterTab() {
 				) : null}
 			>
 				{step === 'idle' ? (
-					<>
-						<p className="ebq-help" style={{ marginTop: 0 }}>
-							{__('Step 1: pull your content brief and the topical-gap analysis. Then pick which suggestions you want the writer to use. Step 2: review section-level proposals and approve.', 'ebq-seo')}
+					<div className="ebq-aiw-hero">
+						<p className="ebq-aiw-hero__title">
+							<IconSparkle /> {__('Draft from your brief + SERP gaps', 'ebq-seo')}
 						</p>
-						<Button variant="primary" onClick={fetchPlan}>
-							<IconSparkle /> {__('Get suggestions', 'ebq-seo')}
-						</Button>
-					</>
+						<p className="ebq-aiw-hero__sub">
+							{__('Step 1: load your content brief and topical-gap analysis. Pick what you want the writer to use. Step 2: review section proposals and approve the ones you like.', 'ebq-seo')}
+						</p>
+						<div className="ebq-aiw-hero__cta">
+							<Button variant="primary" onClick={fetchPlan}>
+								<IconSparkle /> {__('Get suggestions', 'ebq-seo')}
+							</Button>
+						</div>
+					</div>
 				) : null}
 
 				{step === 'planning' ? (
-					<p className="ebq-help">
-						<span className="ebq-spinner" />{' '}
+					<div className="ebq-aiw-loading">
+						<span className="ebq-spinner" />
 						{__('Loading brief + topical gaps…', 'ebq-seo')}
-					</p>
+					</div>
 				) : null}
 
 				{step === 'plan-error' ? (
-					<>
-						<p className="ebq-help" style={{ color: 'var(--ebq-bad-text)' }}>{planError}</p>
-						<Button size="sm" onClick={fetchPlan}>{__('Retry', 'ebq-seo')}</Button>
-					</>
+					<div className="ebq-aiw-error">
+						<div>{planError}</div>
+						<div className="ebq-aiw-error__actions">
+							<Button size="sm" onClick={fetchPlan}>{__('Retry', 'ebq-seo')}</Button>
+						</div>
+					</div>
 				) : null}
 
 				{step === 'selecting' && plan ? (
-					<SelectionPanel plan={plan} pick={pick} setPick={setPick} onGenerate={generate} />
+					<SelectionPanel
+						plan={plan}
+						lists={lists}
+						setLists={setLists}
+						pick={pick}
+						setPick={setPick}
+						onGenerate={generate}
+					/>
 				) : null}
 
 				{step === 'generating' ? (
-					<p className="ebq-help">
-						<span className="ebq-spinner" />{' '}
+					<div className="ebq-aiw-loading">
+						<span className="ebq-spinner" />
 						{__('Drafting proposals from your selection…', 'ebq-seo')}
-					</p>
+					</div>
 				) : null}
 
 				{step === 'gen-error' ? (
-					<>
-						<p className="ebq-help" style={{ color: 'var(--ebq-bad-text)' }}>{genError}</p>
-						<div className="ebq-row" style={{ display: 'flex', gap: 6 }}>
+					<div className="ebq-aiw-error">
+						<div>{genError}</div>
+						<div className="ebq-aiw-error__actions">
 							<Button size="sm" variant="primary" onClick={generate}>{__('Retry', 'ebq-seo')}</Button>
 							<Button size="sm" variant="ghost" onClick={goBackToSelection}>{__('Back to selection', 'ebq-seo')}</Button>
 						</div>
-					</>
+					</div>
 				) : null}
 
 				{step === 'ready' && data ? (
 					<>
 						{data.summary ? (
-							<p className="ebq-help" style={{ marginTop: 0 }}>{data.summary}</p>
+							<p className="ebq-aiw-summary">{data.summary}</p>
 						) : null}
 
 						<DiagnosticsRow diag={data.diagnostics} />
 
-						<div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
+						<div className="ebq-aiw-toolbar">
 							<SourcesUsedRow used={data.sources_used} />
-							<div style={{ flex: 1 }} />
-							<Button
-								size="sm"
-								variant="ghost"
-								onClick={() => handleAll(true)}
-								disabled={allApproved}
-							>
+							<div className="ebq-aiw-toolbar__spacer" />
+							<Button size="sm" variant="ghost" onClick={() => handleAll(true)} disabled={allApproved}>
 								{__('Approve all', 'ebq-seo')}
 							</Button>
-							<Button
-								size="sm"
-								variant="ghost"
-								onClick={() => handleAll(false)}
-								disabled={noneApproved}
-							>
+							<Button size="sm" variant="ghost" onClick={() => handleAll(false)} disabled={noneApproved}>
 								{__('Reject all', 'ebq-seo')}
 							</Button>
 						</div>
@@ -318,7 +341,7 @@ export default function AiWriterTab() {
 							/>
 						))}
 
-						<div className="ebq-row" style={{ marginTop: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+						<div className="ebq-aiw-apply">
 							<Button
 								variant="primary"
 								onClick={handleApply}
@@ -329,16 +352,13 @@ export default function AiWriterTab() {
 									: sprintf(__('Apply %d approved section(s)', 'ebq-seo'), approvedSections.length)}
 							</Button>
 							{applyState.message ? (
-								<span
-									className="ebq-text-xs"
-									style={{ color: applyState.status === 'error' ? 'var(--ebq-bad-text)' : 'var(--ebq-good-text)' }}
-								>
+								<span className={`ebq-aiw-apply__msg ${applyState.status === 'error' ? 'ebq-aiw-apply__msg--bad' : 'ebq-aiw-apply__msg--good'}`}>
 									{applyState.message}
 								</span>
 							) : null}
 						</div>
 						{data.cached ? (
-							<p className="ebq-help" style={{ marginTop: 8, marginBottom: 0 }}>
+							<p className="ebq-aiw-apply__cached">
 								{__('Cached for 24h — re-clicks within today are free.', 'ebq-seo')}
 							</p>
 						) : null}
@@ -351,35 +371,47 @@ export default function AiWriterTab() {
 
 /* ────────────────── selection panel ──────────────────────── */
 
-function SelectionPanel({ plan, pick, setPick, onGenerate }) {
+function SelectionPanel({ plan, lists, setLists, pick, setPick, onGenerate }) {
 	const briefAvail = !!plan?.brief?.available;
 	const gapsAvail = !!plan?.gaps?.available;
 
-	// Dedupe across groups so the user doesn't see the same string twice.
-	// `topics` (H2 outline + subtopics, merged) is built first; PAA / gaps
-	// are then filtered against the topics seen-set so a PAA that's also
-	// a topic shows only in the topics group.
-	const seen = new Set();
-	const dedup = (list) => {
-		if (!Array.isArray(list)) return [];
-		return list.filter((item) => {
-			const k = normTopic(item);
-			if (!k || seen.has(k)) return false;
-			seen.add(k);
-			return true;
-		});
-	};
-	const mergedTopics = mergeTopics(plan?.brief?.suggested_h2_outline, plan?.brief?.subtopics);
-	mergedTopics.forEach((t) => seen.add(normTopic(t)));
-	const dedupedPaa = dedup(plan?.brief?.people_also_ask);
-	const dedupedGapMissing = dedup(plan?.gaps?.missing_subtopics);
-	const dedupedGapCompetitor = dedup(plan?.gaps?.competitor_subtopics);
+	// Items now come from `lists` (lifted state, editable). Dedupe is
+	// already done in fetchPlan; the lists arrive non-overlapping.
+	const mergedTopics = lists.topics || [];
+	const dedupedPaa = lists.paa || [];
+	const dedupedGapMissing = lists.gap_topics || [];
+	const dedupedGapCompetitor = lists.competitor_subtopics || [];
 
 	const toggle = (group, key) => {
 		setPick((p) => ({ ...p, [group]: { ...p[group], [key]: !p[group]?.[key] } }));
 	};
 	const setAll = (group, items, val) => {
 		setPick((p) => ({ ...p, [group]: Object.fromEntries((items || []).map((k) => [k, val])) }));
+	};
+
+	// Inline rename: swap `oldVal` for `newVal` in the items list AND
+	// remap the picks map so the new key carries forward the prior
+	// approval. Skip if the new value is empty / unchanged / would
+	// duplicate an existing item in the same group.
+	const renameItem = (group, oldVal, newVal) => {
+		const next = String(newVal || '').trim();
+		if (!next || next === oldVal) return;
+		const list = Array.isArray(lists[group]) ? lists[group] : [];
+		const lowerNext = normTopic(next);
+		const conflict = list.some((v) => v !== oldVal && normTopic(v) === lowerNext);
+		if (conflict) return;
+		setLists((s) => ({
+			...s,
+			[group]: (s[group] || []).map((v) => (v === oldVal ? next : v)),
+		}));
+		setPick((p) => {
+			const cur = p[group] || {};
+			const wasOn = cur[oldVal];
+			const nextPicks = { ...cur };
+			delete nextPicks[oldVal];
+			nextPicks[next] = wasOn === undefined ? true : wasOn;
+			return { ...p, [group]: nextPicks };
+		});
 	};
 
 	const totalPicked =
@@ -390,9 +422,9 @@ function SelectionPanel({ plan, pick, setPick, onGenerate }) {
 		Object.values(pick.competitor_subtopics || {}).filter(Boolean).length;
 
 	return (
-		<div className="ebq-stack" style={{ gap: 14 }}>
+		<div className="ebq-aiw-groups">
 			{!briefAvail && !gapsAvail ? (
-				<p className="ebq-help">
+				<p className="ebq-aiw-empty">
 					{__('No brief or gaps data available — try generating those tabs first, or just click Generate to let the writer work from your existing post.', 'ebq-seo')}
 				</p>
 			) : null}
@@ -401,60 +433,65 @@ function SelectionPanel({ plan, pick, setPick, onGenerate }) {
 				<>
 					{plan.brief.suggested_h1 ? (
 						<SelectionGroup title={__('H1 (page title in body)', 'ebq-seo')}>
-							<label className="ebq-text-xs" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-								<input
-									type="radio"
-									checked={pick.h1Mode === 'suggested'}
-									onChange={() => setPick((p) => ({ ...p, h1Mode: 'suggested', h1: plan.brief.suggested_h1 }))}
-								/>
-								<span><strong>{plan.brief.suggested_h1}</strong> <span className="ebq-text-soft">— {__('suggested', 'ebq-seo')}</span></span>
-							</label>
-							<label className="ebq-text-xs" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-								<input
-									type="radio"
-									checked={pick.h1Mode === 'custom'}
-									onChange={() => setPick((p) => ({ ...p, h1Mode: 'custom' }))}
-								/>
-								<input
-									type="text"
-									className="ebq-input"
-									placeholder={__('Custom H1…', 'ebq-seo')}
-									value={pick.h1Mode === 'custom' ? pick.h1 : ''}
-									onFocus={() => setPick((p) => ({ ...p, h1Mode: 'custom' }))}
-									onChange={(e) => setPick((p) => ({ ...p, h1Mode: 'custom', h1: e.target.value }))}
-									style={{ flex: 1 }}
-								/>
-							</label>
-							<label className="ebq-text-xs" style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
-								<input
-									type="radio"
-									checked={pick.h1Mode === 'none'}
-									onChange={() => setPick((p) => ({ ...p, h1Mode: 'none' }))}
-								/>
-								<span>{__('Don\'t add an H1', 'ebq-seo')}</span>
-							</label>
+							<div className="ebq-aiw-h1">
+								<label className="ebq-aiw-h1__option ebq-aiw-h1__option--suggested">
+									<input
+										type="radio"
+										checked={pick.h1Mode === 'suggested'}
+										onChange={() => setPick((p) => ({ ...p, h1Mode: 'suggested', h1: plan.brief.suggested_h1 }))}
+									/>
+									<strong>{plan.brief.suggested_h1}</strong>
+									<span className="ebq-aiw-h1__option-tag">{__('suggested', 'ebq-seo')}</span>
+								</label>
+								<label className="ebq-aiw-h1__option">
+									<input
+										type="radio"
+										checked={pick.h1Mode === 'custom'}
+										onChange={() => setPick((p) => ({ ...p, h1Mode: 'custom' }))}
+									/>
+									<input
+										type="text"
+										className="ebq-aiw-h1__custom"
+										placeholder={__('Write a custom H1…', 'ebq-seo')}
+										value={pick.h1Mode === 'custom' ? pick.h1 : ''}
+										onFocus={() => setPick((p) => ({ ...p, h1Mode: 'custom' }))}
+										onChange={(e) => setPick((p) => ({ ...p, h1Mode: 'custom', h1: e.target.value }))}
+									/>
+								</label>
+								<label className="ebq-aiw-h1__option">
+									<input
+										type="radio"
+										checked={pick.h1Mode === 'none'}
+										onChange={() => setPick((p) => ({ ...p, h1Mode: 'none' }))}
+									/>
+									<span>{__("Don't add an H1", 'ebq-seo')}</span>
+								</label>
+							</div>
 						</SelectionGroup>
 					) : null}
 
 					<SelectionGroup
 						title={__('Topics to cover', 'ebq-seo')}
-						hint={__('Merged from your brief\'s suggested H2 outline and subtopics. Order is the suggested narrative flow.', 'ebq-seo')}
+						hint={__('Merged from your brief\'s suggested H2 outline and subtopics. Click any item to edit it before generation.', 'ebq-seo')}
 						items={mergedTopics}
 						picks={pick.topics}
 						onToggle={(k) => toggle('topics', k)}
 						onAll={(val) => setAll('topics', mergedTopics, val)}
+						onEdit={(oldVal, newVal) => renameItem('topics', oldVal, newVal)}
 					/>
 
 					<SelectionGroup
 						title={__('People also ask', 'ebq-seo')}
+						hint={__('Click any question to edit it.', 'ebq-seo')}
 						items={dedupedPaa}
 						picks={pick.paa}
 						onToggle={(k) => toggle('paa', k)}
 						onAll={(val) => setAll('paa', dedupedPaa, val)}
+						onEdit={(oldVal, newVal) => renameItem('paa', oldVal, newVal)}
 					/>
 				</>
 			) : (
-				<p className="ebq-help" style={{ margin: 0 }}>{__('Brief unavailable for this keyword.', 'ebq-seo')}</p>
+				<p className="ebq-aiw-empty">{__('Brief unavailable for this keyword.', 'ebq-seo')}</p>
 			)}
 
 			{gapsAvail ? (
@@ -476,16 +513,16 @@ function SelectionPanel({ plan, pick, setPick, onGenerate }) {
 					/>
 				</>
 			) : (
-				<p className="ebq-help" style={{ margin: 0 }}>
+				<p className="ebq-aiw-empty">
 					{__('Topical-gaps unavailable — needs ≥200 chars of existing content to compare against the SERP.', 'ebq-seo')}
 				</p>
 			)}
 
-			<div className="ebq-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginTop: 4 }}>
+			<div className="ebq-aiw-generate">
 				<Button variant="primary" onClick={onGenerate}>
 					<IconSparkle /> {sprintf(__('Generate from %d selection(s)', 'ebq-seo'), totalPicked)}
 				</Button>
-				<span className="ebq-text-xs ebq-text-soft">
+				<span className="ebq-aiw-generate__hint">
 					{__('The writer will also propose improvements to existing content.', 'ebq-seo')}
 				</span>
 			</div>
@@ -493,12 +530,14 @@ function SelectionPanel({ plan, pick, setPick, onGenerate }) {
 	);
 }
 
-function SelectionGroup({ title, hint, items, picks, onToggle, onAll, children }) {
+function SelectionGroup({ title, hint, items, picks, onToggle, onAll, onEdit, children }) {
 	const list = Array.isArray(items) ? items : [];
 	if (children) {
 		return (
-			<fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
-				<legend className="ebq-text-xs" style={{ fontWeight: 600, marginBottom: 4 }}>{title}</legend>
+			<fieldset className="ebq-aiw-group">
+				<div className="ebq-aiw-group__head">
+					<span className="ebq-aiw-group__title">{title}</span>
+				</div>
 				{children}
 			</fieldset>
 		);
@@ -506,32 +545,92 @@ function SelectionGroup({ title, hint, items, picks, onToggle, onAll, children }
 	if (list.length === 0) return null;
 	const tickedCount = Object.values(picks || {}).filter(Boolean).length;
 	return (
-		<fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
-			<legend className="ebq-text-xs" style={{ fontWeight: 600, marginBottom: 4 }}>
-				{title} <span className="ebq-text-soft">({tickedCount}/{list.length})</span>
-			</legend>
-			{hint ? (
-				<p className="ebq-text-xs ebq-text-soft" style={{ margin: '0 0 6px', fontSize: 11 }}>{hint}</p>
-			) : null}
-			<div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
-				<button type="button" className="ebq-link" onClick={() => onAll(true)}>{__('All', 'ebq-seo')}</button>
-				<span className="ebq-text-soft">·</span>
-				<button type="button" className="ebq-link" onClick={() => onAll(false)}>{__('None', 'ebq-seo')}</button>
+		<fieldset className="ebq-aiw-group">
+			<div className="ebq-aiw-group__head">
+				<span className="ebq-aiw-group__title">{title}</span>
+				<span className="ebq-aiw-group__count">{tickedCount}/{list.length}</span>
+				{onAll ? (
+					<span className="ebq-aiw-group__bulk">
+						<button type="button" onClick={() => onAll(true)}>{__('All', 'ebq-seo')}</button>
+						<button type="button" onClick={() => onAll(false)}>{__('None', 'ebq-seo')}</button>
+					</span>
+				) : null}
 			</div>
-			<div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+			{hint ? <p className="ebq-aiw-group__hint">{hint}</p> : null}
+			<div>
 				{list.map((item) => (
-					<label key={item} className="ebq-text-xs" style={{ display: 'flex', alignItems: 'flex-start', gap: 6, cursor: 'pointer' }}>
-						<input
-							type="checkbox"
-							checked={!!picks?.[item]}
-							onChange={() => onToggle(item)}
-							style={{ marginTop: 2 }}
-						/>
-						<span>{item}</span>
-					</label>
+					<EditableRow
+						key={item}
+						item={item}
+						checked={!!picks?.[item]}
+						onToggle={() => onToggle(item)}
+						onSave={onEdit ? (next) => onEdit(item, next) : null}
+					/>
 				))}
 			</div>
 		</fieldset>
+	);
+}
+
+/**
+ * One row in a SelectionGroup. Click the text to edit it inline; press
+ * Enter (or click Save) to commit, Escape to cancel. Falls back to a
+ * plain checkbox+label when `onSave` is not provided.
+ */
+function EditableRow({ item, checked, onToggle, onSave }) {
+	const [editing, setEditing] = useState(false);
+	const [draft, setDraft] = useState(item);
+
+	if (!onSave) {
+		return (
+			<label className="ebq-aiw-row">
+				<input type="checkbox" className="ebq-aiw-row__check" checked={checked} onChange={onToggle} />
+				<span className="ebq-aiw-row__text">{item}</span>
+			</label>
+		);
+	}
+
+	if (editing) {
+		const commit = () => {
+			const trimmed = String(draft || '').trim();
+			if (trimmed && trimmed !== item) onSave(trimmed);
+			setEditing(false);
+		};
+		const cancel = () => { setDraft(item); setEditing(false); };
+		return (
+			<div className="ebq-aiw-row">
+				<input type="checkbox" className="ebq-aiw-row__check" checked={checked} onChange={onToggle} />
+				<input
+					type="text"
+					className="ebq-aiw-row__input"
+					value={draft}
+					onChange={(e) => setDraft(e.target.value)}
+					onKeyDown={(e) => {
+						if (e.key === 'Enter') { e.preventDefault(); commit(); }
+						else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+					}}
+					onBlur={commit}
+					autoFocus
+				/>
+			</div>
+		);
+	}
+
+	return (
+		<div className="ebq-aiw-row">
+			<input type="checkbox" className="ebq-aiw-row__check" checked={checked} onChange={onToggle} />
+			<button
+				type="button"
+				className="ebq-aiw-row__text"
+				onClick={() => { setDraft(item); setEditing(true); }}
+				title={__('Click to edit', 'ebq-seo')}
+			>
+				{item}
+			</button>
+			<svg className="ebq-aiw-row__edit-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+				<path d="M11.5 2.5l2 2L5 13H3v-2L11.5 2.5z" />
+			</svg>
+		</div>
 	);
 }
 
@@ -576,11 +675,9 @@ function DiagnosticsRow({ diag }) {
 		};
 	})();
 	return (
-		<div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
-			<span className="ebq-text-xs" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-				<Pill tone={linkRow.tone}>{linkRow.text}</Pill>
-			</span>
-			<span className="ebq-text-xs ebq-text-soft" style={{ fontSize: 11 }}>
+		<div className="ebq-aiw-diag">
+			<Pill tone={linkRow.tone}>{linkRow.text}</Pill>
+			<span className="ebq-aiw-diag__meta">
 				{sprintf(
 					__('Sections: %1$d · PAA available: %2$d · gap topics: %3$d', 'ebq-seo'),
 					diag.sections_returned || 0,
@@ -600,8 +697,8 @@ function SourcesUsedRow({ used }) {
 	if (used.content) tags.push({ key: 'content', label: __('Existing post', 'ebq-seo'), tone: 'good' });
 	if (tags.length === 0) return null;
 	return (
-		<span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11 }}>
-			<span className="ebq-text-soft">{__('Using:', 'ebq-seo')}</span>
+		<span className="ebq-aiw-toolbar__sources">
+			<span className="ebq-aiw-toolbar__sources-label">{__('Using:', 'ebq-seo')}</span>
 			{tags.map((t) => <Pill key={t.key} tone={t.tone}>{t.label}</Pill>)}
 		</span>
 	);
@@ -613,47 +710,27 @@ function SectionProposal({ section, approved, onToggle }) {
 		: section.kind === 'edit'
 			? __('EDIT', 'ebq-seo')
 			: __('REPLACE ALL', 'ebq-seo');
-	const kindTone = section.kind === 'add' ? 'good' : section.kind === 'edit' ? 'warn' : 'bad';
 
 	return (
-		<div
-			style={{
-				border: '1px solid var(--ebq-border, #e5e7eb)',
-				borderRadius: 8,
-				padding: 10,
-				marginBottom: 8,
-				opacity: approved ? 1 : 0.55,
-				background: approved ? 'transparent' : 'rgba(0,0,0,0.02)',
-			}}
-		>
-			<div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+		<div className={`ebq-aiw-section${approved ? '' : ' ebq-aiw-section--rejected'}`}>
+			<div className="ebq-aiw-section__head">
 				<input
 					type="checkbox"
+					className="ebq-aiw-section__check"
 					checked={approved}
 					onChange={onToggle}
-					style={{ marginTop: 3, cursor: 'pointer' }}
 					aria-label={approved ? __('Reject this section', 'ebq-seo') : __('Approve this section', 'ebq-seo')}
 				/>
-				<div style={{ flex: 1, minWidth: 0 }}>
-					<div
-						style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', cursor: 'pointer' }}
-						onClick={onToggle}
-						role="button"
-						tabIndex={0}
-						onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); onToggle(); } }}
-					>
-						<Pill tone={kindTone}>{kindLabel}</Pill>
-						<strong style={{ fontSize: 12 }}>{section.title}</strong>
+				<div className="ebq-aiw-section__body">
+					<div className="ebq-aiw-section__meta">
+						<span className={`ebq-aiw-kind ebq-aiw-kind--${section.kind}`}>{kindLabel}</span>
+						<span className="ebq-aiw-section__title">{section.title}</span>
 						{(section.source_tags || []).map((t) => (
-							<span key={t} className="ebq-text-xs ebq-text-soft" style={{ fontSize: 10 }}>
-								#{t}
-							</span>
+							<span key={t} className="ebq-aiw-section__source-tag">#{t}</span>
 						))}
 					</div>
 					{section.rationale ? (
-						<p className="ebq-text-xs ebq-text-soft" style={{ margin: '4px 0 6px' }}>
-							{section.rationale}
-						</p>
+						<p className="ebq-aiw-section__rationale">{section.rationale}</p>
 					) : null}
 					{section.kind === 'edit' && section.current_html ? (
 						<DiffPair
@@ -673,7 +750,7 @@ function SectionProposal({ section, approved, onToggle }) {
 
 function DiffPair({ leftLabel, leftHtml, rightLabel, rightHtml }) {
 	return (
-		<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginTop: 4 }}>
+		<div className="ebq-aiw-section__diff">
 			<HtmlBlock label={leftLabel} html={leftHtml} tone="bad" />
 			<HtmlBlock label={rightLabel} html={rightHtml} tone="good" />
 		</div>
@@ -681,21 +758,11 @@ function DiffPair({ leftLabel, leftHtml, rightLabel, rightHtml }) {
 }
 
 function HtmlBlock({ label, html, tone }) {
-	const color = tone === 'good' ? 'var(--ebq-good, #16a34a)' : tone === 'bad' ? 'var(--ebq-bad, #dc2626)' : 'var(--ebq-text-soft)';
+	const toneClass = tone === 'good' ? 'ebq-aiw-html--good' : tone === 'bad' ? 'ebq-aiw-html--bad' : '';
 	return (
-		<div
-			style={{
-				border: `1px solid ${color}`,
-				borderRadius: 6,
-				padding: 6,
-				fontSize: 11,
-				maxHeight: 220,
-				overflow: 'auto',
-				background: 'var(--ebq-card, #fff)',
-			}}
-		>
-			<div style={{ fontSize: 10, fontWeight: 600, color, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>{label}</div>
-			<div className="ebq-ai-rendered" dangerouslySetInnerHTML={{ __html: html }} />
+		<div className={`ebq-aiw-html ${toneClass}`}>
+			<div className="ebq-aiw-html__label">{label}</div>
+			<div className="ebq-aiw-html__body" dangerouslySetInnerHTML={{ __html: html }} />
 		</div>
 	);
 }
