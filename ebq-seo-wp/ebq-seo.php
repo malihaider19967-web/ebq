@@ -42,6 +42,7 @@ require_once EBQ_SEO_PATH . 'includes/class-ebq-schema-templates.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-schema-output.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-schema-shortcode.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-hq-page.php';
+require_once EBQ_SEO_PATH . 'includes/class-ebq-aiwriter-page.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-sitemap.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-seo-fields-meta-box.php';
 require_once EBQ_SEO_PATH . 'includes/class-ebq-breadcrumbs.php';

@@ -138,14 +138,15 @@ class AiWriterService
         //      outline + subtopics + paa + gap as input list, so
         //      outline-origin picks aren't silently excluded from N.
         // v15: additional_keywords + title supplied by the standalone
-        //      draft form land in the prompt; cache key includes them
-        //      so different keyword sets produce different generations.
+        //      draft form land in the prompt; cache key includes them.
+        // v16: strict mode now forbids <h1> in any section (per-section
+        //      generation flow was producing duplicate H1s).
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
         $extraHash = substr(hash('sha256', mb_strtolower($title).'|'.implode('|', $additionalKeywords)), 0, 8);
         $cacheKey = sprintf(
-            'ai_writer_v15:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s',
+            'ai_writer_v16:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -214,6 +215,34 @@ class AiWriterService
                     'dropped' => $dropped,
                 ]);
             }
+
+            // Strip <h1>...</h1> blocks from per-section output. The H1 is
+            // the user's Title and is rendered separately; emitting it
+            // inside every generated section was producing duplicate H1s
+            // in the editor canvas. Demote any leading <h1> to <h2>
+            // (so the section still has a heading) and drop subsequent
+            // ones outright.
+            $sections = array_map(static function (array $s): array {
+                $html = (string) ($s['proposed_html'] ?? '');
+                if ($html === '' || stripos($html, '<h1') === false) {
+                    return $s;
+                }
+                // Demote the FIRST <h1>...</h1> to <h2>; remove any others.
+                $promoted = false;
+                $html = preg_replace_callback(
+                    '/<h1\b[^>]*>(.*?)<\/h1>/is',
+                    static function (array $m) use (&$promoted): string {
+                        if (! $promoted) {
+                            $promoted = true;
+                            return '<h2>'.$m[1].'</h2>';
+                        }
+                        return '';
+                    },
+                    $html,
+                ) ?? $html;
+                $s['proposed_html'] = $html;
+                return $s;
+            }, $sections);
 
             // Diagnostics: did the model actually produce N sections?
             // Compute the expected N (union of outline + subtopics + paa
@@ -426,14 +455,7 @@ Output rules (STRICT — non-compliance breaks the consumer):
   Default to <p> + <ul>/<ol>. Reach for the rich elements only when
   the topic genuinely benefits — a forced comparison table is worse
   than three good paragraphs.
-- H1 RULE: the post says HAS_H1=%H1_FLAG%. When HAS_H1=false, the FIRST
-  add (or the replace, if any) MUST start with one <h1> that includes
-  the focus keyword naturally, IMMEDIATELY FOLLOWED by an intro <p>
-  paragraph of 2–4 sentences that previews what the post covers and
-  uses the focus keyword once. Only AFTER that intro paragraph may any
-  <h2> appear. Never place an <h2> directly after an <h1> with no
-  intervening body content. When HAS_H1=true, do NOT introduce another
-  <h1> in any section.
+- H1 RULE: %H1_RULE%
 - HEADING-AFTER-HEADING RULE: at no point should two heading tags
   (<h1>/<h2>/<h3>) appear back-to-back with no body content (<p>,
   <ul>, <ol>) between them. Every heading must be followed by at least
@@ -459,6 +481,16 @@ again in at least one <h2> within the first three sections.
 
 %SCARCITY_FALLBACK%
 SYS;
+        // Per-section calls (strict mode) always have selected — they're
+        // generating ONE section at a time, so emitting an H1 in EVERY
+        // section is the bug we just fixed. Strict mode → never emit
+        // <h1>; the user's Title is rendered as the page H1 separately.
+        $h1Rule = $strictSelection
+            ? 'NEVER emit <h1> in any section — the page H1 is the user-supplied Title and is rendered separately. Each section starts with <h2>.'
+            : ($hasH1
+                ? 'The post already has an <h1>. Do NOT introduce another <h1> in any section.'
+                : 'When the post has no existing <h1>, the FIRST add (or the replace, if any) MUST start with ONE <h1> that includes the focus keyword naturally, IMMEDIATELY FOLLOWED by an intro <p> paragraph of 2–4 sentences. Only after that intro paragraph may any <h2> appear. Never place an <h2> directly after an <h1> with no intervening body content. Subsequent sections must NOT include another <h1>.');
+
         $sectionCountRule = $strictSelection
             ? "STRICT-SELECTION MODE — the user curated their inputs in a prior step. Follow these rules exactly:\n  (1) Build the INPUT LIST as the case-insensitive UNION of all items in: `suggested_outline` + `subtopics` + `people_also_ask` + the gap analysis's `missing` array. Deduplicate so the same string never appears twice. Call its size N.\n      (Do NOT count `must_have_entities`, `top_serp_titles`, or internal_links — those are CONTEXT for prose, not section drivers.)\n  (2) Generate EXACTLY N sections of kind=\"add\", one per item in the input list, in this order: outline first, then subtopics, then people_also_ask, then gap topics. Each section's <h2> uses or closely paraphrases its source item.\n  (3) NEVER use kind=\"replace\" in strict mode, EVEN WHEN THE POST IS EMPTY. Always emit N add sections instead.\n  (4) Do NOT invent new topics, do NOT pad with extra sections, do NOT split an input into multiple sections, do NOT merge two inputs into one section. One input → one section.\n  (5) Optionally append `edit` sections for weak passages of the existing post (improvements). These do NOT count toward N and are extra, not substitutes.\n  (6) Verify before emitting: the number of `add` sections in your output must equal N exactly. If you produce N-1 or N+1, the response is invalid."
             : 'BETWEEN 12 AND 20 sections. Coverage is the point — produce one section per brief subtopic, one per topical gap, and one per "people also ask" question. Combining is allowed only when two inputs cover the same ground; otherwise each gets its own section. Returning fewer than 12 sections when richer inputs are available is a failure of the task.';
@@ -476,8 +508,8 @@ SYS;
             : "INPUT-SCARCITY FALLBACK: when CONTENT BRIEF, TOPICAL GAPS, and CURRENT\nPOST CONTENT are ALL marked \"(none)\" / \"(empty post)\", you still produce\na useful first draft using only the target keyword and any user-curated\nitems in the user message. In that case, return ONE \"replace\" section\nthat scaffolds a complete article: H1 (if not yet on page) → 2–4\nsentence intro paragraph → 6–10 H2 sections covering the keyword's\ntypical search intent (problem → core explanation → how-to / comparison\n→ FAQs → next steps), each followed by 2–4 paragraphs of substantive\nprose. Do NOT refuse — the absence of brief / gaps means richer output\nis impossible, not that no output is.";
 
         $system = str_replace(
-            ['%H1_FLAG%', '%SECTION_COUNT_RULE%', '%LINK_FALLBACK_RULE%', '%REPLACE_RULE%', '%SCARCITY_FALLBACK%'],
-            [$hasH1 ? 'true' : 'false', $sectionCountRule, $linkFallbackRule, $replaceRule, $scarcityFallback],
+            ['%H1_FLAG%', '%H1_RULE%', '%SECTION_COUNT_RULE%', '%LINK_FALLBACK_RULE%', '%REPLACE_RULE%', '%SCARCITY_FALLBACK%'],
+            [$hasH1 ? 'true' : 'false', $h1Rule, $sectionCountRule, $linkFallbackRule, $replaceRule, $scarcityFallback],
             $system,
         );
 

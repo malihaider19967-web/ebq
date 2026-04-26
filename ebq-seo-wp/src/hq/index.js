@@ -9,11 +9,21 @@
 
 import { createRoot } from '@wordpress/element';
 import App from './App';
+import AiWriterStandalone from './AiWriterStandalone';
 import './hq.css';
 
 document.addEventListener('DOMContentLoaded', () => {
-	const mount = document.getElementById('ebq-hq-root');
-	if (!mount) return;
-	const root = createRoot(mount);
-	root.render(<App />);
+	// EBQ HQ — full dashboard with the tab sidebar.
+	const hqMount = document.getElementById('ebq-hq-root');
+	if (hqMount) {
+		createRoot(hqMount).render(<App />);
+	}
+
+	// AI Writer — standalone top-level admin page. Same React bundle,
+	// different mount point so we don't load the AI Writer's TinyMCE
+	// chrome on every HQ pageview.
+	const aiwMount = document.getElementById('ebq-aiwriter-root');
+	if (aiwMount) {
+		createRoot(aiwMount).render(<AiWriterStandalone />);
+	}
 });

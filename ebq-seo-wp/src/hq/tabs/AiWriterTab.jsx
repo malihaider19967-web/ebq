@@ -32,7 +32,11 @@ export default function AiWriterTab() {
 	// State per topic: 'idle' | 'pending' | 'done' | 'error:<message>'
 	const [genState, setGenState] = useState({});
 	const [editorHtml, setEditorHtml] = useState('');
+	// `editorRef` is the underlying <textarea>; once `wp.editor.initialize`
+	// runs, TinyMCE mounts on top and the textarea is read/written via
+	// `wp.editor.getContent` / `tinymce.get(id).setContent`.
 	const editorRef = useRef(null);
+	const editorIdRef = useRef('ebq-aiw-editor-' + Math.random().toString(36).slice(2, 8));
 	const additionalKws = useMemo(
 		() => additionalRaw.split(',').map((s) => s.trim()).filter(Boolean),
 		[additionalRaw],
@@ -42,14 +46,64 @@ export default function AiWriterTab() {
 
 	const canFetchPlan = title.trim().length >= 2 && focusKw.trim().length >= 2;
 
-	// Sync the contentEditable's innerHTML when editorHtml changes from
-	// outside (e.g. a section was generated). Don't fight the user's
-	// direct typing — the editor's onInput updates editorHtml first, so
-	// this effect's update mirrors the same value back and is a no-op.
+	// Mount WordPress's native TinyMCE editor on the textarea. The editor
+	// is the source of truth for content while the page is open — we
+	// only sync `editorHtml` state back from TinyMCE on visible events
+	// (insert / save) instead of on every keystroke.
 	useEffect(() => {
-		if (editorRef.current && editorRef.current.innerHTML !== editorHtml) {
-			editorRef.current.innerHTML = editorHtml;
+		const id = editorIdRef.current;
+		const wpEditor = (typeof window !== 'undefined' && window.wp && window.wp.editor) || null;
+		if (!wpEditor || !editorRef.current) return undefined;
+
+		// Bail if already mounted (React StrictMode double-invokes effects in dev).
+		if (window.tinymce && window.tinymce.get && window.tinymce.get(id)) return undefined;
+
+		wpEditor.initialize(id, {
+			tinymce: {
+				wpautop: true,
+				plugins: 'charmap colorpicker compat3x directionality fullscreen hr image lists media paste tabfocus textcolor wordpress wpautoresize wpdialogs wpeditimage wpemoji wpgallery wplink wptextpattern wpview',
+				toolbar1: 'formatselect bold italic bullist numlist blockquote alignleft aligncenter alignright link unlink wp_more strikethrough hr forecolor pastetext removeformat charmap outdent indent undo redo wp_help',
+				toolbar2: '',
+				height: 520,
+			},
+			quicktags: { buttons: 'strong,em,link,block,del,ins,img,ul,ol,li,code,more,close' },
+			mediaButtons: true,
+		});
+
+		return () => {
+			try { wpEditor.remove(id); } catch (_) { /* may already be torn down */ }
+		};
+	}, []);
+
+	// When `editorHtml` changes from OUTSIDE (a section was just
+	// generated server-side), push the new content into TinyMCE. Skip
+	// when TinyMCE's current content already matches — avoids overwriting
+	// the user's direct typing and prevents cursor jumps.
+	useEffect(() => {
+		const id = editorIdRef.current;
+		const tm = (typeof window !== 'undefined' && window.tinymce) || null;
+		const ed = tm && tm.get ? tm.get(id) : null;
+		if (ed) {
+			const cur = ed.getContent();
+			if (cur !== editorHtml) {
+				ed.setContent(editorHtml);
+				// Mark dirty so the toolbar's autosave logic doesn't think nothing happened.
+				ed.fire('change');
+			}
+		} else if (editorRef.current && editorRef.current.value !== editorHtml) {
+			// Fallback when TinyMCE is in HTML / "Text" tab — just update the textarea.
+			editorRef.current.value = editorHtml;
 		}
+	}, [editorHtml]);
+
+	// Read the live editor content (TinyMCE → textarea fallback).
+	const readEditor = useCallback(() => {
+		const id = editorIdRef.current;
+		const wpEditor = (typeof window !== 'undefined' && window.wp && window.wp.editor) || null;
+		if (wpEditor && typeof wpEditor.getContent === 'function') {
+			try { return wpEditor.getContent(id); } catch (_) { /* fallthrough */ }
+		}
+		return editorRef.current ? editorRef.current.value : editorHtml;
 	}, [editorHtml]);
 
 	const fetchPlan = useCallback(() => {
@@ -112,7 +166,7 @@ export default function AiWriterTab() {
 					focus_keyword: focusKw.trim(),
 					title: title.trim(),
 					additional_keywords: additionalKws,
-					current_html: editorRef.current ? editorRef.current.innerHTML : editorHtml,
+					current_html: readEditor(),
 					selected: {
 						h1: '', // user's title is sent separately; never insert <h1> at this stage
 						h2_outline: [topic],
@@ -141,25 +195,25 @@ export default function AiWriterTab() {
 				setGenState((g) => ({ ...g, [topic]: 'error:' + __('Empty response', 'ebq-seo') }));
 				return;
 			}
-			const live = editorRef.current ? editorRef.current.innerHTML : editorHtml;
+			const live = readEditor();
 			const next = (live.replace(/\s+$/, '') + '\n\n' + String(best.proposed_html).trim()).replace(/^\s+/, '');
 			setEditorHtml(next);
 			setGenState((g) => ({ ...g, [topic]: 'done' }));
 		} catch (err) {
 			setGenState((g) => ({ ...g, [topic]: 'error:' + (err?.message || __('Network error', 'ebq-seo')) }));
 		}
-	}, [focusKw, title, additionalKws, editorHtml]);
+	}, [focusKw, title, additionalKws, readEditor]);
 
 	const insertH1 = () => {
 		if (!title.trim()) return;
-		const live = editorRef.current ? editorRef.current.innerHTML : editorHtml;
+		const live = readEditor();
 		if (/<h1\b/i.test(live)) return; // already there
 		const next = `<h1>${escapeHtml(title.trim())}</h1>\n\n` + live;
 		setEditorHtml(next);
 	};
 
 	const saveDraft = useCallback(async () => {
-		const liveHtml = editorRef.current ? editorRef.current.innerHTML : editorHtml;
+		const liveHtml = readEditor();
 		if (!title.trim()) {
 			setSaveState({ status: 'error', message: __('Title is required.', 'ebq-seo'), postId: 0, editLink: '' });
 			return;
@@ -198,7 +252,7 @@ export default function AiWriterTab() {
 		} catch (err) {
 			setSaveState({ status: 'error', message: err?.message || __('Save failed', 'ebq-seo'), postId: 0, editLink: '' });
 		}
-	}, [title, focusKw, additionalKws, editorHtml]);
+	}, [title, focusKw, additionalKws, readEditor]);
 
 	const restart = () => {
 		setStep('form');
@@ -348,14 +402,24 @@ export default function AiWriterTab() {
 						</Button>
 					</div>
 
-					<div
-						ref={editorRef}
-						className="ebq-aiw-main__editor"
-						contentEditable
-						suppressContentEditableWarning
-						onInput={(e) => setEditorHtml(e.currentTarget.innerHTML)}
-						data-placeholder={__('Generate sections from the left panel — they\'ll land here. You can also type, edit, or delete anything in this editor directly.', 'ebq-seo')}
-					/>
+					{/*
+					  Native WordPress editor mounts on this textarea via
+					  wp.editor.initialize() in the effect above. The
+					  `wp-editor` class lets WP's CSS pick it up before
+					  TinyMCE swaps in the toolbar/iframe.
+					*/}
+					<div className="ebq-aiw-main__editor">
+						<textarea
+							ref={editorRef}
+							id={editorIdRef.current}
+							className="wp-editor-area"
+							defaultValue={editorHtml}
+							onChange={(e) => setEditorHtml(e.target.value)}
+							placeholder={__('Generate sections from the left panel — they\'ll land here. You can also write, edit, or delete anything in this editor directly using the WordPress editor toolbar.', 'ebq-seo')}
+							rows={20}
+							style={{ width: '100%' }}
+						/>
+					</div>
 
 					{saveState.message ? (
 						<div className={`ebq-aiw-main__save ebq-aiw-main__save--${saveState.status}`}>
