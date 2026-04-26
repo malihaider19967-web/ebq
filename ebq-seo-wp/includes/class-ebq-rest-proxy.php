@@ -327,6 +327,11 @@ final class EBQ_Rest_Proxy
             'permission_callback' => [$this, 'can_view_hq'],
             'callback' => [$this, 'hq_index_status'],
         ]);
+        register_rest_route('ebq/v1', '/hq/index-status/submit', [
+            'methods' => 'POST',
+            'permission_callback' => [$this, 'can_view_hq'],
+            'callback' => [$this, 'hq_index_status_submit'],
+        ]);
         register_rest_route('ebq/v1', '/hq/insights/(?P<type>[a-z_]+)', [
             'methods' => 'GET',
             'permission_callback' => [$this, 'can_view_hq'],
@@ -1037,6 +1042,19 @@ final class EBQ_Rest_Proxy
             'search' => (string) ($request->get_param('search') ?: ''),
         ], static fn ($v) => $v !== '' && $v !== 0);
         return $this->hq_response(EBQ_Plugin::api_client()->hq_index_status($args), 200);
+    }
+
+    public function hq_index_status_submit(WP_REST_Request $request): WP_REST_Response
+    {
+        $body = $request->get_json_params();
+        if (! is_array($body)) {
+            $body = $request->get_params();
+        }
+        $url = isset($body['url']) ? trim((string) $body['url']) : '';
+        if ($url === '') {
+            return $this->hq_response(['ok' => false, 'error' => 'missing_url', 'message' => 'URL is required.'], 422);
+        }
+        return $this->hq_response(EBQ_Plugin::api_client()->hq_index_status_submit($url), 200);
     }
 
     public function hq_insights(WP_REST_Request $request): WP_REST_Response

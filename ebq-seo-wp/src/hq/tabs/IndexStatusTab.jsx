@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from '@wordpress/element';
+import { useEffect, useState, useCallback, useRef } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import { Api } from '../api';
 import { Card, ErrorState, Pill } from '../components/primitives';
@@ -19,9 +19,23 @@ export default function IndexStatusTab() {
 	const [meta, setMeta] = useState(null);
 	const [verdictCounts, setVerdictCounts] = useState(null);
 	const [page, setPage] = useState(1);
+	const [searchInput, setSearchInput] = useState('');
 	const [search, setSearch] = useState('');
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState(null);
+	// Per-row submit state, keyed by URL: 'pending' | { kind: 'good'|'bad', message: string }
+	const [submitState, setSubmitState] = useState({});
+	const debounceRef = useRef(null);
+
+	// Debounce search input → query so we don't refetch on every keystroke.
+	useEffect(() => {
+		if (debounceRef.current) clearTimeout(debounceRef.current);
+		debounceRef.current = setTimeout(() => {
+			setSearch(searchInput.trim());
+			setPage(1);
+		}, 300);
+		return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+	}, [searchInput]);
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -40,6 +54,32 @@ export default function IndexStatusTab() {
 
 	useEffect(() => { load(); }, [load]);
 
+	const handleSubmit = useCallback(async (url) => {
+		if (!url) return;
+		setSubmitState((s) => ({ ...s, [url]: 'pending' }));
+		const res = await Api.indexSubmit(url);
+		if (res?.ok === false || res?.error) {
+			setSubmitState((s) => ({
+				...s,
+				[url]: {
+					kind: 'bad',
+					message: res?.message || res?.error || __('Submission failed.', 'ebq-seo'),
+				},
+			}));
+			return;
+		}
+		setRows((prev) => prev.map((r) => r.page === url
+			? { ...r, last_reindex_requested_at: res?.last_reindex_requested_at || new Date().toISOString() }
+			: r));
+		setSubmitState((s) => ({
+			...s,
+			[url]: {
+				kind: 'good',
+				message: res?.message || __('Submitted to Google.', 'ebq-seo'),
+			},
+		}));
+	}, []);
+
 	const segments = verdictCounts ? [
 		{ label: 'Pass', value: verdictCounts.PASS, tone: 'good' },
 		{ label: 'Partial', value: verdictCounts.PARTIAL, tone: 'warn' },
@@ -51,9 +91,19 @@ export default function IndexStatusTab() {
 		{
 			key: 'page',
 			label: __('URL', 'ebq-seo'),
-			render: (row) => (
-				<a href={row.page} target="_blank" rel="noopener noreferrer" className="ebq-hq-pages-url" title={row.page}>{shortUrl(row.page)}</a>
-			),
+			render: (row) => {
+				const state = submitState[row.page];
+				return (
+					<div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+						<a href={row.page} target="_blank" rel="noopener noreferrer" className="ebq-hq-pages-url" title={row.page}>{shortUrl(row.page)}</a>
+						{state && state !== 'pending' ? (
+							<span style={{ fontSize: 11 }}>
+								<Pill tone={state.kind}>{state.message}</Pill>
+							</span>
+						) : null}
+					</div>
+				);
+			},
 		},
 		{
 			key: 'verdict',
@@ -77,6 +127,33 @@ export default function IndexStatusTab() {
 			align: 'right',
 			render: (row) => relTime(row.last_checked_at),
 		},
+		{
+			key: 'actions',
+			label: __('Action', 'ebq-seo'),
+			align: 'right',
+			render: (row) => {
+				const state = submitState[row.page];
+				const pending = state === 'pending';
+				const hasPrior = !!row.last_reindex_requested_at;
+				const label = pending
+					? __('Submitting…', 'ebq-seo')
+					: hasPrior
+						? __('Resubmit', 'ebq-seo')
+						: __('Submit', 'ebq-seo');
+				const title = hasPrior
+					? __('Last submitted: ', 'ebq-seo') + (relTime(row.last_reindex_requested_at) || '—')
+					: __('Submit this URL to the Google Indexing API', 'ebq-seo');
+				return (
+					<button
+						type="button"
+						className="ebq-hq-btn ebq-hq-btn--ghost ebq-hq-btn--sm"
+						disabled={pending}
+						onClick={() => handleSubmit(row.page)}
+						title={title}
+					>{label}</button>
+				);
+			},
+		},
 	];
 
 	return (
@@ -85,9 +162,9 @@ export default function IndexStatusTab() {
 				<h2 className="ebq-hq-page__title">{__('Index Status', 'ebq-seo')}</h2>
 				<input
 					className="ebq-hq-search"
-					placeholder={__('Filter URL…', 'ebq-seo')}
-					value={search}
-					onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+					placeholder={__('Search URL…', 'ebq-seo')}
+					value={searchInput}
+					onChange={(e) => setSearchInput(e.target.value)}
 				/>
 			</div>
 
@@ -130,8 +207,8 @@ export default function IndexStatusTab() {
 						loading={loading}
 						meta={meta}
 						onPage={setPage}
-						emptyTitle={__('No URL Inspection data yet', 'ebq-seo')}
-						emptySub={__('EBQ syncs Google index status nightly. Once synced, results land here.', 'ebq-seo')}
+						emptyTitle={search ? __('No URLs match your search', 'ebq-seo') : __('No URL Inspection data yet', 'ebq-seo')}
+						emptySub={search ? __('Try a different search term, or clear the search to see all URLs.', 'ebq-seo') : __('EBQ syncs Google index status nightly. Once synced, results land here.', 'ebq-seo')}
 					/>
 				)}
 			</Card>

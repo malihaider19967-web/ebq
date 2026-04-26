@@ -337,6 +337,11 @@ final class EBQ_Api_Client
         return $this->get('/api/v1/hq/index-status', $args);
     }
 
+    public function hq_index_status_submit(string $url): array
+    {
+        return $this->request('POST', '/api/v1/hq/index-status/submit', ['url' => $url]);
+    }
+
     public function hq_insights(string $type, int $limit = 25): array
     {
         return $this->get(sprintf('/api/v1/hq/insights/%s', rawurlencode($type)), ['limit' => $limit]);

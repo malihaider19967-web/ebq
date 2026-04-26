@@ -10,12 +10,14 @@ use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Services\BacklinkProspectingService;
 use App\Services\CrossSiteBenchmarkService;
+use App\Services\Google\GoogleClientFactory;
 use App\Services\ReportDataService;
 use App\Services\SerpFeatureTrackerService;
 use App\Services\TopicalAuthorityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\Rule;
 
 /**
@@ -741,6 +743,93 @@ class PluginHqController extends Controller
                 'last_page' => max(1, (int) ceil($total / $perPage)),
                 'status' => $status ?: null,
             ],
+        ]);
+    }
+
+    /**
+     * Submit (or resubmit) a single URL to the Google Indexing API. Mirrors
+     * the EBQ.io Page Detail "Request reindex" button so the WP plugin can
+     * trigger reindex requests without bouncing out to the SaaS UI.
+     *
+     * Authenticates with the website-owner's Google account; the Indexing
+     * API itself caps at ~200 requests / day / project, which Google
+     * enforces — we pass the error through.
+     *
+     *   POST /api/v1/hq/index-status/submit  { "url": "https://..." }
+     */
+    public function indexStatusSubmit(Request $request, GoogleClientFactory $googleClientFactory): JsonResponse
+    {
+        $website = $this->website($request);
+        $url = trim((string) $request->input('url', ''));
+
+        if ($url === '' || ! $website->isAuditUrlForThisSite($url)) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'invalid_url',
+                'message' => 'URL is missing or does not belong to this website.',
+            ], 422);
+        }
+
+        $account = $website->user?->googleAccounts()->latest('id')->first();
+        if (! $account) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'not_connected',
+                'message' => 'Connect a Google account in EBQ.io to submit URLs for indexing.',
+            ], 400);
+        }
+
+        try {
+            $client = $googleClientFactory->make($account);
+            $accessToken = (string) ($client->getAccessToken()['access_token'] ?? '');
+            if ($accessToken === '') {
+                return response()->json([
+                    'ok' => false,
+                    'error' => 'no_access_token',
+                    'message' => 'Google access token is missing — reconnect Google in EBQ.io.',
+                    'needs_google_reconnect' => true,
+                ], 400);
+            }
+        } catch (\Throwable $e) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'token_failed',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+
+        $response = Http::withToken($accessToken)
+            ->acceptJson()
+            ->post('https://indexing.googleapis.com/v3/urlNotifications:publish', [
+                'url' => $url,
+                'type' => 'URL_UPDATED',
+            ]);
+
+        if (! $response->successful()) {
+            $msg = (string) data_get($response->json(), 'error.message', 'Google rejected the request.');
+            $needsReconnect = str_contains(strtolower($msg), 'insufficient');
+
+            return response()->json([
+                'ok' => false,
+                'error' => 'google_error',
+                'message' => $msg,
+                'status' => $response->status(),
+                'needs_google_reconnect' => $needsReconnect,
+            ], 502);
+        }
+
+        $notifyTime = data_get($response->json(), 'urlNotificationMetadata.latestUpdate.notifyTime');
+        $parsed = is_string($notifyTime) ? Carbon::parse($notifyTime) : now();
+
+        PageIndexingStatus::query()->updateOrCreate(
+            ['website_id' => $website->id, 'page' => $url],
+            ['last_reindex_requested_at' => $parsed],
+        );
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Reindex request submitted to Google. Processing is not guaranteed and may take time.',
+            'last_reindex_requested_at' => $parsed->toIso8601String(),
         ]);
     }
 

@@ -69,6 +69,7 @@ export const Api = {
 	recheckKeyword: (id) => request('POST', `/hq/keywords/${id}/recheck`),
 	pages: (params) => request('GET', '/hq/pages', { query: params }),
 	indexStatus: (params) => request('GET', '/hq/index-status', { query: params }),
+	indexSubmit: (url) => request('POST', '/hq/index-status/submit', { body: { url } }),
 	insights: (type, limit = 25) => request('GET', `/hq/insights/${encodeURIComponent(type)}`, { query: { limit } }),
 	iframeUrl: (insight) => request('GET', '/hq/iframe-url', { query: { insight } }),
 };
