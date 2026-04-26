@@ -2,8 +2,10 @@ import { useEffect, useState, useRef, useCallback } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
 import { createPortal } from 'react-dom';
-import { ScoreBadge, CheckCard } from './primitives';
+import { ScoreBadge, CheckCard, NeedsSetup } from './primitives';
 import TrackKeywordButton from './TrackKeywordButton';
+import { liveScoreUnavailable } from './dependencyMessages';
+import { publicConfig } from '../hooks/useEditorContext';
 
 /**
  * EBQ live score card. Mirrors the offline `ScoreBadge` shape so the two
@@ -120,6 +122,7 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected }) {
 		};
 	}, [open]);
 
+	const cfg = publicConfig();
 	const badgeText = __('EBQ', 'ebq-seo');
 	const labelText = __('Live SEO score', 'ebq-seo');
 
@@ -129,18 +132,37 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected }) {
 	let canOpen = false;
 	let data = null;
 	let auditStatus = null;
+	// `setupCard` (when populated) renders a friendly NeedsSetup card
+	// BELOW the score badge with what / why / fix / action — replaces
+	// the previous one-line cryptic caption that said "no GSC data" without
+	// telling the user what to do about it.
+	let setupCard = null;
 
 	if (!isConnected) {
-		caption = __('Connect this site to EBQ for the live score.', 'ebq-seo');
+		caption = __('Connect to see live data', 'ebq-seo');
+		setupCard = {
+			feature: __('Live SEO score', 'ebq-seo'),
+			why: __('This site isn\'t connected to an EBQ workspace yet, so the score has no data to compute from.', 'ebq-seo'),
+			fix: __('Open EBQ SEO settings and click Connect — it\'s a one-click flow, no API keys to copy.', 'ebq-seo'),
+			action: cfg.settingsUrl ? { label: __('Open EBQ SEO settings', 'ebq-seo'), url: cfg.settingsUrl, target: '_top' } : null,
+			tone: 'info',
+		};
 	} else if (state.status === 'loading' || state.status === 'idle') {
 		caption = __('Fetching live signals…', 'ebq-seo');
 	} else if (state.status === 'error') {
-		caption = state.error || __('Live score unavailable.', 'ebq-seo');
+		caption = __('Live score unavailable', 'ebq-seo');
+		setupCard = {
+			feature: __('Live SEO score', 'ebq-seo'),
+			why: state.error || __('We couldn\'t reach EBQ to compute the score.', 'ebq-seo'),
+			fix: __('This is usually a network blip. Reload the editor; if it persists, check that the EBQ connection is still active in plugin settings.', 'ebq-seo'),
+			tone: 'warn',
+		};
 	} else if (state.status === 'ready') {
 		data = state.data;
 		auditStatus = data?.audit?.status || null;
 		if (!data || data.available === false) {
-			caption = data?.explanation || __('No live data yet — waiting on Search Console impressions.', 'ebq-seo');
+			caption = __('No live data yet', 'ebq-seo');
+			setupCard = liveScoreUnavailable(data?.reason || null, cfg);
 		} else {
 			score = Number(data.score) || 0;
 			displayScore = score;
@@ -174,6 +196,15 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected }) {
 					ariaExpanded={open}
 					trailing={isAuditPending ? <span className="ebq-spinner" aria-hidden /> : null}
 				/>
+				{setupCard ? (
+					<NeedsSetup
+						feature={setupCard.feature}
+						why={setupCard.why}
+						fix={setupCard.fix}
+						action={setupCard.action}
+						tone={setupCard.tone}
+					/>
+				) : null}
 			</div>
 
 			{open && data && data.available !== false ? createPortal(

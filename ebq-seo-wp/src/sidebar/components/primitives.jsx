@@ -299,6 +299,59 @@ export function Button({ children, variant = 'ghost', block = false, size = 'md'
 	return <button type="button" className={cls} {...rest}>{children}</button>;
 }
 
+/* ─── NeedsSetup — unified dependency-blocked state ─────────── */
+
+/**
+ * Used by every feature that has a hard precondition (focus keyphrase,
+ * GSC data, completed audit, etc.). Replaces ad-hoc one-line "X is
+ * unavailable" copy with a friendly "what this feature does / why it's
+ * blocked / how to fix / button to take you there" card.
+ *
+ * Design intent: the user should never have to ask "what does this error
+ * mean and what do I do?". Every NeedsSetup tells them.
+ *
+ * Props:
+ *   - feature: short feature name (used in the title)
+ *   - why: one sentence describing the missing dependency in plain terms
+ *   - fix: one sentence describing the concrete next action
+ *   - action (optional): { label, onClick? OR url? } for the CTA button
+ *   - tone: 'info' (default — neutral blue) | 'warn' (something is wrong)
+ *           | 'pending' (background work in progress)
+ *   - icon (optional): override the default icon
+ */
+export function NeedsSetup({ feature, why, fix, action, tone = 'info', icon }) {
+	const cls = `ebq-needs-setup ebq-needs-setup--${tone}`;
+	const button = action ? (
+		action.url ? (
+			<a
+				href={action.url}
+				target={action.target || '_blank'}
+				rel="noopener noreferrer"
+				className="ebq-needs-setup__action"
+			>
+				{action.label} →
+			</a>
+		) : (
+			<button type="button" className="ebq-needs-setup__action" onClick={action.onClick}>
+				{action.label} →
+			</button>
+		)
+	) : null;
+	return (
+		<div className={cls}>
+			<div className="ebq-needs-setup__icon" aria-hidden>
+				{icon || (tone === 'warn' ? <IconWarn /> : tone === 'pending' ? <IconDot /> : <IconSparkle />)}
+			</div>
+			<div className="ebq-needs-setup__body">
+				{feature ? <p className="ebq-needs-setup__feature">{feature}</p> : null}
+				{why ? <p className="ebq-needs-setup__why">{why}</p> : null}
+				{fix ? <p className="ebq-needs-setup__fix">{fix}</p> : null}
+				{button}
+			</div>
+		</div>
+	);
+}
+
 /* ─── Empty / loading ────────────────────────────────────────── */
 
 export function EmptyState({ icon, title, sub, children }) {

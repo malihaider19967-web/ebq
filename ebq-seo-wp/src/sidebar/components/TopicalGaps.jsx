@@ -1,8 +1,10 @@
 import { useState, useCallback } from '@wordpress/element';
 import { __ } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
-import { Section, Button, EmptyState } from './primitives';
+import { Section, Button, EmptyState, NeedsSetup } from './primitives';
 import { IconSparkle } from './icons';
+import { topicalGapsUnavailable } from './dependencyMessages';
+import { publicConfig } from '../hooks/useEditorContext';
 
 /**
  * Topical-coverage gap analysis. Manual trigger (it costs Serper credits
@@ -100,13 +102,17 @@ export default function TopicalGaps({ postId, focusKeyword, content, isConnected
 
 function GapResults({ data }) {
 	if (data.available === false) {
-		const msg = data.reason === 'llm_not_configured' ? __('AI gap analysis is not configured on this EBQ instance.', 'ebq-seo')
-			: data.reason === 'content_too_short' ? __('Add at least 200 characters of content first.', 'ebq-seo')
-			: data.reason === 'missing_focus_keyword' ? __('Set a focus keyphrase first.', 'ebq-seo')
-			: data.reason === 'no_serp_data' ? __('We couldn\'t pull SERP data for that keyword right now.', 'ebq-seo')
-			: data.reason === 'llm_parse_failed' ? __('AI returned malformed output — try re-analyzing.', 'ebq-seo')
-			: __('Gap analysis is unavailable right now.', 'ebq-seo');
-		return <EmptyState title={__('No gap analysis', 'ebq-seo')} sub={msg} />;
+		const cfg = publicConfig();
+		const setup = topicalGapsUnavailable(data.reason || null, cfg);
+		return (
+			<NeedsSetup
+				feature={setup.feature}
+				why={setup.why}
+				fix={setup.fix}
+				action={setup.action}
+				tone={setup.tone}
+			/>
+		);
 	}
 
 	const missing = data.missing || [];

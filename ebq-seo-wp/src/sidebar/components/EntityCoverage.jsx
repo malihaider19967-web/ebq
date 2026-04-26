@@ -1,8 +1,10 @@
 import { useState, useCallback } from '@wordpress/element';
 import { __, sprintf } from '@wordpress/i18n';
 import apiFetch from '@wordpress/api-fetch';
-import { Section, Button, EmptyState, Pill } from './primitives';
+import { Section, Button, EmptyState, Pill, NeedsSetup } from './primitives';
 import { IconSparkle } from './icons';
+import { entityCoverageUnavailable } from './dependencyMessages';
+import { publicConfig } from '../hooks/useEditorContext';
 
 /**
  * Phase 3 #11 — Entity coverage analysis (E-E-A-T signal).
@@ -75,20 +77,24 @@ export default function EntityCoverage({ postId, isConnected }) {
 				<p className="ebq-help"><span className="ebq-spinner" /> {__('Extracting entities… (10–20s)', 'ebq-seo')}</p>
 			) : null}
 
-			{state.status === 'error' ? (
-				<>
-					<p className="ebq-help" style={{ color: 'var(--ebq-bad-text)' }}>
-						{state.error === 'no_audit'
-							? __('No completed audit on file for this URL yet — open the SEO tab to trigger one, then come back.', 'ebq-seo')
-							: state.error === 'llm_not_configured'
-								? __('AI extraction is not configured on this EBQ instance.', 'ebq-seo')
-								: state.error === 'llm_parse_failed'
-									? __('AI returned malformed output — try re-analyzing.', 'ebq-seo')
-									: state.error}
-					</p>
-					<Button size="sm" onClick={analyze}>{__('Retry', 'ebq-seo')}</Button>
-				</>
-			) : null}
+			{state.status === 'error' ? (() => {
+				const cfg = publicConfig();
+				const setup = entityCoverageUnavailable(state.error || null, cfg);
+				return (
+					<>
+						<NeedsSetup
+							feature={setup.feature}
+							why={setup.why}
+							fix={setup.fix}
+							action={setup.action}
+							tone={setup.tone}
+						/>
+						<div style={{ marginTop: 8 }}>
+							<Button size="sm" onClick={analyze}>{__('Retry', 'ebq-seo')}</Button>
+						</div>
+					</>
+				);
+			})() : null}
 
 			{state.status === 'ready' && state.data ? (
 				<div className="ebq-entity-coverage">

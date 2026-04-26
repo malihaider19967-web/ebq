@@ -2422,6 +2422,80 @@
 	margin-top: 2px;
 }
 
+/* NeedsSetup — shared "this feature can't run yet, here's why and how
+   to fix" card. Used by LiveSeoScore, TopicalGaps, EntityCoverage —
+   anywhere a hard precondition is missing. The pattern: clear feature
+   name → why it's blocked in plain language → concrete fix → optional
+   CTA button to take the user there. Replaces ad-hoc one-line errors. */
+.ebq-needs-setup {
+	display: flex;
+	gap: 10px;
+	padding: 10px 12px;
+	margin-top: 8px;
+	border-radius: var(--ebq-r-2);
+	border: 1px solid var(--ebq-border-soft);
+	background: var(--ebq-bg-subtle);
+	border-left-width: 3px;
+}
+.ebq-needs-setup--info {
+	background: color-mix(in srgb, var(--ebq-accent) 5%, var(--ebq-bg-subtle));
+	border-left-color: var(--ebq-accent);
+}
+.ebq-needs-setup--warn {
+	background: color-mix(in srgb, var(--ebq-warn) 8%, var(--ebq-bg-subtle));
+	border-left-color: var(--ebq-warn);
+}
+.ebq-needs-setup--pending {
+	background: color-mix(in srgb, var(--ebq-text-faint) 8%, var(--ebq-bg-subtle));
+	border-left-color: var(--ebq-text-soft);
+}
+.ebq-needs-setup__icon {
+	width: 18px;
+	height: 18px;
+	flex-shrink: 0;
+	margin-top: 1px;
+	color: var(--ebq-accent);
+}
+.ebq-needs-setup--warn .ebq-needs-setup__icon { color: var(--ebq-warn); }
+.ebq-needs-setup--pending .ebq-needs-setup__icon { color: var(--ebq-text-soft); }
+.ebq-needs-setup__icon svg { width: 16px; height: 16px; }
+.ebq-needs-setup__body { flex: 1; min-width: 0; }
+.ebq-needs-setup__feature {
+	margin: 0 0 3px;
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--ebq-text);
+	text-transform: uppercase;
+	letter-spacing: .04em;
+}
+.ebq-needs-setup__why {
+	margin: 0 0 4px;
+	font-size: 12px;
+	font-weight: 600;
+	color: var(--ebq-text);
+	line-height: 1.4;
+}
+.ebq-needs-setup__fix {
+	margin: 0 0 6px;
+	font-size: 11px;
+	color: var(--ebq-text-soft);
+	line-height: 1.45;
+}
+.ebq-needs-setup__action {
+	display: inline-block;
+	margin-top: 2px;
+	font-size: 11px;
+	font-weight: 700;
+	color: var(--ebq-accent);
+	text-decoration: none;
+	background: transparent;
+	border: 0;
+	padding: 0;
+	cursor: pointer;
+}
+.ebq-needs-setup__action:hover { text-decoration: underline; }
+.ebq-needs-setup--warn .ebq-needs-setup__action { color: var(--ebq-warn); }
+
 /* Entity coverage panel */
 .ebq-entity-coverage { display: flex; flex-direction: column; gap: 10px; }
 .ebq-entity-summary {
