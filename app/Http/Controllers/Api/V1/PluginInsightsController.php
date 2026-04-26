@@ -491,6 +491,13 @@ class PluginInsightsController extends Controller
             'language' => 'nullable|string|min:2|max:10',
         ]);
 
+        // Cold path can chain Serper + 3 LLM calls totaling ~5 minutes wall
+        // time when generating up to 20 sections. PHP's default 30s
+        // max_execution_time kills the process long before Mistral
+        // returns. Bump it for THIS request only — `set_time_limit` resets
+        // the timer; it doesn't touch php.ini.
+        @set_time_limit(360);
+
         $keyword = (string) $data['focus_keyword'];
         $currentHtml = (string) ($data['current_html'] ?? '');
         $country = isset($data['country']) ? (string) $data['country'] : null;

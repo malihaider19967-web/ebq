@@ -243,9 +243,9 @@ final class EBQ_Api_Client
         if ($country !== '')      $body['country']      = $country;
         if ($language !== '')     $body['language']     = $language;
         // Cold path: Serper + brief LLM (~45s) + topical-gaps LLM (~30s) +
-        // writer LLM (up to 90s for the larger 8k-token output budget).
-        // 120s is the request() clamp ceiling; we ride it.
-        return $this->request('POST', sprintf('/api/v1/posts/%s/ai-writer', rawurlencode($post_id)), $body, 120);
+        // writer LLM (up to 240s for 20 sections at 16k tokens). 280s
+        // total leaves a small buffer under the 300s clamp ceiling.
+        return $this->request('POST', sprintf('/api/v1/posts/%s/ai-writer', rawurlencode($post_id)), $body, 280);
     }
 
     public function ai_content_brief(string $post_id, string $focus_keyword, string $country = '', string $language = ''): array
@@ -438,7 +438,11 @@ final class EBQ_Api_Client
 
         $args = [
             'method'  => $method,
-            'timeout' => max(5, min(120, $timeout)),
+            // Ceiling 300s (was 120s). The AI Writer's worst-case end-to-end
+            // (Serper + brief LLM + topical-gaps LLM + 20-section writer LLM)
+            // approaches 4 minutes on a fully cold cache. Per-call sites
+            // pass their own value; this just guards against runaway.
+            'timeout' => max(5, min(300, $timeout)),
             'headers' => [
                 'Authorization' => 'Bearer ' . $this->token,
                 'Accept'        => 'application/json',

@@ -32,13 +32,12 @@ class AiWriterService
     private const CACHE_TTL_SEC = 60 * 60 * 24;
 
     /**
-     * 6 sections × up to 600 words each ≈ 4.5–6k output tokens, comfortably
-     * under the 8k `max_tokens` budget below. Bumped from the earlier
-     * conservative cap (5×250 words) so writers can ship richer proposals
-     * without hitting the truncation edge case that produces
-     * `llm_parse_failed`.
+     * 20 sections × ~400 words avg ≈ 10–12k output tokens; the 16k
+     * `max_tokens` budget below leaves headroom for JSON delimiters and
+     * metadata. The model is told to aim for substantive sections but
+     * skip ones that would just pad — quality over hitting the cap.
      */
-    private const MAX_SECTIONS = 6;
+    private const MAX_SECTIONS = 20;
 
     /** Per-section HTML cap (chars). 6000 ≈ 900 words of prose. */
     private const SECTION_HTML_CAP = 6000;
@@ -106,15 +105,15 @@ class AiWriterService
         }
 
         $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1);
-        // 8000 tokens ≈ 6000 words. Lets the model deliver fuller, ready-
-        // to-publish sections without hitting the mid-JSON truncation that
-        // surfaces as `llm_parse_failed`. Mistral Small supports up to 32k
-        // context, so this is well within budget.
+        // 16k output tokens supports the 20-section cap with room for JSON
+        // overhead. Mistral Small's 32k context window comfortably fits
+        // input + this output. 240s timeout matches the worst-case wall
+        // time for large JSON-mode generations.
         $response = $this->llm->completeJson($messages, [
             'temperature' => 0.5,
-            'max_tokens' => 8000,
+            'max_tokens' => 16000,
             'json_object' => true,
-            'timeout' => 90,
+            'timeout' => 240,
         ]);
 
         if (! is_array($response) || ! isset($response['sections']) || ! is_array($response['sections'])) {
@@ -165,17 +164,36 @@ class AiWriterService
     {
         $briefBlock = '(none)';
         if (is_array($brief) && ! empty($brief)) {
-            $subtopics = array_slice(array_filter((array) ($brief['subtopics'] ?? []), 'is_string'), 0, 12);
-            $entities = array_slice(array_filter((array) ($brief['must_have_entities'] ?? []), 'is_string'), 0, 8);
-            $outline = array_slice(array_filter((array) ($brief['suggested_outline'] ?? []), 'is_string'), 0, 8);
-            $paa = array_slice(array_filter((array) ($brief['people_also_ask'] ?? []), 'is_string'), 0, 6);
+            $subtopics = array_values(array_filter((array) ($brief['subtopics'] ?? []), 'is_string'));
+            $entities = array_values(array_filter((array) ($brief['must_have_entities'] ?? []), 'is_string'));
+            $outline = array_values(array_filter((array) ($brief['suggested_outline'] ?? []), 'is_string'));
+            $paa = array_values(array_filter((array) ($brief['people_also_ask'] ?? []), 'is_string'));
+            $serpTitles = array_slice(array_values(array_filter((array) ($brief['serp_titles'] ?? []), 'is_string')), 0, 10);
+            $internalLinks = [];
+            foreach ((array) ($brief['internal_link_targets'] ?? []) as $row) {
+                if (! is_array($row)) {
+                    continue;
+                }
+                $url = (string) ($row['url'] ?? '');
+                $anchor = (string) ($row['anchor_hint'] ?? '');
+                if ($url === '') {
+                    continue;
+                }
+                $internalLinks[] = ['url' => $url, 'anchor' => $anchor];
+                if (count($internalLinks) >= 8) {
+                    break;
+                }
+            }
             $briefBlock = json_encode([
                 'angle' => (string) ($brief['angle'] ?? ''),
                 'recommended_word_count' => (int) ($brief['recommended_word_count'] ?? 0),
+                'suggested_schema_type' => (string) ($brief['suggested_schema_type'] ?? ''),
                 'subtopics' => $subtopics,
                 'must_have_entities' => $entities,
                 'suggested_outline' => $outline,
                 'people_also_ask' => $paa,
+                'top_serp_titles' => $serpTitles,
+                'internal_link_targets' => $internalLinks,
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
 
@@ -195,15 +213,29 @@ class AiWriterService
 
         $system = <<<'SYS'
 You are a senior SEO editor proposing publish-ready content changes the
-user can review and approve one section at a time.
+user can review and approve one section at a time. Your job is to use
+EVERY signal you're given — the brief's outline, must-have entities,
+"people also ask" questions, top-SERP titles, internal-link targets,
+and the topical-gap analysis — and turn them into reviewable sections.
 
 Output rules (STRICT — non-compliance breaks the consumer):
 - Return ONE JSON object only. No prose, no markdown fences, no commentary.
 - Top-level keys: "summary" (string) and "sections" (array).
-- Generate UP TO 6 sections. Aim for substantive, ready-to-ship sections,
-  not stubs. 300–600 words of body per section is ideal; up to 900 if the
-  topic genuinely warrants depth. Don't pad — but don't shy away from
-  detail when the brief or gap topic deserves it.
+- Generate UP TO 20 sections. Cover every important brief subtopic, every
+  topical gap, and every "people also ask" question worth answering with
+  its own section. Don't pad — skip ones that would just repeat — but
+  don't undersell either. 200–500 words per section is the sweet spot;
+  up to 800 when the topic genuinely warrants depth.
+- For every "people also ask" question, prefer producing an <h2> framed
+  as the question itself (or a near-paraphrase) followed by a direct
+  answer in the first paragraph. This is the snippet-grab pattern.
+- For every topical-gap "missing" topic, produce a section that closes
+  it. Tag it with source_tags including "gaps".
+- For every must-have entity, weave it naturally into at least one
+  section (no entity stuffing — work it into prose where it fits).
+- For every internal_link_targets entry, when its anchor is relevant to
+  the section you're writing, include exactly ONE <a href="<url>">
+  <anchor>...</anchor></a> link to it. Don't link to the same URL twice.
 - proposed_html: valid HTML using <h1>, <h2>, <h3>, <p>, <ul>, <ol>,
   <li>, <strong>, <em>, <a>. No inline styles, no <script>, no markdown,
   no <html>/<body>/<head>.
@@ -226,9 +258,10 @@ Output rules (STRICT — non-compliance breaks the consumer):
 
 Write in the same voice and reading level as the existing post when one is
 provided. When the post is empty, default to clear, conversational expert
-tone. Always respect the brief's recommended depth and target keyword
+tone. Respect the brief's recommended depth and target keyword
 prominence — the focus keyword should appear naturally in the H1 (when
-you generate one) or in the opening paragraph of any "add" section.
+you generate one) or the opening paragraph of any "add" section, and
+again in at least one <h2> within the first three sections.
 SYS;
         $system = str_replace('%H1_FLAG%', $hasH1 ? 'true' : 'false', $system);
 

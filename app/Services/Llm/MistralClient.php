@@ -42,11 +42,13 @@ final class MistralClient implements LlmClient
         }
 
         $model = (string) ($options['model'] ?? $this->defaultModel);
-        // Ceiling raised from 30→60s. JSON-mode requests are noticeably
-        // slower than free-text (token-by-token grammar checking), and
-        // long-context tasks like content briefs / topical gaps can need
-        // 30–45s. Floor stays at 2s; nobody calls intentionally short.
-        $timeout = max(2, min(60, (int) ($options['timeout'] ?? 12)));
+        // Ceiling raised from 60→300s. JSON-mode requests are slower than
+        // free-text (token-by-token grammar checking), and large-output
+        // tasks like the AI Writer (up to 20 sections, 16k output tokens)
+        // can run 2–4 minutes wall time. Floor stays at 2s; nobody calls
+        // intentionally short. Per-call sites pass their own `timeout`,
+        // so this is just a safety ceiling.
+        $timeout = max(2, min(300, (int) ($options['timeout'] ?? 12)));
 
         $body = [
             'model' => $model,
