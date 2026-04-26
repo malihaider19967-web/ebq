@@ -57,8 +57,17 @@ class LiveSeoScoreService
         private readonly PluginInsightResolver $resolver,
     ) {}
 
-    public function score(Website $website, string $canonicalUrl, ?string $focusKeyword = null, ?Carbon $postModifiedAt = null): array
+    public function score(Website $website, string $canonicalUrl, ?string $focusKeyword = null, ?\DateTimeInterface $postModifiedAt = null): array
     {
+        // Normalize to Illuminate's Carbon so downstream comparisons (e.g.
+        // `->greaterThan(...)`) work regardless of whether the caller passed
+        // base `Carbon\Carbon`, Laravel's `Illuminate\Support\Carbon`, or
+        // a plain `DateTime`. The variance trap (Illuminate\Support\Carbon
+        // extends Carbon\Carbon, not the other way around) is otherwise
+        // brittle across Laravel versions.
+        $postModifiedAt = $postModifiedAt instanceof \DateTimeInterface
+            ? Carbon::instance($postModifiedAt)
+            : null;
         $url = trim($canonicalUrl);
         if ($url === '' || ! $website->isAuditUrlForThisSite($url)) {
             return $this->unavailable('url_not_for_website', ['url' => $url, 'domain' => $website->domain]);
