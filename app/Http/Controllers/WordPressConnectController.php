@@ -82,6 +82,13 @@ class WordPressConnectController extends Controller
             'website_id' => $website->id,
             'state' => $validated['state'],
             'ebq_domain' => $website->domain,
+            // `ebq_tier` lets the plugin decide which UI to show on first
+            // load (Pro features hidden behind a CTA on free tier). Live
+            // tier changes are reconciled by the heartbeat / score endpoints
+            // returning the current tier in their response — this carry on
+            // connect just primes the local option so the editor doesn't
+            // flash a wrong button before the first request resolves.
+            'ebq_tier' => $website->tier ?: Website::TIER_FREE,
         ]);
 
         return redirect()->away($callback);

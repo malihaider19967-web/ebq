@@ -8,6 +8,7 @@ import AssessmentList from '../components/AssessmentList';
 import KeyphraseInput from '../components/KeyphraseInput';
 import GscSuggestions from '../components/GscSuggestions';
 import RelatedKeyphrases from '../components/RelatedKeyphrases';
+import AiRewriteSnippet from '../components/AiRewriteSnippet';
 import AdditionalKeyphrases, { parseAdditionalKeywords, stringifyAdditionalKeywords } from '../components/AdditionalKeyphrases';
 import TopicalCoverage from '../components/TopicalCoverage';
 import KeywordDensity from '../components/KeywordDensity';
@@ -190,6 +191,35 @@ export default function SeoTab() {
 					maxHint={`${descLen} / 155`}
 				/>
 				<CharGauge length={descLen} goodMin={130} goodMax={155} hardMax={170} />
+
+				{/* AI rewrite — Pro tier only. Free tier sees an upgrade
+				    nudge so they know the feature exists without us
+				    rendering a non-functional button. */}
+				<div className="ebq-row" style={{ marginTop: 8, gap: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center' }}>
+					{cfg.tier === 'pro' ? (
+						<AiRewriteSnippet
+							postId={ctx.postId}
+							focusKeyword={focusKeyword}
+							currentTitle={seoTitleRaw}
+							currentMeta={description}
+							contentExcerpt={debouncedContent}
+							onApplyTitle={(v) => set('_ebq_title', v)}
+							onApplyMeta={(v) => set('_ebq_description', v)}
+						/>
+					) : (
+						<span className="ebq-tier-cta">
+							<IconSparkle />{' '}
+							{__('AI title + meta rewrites are on Pro.', 'ebq-seo')}{' '}
+							<a
+								href={cfg.appBase ? `${cfg.appBase}/billing` : '#'}
+								target="_blank"
+								rel="noopener noreferrer"
+							>
+								{__('Upgrade →', 'ebq-seo')}
+							</a>
+						</span>
+					)}
+				</div>
 			</Section>
 
 			<TopicalCoverage

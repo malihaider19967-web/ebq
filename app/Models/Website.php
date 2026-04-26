@@ -16,9 +16,14 @@ class Website extends Model
 {
     use HasApiTokens, HasFactory;
 
+    /** Subscription tier constants — drives gating for AI features. */
+    public const TIER_FREE = 'free';
+    public const TIER_PRO  = 'pro';
+
     protected $fillable = [
         'user_id',
         'domain',
+        'tier',
         'ga_property_id',
         'gsc_site_url',
         'gsc_keyword_lookback_days',
@@ -28,6 +33,17 @@ class Website extends Model
         'last_traffic_drop_alert_at',
         'last_rank_drop_alert_at',
     ];
+
+    /**
+     * True when this website's tier unlocks paid AI features (snippet
+     * rewrites, content briefs, redirect matching). Single check used
+     * everywhere — controllers gate on this, plugin reads `tier` to
+     * decide whether to render the action button or a Pro CTA.
+     */
+    public function isPro(): bool
+    {
+        return $this->tier === self::TIER_PRO;
+    }
 
     protected function casts(): array
     {

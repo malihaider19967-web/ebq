@@ -118,6 +118,36 @@ final class EBQ_Api_Client
      * compare what the user wrote against what the top SERP results
      * cover. POST (not GET) because content can be large.
      */
+    /**
+     * AI snippet rewriter — Pro tier only on the EBQ side. Returns 3
+     * ranked title + meta rewrites with rationales, or a 402-tier_required
+     * payload that the plugin renders as an upgrade CTA.
+     */
+    public function ai_rewrite_snippet(string $post_id, string $focus_keyword, string $current_title, string $current_meta, string $content_excerpt, array $competitor_titles = []): array
+    {
+        $body = [
+            'focus_keyword' => $focus_keyword,
+            'current_title' => $current_title,
+            'current_meta' => $current_meta,
+            'content_excerpt' => $content_excerpt,
+            'competitor_titles' => array_values(array_slice(array_filter(array_map('strval', $competitor_titles)), 0, 5)),
+        ];
+        return $this->request('POST', sprintf('/api/v1/posts/%s/rewrite-snippet', rawurlencode($post_id)), $body);
+    }
+
+    /**
+     * AI content brief from a target keyword — Pro tier only on EBQ.
+     * Returns subtopics, recommended word count, schema type, outline,
+     * and internal-link targets pulled from this site's GSC footprint.
+     */
+    public function ai_content_brief(string $post_id, string $focus_keyword, string $country = '', string $language = ''): array
+    {
+        $body = ['focus_keyword' => $focus_keyword];
+        if ($country !== '')  $body['country'] = $country;
+        if ($language !== '') $body['language'] = $language;
+        return $this->request('POST', sprintf('/api/v1/posts/%s/content-brief', rawurlencode($post_id)), $body);
+    }
+
     public function get_topical_gaps(string $post_id, string $url, string $focus_keyword, string $content, string $country = '', string $language = ''): array
     {
         $body = [

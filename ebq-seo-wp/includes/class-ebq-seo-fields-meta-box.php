@@ -129,6 +129,7 @@ final class EBQ_Seo_Fields_Meta_Box
             'isConnected' => EBQ_Plugin::is_configured(),
             'settingsUrl' => admin_url('admin.php?page=ebq-seo'),
             'workspaceDomain' => (string) get_option('ebq_website_domain', ''),
+            'tier' => (string) (get_option('ebq_site_tier', 'free') ?: 'free'),
         ]);
     }
 

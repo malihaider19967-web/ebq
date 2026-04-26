@@ -65,6 +65,9 @@ final class EBQ_Gutenberg_Sidebar
             'isConnected' => EBQ_Plugin::is_configured(),
             'settingsUrl' => admin_url('admin.php?page=ebq-seo'),
             'workspaceDomain' => (string) get_option('ebq_website_domain', ''),
+            // Tier from connect callback. Drives Pro vs Free UI gating for
+            // AI features (snippet rewrites, content briefs).
+            'tier' => (string) (get_option('ebq_site_tier', 'free') ?: 'free'),
         ]);
 
         wp_set_script_translations('ebq-seo-sidebar', 'ebq-seo');

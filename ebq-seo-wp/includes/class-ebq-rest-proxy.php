@@ -36,6 +36,8 @@ final class EBQ_Rest_Proxy
         '/ebq/v1/serp-preview',
         '/ebq/v1/internal-link-suggestions',
         '/ebq/v1/track-keyword',
+        '/ebq/v1/rewrite-snippet',
+        '/ebq/v1/content-brief',
     ];
 
     public function register(): void
@@ -126,6 +128,24 @@ final class EBQ_Rest_Proxy
             'methods' => 'POST',
             'permission_callback' => [$this, 'can_edit'],
             'callback' => [$this, 'topical_gaps'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+            ],
+        ]);
+
+        register_rest_route('ebq/v1', '/rewrite-snippet/(?P<id>\d+)', [
+            'methods' => 'POST',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'rewrite_snippet'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
+            ],
+        ]);
+
+        register_rest_route('ebq/v1', '/content-brief/(?P<id>\d+)', [
+            'methods' => 'POST',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'content_brief'],
             'args' => [
                 'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
             ],
@@ -532,6 +552,49 @@ final class EBQ_Rest_Proxy
         );
         $response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0, private');
         return $response;
+    }
+
+    /**
+     * AI title + meta rewrites. POST body forwarded to EBQ which handles
+     * tier gating server-side (returns 402 with `tier_required` when the
+     * site isn't on Pro). Plugin renders that as an upgrade CTA.
+     */
+    public function rewrite_snippet(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $body = $request->get_json_params();
+        if (! is_array($body)) $body = $request->get_params();
+
+        $payload = EBQ_Plugin::api_client()->ai_rewrite_snippet(
+            (string) $post_id,
+            (string) ($body['focus_keyword'] ?? ''),
+            (string) ($body['current_title'] ?? ''),
+            (string) ($body['current_meta'] ?? ''),
+            (string) ($body['content_excerpt'] ?? ''),
+            is_array($body['competitor_titles'] ?? null) ? $body['competitor_titles'] : []
+        );
+
+        return new WP_REST_Response($payload, 200);
+    }
+
+    /**
+     * AI content brief from a focus keyword. Same Pro-tier gate as the
+     * snippet rewriter above.
+     */
+    public function content_brief(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $body = $request->get_json_params();
+        if (! is_array($body)) $body = $request->get_params();
+
+        $payload = EBQ_Plugin::api_client()->ai_content_brief(
+            (string) $post_id,
+            (string) ($body['focus_keyword'] ?? ''),
+            (string) ($body['country'] ?? ''),
+            (string) ($body['language'] ?? '')
+        );
+
+        return new WP_REST_Response($payload, 200);
     }
 
     public function internal_link_suggestions(WP_REST_Request $request): WP_REST_Response

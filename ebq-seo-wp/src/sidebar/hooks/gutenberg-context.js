@@ -69,7 +69,7 @@ export function resolveTitleTemplate(template, { postTitle, sep, siteName }) {
 
 export function publicConfig() {
 	if (typeof window === 'undefined') {
-		return { sep: '–', siteName: '', appBase: '', homeUrl: '', isConnected: true, settingsUrl: '', workspaceDomain: '' };
+		return { sep: '–', siteName: '', appBase: '', homeUrl: '', isConnected: true, settingsUrl: '', workspaceDomain: '', tier: 'free' };
 	}
 	const cfg = window.ebqSeoPublic || {};
 	return {
@@ -82,5 +82,8 @@ export function publicConfig() {
 		isConnected: cfg.isConnected !== false,
 		settingsUrl: cfg.settingsUrl || '',
 		workspaceDomain: cfg.workspaceDomain || '',
+		// Subscription tier from the connect callback (or refreshed by
+		// API responses). Drives Pro vs Free UI gating for AI features.
+		tier: (cfg.tier === 'pro' ? 'pro' : 'free'),
 	};
 }

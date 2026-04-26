@@ -55,6 +55,14 @@ final class EBQ_Connect
         $received_state = (string) wp_unslash($_GET['state']);
         $website_id = isset($_GET['website_id']) ? (int) $_GET['website_id'] : 0;
         $domain = isset($_GET['ebq_domain']) ? sanitize_text_field((string) wp_unslash($_GET['ebq_domain'])) : '';
+        // Tier carried on connect so the editor can render Pro vs. Free UI
+        // immediately on first load, before the first score request returns
+        // the canonical current tier. Always reconciled to canonical via
+        // every API response that includes `tier`.
+        $tier = isset($_GET['ebq_tier']) ? sanitize_text_field((string) wp_unslash($_GET['ebq_tier'])) : 'free';
+        if (! in_array($tier, ['free', 'pro'], true)) {
+            $tier = 'free';
+        }
         $expected_state = (string) get_option('ebq_connect_state', '');
 
         $debug = [
@@ -77,6 +85,7 @@ final class EBQ_Connect
         update_option('ebq_site_token', $token);
         update_option('ebq_website_id', $website_id);
         update_option('ebq_website_domain', $domain);
+        update_option('ebq_site_tier', $tier);
         delete_option('ebq_connect_state');
         delete_option('ebq_last_connect_error');
 

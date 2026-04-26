@@ -3,7 +3,11 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\MatchRedirectFor404Job;
+use App\Models\RedirectSuggestion;
 use App\Models\Website;
+use App\Services\AiContentBriefService;
+use App\Services\AiSnippetRewriterService;
 use App\Services\LiveSeoScoreService;
 use App\Services\PluginInsightResolver;
 use App\Services\ReportDataService;
@@ -323,6 +327,195 @@ class PluginInsightsController extends Controller
             'url' => (string) $data['url'],
             'focus_keyword' => (string) $data['focus_keyword'],
             'gaps' => $payload,
+        ]);
+    }
+
+    /**
+     * AI title + meta description rewrites. Pro tier only — free tier
+     * users see a 402 with `tier_required` so the plugin can render a
+     * "Upgrade to Pro" CTA in place of the action button.
+     *   POST /api/v1/posts/{externalPostId}/rewrite-snippet
+     *   body: { focus_keyword, current_title, current_meta, content_excerpt, competitor_titles? }
+     */
+    public function rewriteSnippet(Request $request, string $externalPostId, AiSnippetRewriterService $service): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        if (! $website->isPro()) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'tier_required',
+                'tier' => $website->tier,
+                'required_tier' => Website::TIER_PRO,
+                'message' => 'AI snippet rewrites are available on Pro. Upgrade to unlock.',
+            ], 402);
+        }
+
+        $data = $request->validate([
+            'focus_keyword' => 'required|string|min:2|max:200',
+            'current_title' => 'nullable|string|max:200',
+            'current_meta' => 'nullable|string|max:400',
+            'content_excerpt' => 'required|string|min:50|max:8000',
+            'competitor_titles' => 'nullable|array|max:5',
+            'competitor_titles.*' => 'string|max:200',
+        ]);
+
+        $payload = $service->rewrite((int) $externalPostId, [
+            'focus_keyword' => $data['focus_keyword'],
+            'current_title' => $data['current_title'] ?? '',
+            'current_meta' => $data['current_meta'] ?? '',
+            'content_excerpt' => $data['content_excerpt'],
+            'competitor_titles' => $data['competitor_titles'] ?? [],
+        ]);
+
+        return response()->json([
+            'external_post_id' => $externalPostId,
+            'tier' => $website->tier,
+            'rewrite' => $payload,
+        ]);
+    }
+
+    /**
+     * AI content brief from a target keyword — subtopics, recommended
+     * word count, suggested schema type, and internal-link targets from
+     * the user's own site. Pro tier only.
+     *   POST /api/v1/posts/{externalPostId}/content-brief
+     *   body: { focus_keyword, country?, language? }
+     */
+    public function contentBrief(Request $request, string $externalPostId, AiContentBriefService $service): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        if (! $website->isPro()) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'tier_required',
+                'tier' => $website->tier,
+                'required_tier' => Website::TIER_PRO,
+                'message' => 'AI content briefs are available on Pro. Upgrade to unlock.',
+            ], 402);
+        }
+
+        $data = $request->validate([
+            'focus_keyword' => 'required|string|min:2|max:200',
+            'country' => 'nullable|string|size:2',
+            'language' => 'nullable|string|min:2|max:10',
+        ]);
+
+        $payload = $service->brief($website, (int) $externalPostId, [
+            'focus_keyword' => $data['focus_keyword'],
+            'country' => $data['country'] ?? null,
+            'language' => $data['language'] ?? null,
+        ]);
+
+        return response()->json([
+            'external_post_id' => $externalPostId,
+            'focus_keyword' => $data['focus_keyword'],
+            'tier' => $website->tier,
+            'brief' => $payload,
+        ]);
+    }
+
+    /**
+     * Receive a batch of 404 paths from the WP plugin's heartbeat. Each
+     * unique path is queued for async LLM matching; we return immediately
+     * with a count so the heartbeat stays fast. Idempotent — re-posting
+     * the same path bumps `hits_30d` on the existing suggestion.
+     *   POST /api/v1/posts/report-404s
+     *   body: { paths: [{ path: "/foo/bar", hits: 12 }, ...] }
+     */
+    public function report404s(Request $request): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+
+        $data = $request->validate([
+            'paths' => 'required|array|max:200',
+            'paths.*.path' => 'required|string|max:700',
+            'paths.*.hits' => 'nullable|integer|min:1|max:100000',
+        ]);
+
+        $queued = 0;
+        foreach ($data['paths'] as $entry) {
+            $path = (string) $entry['path'];
+            $hits = (int) ($entry['hits'] ?? 1);
+            if ($path === '') continue;
+            MatchRedirectFor404Job::dispatch($website->id, $path, $hits);
+            $queued++;
+        }
+
+        return response()->json([
+            'ok' => true,
+            'queued' => $queued,
+        ]);
+    }
+
+    /**
+     * List pending redirect suggestions for HQ to render. Filters to
+     * `pending` by default; `?status=applied|rejected|all` overrides.
+     *   GET /api/v1/redirect-suggestions?status=pending
+     */
+    public function redirectSuggestions(Request $request): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        $status = (string) $request->query('status', 'pending');
+
+        $query = RedirectSuggestion::query()
+            ->where('website_id', $website->id)
+            ->orderByDesc('hits_30d')
+            ->orderByDesc('confidence')
+            ->orderByDesc('last_seen_at');
+
+        if ($status !== 'all') {
+            $query->where('status', $status);
+        }
+
+        $rows = $query->limit(200)->get()->map(fn (RedirectSuggestion $s) => [
+            'id' => $s->id,
+            'source_path' => $s->source_path,
+            'suggested_destination' => $s->suggested_destination,
+            'confidence' => $s->confidence,
+            'status' => $s->status,
+            'rationale' => $s->rationale,
+            'hits_30d' => $s->hits_30d,
+            'last_seen_at' => $s->last_seen_at?->toIso8601String(),
+            'matched_at' => $s->matched_at?->toIso8601String(),
+        ])->all();
+
+        return response()->json(['suggestions' => $rows]);
+    }
+
+    /**
+     * User decision on a single suggestion. `apply` or `reject` is the
+     * only valid action. After `apply` the WP plugin pulls and writes a
+     * 301 rule; we record the decision so we don't re-suggest.
+     *   POST /api/v1/redirect-suggestions/{id}/decide
+     *   body: { action: "apply"|"reject" }
+     */
+    public function decideRedirectSuggestion(Request $request, int $id): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+        $data = $request->validate([
+            'action' => 'required|in:apply,reject',
+        ]);
+
+        $suggestion = RedirectSuggestion::query()
+            ->where('website_id', $website->id)
+            ->where('id', $id)
+            ->firstOrFail();
+
+        if ($data['action'] === 'apply') {
+            if ($suggestion->suggested_destination === '') {
+                return response()->json(['ok' => false, 'error' => 'no_destination'], 400);
+            }
+            $suggestion->status = RedirectSuggestion::STATUS_APPLIED;
+            $suggestion->applied_at = Carbon::now();
+        } else {
+            $suggestion->status = RedirectSuggestion::STATUS_REJECTED;
+        }
+        $suggestion->save();
+
+        return response()->json([
+            'ok' => true,
+            'id' => $suggestion->id,
+            'status' => $suggestion->status,
         ]);
     }
 

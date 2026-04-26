@@ -29,6 +29,19 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/posts/{externalPostId}/topical-gaps', [PluginInsightsController::class, 'topicalGaps'])
             ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
             ->name('api.v1.posts.topical-gaps');
+        Route::post('/posts/{externalPostId}/rewrite-snippet', [PluginInsightsController::class, 'rewriteSnippet'])
+            ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
+            ->name('api.v1.posts.rewrite-snippet');
+        Route::post('/posts/{externalPostId}/content-brief', [PluginInsightsController::class, 'contentBrief'])
+            ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
+            ->name('api.v1.posts.content-brief');
+        Route::post('/posts/report-404s', [PluginInsightsController::class, 'report404s'])
+            ->name('api.v1.posts.report-404s');
+        Route::get('/redirect-suggestions', [PluginInsightsController::class, 'redirectSuggestions'])
+            ->name('api.v1.redirect-suggestions.index');
+        Route::post('/redirect-suggestions/{id}/decide', [PluginInsightsController::class, 'decideRedirectSuggestion'])
+            ->where('id', '[0-9]+')
+            ->name('api.v1.redirect-suggestions.decide');
         Route::get('/posts', [PluginInsightsController::class, 'indexPosts'])
             ->name('api.v1.posts.index');
         Route::get('/dashboard', [PluginInsightsController::class, 'dashboard'])
