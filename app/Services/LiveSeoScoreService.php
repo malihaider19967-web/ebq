@@ -348,7 +348,7 @@ class LiveSeoScoreService
                 pageUrl: $url,
                 targetKeyword: $focusKeyword ?? '',
                 serpSampleGl: null,
-                source: CustomPageAudit::SOURCE_PAGE_DETAIL,
+                source: CustomPageAudit::SOURCE_LIVE_SCORE,
             );
             RunCustomPageAudit::dispatch($queued->id);
 

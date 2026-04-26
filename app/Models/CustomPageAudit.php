@@ -12,6 +12,13 @@ class CustomPageAudit extends Model
 
     public const SOURCE_PAGE_DETAIL = 'page_detail';
 
+    /**
+     * Audit triggered from the WP plugin's editor live-score endpoint.
+     * Runs in lite mode (skips link checking + Serper benchmark) so the
+     * editor spinner doesn't sit there for 90+ seconds.
+     */
+    public const SOURCE_LIVE_SCORE = 'live_score';
+
     public const STATUS_QUEUED = 'queued';
 
     public const STATUS_RUNNING = 'running';
@@ -64,7 +71,7 @@ class CustomPageAudit extends Model
         return self::query()->create([
             'website_id' => $websiteId,
             'user_id' => $userId,
-            'source' => in_array($source, [self::SOURCE_CUSTOM, self::SOURCE_PAGE_DETAIL], true)
+            'source' => in_array($source, [self::SOURCE_CUSTOM, self::SOURCE_PAGE_DETAIL, self::SOURCE_LIVE_SCORE], true)
                 ? $source
                 : self::SOURCE_CUSTOM,
             'page_url' => $pageUrl,
@@ -96,7 +103,7 @@ class CustomPageAudit extends Model
         return self::query()->create([
             'website_id' => $websiteId,
             'user_id' => $userId,
-            'source' => in_array($source, [self::SOURCE_CUSTOM, self::SOURCE_PAGE_DETAIL], true)
+            'source' => in_array($source, [self::SOURCE_CUSTOM, self::SOURCE_PAGE_DETAIL, self::SOURCE_LIVE_SCORE], true)
                 ? $source
                 : self::SOURCE_CUSTOM,
             'page_url' => $pageUrlAsAudited,

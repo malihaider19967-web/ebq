@@ -32,7 +32,15 @@ class PageAuditService
 
     public function __construct(private readonly SafeHttpGuard $guard) {}
 
-    public function audit(int $websiteId, string $pageUrl, ?string $serpTargetKeyword = null, bool $enforceUrlBelongsToWebsite = false, ?string $serpGlUserOverride = null): PageAuditReport
+    /**
+     * `$lite = true` skips the two slowest optional stages (link checking
+     * across up to 100 outbound URLs, and the 3-competitor Serper benchmark
+     * with full HTML fetches). Use it when the audit is triggered from a
+     * UX path where wall-time matters more than completeness — e.g. the
+     * editor's live-score endpoint, where users are watching a spinner.
+     * Typical wall-time: full ≈ 60–120s; lite ≈ 15–30s.
+     */
+    public function audit(int $websiteId, string $pageUrl, ?string $serpTargetKeyword = null, bool $enforceUrlBelongsToWebsite = false, ?string $serpGlUserOverride = null, bool $lite = false): PageAuditReport
     {
         $startedAt = microtime(true);
 
@@ -123,11 +131,20 @@ class PageAuditService
             $favicon = $auditor->favicon();
             $readability = $auditor->readability($bodyText);
 
-            $allLinks = array_merge($links['internal'], $links['external']);
-            $linkCheck = $this->checkLinks($allLinks);
-            $links['broken'] = $linkCheck['broken'];
-            $links['links_checked'] = $linkCheck['checked'];
-            $links['links_skipped'] = $linkCheck['skipped'];
+            // Link checking can take up to ~80s for a page with many
+            // outbound links. Skip it in lite mode — the live-score caller
+            // doesn't surface broken-link counts in its factor anyway.
+            if ($lite) {
+                $links['broken'] = [];
+                $links['links_checked'] = 0;
+                $links['links_skipped'] = count($links['internal']) + count($links['external']);
+            } else {
+                $allLinks = array_merge($links['internal'], $links['external']);
+                $linkCheck = $this->checkLinks($allLinks);
+                $links['broken'] = $linkCheck['broken'];
+                $links['links_checked'] = $linkCheck['checked'];
+                $links['links_skipped'] = $linkCheck['skipped'];
+            }
 
             $technical = [
                 'http_status' => $fetch['http_status'],
@@ -196,7 +213,10 @@ class PageAuditService
                 $result['keywords']['gsc_lookback_days'] = $website->effectiveGscKeywordLookbackDays();
             }
 
-            $benchmark = $this->buildSerperReadabilityBenchmark(
+            // Serper benchmark fetches 3 competitor HTML pages + audits them —
+            // adds 20–40s to wall-time. The live-score factors don't surface
+            // benchmark data, so skip it in lite mode.
+            $benchmark = $lite ? null : $this->buildSerperReadabilityBenchmark(
                 $pageUrl,
                 $result['keywords'],
                 is_numeric($readability['flesch'] ?? null) ? (float) $readability['flesch'] : null,

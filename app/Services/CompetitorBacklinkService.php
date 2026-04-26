@@ -94,6 +94,20 @@ class CompetitorBacklinkService
             return 0;
         }
 
+        // Belt-and-suspenders: queueRefresh() filters out fresh domains
+        // before dispatching, but this method is also reachable directly
+        // (CLI commands, manual scripts, future call sites). Re-check here
+        // so a fresh domain never bills KE — saves credits even when callers
+        // forget to gate.
+        if ($this->isFresh($domain)) {
+            Log::info('CompetitorBacklinkService.refresh: cache fresh, skipping KE call', [
+                'domain' => $domain,
+                'website_id' => $websiteId,
+            ]);
+
+            return 0;
+        }
+
         Log::info('CompetitorBacklinkService.refresh: starting', ['domain' => $domain, 'website_id' => $websiteId]);
 
         $items = $this->client->backlinksForDomain(

@@ -20,7 +20,10 @@ import TrackKeywordButton from './TrackKeywordButton';
  * Audits never re-run automatically once a `ready` report exists; the user
  * can trigger a fresh audit from HQ → Page Audits.
  */
-const POLL_INTERVAL_MS = 12000;
+// Polled while the audit is in flight. 6s = at most one extra round-trip
+// of latency between audit completion and the breakdown updating in the
+// editor. Audit-side: editor-triggered audits run in lite mode (~15–30s).
+const POLL_INTERVAL_MS = 6000;
 
 export default function LiveSeoScore({ postId, focusKeyword, isConnected }) {
 	const [state, setState] = useState({ status: 'idle', data: null, error: null });

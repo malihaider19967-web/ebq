@@ -59,12 +59,19 @@ class RunCustomPageAudit implements ShouldBeUnique, ShouldQueue
         $audit->markRunning();
 
         try {
+            // Editor-triggered audits run in lite mode so the live-score
+            // spinner doesn't sit there for 90+ seconds. Skips link
+            // checking + Serper benchmark — both irrelevant to the live-
+            // score factors. HQ → Page Detail and manual audits still
+            // run the full pipeline.
+            $lite = $audit->source === CustomPageAudit::SOURCE_LIVE_SCORE;
             $report = $service->audit(
                 $audit->website_id,
                 $audit->page_url,
                 $audit->target_keyword !== '' ? $audit->target_keyword : null,
                 true,
                 $audit->serp_sample_gl,
+                $lite,
             );
         } catch (Throwable $e) {
             Log::error('RunCustomPageAudit: service threw', [
