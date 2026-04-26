@@ -487,8 +487,16 @@ class PluginInsightsController extends Controller
         $data = $request->validate([
             'focus_keyword' => 'required|string|min:2|max:200',
             'current_html' => 'nullable|string|max:200000',
+            'url' => 'nullable|string|max:2048',
             'country' => 'nullable|string|size:2',
             'language' => 'nullable|string|min:2|max:10',
+            // Lightweight WordPress page list the plugin sends so EBQ's
+            // internal-link resolver can fall back to "this URL exists on
+            // the site even though it has no GSC traction yet" candidates
+            // — useful for newly-published or never-ranked content.
+            'wp_pages' => 'nullable|array|max:300',
+            'wp_pages.*.url' => 'required_with:wp_pages|string|max:2048',
+            'wp_pages.*.title' => 'nullable|string|max:300',
         ]);
 
         // Cold path can chain Serper + 3 LLM calls totaling ~5 minutes wall
@@ -536,8 +544,10 @@ class PluginInsightsController extends Controller
         $payload = $writer->draft($website, (int) $externalPostId, [
             'focus_keyword' => $keyword,
             'current_html' => $currentHtml,
+            'exclude_url' => (string) ($data['url'] ?? ''),
             'brief' => $brief,
             'gaps' => $gaps,
+            'wp_pages' => is_array($data['wp_pages'] ?? null) ? $data['wp_pages'] : [],
         ]);
 
         return response()->json([

@@ -47,6 +47,7 @@ export default function AiWriterTab() {
 			data: {
 				focus_keyword: focusKw,
 				current_html: String(ctx.content || '').slice(0, 200000),
+				url: ctx.postLink || '',
 			},
 		})
 			.then((res) => {

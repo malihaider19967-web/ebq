@@ -236,10 +236,12 @@ final class EBQ_Api_Client
         return $this->get(sprintf('/api/v1/posts/%s/entity-coverage', rawurlencode($post_id)), $args);
     }
 
-    public function ai_writer(string $post_id, string $focus_keyword, string $current_html, string $country = '', string $language = ''): array
+    public function ai_writer(string $post_id, string $focus_keyword, string $current_html, string $url = '', array $wp_pages = [], string $country = '', string $language = ''): array
     {
         $body = ['focus_keyword' => $focus_keyword];
         if ($current_html !== '') $body['current_html'] = $current_html;
+        if ($url !== '')          $body['url']          = $url;
+        if (! empty($wp_pages))   $body['wp_pages']     = array_values($wp_pages);
         if ($country !== '')      $body['country']      = $country;
         if ($language !== '')     $body['language']     = $language;
         // Cold path: Serper + brief LLM (~45s) + topical-gaps LLM (~30s) +

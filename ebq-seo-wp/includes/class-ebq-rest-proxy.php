@@ -685,6 +685,12 @@ final class EBQ_Rest_Proxy
      * AI Writer — generates section-level proposals (add/edit/replace) for a
      * post using whatever inputs are available (existing content + brief +
      * topical gaps). Pro-tier gated by EBQ.
+     *
+     * Also gathers a lightweight list of published WP posts/pages and
+     * forwards them as `wp_pages` so EBQ's internal-link resolver can
+     * surface never-indexed content as fallback link candidates. The
+     * GSC-backed candidates remain the priority — wp_pages just fill
+     * coverage where the GSC footprint is sparse.
      */
     public function ai_writer(WP_REST_Request $request): WP_REST_Response
     {
@@ -692,15 +698,62 @@ final class EBQ_Rest_Proxy
         $body = $request->get_json_params();
         if (! is_array($body)) $body = $request->get_params();
 
+        $wp_pages = $this->collect_wp_link_candidates($post_id);
+
         $payload = EBQ_Plugin::api_client()->ai_writer(
             (string) $post_id,
             (string) ($body['focus_keyword'] ?? ''),
             (string) ($body['current_html'] ?? ''),
+            (string) ($body['url'] ?? ''),
+            $wp_pages,
             (string) ($body['country'] ?? ''),
             (string) ($body['language'] ?? '')
         );
 
         return new WP_REST_Response($payload, 200);
+    }
+
+    /**
+     * Build the `wp_pages` payload — a list of {url, title} pairs for
+     * every published post/page (excluding the current one). EBQ's
+     * resolver matches titles against topic tokens and surfaces them
+     * as link candidates BELOW any GSC-backed match for the same URL.
+     *
+     * Cap at 300 to keep the request payload small; for typical sites
+     * this covers everything, and for very large sites the resolver
+     * would only accept the first 12 anyway.
+     *
+     * @return list<array{url: string, title: string}>
+     */
+    private function collect_wp_link_candidates(int $exclude_post_id): array
+    {
+        $ids = get_posts([
+            'post_type'      => ['post', 'page'],
+            'post_status'    => 'publish',
+            'numberposts'    => 300,
+            'orderby'        => 'modified',
+            'order'          => 'DESC',
+            'fields'         => 'ids',
+            'no_found_rows'  => true,
+            'suppress_filters' => true,
+        ]);
+        if (! is_array($ids)) {
+            return [];
+        }
+        $out = [];
+        foreach ($ids as $id) {
+            $id = (int) $id;
+            if ($id <= 0 || $id === $exclude_post_id) {
+                continue;
+            }
+            $url = get_permalink($id);
+            $title = wp_strip_all_tags((string) get_the_title($id));
+            if (! is_string($url) || $url === '' || $title === '') {
+                continue;
+            }
+            $out[] = ['url' => $url, 'title' => $title];
+        }
+        return $out;
     }
 
     /**

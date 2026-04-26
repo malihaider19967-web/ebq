@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Services\Llm\LlmClient;
 use Illuminate\Support\Carbon;
@@ -70,13 +71,19 @@ class AiWriterService
         $currentText = trim(strip_tags($currentHtml));
         $brief = is_array($input['brief'] ?? null) ? $input['brief'] : null;
         $gaps = is_array($input['gaps'] ?? null) ? $input['gaps'] : null;
+        $excludeUrl = trim((string) ($input['exclude_url'] ?? ''));
+        $wpPages = is_array($input['wp_pages'] ?? null) ? $input['wp_pages'] : [];
+
+        // Topic-aware internal-link candidate pool. GSC click data is the
+        // moat — pages with proven user demand always beat "exists but
+        // unranked" candidates. The wp_pages fallback lets newly-published
+        // content surface before it accumulates GSC impressions.
+        $smartLinks = $this->resolveSmartInternalLinks($website, $excludeUrl, $keyword, $brief, $gaps, $wpPages);
 
         $hasBrief = $brief !== null && ! empty($brief['subtopics'] ?? []);
         $hasGaps = $gaps !== null && ! empty($gaps['missing'] ?? []);
         $hasContent = mb_strlen($currentText) >= 100;
-        $availableInternalLinks = is_array($brief['internal_link_targets'] ?? null)
-            ? count(array_filter($brief['internal_link_targets'], static fn ($r) => is_array($r) && ! empty($r['url'])))
-            : 0;
+        $availableInternalLinks = count($smartLinks);
         $availablePaaCount = is_array($brief['people_also_ask'] ?? null)
             ? count(array_filter($brief['people_also_ask'], 'is_string'))
             : 0;
@@ -99,16 +106,18 @@ class AiWriterService
 
         // Cache version — bump when the prompt or output shape changes so
         // existing cached results don't pin users to a stale generation.
-        // v5: H1 must be followed by an intro <p> before any <h2>; no two
-        //     headings may be back-to-back without body content between.
+        // v7: WP-page candidates added as fallback to the GSC moat for
+        //     never-indexed published content.
         $cacheKey = sprintf(
-            'ai_writer_v5:%d:%d:%s:%s:%s:%s',
+            'ai_writer_v7:%d:%d:%s:%s:%s:%s:%d:%d',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
             $hasBrief ? '1' : '0',
             $hasGaps ? '1' : '0',
             substr(hash('sha256', $currentText), 0, 12),
+            count($smartLinks),
+            count($wpPages),
         );
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && ($cached['ok'] ?? false) === true) {
@@ -117,7 +126,7 @@ class AiWriterService
             return $cached;
         }
 
-        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1);
+        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1, $smartLinks);
         // 16k output tokens supports the 20-section cap with room for JSON
         // overhead. Mistral Small's 32k context window comfortably fits
         // input + this output. 240s timeout matches the worst-case wall
@@ -188,9 +197,10 @@ class AiWriterService
     }
 
     /**
+     * @param  list<array{url: string, anchor: string, topic: string, clicks: int}>  $smartLinks
      * @return list<array{role: string, content: string}>
      */
-    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1): array
+    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1, array $smartLinks): array
     {
         $briefBlock = '(none)';
         if (is_array($brief) && ! empty($brief)) {
@@ -199,21 +209,6 @@ class AiWriterService
             $outline = array_values(array_filter((array) ($brief['suggested_outline'] ?? []), 'is_string'));
             $paa = array_values(array_filter((array) ($brief['people_also_ask'] ?? []), 'is_string'));
             $serpTitles = array_slice(array_values(array_filter((array) ($brief['serp_titles'] ?? []), 'is_string')), 0, 10);
-            $internalLinks = [];
-            foreach ((array) ($brief['internal_link_targets'] ?? []) as $row) {
-                if (! is_array($row)) {
-                    continue;
-                }
-                $url = (string) ($row['url'] ?? '');
-                $anchor = (string) ($row['anchor_hint'] ?? '');
-                if ($url === '') {
-                    continue;
-                }
-                $internalLinks[] = ['url' => $url, 'anchor' => $anchor];
-                if (count($internalLinks) >= 8) {
-                    break;
-                }
-            }
             $briefBlock = json_encode([
                 'angle' => (string) ($brief['angle'] ?? ''),
                 'recommended_word_count' => (int) ($brief['recommended_word_count'] ?? 0),
@@ -223,9 +218,19 @@ class AiWriterService
                 'suggested_outline' => $outline,
                 'people_also_ask' => $paa,
                 'top_serp_titles' => $serpTitles,
-                'internal_link_targets' => $internalLinks,
             ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         }
+
+        // Topic-tagged internal links: each entry tells the model which
+        // section topic this URL is the strongest fit for, derived from
+        // the GSC query that drove the most impressions to that page.
+        $smartLinksBlock = empty($smartLinks)
+            ? '(none)'
+            : json_encode(array_map(static fn (array $l) => [
+                'url' => $l['url'],
+                'anchor' => $l['anchor'],
+                'best_fit_topic' => $l['topic'],
+            ], $smartLinks), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         $gapsBlock = '(none)';
         if (is_array($gaps) && ! empty($gaps)) {
@@ -269,22 +274,30 @@ Output rules (STRICT — non-compliance breaks the consumer):
   it. Tag with source_tags ⊇ ["gaps"].
 - For every must-have entity, weave it naturally into at least one
   section (no entity stuffing — work it into prose where it fits).
-- INTERNAL LINKS — REQUIRED: for EVERY entry in
-  internal_link_targets, you MUST place exactly ONE <a href="...">
-  link to that URL somewhere in the response. Pick the section where
-  the link's anchor is most topically relevant; if no perfect fit
-  exists, place it in the closest-related section anyway. The anchor
-  text inside the <a> tag should match (or closely paraphrase) the
-  entry's "anchor" field. Do not link to the same URL more than once.
-  Do not skip any entry.
+- INTERNAL LINKS — REQUIRED. The user provides a topic-tagged list of
+  internal_links. Each entry has:
+    • url             — the page to link to
+    • anchor          — suggested anchor text (paraphrase if it reads
+                        more naturally; do not invent a different URL)
+    • best_fit_topic  — the topic that page is the strongest fit for,
+                        derived from the GSC query that drives the
+                        most clicks to it
+  For EVERY entry you MUST include exactly ONE <a href="<url>"><anchor
+  or paraphrase></a> in the response. Place each link in the section
+  whose subject most overlaps with the entry's best_fit_topic. If no
+  section is a clean fit, create one (an "add" section about that
+  topic) so the link has a home — that's preferable to dropping the
+  entry. Do not link to the same URL twice. Do not skip any entry.
 
-  Concrete example: if internal_link_targets contains
-    [{"url":"https://example.com/protein-guide","anchor":"vegan protein"}]
-  then ONE of your sections must include something like
-    <p>...for an in-depth comparison see our
+  Concrete example: if internal_links contains
+    [{"url":"https://example.com/protein-guide",
+      "anchor":"vegan protein",
+      "best_fit_topic":"vegan protein sources"}]
+  then your section about protein sources must include something like
+    <p>For an in-depth comparison see our
     <a href="https://example.com/protein-guide">vegan protein</a>
-    guide...</p>
-  Failing to include all internal_link_targets is a failure of the task.
+    guide.</p>
+  Failing to include any internal_link is a failure of the task.
 - proposed_html: valid HTML using <h1>, <h2>, <h3>, <p>, <ul>, <ol>,
   <li>, <strong>, <em>, <a>. No inline styles, no <script>, no markdown,
   no <html>/<body>/<head>.
@@ -328,6 +341,10 @@ Target keyword: "{$keyword}"
 CONTENT BRIEF (may be empty):
 {$briefBlock}
 
+INTERNAL LINKS — topic-tagged candidates pulled from this site's own GSC
+footprint, ordered by topical fit (may be empty):
+{$smartLinksBlock}
+
 TOPICAL GAPS vs. top SERP (may be empty):
 {$gapsBlock}
 
@@ -355,6 +372,265 @@ USER;
             ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => $user],
         ];
+    }
+
+    /**
+     * Build a topic-tagged internal-link candidate pool.
+     *
+     * Two sources, layered:
+     *   1) GSC click data — the EBQ moat. Pages with proven user demand
+     *      always rank highest. Score = clicks × (1 + topic_overlap).
+     *   2) WordPress pages provided by the plugin (wp_pages) — every
+     *      published post/page on the site, including newly-published
+     *      ones that have zero GSC traction yet. Score uses a tiny
+     *      synthetic signal so these only surface when topic overlap is
+     *      strong AND no GSC candidate covers the same topic better.
+     *
+     * Dedup by URL: if a URL appears in both, the GSC entry wins (preserves
+     * its click signal and best-matching anchor from real search queries).
+     *
+     * Returns up to 12 candidates as
+     *   [{url, anchor, topic, source, clicks}, ...]
+     * sorted by score desc.
+     *
+     * Excludes the current post's URL so we don't link the page to itself.
+     *
+     * @param  list<array{url: string, title?: string}>  $wpPages
+     * @return list<array{url: string, anchor: string, topic: string, source: string, clicks: int}>
+     */
+    private function resolveSmartInternalLinks(
+        Website $website,
+        string $excludeUrl,
+        string $focusKeyword,
+        ?array $brief,
+        ?array $gaps,
+        array $wpPages = [],
+    ): array {
+        // Build a list of (topic_label, tokens) pairs. Each candidate URL
+        // is then matched against whichever topic shares the most tokens
+        // with its top GSC query.
+        $topics = [];
+
+        $addTopic = function (string $label) use (&$topics) {
+            $label = trim($label);
+            if ($label === '') {
+                return;
+            }
+            $tokens = $this->significantTokens($label);
+            if ($tokens === []) {
+                return;
+            }
+            $topics[] = ['label' => $label, 'tokens' => $tokens];
+        };
+
+        $addTopic($focusKeyword);
+        if (is_array($brief)) {
+            foreach (array_slice((array) ($brief['subtopics'] ?? []), 0, 20) as $t) {
+                if (is_string($t)) {
+                    $addTopic($t);
+                }
+            }
+            foreach (array_slice((array) ($brief['people_also_ask'] ?? []), 0, 20) as $t) {
+                if (is_string($t)) {
+                    $addTopic($t);
+                }
+            }
+            foreach (array_slice((array) ($brief['must_have_entities'] ?? []), 0, 20) as $t) {
+                if (is_string($t)) {
+                    $addTopic($t);
+                }
+            }
+        }
+        if (is_array($gaps)) {
+            foreach (array_slice((array) ($gaps['missing'] ?? []), 0, 20) as $row) {
+                if (is_array($row) && is_string($row['topic'] ?? null)) {
+                    $addTopic((string) $row['topic']);
+                }
+            }
+        }
+
+        if ($topics === []) {
+            return [];
+        }
+
+        // Union of all tokens across topics — the WHERE clause that pulls
+        // candidate rows. We score per-topic in PHP afterwards, so over-
+        // pulling here is fine.
+        $allTokens = [];
+        foreach ($topics as $t) {
+            foreach ($t['tokens'] as $tok) {
+                $allTokens[$tok] = true;
+            }
+        }
+        $allTokens = array_keys($allTokens);
+
+        try {
+            $tz = config('app.timezone');
+            $end = Carbon::yesterday($tz)->endOfDay();
+            $start = $end->copy()->subDays(89)->startOfDay();
+
+            $rows = SearchConsoleData::query()
+                ->where('website_id', $website->id)
+                ->whereDate('date', '>=', $start->toDateString())
+                ->whereDate('date', '<=', $end->toDateString())
+                ->where('page', '!=', '')
+                ->where('query', '!=', '')
+                ->when($excludeUrl !== '', fn ($q) => $q->where('page', '!=', $excludeUrl))
+                ->where(function ($w) use ($allTokens) {
+                    foreach ($allTokens as $tok) {
+                        $w->orWhere('query', 'LIKE', '%'.$tok.'%');
+                    }
+                })
+                ->selectRaw('page, query, SUM(clicks) AS clicks, SUM(impressions) AS impressions')
+                ->groupBy('page', 'query')
+                ->orderByDesc('clicks')
+                ->limit(200)
+                ->get();
+        } catch (\Throwable $e) {
+            Log::warning('AiWriterService: smart internal link lookup failed', [
+                'website_id' => $website->id,
+                'message' => $e->getMessage(),
+            ]);
+
+            return [];
+        }
+
+        // Score each (page, query) row against every topic; whichever
+        // topic shares the most tokens with the query becomes that row's
+        // best_fit_topic. Then keep the highest-scoring row per page.
+        $best = [];
+        foreach ($rows as $r) {
+            $page = (string) $r->page;
+            $query = (string) $r->query;
+            $clicks = (int) $r->clicks;
+            $impressions = (int) $r->impressions;
+            $signal = $clicks > 0 ? $clicks : max(1, (int) round($impressions / 10));
+
+            $queryLower = mb_strtolower($query);
+            $bestTopic = null;
+            $bestOverlap = 0;
+            foreach ($topics as $t) {
+                $overlap = 0;
+                foreach ($t['tokens'] as $tok) {
+                    if ($tok !== '' && str_contains($queryLower, $tok)) {
+                        $overlap++;
+                    }
+                }
+                if ($overlap > $bestOverlap) {
+                    $bestOverlap = $overlap;
+                    $bestTopic = $t['label'];
+                }
+            }
+            if ($bestTopic === null) {
+                continue;
+            }
+
+            $score = $signal * (1 + $bestOverlap);
+
+            if (! isset($best[$page]) || $best[$page]['score'] < $score) {
+                $best[$page] = [
+                    'url' => $page,
+                    'anchor' => $query,
+                    'topic' => $bestTopic,
+                    'source' => 'gsc',
+                    'clicks' => $clicks,
+                    'score' => $score,
+                ];
+            }
+        }
+
+        // WordPress fallback layer. Each plugin-supplied page is matched
+        // against topics by its TITLE, with a low synthetic signal so it
+        // only beats a GSC entry when overlap is dramatically stronger.
+        // GSC dedup wins: if a URL is already keyed in $best, skip it.
+        // ALL_TOKENS_MATCH bonus rewards titles whose tokens are entirely
+        // contained in a topic, which captures cases like a post titled
+        // "Vegan Protein Sources" matching the topic "vegan protein".
+        foreach ($wpPages as $row) {
+            if (! is_array($row)) {
+                continue;
+            }
+            $url = trim((string) ($row['url'] ?? ''));
+            $title = trim((string) ($row['title'] ?? ''));
+            if ($url === '' || $title === '' || $url === $excludeUrl || isset($best[$url])) {
+                continue;
+            }
+            $titleLower = mb_strtolower($title);
+            $bestTopic = null;
+            $bestOverlap = 0;
+            foreach ($topics as $t) {
+                $overlap = 0;
+                foreach ($t['tokens'] as $tok) {
+                    if ($tok !== '' && str_contains($titleLower, $tok)) {
+                        $overlap++;
+                    }
+                }
+                if ($overlap > $bestOverlap) {
+                    $bestOverlap = $overlap;
+                    $bestTopic = $t['label'];
+                }
+            }
+            if ($bestTopic === null || $bestOverlap === 0) {
+                continue;
+            }
+
+            // Synthetic signal — well below typical click counts so a
+            // GSC-backed candidate with even modest clicks outranks a
+            // perfect-overlap WP page. The 2× overlap multiplier keeps
+            // strongly-matching new content competitive.
+            $score = 1 + (2 * $bestOverlap);
+
+            $best[$url] = [
+                'url' => $url,
+                'anchor' => $title,
+                'topic' => $bestTopic,
+                'source' => 'wp',
+                'clicks' => 0,
+                'score' => $score,
+            ];
+        }
+
+        uasort($best, static fn (array $a, array $b) => $b['score'] <=> $a['score']);
+        $out = [];
+        foreach ($best as $row) {
+            unset($row['score']);
+            $out[] = $row;
+            if (count($out) >= 12) {
+                break;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function significantTokens(string $text): array
+    {
+        $text = mb_strtolower(trim($text));
+        if ($text === '') {
+            return [];
+        }
+        $parts = preg_split('/[^a-z0-9]+/u', $text) ?: [];
+        $stop = [
+            'the', 'and', 'for', 'with', 'a', 'an', 'of', 'to', 'in', 'on',
+            'is', 'are', 'or', 'be', 'do', 'does', 'how', 'what', 'why',
+            'when', 'where', 'who', 'which', 'can', 'will', 'should',
+            'this', 'that', 'these', 'those', 'has', 'have', 'had',
+            'as', 'at', 'by', 'it', 'its',
+        ];
+        $out = [];
+        foreach ($parts as $p) {
+            if (mb_strlen($p) >= 3 && ! in_array($p, $stop, true)) {
+                $out[$p] = true;
+            }
+            if (count($out) >= 6) {
+                break;
+            }
+        }
+
+        return array_keys($out);
     }
 
     /**
