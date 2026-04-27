@@ -1100,6 +1100,21 @@ class LiveSeoScoreService
     {
         $recs = is_array($audit->result['recommendations'] ?? null) ? $audit->result['recommendations'] : [];
 
+        // Drop recommendations the dedicated `keyword_alignment` factor
+        // already surfaces with full audit-saw transparency — otherwise
+        // the same "Primary keyword missing from <title>" message shows
+        // up twice (once in keyword_alignment with context, once in Top
+        // fixes without context). The duplicate has no audit-saw
+        // diagnostic, so it reads as a hard-fact accusation when the
+        // user might have set the title correctly in their SEO field
+        // but another plugin is winning the wp_head race.
+        $duplicateIds = ['kw.placement.title', 'kw.placement.h1', 'kw.placement.desc'];
+        $recs = array_values(array_filter($recs, static function ($r) use ($duplicateIds) {
+            if (! is_array($r)) return false;
+            $id = (string) ($r['id'] ?? '');
+            return ! in_array($id, $duplicateIds, true);
+        }));
+
         $counts = ['critical' => 0, 'warning' => 0, 'serp_gap' => 0, 'info' => 0, 'good' => 0];
         foreach ($recs as $r) {
             $sev = is_array($r) && isset($r['severity']) ? (string) $r['severity'] : 'info';
