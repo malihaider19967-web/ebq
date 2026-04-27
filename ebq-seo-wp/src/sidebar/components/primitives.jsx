@@ -171,9 +171,20 @@ export function CharGauge({ length = 0, goodMin = 0, goodMax, hardMax }) {
 export function ScoreBadge({ kind = 'offline', score = 0, displayScore, label, caption, onClick, ariaExpanded, badge, trailing }) {
 	const safeScore = Math.max(0, Math.min(100, Number(score) || 0));
 	const level = safeScore >= 65 ? 'good' : safeScore >= 45 ? 'warn' : 'bad';
-	const colorVar = kind === 'live'
-		? (level === 'good' ? 'var(--ebq-good)' : level === 'warn' ? 'var(--ebq-warn)' : 'var(--ebq-bad)')
-		: 'var(--ebq-accent)';
+	// When the caller passes a non-numeric displayScore (e.g. "—" while
+	// the audit can't run on a non-public URL), don't color the ring as
+	// bad-red just because score is 0 — that misreads as "you're failing"
+	// when the truth is "we can't grade this yet". Render a neutral
+	// muted ring instead and keep the rest of the layout intact.
+	const isPlaceholder = displayScore !== undefined && displayScore !== null && typeof displayScore !== 'number' && isNaN(Number(displayScore));
+	const colorVar = isPlaceholder
+		? 'var(--ebq-text-soft)'
+		: (kind === 'live'
+			? (level === 'good' ? 'var(--ebq-good)' : level === 'warn' ? 'var(--ebq-warn)' : 'var(--ebq-bad)')
+			: 'var(--ebq-accent)');
+	// Empty-state ring should fill all the way (visual: a "muted full
+	// circle") rather than partially based on a misleading 0.
+	const ringFill = isPlaceholder ? 100 : safeScore;
 	const cls = `ebq-scorebadge ebq-scorebadge--${kind}${onClick ? ' is-clickable' : ''}`;
 	// Caption is line-clamped to 2 lines visually; use `title` so the full
 	// message reveals on hover. Required for explanations like the GSC
@@ -182,7 +193,7 @@ export function ScoreBadge({ kind = 'offline', score = 0, displayScore, label, c
 	const captionStr = typeof caption === 'string' ? caption : '';
 	const inner = (
 		<>
-			<div className="ebq-scorebadge__ring" style={{ '--p': safeScore, '--col': colorVar }}>
+			<div className="ebq-scorebadge__ring" style={{ '--p': ringFill, '--col': colorVar }}>
 				<span className="ebq-scorebadge__num">{displayScore ?? safeScore}</span>
 			</div>
 			<div className="ebq-scorebadge__main">

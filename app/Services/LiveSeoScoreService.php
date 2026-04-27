@@ -315,6 +315,20 @@ class LiveSeoScoreService
         $partial = ! $gscHasData || ! $auditReady;
         $partialReason = $this->buildPartialReason($gscHasData, $gscIsSparse, $impressions, $auditReady, $auditState['status']);
 
+        // Suppress the composite score number when there isn't enough
+        // signal to compose one honestly. With both the audit blocked
+        // (non-public post) AND GSC empty, the score collapses to just
+        // indexing + backlinks + tracked-keyword — too thin to grade
+        // a page on. The breakdown still renders so the user can act on
+        // whatever individual factors ARE live; the chip just shows "—"
+        // instead of a misleading number.
+        $auditBlocked = ($auditState['status'] ?? '') === 'blocked';
+        $suppressScore = $auditBlocked && ! $gscHasData;
+        if ($suppressScore) {
+            $score = null;
+            $label = $auditBlocked ? 'Awaiting publish' : 'Awaiting data';
+        }
+
         return [
             'score' => $score,
             'label' => $label,

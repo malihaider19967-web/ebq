@@ -163,6 +163,16 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected, onSetu
 		if (!data || data.available === false) {
 			caption = __('No live data yet', 'ebq-seo');
 			setupCard = liveScoreUnavailable(data?.reason || null, cfg);
+		} else if (data.score === null || data.score === undefined) {
+			// Backend deliberately suppressed the composite — not enough
+			// signal to score honestly (audit blocked + GSC empty). Show
+			// a dash; keep the popover clickable so the user can still
+			// see the factor breakdown and act on whatever IS live
+			// (offline on-page checks, indexing, backlinks).
+			score = 0;
+			displayScore = '—';
+			canOpen = true;
+			caption = data.label || __('Awaiting publish', 'ebq-seo');
 		} else {
 			score = Number(data.score) || 0;
 			displayScore = score;
