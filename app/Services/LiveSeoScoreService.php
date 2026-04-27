@@ -211,21 +211,23 @@ class LiveSeoScoreService
             $auditReady = false;
         }
 
-        // Also detect "audit completed but the fetch must have failed":
-        // the auditor ran but came back with no title, no H1, AND no
-        // meta description. That's not a real page response — it's a
-        // 404 / login wall / placeholder URL. Treat as not-ready so we
-        // don't surface phantom "Missing from: SEO title, meta description"
-        // recommendations when the editor side has them set correctly.
+        // Also detect "audit completed but the fetch must have failed".
+        // The audit result lives at:
+        //   metadata.title              ← <title> tag text
+        //   metadata.meta_description   ← <meta name=description content>
+        //   content.headings[*]         ← {level, text} array
+        //
+        // If `<title>` is empty, the auditor didn't actually fetch a real
+        // page (every rendered HTML has a title). That's a 404 / login
+        // wall / placeholder-URL fetch — the keyword-placement factor
+        // would then surface phantom "Missing from: SEO title, meta
+        // description" recommendations even when the editor side is set
+        // correctly. Treat as not-ready so the user gets a clear failed
+        // message instead.
         if ($auditReady && $latestAudit && is_array($latestAudit->result)) {
-            $auditTitle = trim((string) data_get($latestAudit->result, 'on_page.title', '')
-                ?: data_get($latestAudit->result, 'metadata.title', ''));
-            $auditH1 = trim((string) data_get($latestAudit->result, 'on_page.h1', '')
-                ?: data_get($latestAudit->result, 'headings.h1.0', ''));
-            $auditMeta = trim((string) data_get($latestAudit->result, 'on_page.meta_description', '')
-                ?: data_get($latestAudit->result, 'metadata.description', ''));
-            if ($auditTitle === '' && $auditH1 === '' && $auditMeta === '') {
-                Log::info('LiveSeoScoreService: audit completed but content empty — likely a failed fetch', [
+            $auditTitle = trim((string) data_get($latestAudit->result, 'metadata.title', ''));
+            if ($auditTitle === '') {
+                Log::info('LiveSeoScoreService: audit completed but <title> is empty — likely a failed fetch', [
                     'website_id' => $website->id,
                     'url' => $url,
                     'audit_id' => $latestAudit->id,
@@ -234,7 +236,7 @@ class LiveSeoScoreService
                 if (($auditState['status'] ?? '') !== 'blocked') {
                     $auditState = [
                         'status' => 'failed',
-                        'message' => 'The previous audit fetched a page with no title, H1, or meta description — most likely a 404 or login wall. Re-trigger the audit from HQ → Page Audits to retry.',
+                        'message' => 'The previous audit fetched a page with no <title> tag — most likely a 404, login wall, or placeholder URL. Re-trigger the audit from HQ → Page Audits to retry.',
                         'audited_at' => $latestAudit->audited_at?->toIso8601String(),
                     ];
                 }
@@ -1030,14 +1032,42 @@ class LiveSeoScoreService
             $detail .= sprintf(' Runner-up term in this content: "%s".', $runnerUpQuery);
         }
 
+        // Surface what the audit ACTUALLY saw in the rendered HTML so
+        // the user can reconcile when their editor / SEO-fields view
+        // differs (e.g. another SEO plugin is winning the wp_head race,
+        // or the theme is rendering the post title verbatim). Without
+        // this transparency, "Missing from SEO title" is gaslighting
+        // when the user has set the title correctly in their plugin.
+        $items = [];
+        $auditTitle    = trim((string) data_get($audit->result, 'metadata.title', ''));
+        $auditMeta     = trim((string) data_get($audit->result, 'metadata.meta_description', ''));
+        $auditH1Texts  = array_values(array_filter(array_map(
+            static fn ($h) => is_array($h) && (int) ($h['level'] ?? 0) === 1 ? trim((string) ($h['text'] ?? '')) : '',
+            (array) data_get($audit->result, 'content.headings', []),
+        )));
+        $firstH1 = $auditH1Texts[0] ?? '';
+        if ($auditTitle !== '') {
+            $items[] = sprintf('Audit saw title: "%s"', mb_substr($auditTitle, 0, 140));
+        }
+        if ($firstH1 !== '') {
+            $items[] = sprintf('Audit saw H1: "%s"', mb_substr($firstH1, 0, 140));
+        }
+        if ($auditMeta !== '') {
+            $items[] = sprintf('Audit saw meta description: "%s"', mb_substr($auditMeta, 0, 200));
+        }
+
         $recommendation = null;
         if ($score < 90 && $missing !== []) {
             $kwText = $focusKeyword !== null && $focusKeyword !== '' ? '"' . $focusKeyword . '"' : 'the focus keyphrase';
+            $reconcileHint = ($auditTitle !== '' && ! $inTitle && $focusKeyword !== null && $focusKeyword !== '')
+                ? sprintf(' Heads-up: the audit fetched the live page and parsed the <title> tag as "%s". If that doesn\'t match what you set in the EBQ SEO field, another plugin or theme may be overriding the title — check the page\'s rendered HTML.', mb_substr($auditTitle, 0, 140))
+                : '';
             $recommendation = sprintf(
-                'Place %s in the missing slot%s: %s. Title and H1 carry the most weight; meta description influences CTR (which loops back into rank).',
+                'Place %s in the missing slot%s: %s. Title and H1 carry the most weight; meta description influences CTR (which loops back into rank).%s',
                 $kwText,
                 count($missing) === 1 ? '' : 's',
                 implode(' + ', $missing),
+                $reconcileHint,
             );
         }
 
@@ -1048,6 +1078,7 @@ class LiveSeoScoreService
             'weight' => 7,
             'detail' => $detail,
             'recommendation' => $recommendation,
+            'items' => $items === [] ? null : $items,
         ];
     }
 
