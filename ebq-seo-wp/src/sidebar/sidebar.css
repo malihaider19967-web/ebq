@@ -2639,6 +2639,24 @@
 	font-weight: 700;
 	color: var(--ebq-text);
 }
+.ebq-live-score__pop-titlewrap {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	min-width: 0;
+	flex: 1;
+}
+.ebq-live-score__pop-url {
+	font-size: 11px;
+	color: var(--ebq-accent);
+	text-decoration: none;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	max-width: 100%;
+}
+.ebq-live-score__pop-url:hover { text-decoration: underline; }
 .ebq-live-score__pop-close {
 	background: 0; border: 0; cursor: pointer;
 	font-size: 20px; line-height: 1; color: var(--ebq-text-soft);

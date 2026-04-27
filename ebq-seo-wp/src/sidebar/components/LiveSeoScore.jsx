@@ -232,7 +232,18 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected, onSetu
 					style={{ top: anchor.top, left: anchor.left, width: anchor.width }}
 				>
 					<header className="ebq-live-score__pop-head">
-						<strong>{__('Live SEO score breakdown', 'ebq-seo')}</strong>
+						<div className="ebq-live-score__pop-titlewrap">
+							<strong>{__('Live SEO score breakdown', 'ebq-seo')}</strong>
+							{data.audited_url ? (
+								<a
+									href={data.audited_url}
+									target="_blank"
+									rel="noopener noreferrer"
+									className="ebq-live-score__pop-url"
+									title={data.audited_url}
+								>{shortenUrl(data.audited_url)}</a>
+							) : null}
+						</div>
 						<button
 							type="button"
 							className="ebq-live-score__pop-close"
@@ -312,4 +323,20 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected, onSetu
 			) : null}
 		</>
 	);
+}
+
+/**
+ * Shorten a permalink for display in the popover header. Keep the
+ * pathname (which the user actually recognizes) and drop the protocol +
+ * host. Falls back to the raw string if URL parsing fails (e.g. classic
+ * editor handing us a relative permalink draft).
+ */
+function shortenUrl(url) {
+	try {
+		const u = new URL(url);
+		const path = (u.pathname || '/') + (u.search || '') + (u.hash || '');
+		return path.length > 1 ? path : u.host;
+	} catch (_) {
+		return String(url || '');
+	}
 }

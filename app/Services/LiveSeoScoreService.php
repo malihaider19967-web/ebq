@@ -114,13 +114,18 @@ class LiveSeoScoreService
         $avgPos = $gsc && $gsc->position !== null ? (float) $gsc->position : null;
         $avgCtr = $gsc && $gsc->ctr !== null ? (float) $gsc->ctr : null;
 
-        // GSC data is missing on every freshly-published URL until Google
-        // starts surfacing it (~1–7 days). Don't short-circuit the score
-        // — fall through and build it from audit + indexing + backlinks
-        // alone. The four GSC-only factors below become pending entries;
-        // the existing weighted composite (line ~250) already skips
-        // pending factors and re-distributes their weight automatically.
-        $gscHasData = ($impressions > 0 || $avgPos !== null);
+        // GSC sample sufficiency. A handful of impressions on long-tail
+        // queries gives a mathematically real but practically meaningless
+        // "average position 69 across 2 queries" — scoring on that lies
+        // to the user. Require a non-trivial sample before rank/CTR/
+        // coverage/cannibalization are treated as real signal.
+        //
+        // Threshold: 10 impressions over the 30-day window. Below that
+        // we treat GSC the same as "no data yet" — the four factors go
+        // pending and the partial-state banner explains why.
+        $MIN_GSC_IMPRESSIONS = 10;
+        $gscHasData = $impressions >= $MIN_GSC_IMPRESSIONS;
+        $gscIsSparse = $impressions > 0 && $impressions < $MIN_GSC_IMPRESSIONS;
 
         // ── Focus-keyword rank ──────────────────────────────────
         $kwRank = null;
@@ -244,7 +249,14 @@ class LiveSeoScoreService
             $factors[] = $this->factorCoverage($coverage);
             $factors[] = $this->factorCannibalization($cannibalized);
         } else {
-            $gscMsg = 'Google Search Console has no impressions for this URL yet. Fills in within a few days of publishing once Google starts surfacing the page.';
+            $gscMsg = $gscIsSparse
+                ? sprintf(
+                    'Only %d impression%s recorded so far — too sparse to score meaningfully. The rank, CTR, and coverage factors will turn live once at least %d impressions accumulate (typically within a week of indexing).',
+                    $impressions,
+                    $impressions === 1 ? '' : 's',
+                    $MIN_GSC_IMPRESSIONS,
+                )
+                : 'Google Search Console has no impressions for this URL yet. Fills in within a few days of publishing once Google starts surfacing the page.';
             $factors[] = $this->pendingFactor('rank', 'Average rank', $gscMsg);
             $factors[] = $this->pendingFactor('ctr', 'Click-through rate', $gscMsg);
             $factors[] = $this->pendingFactor('coverage', 'Query coverage', $gscMsg);
@@ -299,7 +311,7 @@ class LiveSeoScoreService
         $explanation = $this->buildExplanation($score, $rankBasis, $cannibalized, $coverage, $kwRank !== null, $auditState['status']);
 
         $partial = ! $gscHasData || ! $auditReady;
-        $partialReason = $this->buildPartialReason($gscHasData, $auditReady, $auditState['status']);
+        $partialReason = $this->buildPartialReason($gscHasData, $gscIsSparse, $impressions, $auditReady, $auditState['status']);
 
         return [
             'score' => $score,
@@ -307,6 +319,7 @@ class LiveSeoScoreService
             'available' => true,
             'partial' => $partial,
             'partial_reason' => $partialReason,
+            'audited_url' => $url, // echo back the canonical URL so the UI can show it
             'audit' => $auditState,
             'factors' => $factors,
             'explanation' => $explanation,
@@ -318,7 +331,7 @@ class LiveSeoScoreService
      * primary signal sources (GSC, on-page audit) is not yet available.
      * `null` when both are present and the score is fully grounded.
      */
-    private function buildPartialReason(bool $gscHasData, bool $auditReady, string $auditStatus): ?string
+    private function buildPartialReason(bool $gscHasData, bool $gscIsSparse, int $impressions, bool $auditReady, string $auditStatus): ?string
     {
         if ($gscHasData && $auditReady) {
             return null;
@@ -328,10 +341,20 @@ class LiveSeoScoreService
             $auditPart = in_array($auditStatus, ['queued', 'running', 'refreshing'], true)
                 ? 'on-page audit running'
                 : 'on-page audit pending';
-            return "Provisional score — {$auditPart}, GSC data pending. Both fill in shortly after the post is published.";
+            $gscPart = $gscIsSparse
+                ? sprintf('GSC data sparse (only %d impression%s)', $impressions, $impressions === 1 ? '' : 's')
+                : 'GSC data pending';
+            return "Provisional score — {$auditPart}, {$gscPart}. Both fill in shortly after the post is published.";
         }
 
         if (! $gscHasData) {
+            if ($gscIsSparse) {
+                return sprintf(
+                    'Provisional score — only %d Search Console impression%s for this URL so far. Rank, CTR, coverage, and cannibalization will turn live once at least 10 impressions accumulate (usually within a week of indexing).',
+                    $impressions,
+                    $impressions === 1 ? '' : 's',
+                );
+            }
             return 'Provisional score — based on the on-page audit only. Rank, CTR, coverage, and cannibalization fill in once Google starts surfacing this URL in search results.';
         }
 
