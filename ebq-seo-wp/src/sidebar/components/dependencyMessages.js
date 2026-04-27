@@ -32,14 +32,19 @@ export function liveScoreUnavailable(reason, cfg) {
 				action: { label: t('Open EBQ settings', 'Open EBQ settings'), url: cfg.settingsUrl },
 				tone: 'warn',
 			};
-		case 'no_gsc_data_for_url':
+		// `no_gsc_data_for_url` was the previous fallback. It's no longer
+		// returned by the backend — fresh URLs now produce a partial
+		// score from audit + indexing + backlinks, with a "Provisional"
+		// banner shown inside the score popover instead of a setup card.
+		// Kept the default branch as a generic safety net for any new
+		// reason the backend might surface.
 		default:
 			return {
 				feature: t('Live SEO score', 'Live SEO score'),
-				why: t('Google Search Console hasn\'t recorded any impressions for this URL yet.', 'Google Search Console hasn\'t recorded any impressions for this URL yet.'),
-				fix: t('Make sure Search Console is connected to your EBQ workspace and the page is indexed. New pages typically appear in GSC 3–7 days after Google first crawls them.', 'Make sure Search Console is connected to your EBQ workspace and the page is indexed. New pages typically appear in GSC 3–7 days after Google first crawls them.'),
-				action: cfg.appBase ? { label: t('Open EBQ settings', 'Open EBQ settings'), url: cfg.appBase + '/settings' } : null,
-				tone: 'info',
+				why: t('The live score is unavailable for this URL right now.', 'The live score is unavailable for this URL right now.'),
+				fix: t('Reload the editor in a moment. If this persists, check that the EBQ connection is active in plugin settings.', 'Reload the editor in a moment. If this persists, check that the EBQ connection is active in plugin settings.'),
+				action: cfg.settingsUrl ? { label: t('Open EBQ settings', 'Open EBQ settings'), url: cfg.settingsUrl } : null,
+				tone: 'warn',
 			};
 	}
 }

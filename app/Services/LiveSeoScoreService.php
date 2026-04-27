@@ -34,6 +34,26 @@ use Illuminate\Support\Facades\Log;
  * don't re-audit (no content-hash check yet) — the user can manually re-audit
  * from HQ if they want fresh CWV/perf data.
  *
+ * GSC gating (the "fresh URL" case)
+ * ─────────────────────────────────
+ * Every freshly-published URL spends the first ~1–7 days with zero GSC
+ * impressions. Rather than blanking the entire score in that window, we
+ * mark the four GSC-only factors as `pending` and let the rest of the
+ * factor stack carry the weight. `partial: true` is set on the response
+ * so the UI can render an advisory banner. Factor availability map:
+ *
+ *   GSC-only (pending without GSC):
+ *     rank, ctr, coverage, cannibalization
+ *
+ *   Available without GSC:
+ *     indexing (PageIndexingStatus, null-safe)
+ *     backlinks (Backlink table + KE sync)
+ *     core_web_vitals, page_performance, on_page_seo, technical_health,
+ *     content_quality, keyword_alignment, recommendations (audit blob)
+ *     tracked-keyword nudge
+ *
+ * → 9 of 13 factors compose the score on a brand-new URL.
+ *
  * URL matching uses `PluginInsightResolver::__publicPageVariants()` so we
  * match GSC rows regardless of:
  *   - trailing slash drift  (`/abc/xyz` vs `/abc/xyz/`)
@@ -94,13 +114,17 @@ class LiveSeoScoreService
         $avgPos = $gsc && $gsc->position !== null ? (float) $gsc->position : null;
         $avgCtr = $gsc && $gsc->ctr !== null ? (float) $gsc->ctr : null;
 
-        if ($impressions === 0 && $avgPos === null) {
-            return $this->unavailable('no_gsc_data_for_url', $this->buildDiagnostics($website, $url, $variants));
-        }
+        // GSC data is missing on every freshly-published URL until Google
+        // starts surfacing it (~1–7 days). Don't short-circuit the score
+        // — fall through and build it from audit + indexing + backlinks
+        // alone. The four GSC-only factors below become pending entries;
+        // the existing weighted composite (line ~250) already skips
+        // pending factors and re-distributes their weight automatically.
+        $gscHasData = ($impressions > 0 || $avgPos !== null);
 
         // ── Focus-keyword rank ──────────────────────────────────
         $kwRank = null;
-        if ($focusKeyword !== null && $focusKeyword !== '') {
+        if ($gscHasData && $focusKeyword !== null && $focusKeyword !== '') {
             $kwRow = SearchConsoleData::query()
                 ->where('website_id', $website->id)
                 ->whereDate('date', '>=', $start30->toDateString())
@@ -115,19 +139,22 @@ class LiveSeoScoreService
         }
 
         // ── Coverage breadth ─────────────────────────────────────
-        $coverage = (int) SearchConsoleData::query()
-            ->where('website_id', $website->id)
-            ->whereDate('date', '>=', $start30->toDateString())
-            ->whereDate('date', '<=', $end->toDateString())
-            ->tap(fn ($q) => $this->resolver->__publicApplyPageMatch($q, $url))
-            ->where('query', '!=', '')
-            ->where('position', '<=', 100)
-            ->distinct('query')
-            ->count('query');
+        $coverage = 0;
+        if ($gscHasData) {
+            $coverage = (int) SearchConsoleData::query()
+                ->where('website_id', $website->id)
+                ->whereDate('date', '>=', $start30->toDateString())
+                ->whereDate('date', '<=', $end->toDateString())
+                ->tap(fn ($q) => $this->resolver->__publicApplyPageMatch($q, $url))
+                ->where('query', '!=', '')
+                ->where('position', '<=', 100)
+                ->distinct('query')
+                ->count('query');
+        }
 
         // ── Cannibalization ──────────────────────────────────────
         $cannibalized = false;
-        if ($focusKeyword !== null && $focusKeyword !== '') {
+        if ($gscHasData && $focusKeyword !== null && $focusKeyword !== '') {
             $competingPages = SearchConsoleData::query()
                 ->where('website_id', $website->id)
                 ->whereDate('date', '>=', $start30->toDateString())
@@ -202,14 +229,27 @@ class LiveSeoScoreService
         $factors = [];
         $rankBasis = $kwRank ?? $avgPos ?? 100.0;
 
-        // GSC-derived (always available once we have impressions). Rank
-        // takes the audit so it can discount when SERP features dominate
-        // the query (an organic #5 sometimes hides below an answer box +
-        // PAA + image pack — that needs to read as worse than rank alone).
-        $factors[] = $this->factorRank($kwRank, $avgPos, $focusKeyword, $rankBasis, $auditReady ? $latestAudit : null);
-        $factors[] = $this->factorCtr($avgCtr ?? 0.0, $rankBasis);
-        $factors[] = $this->factorCoverage($coverage);
-        $factors[] = $this->factorCannibalization($cannibalized);
+        // GSC-derived. When GSC has no impressions for the URL yet
+        // (every freshly-published post for the first ~1–7 days), these
+        // four factors are pending — score still composes from the
+        // audit-derived factors below + indexing + backlinks. The
+        // existing weighted composite skips pending entries.
+        if ($gscHasData) {
+            // Rank takes the audit so it can discount when SERP features
+            // dominate the query (an organic #5 sometimes hides below an
+            // answer box + PAA + image pack — that needs to read as worse
+            // than rank alone).
+            $factors[] = $this->factorRank($kwRank, $avgPos, $focusKeyword, $rankBasis, $auditReady ? $latestAudit : null);
+            $factors[] = $this->factorCtr($avgCtr ?? 0.0, $rankBasis);
+            $factors[] = $this->factorCoverage($coverage);
+            $factors[] = $this->factorCannibalization($cannibalized);
+        } else {
+            $gscMsg = 'Google Search Console has no impressions for this URL yet. Fills in within a few days of publishing once Google starts surfacing the page.';
+            $factors[] = $this->pendingFactor('rank', 'Average rank', $gscMsg);
+            $factors[] = $this->pendingFactor('ctr', 'Click-through rate', $gscMsg);
+            $factors[] = $this->pendingFactor('coverage', 'Query coverage', $gscMsg);
+            $factors[] = $this->pendingFactor('cannibalization', 'Cannibalization risk', $gscMsg);
+        }
 
         // Indexing (always available — even null state has a recommendation)
         $factors[] = $this->factorIndexing($indexing);
@@ -258,14 +298,46 @@ class LiveSeoScoreService
         $label = $score >= 65 ? 'Good' : ($score >= 45 ? 'Needs work' : 'Bad');
         $explanation = $this->buildExplanation($score, $rankBasis, $cannibalized, $coverage, $kwRank !== null, $auditState['status']);
 
+        $partial = ! $gscHasData || ! $auditReady;
+        $partialReason = $this->buildPartialReason($gscHasData, $auditReady, $auditState['status']);
+
         return [
             'score' => $score,
             'label' => $label,
             'available' => true,
+            'partial' => $partial,
+            'partial_reason' => $partialReason,
             'audit' => $auditState,
             'factors' => $factors,
             'explanation' => $explanation,
         ];
+    }
+
+    /**
+     * Human-readable advisory shown above the score when one of the two
+     * primary signal sources (GSC, on-page audit) is not yet available.
+     * `null` when both are present and the score is fully grounded.
+     */
+    private function buildPartialReason(bool $gscHasData, bool $auditReady, string $auditStatus): ?string
+    {
+        if ($gscHasData && $auditReady) {
+            return null;
+        }
+
+        if (! $gscHasData && ! $auditReady) {
+            $auditPart = in_array($auditStatus, ['queued', 'running', 'refreshing'], true)
+                ? 'on-page audit running'
+                : 'on-page audit pending';
+            return "Provisional score — {$auditPart}, GSC data pending. Both fill in shortly after the post is published.";
+        }
+
+        if (! $gscHasData) {
+            return 'Provisional score — based on the on-page audit only. Rank, CTR, coverage, and cannibalization fill in once Google starts surfacing this URL in search results.';
+        }
+
+        // GSC ready, audit not — already happens today on stale audit;
+        // existing behavior is to show prior data while refreshing.
+        return 'Provisional score — on-page audit running. Audit-derived factors will refresh when complete.';
     }
 
     /* ──────────────────────────────────────────────────────────────

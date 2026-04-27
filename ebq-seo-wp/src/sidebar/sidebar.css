@@ -2591,6 +2591,7 @@
 .ebq-audit-banner--queued     { border-left-color: var(--ebq-accent); }
 .ebq-audit-banner--refreshing { border-left-color: var(--ebq-accent); background: color-mix(in srgb, var(--ebq-accent) 10%, var(--ebq-bg)); }
 .ebq-audit-banner--failed     { border-left-color: var(--ebq-bad);    background: color-mix(in srgb, var(--ebq-bad) 8%, var(--ebq-bg)); }
+.ebq-audit-banner--partial    { border-left-color: var(--ebq-warn);   background: color-mix(in srgb, var(--ebq-warn) 7%, var(--ebq-bg)); }
 .ebq-audit-banner strong {
 	display: block;
 	font-size: 12px;

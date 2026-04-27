@@ -173,6 +173,12 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected, onSetu
 					: __('Audit queued…', 'ebq-seo');
 			} else if (auditStatus === 'refreshing') {
 				caption = __('Re-auditing — post was updated', 'ebq-seo');
+			} else if (data.partial) {
+				// Freshly-published URL: GSC factors are pending. The
+				// score is still composed from audit + indexing +
+				// backlinks; surface that here so the user knows
+				// what it represents and that it'll fill in.
+				caption = __('Provisional · audit-only signals', 'ebq-seo');
 			} else {
 				caption = data.label || '';
 			}
@@ -256,6 +262,15 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected, onSetu
 							<div>
 								<strong>{__('Last audit failed', 'ebq-seo')}</strong>
 								<p>{data.audit.message}</p>
+							</div>
+						</div>
+					) : null}
+
+					{data.partial && data.partial_reason ? (
+						<div className="ebq-audit-banner ebq-audit-banner--partial">
+							<div>
+								<strong>{__('Provisional score', 'ebq-seo')}</strong>
+								<p>{data.partial_reason}</p>
 							</div>
 						</div>
 					) : null}
