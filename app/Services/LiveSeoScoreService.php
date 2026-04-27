@@ -1032,33 +1032,55 @@ class LiveSeoScoreService
             $detail .= sprintf(' Runner-up term in this content: "%s".', $runnerUpQuery);
         }
 
-        // Surface what the audit ACTUALLY saw in the rendered HTML so
-        // the user can reconcile when their editor / SEO-fields view
-        // differs (e.g. another SEO plugin is winning the wp_head race,
-        // or the theme is rendering the post title verbatim). Without
-        // this transparency, "Missing from SEO title" is gaslighting
-        // when the user has set the title correctly in their plugin.
+        // Surface what the audit ACTUALLY saw in the rendered HTML, but
+        // ONLY when there's a discrepancy to diagnose. When everything
+        // passes ($missing === []), the cards are noise. When the user
+        // is told something is missing, the audit-saw items help them
+        // reconcile (e.g. another SEO plugin winning the wp_head race).
+        // Items must match CheckCard's shape: {severity, title, why?, fix?}.
         $items = [];
-        $auditTitle    = trim((string) data_get($audit->result, 'metadata.title', ''));
-        $auditMeta     = trim((string) data_get($audit->result, 'metadata.meta_description', ''));
-        $auditH1Texts  = array_values(array_filter(array_map(
-            static fn ($h) => is_array($h) && (int) ($h['level'] ?? 0) === 1 ? trim((string) ($h['text'] ?? '')) : '',
-            (array) data_get($audit->result, 'content.headings', []),
-        )));
-        $firstH1 = $auditH1Texts[0] ?? '';
-        if ($auditTitle !== '') {
-            $items[] = sprintf('Audit saw title: "%s"', mb_substr($auditTitle, 0, 140));
-        }
-        if ($firstH1 !== '') {
-            $items[] = sprintf('Audit saw H1: "%s"', mb_substr($firstH1, 0, 140));
-        }
-        if ($auditMeta !== '') {
-            $items[] = sprintf('Audit saw meta description: "%s"', mb_substr($auditMeta, 0, 200));
+        if ($missing !== []) {
+            $auditTitle    = trim((string) data_get($audit->result, 'metadata.title', ''));
+            $auditMeta     = trim((string) data_get($audit->result, 'metadata.meta_description', ''));
+            $auditH1Texts  = array_values(array_filter(array_map(
+                static fn ($h) => is_array($h) && (int) ($h['level'] ?? 0) === 1 ? trim((string) ($h['text'] ?? '')) : '',
+                (array) data_get($audit->result, 'content.headings', []),
+            )));
+            $firstH1 = $auditH1Texts[0] ?? '';
+
+            if (! $inTitle) {
+                $items[] = [
+                    'severity' => 'info',
+                    'title'    => '<title>',
+                    'why'      => $auditTitle !== ''
+                        ? sprintf('Audit saw: "%s"', mb_substr($auditTitle, 0, 140))
+                        : 'Audit saw an empty <title> tag.',
+                ];
+            }
+            if (! $inH1) {
+                $items[] = [
+                    'severity' => 'info',
+                    'title'    => '<h1>',
+                    'why'      => $firstH1 !== ''
+                        ? sprintf('Audit saw: "%s"', mb_substr($firstH1, 0, 140))
+                        : 'Audit found no <h1> on the page.',
+                ];
+            }
+            if (! $inMeta) {
+                $items[] = [
+                    'severity' => 'info',
+                    'title'    => '<meta name="description">',
+                    'why'      => $auditMeta !== ''
+                        ? sprintf('Audit saw: "%s"', mb_substr($auditMeta, 0, 200))
+                        : 'Audit saw an empty meta description tag.',
+                ];
+            }
         }
 
         $recommendation = null;
         if ($score < 90 && $missing !== []) {
             $kwText = $focusKeyword !== null && $focusKeyword !== '' ? '"' . $focusKeyword . '"' : 'the focus keyphrase';
+            $auditTitle = trim((string) data_get($audit->result, 'metadata.title', ''));
             $reconcileHint = ($auditTitle !== '' && ! $inTitle && $focusKeyword !== null && $focusKeyword !== '')
                 ? sprintf(' Heads-up: the audit fetched the live page and parsed the <title> tag as "%s". If that doesn\'t match what you set in the EBQ SEO field, another plugin or theme may be overriding the title — check the page\'s rendered HTML.', mb_substr($auditTitle, 0, 140))
                 : '';
