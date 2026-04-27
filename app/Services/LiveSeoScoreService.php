@@ -200,6 +200,47 @@ class LiveSeoScoreService
 
         $auditState = $this->resolveAuditState($website, $url, $focusKeyword, $latestAudit, $auditReady, $auditStale, $postStatus);
 
+        // When the audit is currently blocked (non-public post), the only
+        // audit data we could possibly have is from when the post WAS
+        // public — or worse, from an old fetch that hit a 404 / login
+        // page (e.g. "Primary keyword missing from <title>" surfaced even
+        // though the editor's title is fine). Suppress the stale audit
+        // factors entirely while blocked; pending placeholders render
+        // instead with a clear "publish to enable" message.
+        if (($auditState['status'] ?? '') === 'blocked') {
+            $auditReady = false;
+        }
+
+        // Also detect "audit completed but the fetch must have failed":
+        // the auditor ran but came back with no title, no H1, AND no
+        // meta description. That's not a real page response — it's a
+        // 404 / login wall / placeholder URL. Treat as not-ready so we
+        // don't surface phantom "Missing from: SEO title, meta description"
+        // recommendations when the editor side has them set correctly.
+        if ($auditReady && $latestAudit && is_array($latestAudit->result)) {
+            $auditTitle = trim((string) data_get($latestAudit->result, 'on_page.title', '')
+                ?: data_get($latestAudit->result, 'metadata.title', ''));
+            $auditH1 = trim((string) data_get($latestAudit->result, 'on_page.h1', '')
+                ?: data_get($latestAudit->result, 'headings.h1.0', ''));
+            $auditMeta = trim((string) data_get($latestAudit->result, 'on_page.meta_description', '')
+                ?: data_get($latestAudit->result, 'metadata.description', ''));
+            if ($auditTitle === '' && $auditH1 === '' && $auditMeta === '') {
+                Log::info('LiveSeoScoreService: audit completed but content empty — likely a failed fetch', [
+                    'website_id' => $website->id,
+                    'url' => $url,
+                    'audit_id' => $latestAudit->id,
+                ]);
+                $auditReady = false;
+                if (($auditState['status'] ?? '') !== 'blocked') {
+                    $auditState = [
+                        'status' => 'failed',
+                        'message' => 'The previous audit fetched a page with no title, H1, or meta description — most likely a 404 or login wall. Re-trigger the audit from HQ → Page Audits to retry.',
+                        'audited_at' => $latestAudit->audited_at?->toIso8601String(),
+                    ];
+                }
+            }
+        }
+
         // ── Indexing ─────────────────────────────────────────────
         $indexing = PageIndexingStatus::query()
             ->where('website_id', $website->id)
