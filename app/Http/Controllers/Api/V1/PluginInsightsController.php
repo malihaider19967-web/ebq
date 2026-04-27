@@ -288,7 +288,12 @@ class PluginInsightsController extends Controller
             }
         }
 
-        $payload = $service->score($website, $url, $kw !== '' ? $kw : null, $postModifiedAt);
+        // Post status: 'publish' is the only fetchable state. Anything
+        // else ('draft', 'pending', 'private', 'future', 'auto-draft')
+        // means our external auditor will hit a 404 / login redirect.
+        $postStatus = (string) $request->query('post_status', '');
+
+        $payload = $service->score($website, $url, $kw !== '' ? $kw : null, $postModifiedAt, $postStatus);
         return response()->json([
             'external_post_id' => $externalPostId,
             'url' => $url,

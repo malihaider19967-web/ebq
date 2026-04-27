@@ -93,13 +93,20 @@ function readSlug() {
 
 function readPermalink() {
 	const el = document.querySelector('#sample-permalink a');
-	if (el) return el.getAttribute('href') || el.textContent.trim();
+	const raw = el ? (el.getAttribute('href') || el.textContent.trim()) : '';
 	const slug = readSlug();
-	if (slug && typeof window !== 'undefined' && window.ebqSeoPublic?.homeUrl) {
-		const home = String(window.ebqSeoPublic.homeUrl).replace(/\/$/, '');
-		return `${home}/${slug}/`;
+	const home = (typeof window !== 'undefined' && window.ebqSeoPublic?.homeUrl)
+		? String(window.ebqSeoPublic.homeUrl).replace(/\/$/, '')
+		: '';
+	// Drafts / private / pending posts return `?p=NNN` from
+	// #sample-permalink. Rebuild the pretty permalink from slug+home so
+	// the audit and GSC matching get the URL that'll actually appear
+	// once the post is publicly visible.
+	const isPlaceholder = raw && /[?&](p|page_id)=\d+/i.test(raw);
+	if (slug && home && (!raw || isPlaceholder)) {
+		return `${home}/${slug.replace(/^\/|\/$/g, '')}/`;
 	}
-	return '';
+	return raw || (slug && home ? `${home}/${slug}/` : '');
 }
 
 function readContent() {

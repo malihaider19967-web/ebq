@@ -78,7 +78,7 @@ class LiveSeoScoreService
         private readonly PluginInsightResolver $resolver,
     ) {}
 
-    public function score(Website $website, string $canonicalUrl, ?string $focusKeyword = null, ?\DateTimeInterface $postModifiedAt = null): array
+    public function score(Website $website, string $canonicalUrl, ?string $focusKeyword = null, ?\DateTimeInterface $postModifiedAt = null, string $postStatus = ''): array
     {
         // Normalize to Illuminate's Carbon so downstream comparisons (e.g.
         // `->greaterThan(...)`) work regardless of whether the caller passed
@@ -198,7 +198,7 @@ class LiveSeoScoreService
             $auditStale = $diffSeconds > 60;
         }
 
-        $auditState = $this->resolveAuditState($website, $url, $focusKeyword, $latestAudit, $auditReady, $auditStale);
+        $auditState = $this->resolveAuditState($website, $url, $focusKeyword, $latestAudit, $auditReady, $auditStale, $postStatus);
 
         // ── Indexing ─────────────────────────────────────────────
         $indexing = PageIndexingStatus::query()
@@ -281,11 +281,13 @@ class LiveSeoScoreService
             $factors[] = $this->factorKeywordAlignment($latestAudit, $focusKeyword);
             $factors[] = $this->factorRecommendations($latestAudit);
         } else {
-            $msg = $auditState['status'] === 'running'
-                ? 'Audit running — refreshes when complete.'
-                : ($auditState['status'] === 'queued'
-                    ? 'Audit queued — refreshes when complete.'
-                    : 'No audit on file. Trigger one from HQ → Page Audits.');
+            $msg = match ($auditState['status']) {
+                'running'    => 'Audit running — refreshes when complete.',
+                'queued'     => 'Audit queued — refreshes when complete.',
+                'refreshing' => 'Re-auditing in the background — factor refreshes when the run finishes.',
+                'blocked'    => 'Publish the post (or change visibility from Private to Public) so EBQ\'s external auditor can fetch it. Lighthouse / Core Web Vitals require a publicly reachable URL.',
+                default      => 'No audit on file. Trigger one from HQ → Page Audits.',
+            };
             $factors[] = $this->pendingFactor('core_web_vitals', 'Core Web Vitals', $msg);
             $factors[] = $this->pendingFactor('page_performance', 'Page performance', $msg);
             $factors[] = $this->pendingFactor('on_page_seo', 'On-page SEO', $msg);
@@ -337,6 +339,14 @@ class LiveSeoScoreService
             return null;
         }
 
+        // Non-public post (draft / private / pending / scheduled). The
+        // audit can't run AT ALL until the URL is reachable. Treat this
+        // as the dominant reason regardless of GSC state — fixing post
+        // visibility unblocks both halves once the post is also indexed.
+        if ($auditStatus === 'blocked') {
+            return 'Provisional score — this post isn\'t publicly accessible yet, so EBQ\'s external auditor can\'t run Lighthouse / Core Web Vitals on it. Publish (or change visibility from Private to Public) to enable the full audit. The on-page placement, links, and content checks below run from the editor content directly and stay live.';
+        }
+
         if (! $gscHasData && ! $auditReady) {
             $auditPart = in_array($auditStatus, ['queued', 'running', 'refreshing'], true)
                 ? 'on-page audit running'
@@ -375,13 +385,36 @@ class LiveSeoScoreService
      *
      * @return array{status: string, message: string, audited_at?: string|null, queued_at?: string|null}
      */
-    private function resolveAuditState(Website $website, string $url, ?string $focusKeyword, ?PageAuditReport $latest, bool $auditReady, bool $auditStale = false): array
+    private function resolveAuditState(Website $website, string $url, ?string $focusKeyword, ?PageAuditReport $latest, bool $auditReady, bool $auditStale = false, string $postStatus = ''): array
     {
         if ($auditReady && $latest && ! $auditStale) {
             return [
                 'status' => 'ready',
                 'message' => 'Audit data is current.',
                 'audited_at' => $latest->audited_at?->toIso8601String(),
+            ];
+        }
+
+        // Non-public WordPress statuses (`draft`, `pending`, `private`,
+        // `future`, `auto-draft`, `inherit`) mean the URL returns 404 /
+        // login redirect to our external auditor. Don't queue a job
+        // that's guaranteed to fail — return a clean "blocked" state
+        // with copy that tells the user exactly how to unblock it.
+        $nonPublicStatuses = ['draft', 'pending', 'private', 'future', 'auto-draft', 'inherit', 'trash'];
+        if ($postStatus !== '' && in_array($postStatus, $nonPublicStatuses, true)) {
+            $human = match ($postStatus) {
+                'draft', 'auto-draft' => 'draft',
+                'pending'             => 'pending review',
+                'private'             => 'private (visibility)',
+                'future'              => 'scheduled',
+                'trash'               => 'trashed',
+                default               => $postStatus,
+            };
+            return [
+                'status' => 'blocked',
+                'message' => "Audit needs the page to be publicly accessible. This post is {$human}, so EBQ's external auditor can't fetch it for Lighthouse / Core Web Vitals checks. Once you publish (or change visibility from Private to Public), the audit auto-runs and the score sharpens.",
+                'audited_at' => $auditReady && $latest ? $latest->audited_at?->toIso8601String() : null,
+                'post_status' => $postStatus,
             ];
         }
 

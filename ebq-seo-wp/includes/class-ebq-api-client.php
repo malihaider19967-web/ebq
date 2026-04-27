@@ -95,7 +95,7 @@ final class EBQ_Api_Client
      * Live SEO score — EBQ-side composite from real GSC data + audit
      * signals. Renders alongside the editor's local self-check.
      */
-    public function get_seo_score(string $post_id, string $url, string $focus_keyword = '', string $post_modified_at = ''): array
+    public function get_seo_score(string $post_id, string $url, string $focus_keyword = '', string $post_modified_at = '', string $post_status = ''): array
     {
         $args = ['url' => $url];
         if ($focus_keyword !== '') {
@@ -106,6 +106,14 @@ final class EBQ_Api_Client
             // compares this against the latest PageAuditReport.audited_at
             // and re-queues the audit when the post was updated since.
             $args['post_modified_at'] = $post_modified_at;
+        }
+        if ($post_status !== '') {
+            // Post status drives audit-gating. Non-public statuses
+            // (draft / pending / private / future / auto-draft) mean the
+            // EBQ auditor can't fetch the URL — backend skips the queue
+            // and surfaces a "publish to enable Lighthouse" message
+            // instead of pretending an audit is running.
+            $args['post_status'] = $post_status;
         }
         return $this->get(
             sprintf('/api/v1/posts/%s/seo-score', rawurlencode($post_id)),

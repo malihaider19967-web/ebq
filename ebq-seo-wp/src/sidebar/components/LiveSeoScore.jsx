@@ -173,6 +173,10 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected, onSetu
 					: __('Audit queued…', 'ebq-seo');
 			} else if (auditStatus === 'refreshing') {
 				caption = __('Re-auditing — post was updated', 'ebq-seo');
+			} else if (auditStatus === 'blocked') {
+				// Non-public post: the audit can't fetch the URL.
+				// Clean status message instead of a spinner.
+				caption = __('Audit needs a public URL', 'ebq-seo');
 			} else if (data.partial) {
 				// Freshly-published URL: GSC factors are pending. The
 				// score is still composed from audit + indexing +
@@ -187,6 +191,7 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected, onSetu
 
 	const setRef = (el) => { anchorRef.current = el; };
 	const isAuditPending = auditStatus === 'queued' || auditStatus === 'running' || auditStatus === 'refreshing';
+	const isAuditBlocked = auditStatus === 'blocked';
 
 	// Forward the setup card to the parent (SeoTab) so it can render
 	// below the score-stack as a full-width row. We deliberately don't
@@ -272,6 +277,15 @@ export default function LiveSeoScore({ postId, focusKeyword, isConnected, onSetu
 						<div className="ebq-audit-banner ebq-audit-banner--failed">
 							<div>
 								<strong>{__('Last audit failed', 'ebq-seo')}</strong>
+								<p>{data.audit.message}</p>
+							</div>
+						</div>
+					) : null}
+
+					{isAuditBlocked && data.audit?.message ? (
+						<div className="ebq-audit-banner ebq-audit-banner--blocked">
+							<div>
+								<strong>{__('Audit needs a public URL', 'ebq-seo')}</strong>
 								<p>{data.audit.message}</p>
 							</div>
 						</div>

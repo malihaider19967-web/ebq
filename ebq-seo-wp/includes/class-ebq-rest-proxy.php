@@ -482,9 +482,36 @@ final class EBQ_Rest_Proxy
     public function seo_score(WP_REST_Request $request): WP_REST_Response
     {
         $post_id = (int) $request->get_param('id');
-        $url = get_permalink($post_id);
-        if (! $url) {
+        $post = get_post($post_id);
+        if (! $post) {
             return new WP_REST_Response(['ok' => false, 'error' => 'post_not_found'], 404);
+        }
+
+        // For draft / pending / auto-draft, get_permalink() returns the
+        // `?p=NNN` placeholder — useless for GSC matching and always
+        // 404s for the EBQ auditor. get_sample_permalink() is the same
+        // function the inline-permalink-editor uses; it returns the
+        // future pretty URL for any post status. For 'private' posts
+        // it also returns the proper permalink. Fall back to
+        // get_permalink() if sample resolution fails.
+        $url = '';
+        if (function_exists('get_sample_permalink') || file_exists(ABSPATH . 'wp-admin/includes/post.php')) {
+            if (! function_exists('get_sample_permalink')) {
+                require_once ABSPATH . 'wp-admin/includes/post.php';
+            }
+            $sample = get_sample_permalink($post_id);
+            if (is_array($sample) && ! empty($sample[0]) && ! empty($sample[1])) {
+                $url = str_replace(['%pagename%', '%postname%'], (string) $sample[1], (string) $sample[0]);
+            }
+        }
+        if ($url === '' || strpos($url, '?p=') !== false || strpos($url, '?page_id=') !== false) {
+            $fallback = get_permalink($post_id);
+            if (is_string($fallback) && $fallback !== '' && strpos($fallback, '?p=') === false && strpos($fallback, '?page_id=') === false) {
+                $url = $fallback;
+            }
+        }
+        if ($url === '') {
+            return new WP_REST_Response(['ok' => false, 'error' => 'permalink_unresolved'], 422);
         }
 
         // Allow query-param override; otherwise use the post's saved
@@ -504,17 +531,23 @@ final class EBQ_Rest_Proxy
         // timestamp that's hours off. get_post_modified_time correctly
         // builds a UTC DateTime and formats with offset (e.g. "+00:00")
         // so Carbon::parse() on the EBQ side reads the actual instant.
-        $post = get_post($post_id);
         $modified = '';
-        if ($post && $post->post_modified_gmt && $post->post_modified_gmt !== '0000-00-00 00:00:00') {
+        if ($post->post_modified_gmt && $post->post_modified_gmt !== '0000-00-00 00:00:00') {
             $candidate = get_post_modified_time('c', true, $post, false);
             if (is_string($candidate) && $candidate !== '') {
                 $modified = $candidate;
             }
         }
 
+        // Post status — non-public ('draft', 'pending', 'private',
+        // 'future', 'auto-draft') means the EBQ auditor can't fetch the
+        // URL. Backend uses this to skip the audit queue and surface a
+        // clear "publish to enable" pending state instead of pretending
+        // an audit is running.
+        $post_status = (string) $post->post_status;
+
         return new WP_REST_Response(
-            EBQ_Plugin::api_client()->get_seo_score((string) $post_id, $url, $focus, $modified),
+            EBQ_Plugin::api_client()->get_seo_score((string) $post_id, $url, $focus, $modified, $post_status),
             200
         );
         // Headers + cache-bust are applied by maybe_apply_nocache_headers()

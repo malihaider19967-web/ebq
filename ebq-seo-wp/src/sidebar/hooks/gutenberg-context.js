@@ -14,11 +14,23 @@ export function useEditorContext() {
 			media?.media_details?.sizes?.medium?.source_url ||
 			media?.source_url ||
 			'';
+		const slug = editor.getEditedPostAttribute('slug') || '';
+		const rawLink = editor.getEditedPostAttribute('link') || '';
+		const status = editor.getEditedPostAttribute('status') || '';
 		return {
 			postId: editor.getCurrentPostId(),
 			postTitle: editor.getEditedPostAttribute('title') || '',
-			postLink: editor.getEditedPostAttribute('link') || '',
-			slug: editor.getEditedPostAttribute('slug') || '',
+			// `postLink` resolves the eventual canonical permalink even
+			// when WP's edit-context returns the `?p=NNN` placeholder.
+			// For draft / pending / private status, Gutenberg often hands
+			// back the placeholder — but the slug is set, so we can build
+			// the pretty URL ourselves and feed it to the live audit, GSC
+			// matcher, and AI Writer the same way it'll appear once
+			// public.
+			postLink: resolveCanonicalLink(rawLink, slug),
+			rawLink,
+			slug,
+			status,
 			content: editor.getEditedPostContent(),
 			meta,
 			lang: editor.getCurrentPost()?.lang || '',
@@ -26,6 +38,23 @@ export function useEditorContext() {
 		};
 	}, []);
 	return ctx;
+}
+
+/**
+ * If the editor handed back the `?p=NNN` / `?page_id=NNN` placeholder
+ * (every draft / pending / private post falls into this until publish),
+ * rebuild the pretty permalink from the site's home URL + the slug. Falls
+ * back to the raw link when no slug is set yet.
+ */
+function resolveCanonicalLink(rawLink, slug) {
+	if (!rawLink) return rawLink;
+	const isPlaceholder = /[?&](p|page_id)=\d+/i.test(rawLink);
+	if (!isPlaceholder) return rawLink;
+	if (!slug) return rawLink;
+	const cfg = (typeof window !== 'undefined' && window.ebqSeoPublic) || {};
+	const home = String(cfg.homeUrl || '').replace(/\/$/, '');
+	if (!home) return rawLink;
+	return `${home}/${String(slug).replace(/^\//, '').replace(/\/$/, '')}/`;
 }
 
 /** Read/write a single `_ebq_*` meta field. */
