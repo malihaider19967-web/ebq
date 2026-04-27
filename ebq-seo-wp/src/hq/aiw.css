@@ -13,10 +13,15 @@
 /* — Two-column layout — */
 .ebq-aiw-layout {
 	display: grid;
-	grid-template-columns: minmax(280px, 360px) 1fr;
+	grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
 	gap: 16px;
 	align-items: start;
+	max-width: 100%;
+	overflow: visible;
 }
+/* min-width: 0 on grid children so TinyMCE's iframe can't blow the
+ * layout out of its track and push columns under WP's #adminmenu. */
+.ebq-aiw-layout > * { min-width: 0; }
 @media (max-width: 980px) {
 	.ebq-aiw-layout { grid-template-columns: 1fr; }
 }
@@ -24,8 +29,12 @@
 /* ─── LEFT — controls ─────────────────────────────────────────── */
 .ebq-aiw-side {
 	position: sticky;
-	top: 16px;
-	max-height: calc(100vh - 80px);
+	/* WP admin bar is 32px tall on desktop. The HQ topbar above the
+	 * tab content adds another ~78px. Stick below that combined
+	 * offset so the panel doesn't ride underneath the admin bar. */
+	top: 48px;
+	align-self: start;
+	max-height: calc(100vh - 100px);
 	overflow-y: auto;
 	background: var(--ebq-hq-bg-card);
 	border: 1px solid var(--ebq-hq-border);
@@ -35,6 +44,15 @@
 	display: flex;
 	flex-direction: column;
 	gap: 14px;
+	min-width: 0; /* allow long topic strings to wrap */
+}
+/* On narrow widths (sidebar collapses to a row above the editor),
+ * drop the sticky behavior — it'd just float over the editor. */
+@media (max-width: 980px) {
+	.ebq-aiw-side {
+		position: static;
+		max-height: none;
+	}
 }
 
 .ebq-aiw-side__section { display: flex; flex-direction: column; gap: 6px; }
@@ -266,6 +284,18 @@
 	display: flex;
 	flex-direction: column;
 	min-height: 480px;
+	min-width: 0; /* don't let the TinyMCE iframe push the column wider */
+	max-width: 100%;
+	overflow: hidden;
+}
+/* TinyMCE renders an iframe with width=100% but its container can
+ * sometimes carry a larger inline width. Force the WP editor to fit
+ * the column — no horizontal overflow under any circumstance. */
+.ebq-aiw-main .wp-editor-wrap,
+.ebq-aiw-main .wp-editor-container,
+.ebq-aiw-main iframe {
+	max-width: 100% !important;
+	box-sizing: border-box;
 }
 
 .ebq-aiw-main__toolbar {

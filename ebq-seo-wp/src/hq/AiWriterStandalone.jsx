@@ -5,35 +5,36 @@ import ConnectionGuide from './components/ConnectionGuide';
 
 /**
  * Standalone wrapper for the AI Writer when mounted as its own top-level
- * admin page (registered by EBQ_AiWriter_Page). Renders the same tab
- * component the HQ used to expose, but without the HQ chrome — just a
- * simple title bar above the editor pane.
+ * admin page (registered by EBQ_AiWriter_Page). Mirrors the App.jsx
+ * outer-div convention so we don't double-wrap the PHP-rendered
+ * .ebq-hq-wrap (which carries the negative left margin needed to break
+ * out of WP admin's gutter).
  */
 export default function AiWriterStandalone() {
 	if (!HQ_CONFIG.isConnected) {
 		return (
-			<div className="ebq-hq-wrap ebq-hq-wrap--standalone">
+			<div className="ebq-hq">
 				<header className="ebq-hq-topbar">
 					<div className="ebq-hq-topbar__brand">
-						<div className="ebq-hq-topbar__mark">E</div>
+						<span className="ebq-hq-topbar__mark" aria-hidden>E</span>
 						<div>
 							<h1 className="ebq-hq-topbar__title">{__('AI Writer', 'ebq-seo')}</h1>
 							<p className="ebq-hq-topbar__sub">{__('Connect EBQ to use the AI Writer.', 'ebq-seo')}</p>
 						</div>
 					</div>
 				</header>
-				<div className="ebq-hq-body">
-					<ConnectionGuide />
-				</div>
+				<main className="ebq-hq-main">
+					<ConnectionGuide reason="not_connected" />
+				</main>
 			</div>
 		);
 	}
 
 	return (
-		<div className="ebq-hq-wrap ebq-hq-wrap--standalone">
+		<div className="ebq-hq">
 			<header className="ebq-hq-topbar">
 				<div className="ebq-hq-topbar__brand">
-					<div className="ebq-hq-topbar__mark">E</div>
+					<span className="ebq-hq-topbar__mark" aria-hidden>E</span>
 					<div>
 						<h1 className="ebq-hq-topbar__title">{__('AI Writer', 'ebq-seo')}</h1>
 						<p className="ebq-hq-topbar__sub">
@@ -42,9 +43,9 @@ export default function AiWriterStandalone() {
 					</div>
 				</div>
 			</header>
-			<div className="ebq-hq-body">
+			<main className="ebq-hq-main">
 				<AiWriterTab />
-			</div>
+			</main>
 		</div>
 	);
 }
