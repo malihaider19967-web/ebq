@@ -23,7 +23,7 @@
         </div>
     </section>
 
-    @if ($freeMode)
+    <?php if ($freeMode): ?>
         <section class="bg-white py-16 sm:py-20">
             <div class="mx-auto max-w-4xl px-6 lg:px-8">
                 <div class="rounded-3xl border border-emerald-200 bg-emerald-50/60 px-8 py-14 text-center">
@@ -41,9 +41,9 @@
                 </div>
             </div>
         </section>
-    @endif
+    <?php endif; ?>
 
-    @unless ($freeMode)
+    <?php if (! $freeMode): ?>
     {{-- ── Plan cards ───────────────────────────────────────── --}}
     <section class="bg-white py-16 sm:py-20">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
@@ -288,7 +288,7 @@
             </div>
         </div>
     </section>
-    @endunless
+    <?php endif; ?>
 
     {{-- ── CTA ──────────────────────────────────────────────── --}}
     <section class="bg-white py-20 sm:py-24">
