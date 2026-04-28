@@ -75,6 +75,9 @@ class GoogleOAuthController extends Controller
                 ->get()
                 ->each(fn (WebsiteInvitation $invitation) => $invitation->acceptFor($user));
         }
+        if (! $user->hasVerifiedEmail()) {
+            $user->forceFill(['email_verified_at' => now()])->save();
+        }
 
         if ($user->is_disabled) {
             return redirect()->route('login')->withErrors([

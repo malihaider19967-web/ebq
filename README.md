@@ -78,7 +78,7 @@ Google OAuth is configured in `config/services.php` under `google` and uses thes
 
 ## Application flow
 
-- **Authentication**: Routes under `routes/auth.php` serve login and register views. Email verification is not required for dashboard or onboarding.
+- **Authentication**: Routes under `routes/auth.php` serve login/register plus email verification. Email/password signups must verify email before onboarding and dashboard access. Google SSO users are marked verified automatically on successful sign-in.
 - **Onboarding**: Until a user has at least one `Website` row, `EnsureOnboarded` redirects to `/onboarding` (except onboarding, Google OAuth, and settings routes). Users connect Google via `/auth/google/redirect` and complete site selection in the onboarding UI.
 - **Main app** (after login + onboarded): Dashboard, keywords, pages, websites list, and settings (`routes/web.php`).
 
@@ -86,8 +86,21 @@ Google OAuth is configured in `config/services.php` under `google` and uses thes
 
 | Command | Description |
 |---------|-------------|
-| `php artisan ebq:sync-daily-data` | Dispatches `SyncAnalyticsData` and `SyncSearchConsoleData` jobs for every website in chunks. |
-| `php artisan ebq:send-reports` | Queues `GrowthReportMail` for every user. |
+| `php artisan ebq:sync-daily-data` | Refresh GA4 + GSC data for all websites. |
+| `php artisan ebq:import-historical --days=480 [--website=ID]` | Backfill historical GA4 + GSC data (up to ~16 months). |
+| `php artisan ebq:resync-gsc --days=30 [--website=ID]` | Re-sync Search Console with extended lookback (country/device backfill). |
+| `php artisan ebq:send-reports` | Queue growth report emails to configured website recipients. |
+| `php artisan ebq:detect-traffic-drops` | Dispatch anomaly detection jobs per website. |
+| `php artisan ebq:track-rankings` | Dispatch SERP rank checks for due keywords. |
+| `php artisan ebq:fetch-keyword-metrics [--website=ID] [--days=N]` | Queue Keywords Everywhere metric lookups for GSC queries. |
+| `php artisan ebq:fetch-competitor-backlinks [--website=ID] [--audit=ID]` | Fetch/refresh competitor backlink datasets. |
+| `php artisan ebq:auto-discover-prospects [--website=ID]` | Build outreach prospects from recent page audits. |
+| `php artisan ebq:purge-empty-country-gsc [--website=ID] [--days=N]` | Remove legacy empty-country GSC rows. |
+| `php artisan ebq:purge-sync-data [--website=ID] [--dry-run] [--force]` | Wipe sync-derived GA/GSC datasets for clean re-import. |
+| `php artisan ebq:delete-website-data WEBSITE_ID [--dry-run] [--force]` | Delete a website and all rows related to it. |
+| `php artisan ebq:package-plugin` | Build downloadable WordPress plugin zip in `public/downloads/`. |
+| `php artisan ebq:publish-scheduled-plugin-releases` | Publish scheduled plugin releases. |
+| `php artisan ebq:apply-plugin-version VERSION` | Update plugin version constants before packaging/release. |
 
 These are registered on the scheduler in `routes/console.php`:
 

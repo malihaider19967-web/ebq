@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Jobs\SyncAnalyticsData;
+use App\Jobs\SyncSearchConsoleData;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -15,6 +17,16 @@ use Laravel\Sanctum\HasApiTokens;
 class Website extends Model
 {
     use HasApiTokens, HasFactory;
+
+    protected static function booted(): void
+    {
+        static::created(function (Website $website): void {
+            // Any newly created website gets an immediate 365-day backfill
+            // so dashboards are populated without manual sync commands.
+            SyncAnalyticsData::dispatch($website->id, 365);
+            SyncSearchConsoleData::dispatch($website->id, 365);
+        });
+    }
 
     /** Subscription tier constants — drives gating for AI features. */
     public const TIER_FREE = 'free';
