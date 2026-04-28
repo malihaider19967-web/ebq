@@ -2,9 +2,17 @@
 
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\RegisteredUserController;
+use App\Http\Controllers\GoogleOAuthController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware('guest')->group(function () {
+    Route::get('auth/google/sso', [GoogleOAuthController::class, 'ssoRedirect'])
+        ->middleware('throttle:oauth')
+        ->name('google.sso.redirect');
+    Route::get('auth/google/sso/callback', [GoogleOAuthController::class, 'ssoCallback'])
+        ->middleware('throttle:oauth')
+        ->name('google.sso.callback');
+
     Route::get('login', [AuthenticatedSessionController::class, 'create'])->name('login');
     Route::post('login', [AuthenticatedSessionController::class, 'store']);
 

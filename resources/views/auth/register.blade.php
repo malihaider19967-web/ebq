@@ -4,6 +4,29 @@
         <p class="mt-2 text-sm text-slate-600">Start tracking your SEO performance today</p>
     </div>
 
+    @php
+        $googleParams = ['intent' => 'register'];
+        if (! empty($inviteToken)) {
+            $googleParams['invite'] = $inviteToken;
+        }
+    @endphp
+    <a href="{{ route('google.sso.redirect', $googleParams) }}"
+        class="mt-8 inline-flex w-full items-center justify-center gap-2.5 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
+            <path fill="#EA4335" d="M12 10.2v3.9h5.5c-.2 1.2-.9 2.2-1.9 2.9l3 2.3c1.7-1.6 2.7-3.9 2.7-6.7 0-.7-.1-1.4-.2-2H12z"/>
+            <path fill="#34A853" d="M12 21c2.4 0 4.5-.8 6-2.2l-3-2.3c-.8.6-1.9 1-3.1 1-2.4 0-4.4-1.6-5.1-3.8l-3.1 2.4C5.2 19 8.3 21 12 21z"/>
+            <path fill="#4A90E2" d="M6.9 13.7c-.2-.6-.3-1.1-.3-1.7s.1-1.2.3-1.7l-3.1-2.4C3.3 8.9 3 10.4 3 12s.3 3.1.8 4.1l3.1-2.4z"/>
+            <path fill="#FBBC05" d="M12 6.5c1.3 0 2.5.5 3.5 1.4l2.6-2.6C16.5 3.8 14.4 3 12 3 8.3 3 5.2 5 3.8 7.9l3.1 2.4c.7-2.2 2.7-3.8 5.1-3.8z"/>
+        </svg>
+        Continue with Google
+    </a>
+
+    <div class="mt-6 flex items-center gap-3 text-xs uppercase tracking-[0.16em] text-slate-400">
+        <span class="h-px flex-1 bg-slate-200"></span>
+        <span>or continue with email</span>
+        <span class="h-px flex-1 bg-slate-200"></span>
+    </div>
+
     <form method="POST" action="{{ route('register') }}" class="mt-8 space-y-5">
         @csrf
         @if (! empty($inviteToken))

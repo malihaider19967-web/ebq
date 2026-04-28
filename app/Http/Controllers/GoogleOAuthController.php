@@ -2,13 +2,94 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
+use App\Models\WebsiteInvitation;
 use App\Services\Google\GoogleOAuthService;
+use App\Services\ClientActivityLogger;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 
 class GoogleOAuthController extends Controller
 {
+    public function ssoRedirect(Request $request): RedirectResponse
+    {
+        // Keep intent in session so callback can distinguish login/register
+        // UX and preserve invite token if user came from invite onboarding.
+        $request->session()->put('google_sso.intent', (string) $request->query('intent', 'login'));
+        $request->session()->put('google_sso.invite', (string) $request->query('invite', ''));
+
+        return Socialite::driver('google')
+            ->redirectUrl(route('google.sso.callback', absolute: true))
+            ->scopes(['openid', 'profile', 'email'])
+            ->redirect();
+    }
+
+    public function ssoCallback(Request $request, GoogleOAuthService $oauthService, ClientActivityLogger $logger): RedirectResponse
+    {
+        $googleUser = Socialite::driver('google')
+            ->redirectUrl(route('google.sso.callback', absolute: true))
+            ->stateless()
+            ->user();
+        $email = Str::lower(trim((string) $googleUser->getEmail()));
+
+        if ($email === '') {
+            return redirect()->route('login')->withErrors([
+                'email' => 'Google account did not return an email address.',
+            ]);
+        }
+
+        /** @var User|null $user */
+        $user = User::query()
+            ->whereRaw('LOWER(email) = ?', [$email])
+            ->first();
+
+        $isNewUser = false;
+        if (! $user) {
+            $isNewUser = true;
+            $user = User::create([
+                'name' => (string) ($googleUser->getName() ?: $googleUser->getNickname() ?: 'Google User'),
+                'email' => $email,
+                // Random local password so account can still use password reset.
+                'password' => Str::password(32),
+                'email_verified_at' => now(),
+            ]);
+
+            WebsiteInvitation::query()
+                ->where('email', $email)
+                ->where('expires_at', '>', now())
+                ->get()
+                ->each(fn (WebsiteInvitation $invitation) => $invitation->acceptFor($user));
+        }
+
+        if ($user->is_disabled) {
+            return redirect()->route('login')->withErrors([
+                'email' => 'Your account has been disabled. Please contact support.',
+            ]);
+        }
+
+        Auth::login($user, true);
+        $oauthService->persistAccount($user, $googleUser);
+        $logger->log($isNewUser ? 'auth.register_google' : 'auth.login_google', userId: $user->id, meta: ['ip' => $request->ip()]);
+
+        $websiteId = (int) session('current_website_id', 0);
+        if ($websiteId <= 0) {
+            $first = $user->accessibleWebsitesQuery()->select('id')->orderBy('domain')->first();
+            if ($first) {
+                $websiteId = (int) $first->id;
+                session(['current_website_id' => $websiteId]);
+            }
+        }
+
+        if (! $user->hasAccessibleWebsites()) {
+            return redirect()->route('onboarding');
+        }
+
+        return redirect()->intended(route($user->firstAccessibleRoute($websiteId), absolute: false));
+    }
+
     public function redirect(): RedirectResponse
     {
         // `access_type=offline` requests a refresh token so EBQ can keep
