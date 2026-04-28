@@ -26,21 +26,33 @@
                 <ul>
                     <li>Do not abuse the service, bypass limits, or attempt unauthorized access.</li>
                     <li>Do not submit unlawful content or misuse third-party integrations.</li>
+                    <li>Do not use the service to violate third-party API terms, including Google API terms and policies.</li>
                 </ul>
 
-                <h2>4. Billing and plans</h2>
+                <h2>4. Google API terms and limited use</h2>
+                <p>Where EBQ accesses Google user data, your use of EBQ is also subject to the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener noreferrer">Google API Services User Data Policy</a>, including Limited Use requirements.</p>
+                <ul>
+                    <li>EBQ uses Google data only to provide and improve user-facing features you requested.</li>
+                    <li>EBQ does not sell Google user data and does not use it for ad-targeting profiles.</li>
+                    <li>You may revoke EBQ access from your Google account at any time.</li>
+                </ul>
+
+                <h2>5. Billing and plans</h2>
                 <p>Paid plans are billed annually after any active trial period. Renewal is automatic unless canceled before the renewal date.</p>
 
-                <h2>5. Customer content</h2>
+                <h2>6. Customer content</h2>
                 <p>You retain ownership of your content and data. You grant EBQ a limited license to process it to operate the service.</p>
 
-                <h2>6. Warranties and liability</h2>
+                <h2>7. Suspension and termination</h2>
+                <p>You may cancel at any time. We may suspend or terminate accounts for breach of terms, security risk, legal compliance obligations, or abuse of integrated third-party APIs.</p>
+
+                <h2>8. Warranties and liability</h2>
                 <p>The service is provided as-is. To the maximum extent allowed by law, EBQ's liability is limited to amounts paid in the prior 12 months.</p>
 
-                <h2>7. Termination</h2>
-                <p>You may cancel at any time. We may suspend accounts for breach of terms or security risk.</p>
+                <h2>9. Changes to these terms</h2>
+                <p>We may update these Terms to reflect legal, security, or product changes. Material changes take effect when posted with an updated effective date.</p>
 
-                <h2>8. Contact</h2>
+                <h2>10. Contact</h2>
                 <p>Questions about terms: <a href="mailto:legal@ebq.io">legal@ebq.io</a>.</p>
             </div>
         </div>
