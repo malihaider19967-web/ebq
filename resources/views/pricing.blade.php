@@ -3,23 +3,45 @@
     description="Simple annual pricing for SEO teams. Free plan available. 1-month free trial on every paid plan."
     active="pricing"
 >
+    @php($freeMode = (bool) config('app.free', false))
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-slate-200 bg-white">
         <div class="mx-auto max-w-6xl px-6 py-20 text-center lg:px-8 lg:py-24">
             <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Pricing</p>
             <h1 class="mx-auto mt-4 max-w-3xl text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-                Pay for the sites you manage. Nothing else.
+                {{ $freeMode ? 'All Pro features are unlocked free for a limited time.' : 'Pay for the sites you manage. Nothing else.' }}
             </h1>
             <p class="mx-auto mt-5 max-w-2xl text-balance text-[17px] leading-8 text-slate-600">
-                Every plan includes the EBQ workspace, WordPress plugin, and unlimited team members. Annual subscriptions only — every paid plan starts with a 1-month free trial.
+                {{ $freeMode
+                    ? 'Every account currently gets Pro capabilities at no cost during this promotional period.'
+                    : 'Every plan includes the EBQ workspace, WordPress plugin, and unlimited team members. Annual subscriptions only — every paid plan starts with a 1-month free trial.' }}
             </p>
-            <div class="mt-7 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600">
+            <div class="mt-7 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium {{ $freeMode ? 'text-emerald-700' : 'text-slate-600' }}">
                 <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                1-month free trial · Cancel during trial, no charge
+                {{ $freeMode ? 'Free Pro access for a limited time' : '1-month free trial · Cancel during trial, no charge' }}
             </div>
         </div>
     </section>
 
+    @if ($freeMode)
+        <section class="bg-white py-16 sm:py-20">
+            <div class="mx-auto max-w-4xl px-6 lg:px-8">
+                <div class="rounded-3xl border border-emerald-200 bg-emerald-50/60 px-8 py-14 text-center">
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Limited-time offer</p>
+                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
+                        You currently have full Pro usage at no cost.
+                    </h2>
+                    <p class="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600">
+                        Create your account and use Pro features now. We will notify users in advance before standard pricing resumes.
+                    </p>
+                    <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                        <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Start free</a>
+                        <a href="{{ route('features') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">See all features</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    @else
     {{-- ── Plan cards ───────────────────────────────────────── --}}
     <section class="bg-white py-16 sm:py-20">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
@@ -264,6 +286,7 @@
             </div>
         </div>
     </section>
+    @endif
 
     {{-- ── CTA ──────────────────────────────────────────────── --}}
     <section class="bg-white py-20 sm:py-24">

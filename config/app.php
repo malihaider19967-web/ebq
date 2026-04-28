@@ -56,6 +56,17 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Promotional Free Pro Mode
+    |--------------------------------------------------------------------------
+    |
+    | When enabled, all websites are treated as Pro for feature gating and
+    | pricing page copy switches to a temporary free-access announcement.
+    |
+    */
+    'free' => filter_var(env('FREE', false), FILTER_VALIDATE_BOOLEAN),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

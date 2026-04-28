@@ -54,7 +54,7 @@ class Website extends Model
      */
     public function isPro(): bool
     {
-        return $this->tier === self::TIER_PRO;
+        return (bool) config('app.free', false) || $this->tier === self::TIER_PRO;
     }
 
     protected function casts(): array
