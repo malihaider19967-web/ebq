@@ -96,7 +96,9 @@ class AiBlockEditorService
         return match ($mode) {
             self::MODE_COMMAND => [
                 $system,
-                "Write a single block of text fulfilling the following instruction. Keep it concise and self-contained.\n\nInstruction:\n{$command}",
+                $text !== ''
+                    ? "Apply the user's instruction to the existing block text below. Change tone, structure, length, or style as instructed, but DO NOT invent facts, drop key information, or contradict the source. Return ONLY the resulting block text — no preamble, no explanation.\n\nInstruction:\n{$command}\n\nExisting text:\n{$text}"
+                    : "Write a single block of text fulfilling the following instruction. Keep it concise and self-contained.\n\nInstruction:\n{$command}",
             ],
             self::MODE_EXTEND => [
                 $system,
@@ -108,7 +110,7 @@ class AiBlockEditorService
             ],
             self::MODE_GRAMMAR => [
                 $system,
-                "Fix grammar, spelling, punctuation, and obvious style errors in the following text. Do NOT change the meaning, tone, voice, or content. Return only the corrected text.\n\nText:\n{$text}",
+                "Proofread the following text. Fix every spelling mistake, typo, grammar error, punctuation error, capitalization error, and obvious style slip. Be thorough — do not skip subtle errors. DO NOT change the meaning, tone, voice, factual content, or paragraph structure. DO NOT rephrase sentences that are already correct. Return only the fully corrected text.\n\nText:\n{$text}",
             ],
             self::MODE_REWRITE => [
                 $system,
