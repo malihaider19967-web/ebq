@@ -38,9 +38,8 @@
 
         <header class="sticky top-0 z-40 border-b border-white/10 bg-slate-950/85 backdrop-blur">
             <div class="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
-                <a href="{{ route('landing') }}" class="flex items-center gap-3" aria-label="EBQ home">
-                    <img src="{{ asset('logo-72.png') }}" alt="" aria-hidden="true" width="36" height="36" class="h-9 w-9 rounded-lg ring-1 ring-white/25">
-                    <span class="text-sm font-semibold uppercase tracking-[0.2em] text-white">EBQ</span>
+                <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="EBQ home">
+                    <img src="{{ asset('logo-96.png') }}" alt="EBQ" width="48" height="48" class="h-12 w-12 rounded-lg">
                 </a>
 
                 <nav aria-label="Primary" class="hidden items-center gap-8 text-sm font-medium text-slate-100 md:flex">
@@ -64,9 +63,8 @@
         <footer class="border-t border-white/10 bg-slate-950">
             <div class="mx-auto grid max-w-7xl gap-10 px-6 py-12 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
                 <div>
-                    <a href="{{ route('landing') }}" class="flex items-center gap-3" aria-label="EBQ home">
-                        <img src="{{ asset('logo-72.png') }}" alt="" aria-hidden="true" width="36" height="36" class="h-9 w-9 rounded-lg ring-1 ring-white/25">
-                        <span class="text-sm font-semibold uppercase tracking-[0.2em] text-white">EBQ</span>
+                    <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="EBQ home">
+                        <img src="{{ asset('logo-96.png') }}" alt="EBQ" width="48" height="48" class="h-12 w-12 rounded-lg">
                     </a>
                     <p class="mt-3 text-slate-400">SEO workspace for teams that ship.</p>
                 </div>
