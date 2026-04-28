@@ -41,12 +41,11 @@
             </ul>
 
             <h2>4. Subscriptions and payment</h2>
-            <p>Paid plans are billed in advance on a monthly or annual cycle. The price displayed at checkout is what you pay (excluding sales tax / VAT where applicable). You authorise us, or our payment processor, to charge your selected payment method on each renewal.</p>
-            <p>Annual plans receive a discount equivalent to two months free.</p>
-            <p>If a payment fails, we will retry the charge and notify you. If payment cannot be collected within 14 days, we may suspend or downgrade the account until the balance is settled.</p>
+            <p>Paid plans are sold on an <strong>annual subscription</strong> only and billed in advance for the full year. The price displayed at checkout is what you pay (excluding sales tax / VAT where applicable). You authorise us, or our payment processor, to charge your selected payment method when the trial ends and on each annual renewal.</p>
+            <p>Renewals occur automatically on the anniversary of your first billing date unless you cancel beforehand. If a payment fails, we will retry the charge and notify you. If payment cannot be collected within 14 days, we may suspend or downgrade the account until the balance is settled.</p>
 
             <h3>4.1 Free trial</h3>
-            <p>Paid plans include a 14-day free trial. You can cancel anytime during the trial without being charged. If you do not cancel before the trial ends, the plan auto-converts and your card is billed for the first cycle.</p>
+            <p>Every paid plan includes a <strong>1-month free trial</strong>. We collect your payment method at sign-up so the plan converts seamlessly at the end of the trial, but your card is not charged until the trial ends. You can cancel anytime during the 1-month trial without being charged. If you do not cancel before the trial ends, the plan auto-converts to a paid annual subscription and your card is billed for the first year.</p>
 
             <h3>4.2 Refunds</h3>
             <p>Refunds are governed by our <a href="{{ route('refund-policy') }}">Refund Policy</a>, which forms part of these Terms.</p>

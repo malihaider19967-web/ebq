@@ -8,11 +8,11 @@
         <p class="inline-flex items-center rounded-full border border-indigo-200/40 bg-indigo-500/15 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-100">Simple pricing</p>
         <h1 class="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl">Pay for the sites you manage, nothing else.</h1>
         <p class="mx-auto mt-6 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
-            Every plan includes the EBQ WordPress plugin, the EBQ HQ dashboard, and unlimited team members. Upgrade only when you grow.
+            Every plan includes the EBQ WordPress plugin, the EBQ HQ dashboard, and unlimited team members. Annual subscriptions only — try free for a month before you commit.
         </p>
         <div class="mt-8 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium text-slate-200">
             <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden></span>
-            14-day free trial on every paid plan · No credit card required
+            1-month free trial · Then annual billing · Cancel during trial, no charge
         </div>
     </section>
 
@@ -25,8 +25,9 @@
                 <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">Free</h2>
                 <p class="mt-3 flex items-baseline gap-1.5">
                     <span class="text-4xl font-bold text-white">$0</span>
-                    <span class="text-sm text-slate-300">/month</span>
+                    <span class="text-sm text-slate-300">forever</span>
                 </p>
+                <p class="mt-1 text-xs text-slate-400">No card required.</p>
                 <p class="mt-3 text-sm text-slate-300">For personal sites and trial runs.</p>
                 <ul class="mt-6 space-y-3 text-sm text-slate-200">
                     <li class="flex gap-2"><span class="text-emerald-400">✓</span> 1 connected website</li>
@@ -46,9 +47,10 @@
             <div class="flex flex-col rounded-2xl border border-white/10 bg-white/5 p-7">
                 <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">Starter</h2>
                 <p class="mt-3 flex items-baseline gap-1.5">
-                    <span class="text-4xl font-bold text-white">$19</span>
-                    <span class="text-sm text-slate-300">/month</span>
+                    <span class="text-4xl font-bold text-white">$15</span>
+                    <span class="text-sm text-slate-300">/mo</span>
                 </p>
+                <p class="mt-1 text-xs text-slate-400">$180 billed yearly · 1-month free trial</p>
                 <p class="mt-3 text-sm text-slate-300">For one site you actively grow.</p>
                 <ul class="mt-6 space-y-3 text-sm text-slate-200">
                     <li class="flex gap-2"><span class="text-emerald-400">✓</span> Everything in Free</li>
@@ -60,7 +62,7 @@
                     <li class="flex gap-2"><span class="text-emerald-400">✓</span> Email support</li>
                 </ul>
                 <a href="{{ route('register') }}?plan=starter" class="mt-7 inline-flex items-center justify-center rounded-md border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
-                    Start 14-day trial
+                    Start 1-month trial
                 </a>
             </div>
 
@@ -69,9 +71,10 @@
                 <span class="absolute -top-3 right-6 inline-flex items-center rounded-full bg-gradient-to-r from-indigo-500 to-cyan-400 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white">Most popular</span>
                 <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-200">Pro</h2>
                 <p class="mt-3 flex items-baseline gap-1.5">
-                    <span class="text-4xl font-bold text-white">$49</span>
-                    <span class="text-sm text-slate-200">/month</span>
+                    <span class="text-4xl font-bold text-white">$39</span>
+                    <span class="text-sm text-slate-200">/mo</span>
                 </p>
+                <p class="mt-1 text-xs text-slate-300">$468 billed yearly · 1-month free trial</p>
                 <p class="mt-3 text-sm text-slate-200">For agencies and growth teams.</p>
                 <ul class="mt-6 space-y-3 text-sm text-slate-100">
                     <li class="flex gap-2"><span class="text-emerald-400">✓</span> Everything in Starter</li>
@@ -84,7 +87,7 @@
                     <li class="flex gap-2"><span class="text-emerald-400">✓</span> Priority email + chat support</li>
                 </ul>
                 <a href="{{ route('register') }}?plan=pro" class="mt-7 inline-flex items-center justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
-                    Start 14-day trial
+                    Start 1-month trial
                 </a>
             </div>
 
@@ -92,9 +95,10 @@
             <div class="flex flex-col rounded-2xl border border-white/10 bg-white/5 p-7">
                 <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">Agency</h2>
                 <p class="mt-3 flex items-baseline gap-1.5">
-                    <span class="text-4xl font-bold text-white">$149</span>
-                    <span class="text-sm text-slate-300">/month</span>
+                    <span class="text-4xl font-bold text-white">$125</span>
+                    <span class="text-sm text-slate-300">/mo</span>
                 </p>
+                <p class="mt-1 text-xs text-slate-400">$1,500 billed yearly · 1-month free trial</p>
                 <p class="mt-3 text-sm text-slate-300">For agencies managing many clients.</p>
                 <ul class="mt-6 space-y-3 text-sm text-slate-200">
                     <li class="flex gap-2"><span class="text-emerald-400">✓</span> Everything in Pro</li>
@@ -114,23 +118,19 @@
         {{-- ── Add-ons / extras ──────────────────────────────────── --}}
         <div class="mt-12 rounded-2xl border border-white/10 bg-white/5 p-8">
             <h3 class="text-lg font-semibold text-white">Need more?</h3>
-            <p class="mt-2 text-sm text-slate-300">Every plan can be expanded à la carte without a full upgrade.</p>
-            <dl class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <p class="mt-2 text-sm text-slate-300">Add-ons stack onto your annual subscription, billed alongside the next renewal.</p>
+            <dl class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                     <dt class="text-sm font-semibold text-white">Extra website</dt>
-                    <dd class="mt-1 text-sm text-slate-300">$9 / site / month</dd>
+                    <dd class="mt-1 text-sm text-slate-300">$96 / site / year</dd>
                 </div>
                 <div>
                     <dt class="text-sm font-semibold text-white">Extra 100 keywords</dt>
-                    <dd class="mt-1 text-sm text-slate-300">$5 / month</dd>
+                    <dd class="mt-1 text-sm text-slate-300">$48 / year</dd>
                 </div>
                 <div>
                     <dt class="text-sm font-semibold text-white">Extra 500 audits</dt>
-                    <dd class="mt-1 text-sm text-slate-300">$15 / month</dd>
-                </div>
-                <div>
-                    <dt class="text-sm font-semibold text-white">Annual billing</dt>
-                    <dd class="mt-1 text-sm text-slate-300">2 months free (~17% off)</dd>
+                    <dd class="mt-1 text-sm text-slate-300">$144 / year</dd>
                 </div>
             </dl>
         </div>
@@ -141,15 +141,19 @@
             <div class="mt-6 grid gap-6 lg:grid-cols-2">
                 <div class="rounded-xl border border-white/10 bg-white/5 p-6">
                     <p class="font-semibold text-white">Is there a free trial?</p>
-                    <p class="mt-2 text-sm text-slate-300">Yes — every paid plan starts with a 14-day free trial. No credit card needed to start. You can cancel anytime during the trial without being charged.</p>
+                    <p class="mt-2 text-sm text-slate-300">Yes — every paid plan starts with a 1-month free trial. Your card isn't charged until the trial ends, and you can cancel anytime during the trial without being billed.</p>
+                </div>
+                <div class="rounded-xl border border-white/10 bg-white/5 p-6">
+                    <p class="font-semibold text-white">Why annual only — no monthly billing?</p>
+                    <p class="mt-2 text-sm text-slate-300">SEO is a long game and the value compounds month over month. Annual plans let us invest more in your account (deeper history, better caching, dedicated SERP capacity) at a price ~25% lower than monthly equivalents. The 1-month free trial gives you plenty of room to evaluate before committing.</p>
                 </div>
                 <div class="rounded-xl border border-white/10 bg-white/5 p-6">
                     <p class="font-semibold text-white">Can I switch plans later?</p>
-                    <p class="mt-2 text-sm text-slate-300">Yes — upgrade or downgrade at any time. Upgrades are pro-rated immediately; downgrades take effect at the next billing cycle.</p>
+                    <p class="mt-2 text-sm text-slate-300">Yes — upgrade anytime; we charge the pro-rated difference for the rest of your annual term. Downgrades take effect at the next renewal so you keep what you paid for.</p>
                 </div>
                 <div class="rounded-xl border border-white/10 bg-white/5 p-6">
                     <p class="font-semibold text-white">Do I need a credit card to sign up?</p>
-                    <p class="mt-2 text-sm text-slate-300">Not for Free. For paid trials we ask for a card so the plan converts seamlessly when the trial ends, but you can cancel beforehand and we won't charge.</p>
+                    <p class="mt-2 text-sm text-slate-300">Not for the Free plan. For paid trials we ask for a card upfront so the plan converts seamlessly when the trial ends — but the card is never charged before the 1-month trial completes, and you can cancel any time before then.</p>
                 </div>
                 <div class="rounded-xl border border-white/10 bg-white/5 p-6">
                     <p class="font-semibold text-white">What counts as a "website"?</p>
