@@ -20,8 +20,7 @@
         {{-- Sidebar --}}
         <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-200 md:static md:translate-x-0 dark:border-slate-800 dark:bg-slate-900">
             <div class="flex h-16 items-center gap-2 border-b border-slate-200 px-6 dark:border-slate-800">
-                <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-sm font-bold text-white">G</div>
-                <span class="text-base font-bold tracking-tight">EBQ</span>
+                <img src="{{ asset('logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 rounded-lg">
             </div>
 
             @php

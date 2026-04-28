@@ -16,7 +16,7 @@
     <div class="flex min-h-full">
         <div class="hidden w-1/2 bg-indigo-600 lg:flex lg:flex-col lg:justify-between lg:p-12">
             <div>
-                <span class="text-2xl font-bold text-white">EBQ</span>
+                <img src="{{ asset('logo.png') }}" alt="EBQ" width="48" height="48" class="h-12 w-12 rounded-lg">
                 <p class="mt-2 text-indigo-200">SEO & Analytics Dashboard</p>
             </div>
             <div>
@@ -42,7 +42,7 @@
         </div>
         <div class="flex w-full flex-col items-center justify-center p-6 lg:w-1/2 lg:p-12">
             <div class="mb-8 lg:hidden">
-                <span class="text-xl font-bold text-indigo-600">EBQ</span>
+                <img src="{{ asset('logo.png') }}" alt="EBQ" width="40" height="40" class="h-10 w-10 rounded-lg">
             </div>
             <div class="w-full max-w-md">
                 {{ $slot }}
