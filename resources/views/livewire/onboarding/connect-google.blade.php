@@ -1,7 +1,16 @@
 <div class="space-y-6">
-    <div>
-        <h1 class="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">Get started</h1>
-        <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Connect your Google account and add your first website.</p>
+    <div class="flex items-start justify-between gap-4">
+        <div>
+            <h1 class="text-lg font-bold tracking-tight text-slate-900 dark:text-slate-100">Get started</h1>
+            <p class="mt-1 text-xs text-slate-600 dark:text-slate-400">Connect your Google account and add your first website.</p>
+        </div>
+        <form method="POST" action="{{ route('logout') }}">
+            @csrf
+            <button type="submit"
+                class="inline-flex h-8 items-center rounded-md border border-slate-200 px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100">
+                Log out
+            </button>
+        </form>
     </div>
 
     {{-- Step indicator --}}
