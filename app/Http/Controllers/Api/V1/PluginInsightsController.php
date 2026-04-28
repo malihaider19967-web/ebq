@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Jobs\MatchRedirectFor404Job;
 use App\Models\RedirectSuggestion;
 use App\Models\Website;
+use App\Services\AiBlockEditorService;
 use App\Services\AiContentBriefService;
 use App\Services\AiSnippetRewriterService;
 use App\Services\AiWriterService;
@@ -700,6 +701,40 @@ class PluginInsightsController extends Controller
             'tier' => $website->tier,
             'writer' => $payload,
         ]);
+    }
+
+    /**
+     * Block-level AI ops invoked from the Gutenberg block toolbar. One of
+     * five modes (command/extend/summarise/grammar/rewrite) operates on the
+     * provided block text (or, for `command`, on the user's instruction).
+     *   POST /api/v1/posts/{externalPostId}/ai-block
+     *   body: { mode, text?, command? }
+     */
+    public function aiBlock(
+        Request $request,
+        string $externalPostId,
+        AiBlockEditorService $service,
+    ): JsonResponse {
+        $website = $this->resolveWebsite($request);
+        if (! $website->isPro()) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'tier_required',
+                'tier' => $website->tier,
+                'required_tier' => Website::TIER_PRO,
+                'message' => 'AI block actions are available on Pro. Upgrade to unlock.',
+            ], 402);
+        }
+
+        $data = $request->validate([
+            'mode' => ['required', 'string', 'in:'.implode(',', AiBlockEditorService::MODES)],
+            'text' => 'nullable|string|max:20000',
+            'command' => 'nullable|string|max:2000',
+        ]);
+
+        @set_time_limit(120);
+
+        return response()->json($service->generate($website, $data));
     }
 
     /**
