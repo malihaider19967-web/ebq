@@ -15,6 +15,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'landing')->name('landing');
 Route::view('/features', 'features')->name('features');
+Route::view('/pricing', 'pricing')->name('pricing');
+Route::view('/terms-conditions', 'legal.terms')->name('terms-conditions');
+Route::view('/privacy-policy', 'legal.privacy')->name('privacy-policy');
+Route::view('/refund-policy', 'legal.refund-policy')->name('refund-policy');
 Route::view('/guide', 'guide')->middleware('auth')->name('guide');
 
 // Always-fresh download of the latest packaged WP plugin — bypasses public/ caching.

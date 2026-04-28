@@ -55,47 +55,85 @@ final class EBQ_Schema_Output
     public function output(): void
     {
         $post_id = is_singular() ? (int) get_queried_object_id() : 0;
-
-        if ($post_id > 0 && EBQ_Meta_Fields::get($post_id, '_ebq_schema_disabled', false)) {
+        $doc = $this->build_document($post_id);
+        if ($doc === null) {
             return;
         }
+        echo "<script type=\"application/ld+json\">".wp_json_encode($doc, JSON_UNESCAPED_UNICODE)."</script>\n";
+    }
+
+    /**
+     * Build the full JSON-LD document EBQ would emit for a post. Same
+     * logic as `output()` but returns the array instead of echoing,
+     * so the WP plugin's Schema tab can call it via REST and surface
+     * the actual auto-emitted graph (Article + WebPage + WebSite +
+     * Organization + BreadcrumbList + …) as read-only entries the user
+     * can see and verify.
+     *
+     * Returns null when schema is disabled for this post.
+     *
+     * @return array{'@context': string, '@graph': list<array<string, mixed>>}|null
+     */
+    public function build_document(int $post_id): ?array
+    {
+        if ($post_id > 0 && EBQ_Meta_Fields::get($post_id, '_ebq_schema_disabled', false)) {
+            return null;
+        }
+
+        // Pull user-configured schemas FIRST so we know which auto-
+        // emitted nodes to suppress. Any auto node whose @type matches
+        // a user-provided schema gets skipped — the user's version wins
+        // for the entire graph (WebSite, Organization, WebPage,
+        // BreadcrumbList, Person, ImageObject, Article, FAQPage, etc.).
+        $user_nodes = [];
+        $user_types = [];
+        if ($post_id > 0) {
+            foreach ($this->user_schemas($post_id) as $entry) {
+                $node = EBQ_Schema_Templates::render($entry, $post_id);
+                if ($node !== null) {
+                    $user_nodes[] = $node;
+                    $user_types[(string) ($node['@type'] ?? '')] = true;
+                }
+            }
+        }
+
+        $skipIfUserHas = static fn (string $type): bool => ! empty($user_types[$type]);
 
         $graph = [];
-        $graph[] = $this->website_node();
-        $graph[] = $this->organization_node();
-        $graph[] = $this->webpage_node($post_id);
+
+        if (! $skipIfUserHas('WebSite')) {
+            $graph[] = $this->website_node();
+        }
+        if (! $skipIfUserHas('Organization')) {
+            $graph[] = $this->organization_node();
+        }
+        if (! $skipIfUserHas('WebPage')) {
+            $graph[] = $this->webpage_node($post_id);
+        }
 
         $primaryImage = $this->primary_image_node($post_id);
-        if ($primaryImage !== null) {
+        if ($primaryImage !== null && ! $skipIfUserHas('ImageObject')) {
             $graph[] = $primaryImage;
         }
 
         $breadcrumbs = $this->breadcrumb_node($post_id);
-        if ($breadcrumbs !== null) {
+        if ($breadcrumbs !== null && ! $skipIfUserHas('BreadcrumbList')) {
             $graph[] = $breadcrumbs;
         }
 
         if ($post_id > 0) {
             $author = $this->person_node($post_id);
-            if ($author !== null) {
+            if ($author !== null && ! $skipIfUserHas('Person')) {
                 $graph[] = $author;
             }
 
-            // User-configured schemas (post-meta `_ebq_schemas`). If the user
-            // has set any here, those take precedence over the auto-detected
-            // Article/Product node and over block-driven FAQ/HowTo for the
-            // same type — so we never emit two of the same kind.
-            $user_schemas = $this->user_schemas($post_id);
-            $user_types = [];
-            foreach ($user_schemas as $entry) {
-                $node = EBQ_Schema_Templates::render($entry, $post_id);
-                if ($node !== null) {
-                    $graph[] = $node;
-                    $user_types[(string) ($node['@type'] ?? '')] = true;
-                }
+            // User-configured nodes inserted as their own graph entries.
+            foreach ($user_nodes as $node) {
+                $graph[] = $node;
             }
 
-            // Suppress the auto-Article/Product if the user already wrote one.
+            // Suppress the auto-Article/Product if the user already wrote
+            // one of the same primary type.
             $skip_primary_types = ['Article', 'BlogPosting', 'NewsArticle', 'Product', 'Event', 'Recipe', 'LocalBusiness', 'Restaurant', 'Store', 'ProfessionalService', 'MedicalBusiness', 'JobPosting', 'SoftwareApplication'];
             $primary_already_user = false;
             foreach ($skip_primary_types as $t) {
@@ -112,7 +150,8 @@ final class EBQ_Schema_Output
             }
 
             // Block-driven FAQ/HowTo are still emitted, but a user-defined
-            // FAQPage suppresses the block-driven one to avoid duplicates.
+            // FAQPage / HowTo suppresses the block-driven one to avoid
+            // duplicates.
             foreach ($this->block_driven_nodes($post_id) as $extra) {
                 $extraType = (string) ($extra['@type'] ?? '');
                 if ($extraType === 'FAQPage' && ! empty($user_types['FAQPage'])) continue;
@@ -121,12 +160,10 @@ final class EBQ_Schema_Output
             }
         }
 
-        $doc = [
+        return [
             '@context' => 'https://schema.org',
             '@graph'   => array_values(array_filter($graph)),
         ];
-
-        echo "<script type=\"application/ld+json\">".wp_json_encode($doc, JSON_UNESCAPED_UNICODE)."</script>\n";
     }
 
     /* ─── Pieces ─────────────────────────────────────────────────── */

@@ -346,6 +346,65 @@ const TEMPLATES = {
 		],
 	},
 
+	// ─── Site-identity overrides ────────────────────────────────
+	// These types are auto-emitted by EBQ on every page. Adding a
+	// user-configured version of any of them suppresses the auto
+	// emission for that @type and ships the user's instead.
+	website: {
+		id: 'website', type: 'WebSite', label: 'WebSite (override site root)', group: 'Site identity',
+		description: 'Override the auto-emitted WebSite node — site name, search action, social URLs.',
+		fields: [
+			{ key: 'name',         label: 'Site name',       type: 'text', default: '%sitename%' },
+			{ key: 'description',  label: 'Site description', type: 'textarea' },
+			{ key: 'inLanguage',   label: 'Language code',    type: 'text', helper: 'e.g. en-US, en-GB' },
+			{ key: 'publisher',    label: 'Publisher (org)',  type: 'text' },
+			{
+				key: 'sameAs',
+				label: 'Social URLs (sameAs)',
+				type: 'repeater',
+				addLabel: 'Add link',
+				subfields: [{ key: 'value', label: 'URL', type: 'url' }],
+			},
+		],
+	},
+
+	organization: {
+		id: 'organization', type: 'Organization', label: 'Organization (override publisher)', group: 'Site identity',
+		description: 'Override the auto-emitted Organization (publisher) node. Use this to set a logo URL, legal name, contact info, and social profiles.',
+		subtypes: ['Organization', 'Corporation', 'NewsMediaOrganization', 'EducationalOrganization', 'NGO'],
+		fields: [
+			{ key: 'name',         label: 'Name',            type: 'text',     default: '%sitename%' },
+			{ key: 'legalName',    label: 'Legal name',      type: 'text' },
+			{ key: 'description',  label: 'Description',     type: 'textarea' },
+			{ key: 'url',          label: 'Website URL',     type: 'url' },
+			{ key: 'logo',         label: 'Logo URL',        type: 'url' },
+			{ key: 'email',        label: 'Email',           type: 'text' },
+			{ key: 'telephone',    label: 'Phone',           type: 'text' },
+			{ key: 'foundingDate', label: 'Founding date',   type: 'date' },
+			{
+				key: 'sameAs',
+				label: 'Social URLs (sameAs)',
+				type: 'repeater',
+				addLabel: 'Add link',
+				subfields: [{ key: 'value', label: 'URL', type: 'url' }],
+			},
+		],
+	},
+
+	webpage: {
+		id: 'webpage', type: 'WebPage', label: 'WebPage (override this URL)', group: 'Site identity',
+		description: 'Override the auto-emitted WebPage node for this post — useful when the page is about something specific (FAQ page, contact page, profile page).',
+		subtypes: ['WebPage', 'AboutPage', 'ContactPage', 'FAQPage', 'CollectionPage', 'CheckoutPage', 'ProfilePage'],
+		fields: [
+			{ key: 'name',          label: 'Page name',         type: 'text',     default: '%title%' },
+			{ key: 'description',   label: 'Description',       type: 'textarea', default: '%excerpt%' },
+			{ key: 'inLanguage',    label: 'Language code',     type: 'text',     helper: 'e.g. en-US' },
+			{ key: 'datePublished', label: 'Date published',    type: 'date',     default: '%date%' },
+			{ key: 'dateModified',  label: 'Date modified',     type: 'date',     default: '%modified%' },
+			{ key: 'primaryImage',  label: 'Primary image URL', type: 'url',      default: '%featured_image%' },
+		],
+	},
+
 	custom: {
 		id: 'custom', type: 'Thing', label: 'Custom', group: 'Custom',
 		description: 'Build your own schema. Set the @type and add any properties — values are strings, or paste JSON ({ ... } or [ ... ]) to embed nested objects/arrays.',

@@ -41,6 +41,12 @@ final class EBQ_Schema_Templates
             'music_album'     => self::music_album_template(),
             'movie'           => self::movie_template(),
             'review'          => self::review_template(),
+            // Site-identity overrides (auto-emitted by EBQ; user can
+            // configure their own version which then takes precedence
+            // for that @type).
+            'website'         => self::website_template(),
+            'organization'    => self::organization_template(),
+            'webpage'         => self::webpage_template(),
             'custom'          => self::custom_template(),
         ];
     }
@@ -534,6 +540,91 @@ final class EBQ_Schema_Templates
                         'price' => $price,
                         'priceCurrency' => self::strv($d['currency'] ?? 'USD') ?: 'USD',
                     ];
+                }
+                return $node;
+            },
+        ];
+    }
+
+    private static function website_template(): array
+    {
+        return [
+            'id' => 'website', 'type' => 'WebSite', 'label' => 'WebSite', 'group' => 'Site identity',
+            'build' => static function (array $d, int $post_id): array {
+                $home = (string) home_url('/');
+                $node = [
+                    '@type' => 'WebSite',
+                    '@id'   => $home . '#website',
+                    'url'   => $home,
+                    'name'  => self::strv($d['name'] ?? '') ?: (string) get_bloginfo('name'),
+                ];
+                if ($d['description'] ?? '') $node['description'] = self::strv($d['description']);
+                if ($d['inLanguage'] ?? '')  $node['inLanguage'] = self::strv($d['inLanguage']);
+                if ($d['publisher'] ?? '')   $node['publisher'] = ['@type' => 'Organization', 'name' => self::strv($d['publisher'])];
+
+                $sameAs = self::list_of_strings($d['sameAs'] ?? null);
+                if (! empty($sameAs)) {
+                    $node['sameAs'] = $sameAs;
+                }
+                return $node;
+            },
+        ];
+    }
+
+    private static function organization_template(): array
+    {
+        return [
+            'id' => 'organization', 'type' => 'Organization', 'label' => 'Organization', 'group' => 'Site identity',
+            'subtypes' => ['Organization', 'Corporation', 'NewsMediaOrganization', 'EducationalOrganization', 'NGO'],
+            'build' => static function (array $d, int $post_id, string $type): array {
+                $home = (string) home_url('/');
+                $node = [
+                    '@type' => $type ?: 'Organization',
+                    '@id'   => $home . '#organization',
+                    'url'   => self::strv($d['url'] ?? '') ?: $home,
+                    'name'  => self::strv($d['name'] ?? '') ?: (string) get_bloginfo('name'),
+                ];
+                if ($d['legalName'] ?? '')  $node['legalName']  = self::strv($d['legalName']);
+                if ($d['description'] ?? '') $node['description'] = self::strv($d['description']);
+                if ($d['logo'] ?? '') {
+                    $node['logo'] = [
+                        '@type' => 'ImageObject',
+                        '@id'   => $home . '#logo',
+                        'url'   => self::strv($d['logo']),
+                    ];
+                }
+                if ($d['email'] ?? '')      $node['email']      = self::strv($d['email']);
+                if ($d['telephone'] ?? '')  $node['telephone']  = self::strv($d['telephone']);
+                if ($d['foundingDate'] ?? '') $node['foundingDate'] = self::strv($d['foundingDate']);
+
+                $sameAs = self::list_of_strings($d['sameAs'] ?? null);
+                if (! empty($sameAs)) {
+                    $node['sameAs'] = $sameAs;
+                }
+                return $node;
+            },
+        ];
+    }
+
+    private static function webpage_template(): array
+    {
+        return [
+            'id' => 'webpage', 'type' => 'WebPage', 'label' => 'WebPage (this URL)', 'group' => 'Site identity',
+            'subtypes' => ['WebPage', 'AboutPage', 'ContactPage', 'FAQPage', 'CollectionPage', 'CheckoutPage', 'ProfilePage'],
+            'build' => static function (array $d, int $post_id, string $type): array {
+                $url = $post_id > 0 ? (string) get_permalink($post_id) : (string) home_url('/');
+                $node = [
+                    '@type' => $type ?: 'WebPage',
+                    '@id'   => $url . '#webpage',
+                    'url'   => $url,
+                    'name'  => self::strv($d['name'] ?? '') ?: (string) get_the_title($post_id),
+                ];
+                if ($d['description'] ?? '') $node['description'] = self::strv($d['description']);
+                if ($d['inLanguage'] ?? '')  $node['inLanguage'] = self::strv($d['inLanguage']);
+                if ($d['datePublished'] ?? '') $node['datePublished'] = self::strv($d['datePublished']);
+                if ($d['dateModified'] ?? '')  $node['dateModified']  = self::strv($d['dateModified']);
+                if ($d['primaryImage'] ?? '') {
+                    $node['primaryImageOfPage'] = ['@type' => 'ImageObject', 'url' => self::strv($d['primaryImage'])];
                 }
                 return $node;
             },

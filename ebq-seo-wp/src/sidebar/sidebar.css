@@ -1715,6 +1715,25 @@
 	opacity: 0.55;
 	background: var(--ebq-bg-subtle);
 }
+.ebq-schema-row--external {
+	background: var(--ebq-bg-subtle);
+	border-style: dashed;
+}
+.ebq-schema-row__readonly {
+	display: inline-flex;
+	align-items: center;
+	height: 20px;
+	padding: 0 8px;
+	border-radius: 999px;
+	background: var(--ebq-bg);
+	border: 1px solid var(--ebq-border);
+	color: var(--ebq-text-soft);
+	font-size: 10.5px;
+	font-weight: 600;
+	letter-spacing: .03em;
+	text-transform: uppercase;
+	cursor: help;
+}
 .ebq-schema-row__main {
 	flex: 1;
 	min-width: 0;

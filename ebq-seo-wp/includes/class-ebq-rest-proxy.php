@@ -40,6 +40,7 @@ final class EBQ_Rest_Proxy
         '/ebq/v1/rewrite-intents',
         '/ebq/v1/content-brief',
         '/ebq/v1/ai-writer',
+        '/ebq/v1/schemas-on-page',
         '/ebq/v1/redirect-suggestions',
         '/ebq/v1/hq/serp-features',
         '/ebq/v1/hq/benchmarks',
@@ -183,6 +184,20 @@ final class EBQ_Rest_Proxy
             'callback' => [$this, 'ai_writer_plan'],
             'args' => [
                 'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v >= 0],
+            ],
+        ]);
+
+        // Returns the JSON-LD document EBQ would emit at wp_head for a
+        // given post — same call path as output() but returns the array
+        // instead of echoing. Used by the editor's Schema tab to show
+        // the auto-emitted graph (Article + WebPage + Organization +
+        // BreadcrumbList + …) as read-only entries the user can verify.
+        register_rest_route('ebq/v1', '/schemas-on-page/(?P<id>\d+)', [
+            'methods' => 'GET',
+            'permission_callback' => [$this, 'can_edit'],
+            'callback' => [$this, 'schemas_on_page'],
+            'args' => [
+                'id' => ['validate_callback' => static fn ($v): bool => is_numeric($v) && (int) $v > 0],
             ],
         ]);
 
@@ -479,6 +494,177 @@ final class EBQ_Rest_Proxy
      * pulled from post meta (the user's saved focus) so the score is
      * computed against the same keyword the editor sidebar shows.
      */
+    /**
+     * Return the JSON-LD document EBQ_Schema_Output would emit for this
+     * post. The Schema tab uses this to surface auto-emitted graph
+     * entries (WebSite / Organization / WebPage / Article / etc.) as
+     * read-only rows alongside the user-managed `_ebq_schemas` list.
+     *
+     * Falls back to scanning rendered page output for non-EBQ JSON-LD
+     * scripts when the post is publicly accessible — picks up schemas
+     * from theme code, other SEO plugins, and inline scripts the user
+     * pasted into post content.
+     */
+    public function schemas_on_page(WP_REST_Request $request): WP_REST_Response
+    {
+        $post_id = (int) $request->get_param('id');
+        $post = get_post($post_id);
+        if (! $post) {
+            return new WP_REST_Response(['ok' => false, 'error' => 'post_not_found'], 404);
+        }
+
+        $ebq_doc = (new EBQ_Schema_Output())->build_document($post_id);
+        $ebq_graph = is_array($ebq_doc) && is_array($ebq_doc['@graph'] ?? null)
+            ? $ebq_doc['@graph']
+            : [];
+
+        $items = [];
+        foreach ($ebq_graph as $node) {
+            if (! is_array($node)) continue;
+            $type = $node['@type'] ?? '';
+            if (is_array($type)) $type = (string) ($type[0] ?? '');
+            $type = (string) $type;
+            if ($type === '') continue;
+            $items[] = [
+                'type' => $type,
+                'source' => 'EBQ (auto-emitted)',
+                'kind' => 'ebq_auto',
+                'note' => 'Built into the JSON-LD graph EBQ outputs at wp_head. Disable per-post via "Disable schema (JSON-LD)" toggle, or override individual pieces with a user-configured schema below.',
+                'id' => (string) ($node['@id'] ?? ''),
+            ];
+        }
+
+        // Bonus: scan the rendered <head> output for OTHER plugins'
+        // application/ld+json scripts. We do this in-process (no HTTP
+        // request) by simulating wp_head with the post object loaded.
+        // This catches Yoast / Rank Math / theme schemas that aren't
+        // visible from the editor's `content` field. Bounded by output
+        // buffer + a string scan — no DOM parsing.
+        try {
+            $extra_json_ld = $this->capture_external_json_ld($post);
+            foreach ($extra_json_ld as $entry) {
+                $type = (string) $entry['type'];
+                if ($type === '' || $type === 'Unknown') continue;
+                // Skip duplicates of EBQ-emitted types (we already listed those).
+                $alreadyListed = false;
+                foreach ($items as $existing) {
+                    if ($existing['type'] === $type && $existing['source'] === 'EBQ (auto-emitted)') {
+                        $alreadyListed = true;
+                        break;
+                    }
+                }
+                if ($alreadyListed) continue;
+                $items[] = $entry;
+            }
+        } catch (\Throwable $e) {
+            // Best-effort — if wp_head simulation fails on this host,
+            // we still return the EBQ graph above.
+        }
+
+        return new WP_REST_Response([
+            'ok' => true,
+            'items' => $items,
+        ], 200);
+    }
+
+    /**
+     * Capture external JSON-LD scripts emitted by other plugins / theme
+     * at wp_head. Runs do_action('wp_head') in an output buffer with
+     * the requested post set as the global query, then regex-extracts
+     * application/ld+json scripts that DIDN'T come from EBQ.
+     *
+     * Bounded: only used for the editor's Schema tab, never on the
+     * front-end render path. Skipped if global state can't be safely
+     * setup (front-page render, etc.).
+     *
+     * @return list<array{type: string, source: string, kind: string, note: string, id: string}>
+     */
+    private function capture_external_json_ld(\WP_Post $target_post): array
+    {
+        global $wp_query;
+
+        $original_post  = isset($GLOBALS['post']) ? $GLOBALS['post'] : null;
+        $original_query = $wp_query;
+
+        // Build a fresh single-post query so wp_head's `is_singular()` is true.
+        $wp_query = new \WP_Query([
+            'p' => $target_post->ID,
+            'post_type' => $target_post->post_type,
+            'post_status' => 'any',
+            'posts_per_page' => 1,
+        ]);
+        // setup_postdata needs a populated $post global.
+        $GLOBALS['post'] = $target_post;
+        setup_postdata($target_post);
+
+        ob_start();
+        try {
+            // Suppress EBQ's own emitter (we already grabbed its graph
+            // above) so we only collect schemas from OTHER sources.
+            remove_action('wp_head', [(new EBQ_Schema_Output()), 'output'], 5);
+            do_action('wp_head');
+            $head_html = (string) ob_get_clean();
+        } catch (\Throwable $e) {
+            ob_end_clean();
+            $head_html = '';
+        }
+
+        // Restore globals.
+        wp_reset_postdata();
+        $wp_query = $original_query;
+        $GLOBALS['post'] = $original_post;
+
+        if ($head_html === '') {
+            return [];
+        }
+
+        $items = [];
+        if (preg_match_all('#<script[^>]+type=["\']application/ld\+json["\'][^>]*>(.*?)</script>#is', $head_html, $matches)) {
+            foreach ($matches[1] as $body) {
+                $body = trim((string) $body);
+                if ($body === '') continue;
+                $decoded = json_decode($body, true);
+                if (! is_array($decoded)) continue;
+
+                // Two shapes: a single node `{@type:...}` or a graph `{@graph:[...]}`.
+                $nodes = isset($decoded['@graph']) && is_array($decoded['@graph'])
+                    ? $decoded['@graph']
+                    : [$decoded];
+
+                $sourceHint = $this->guess_source($head_html, $body);
+                foreach ($nodes as $node) {
+                    if (! is_array($node)) continue;
+                    $t = $node['@type'] ?? '';
+                    if (is_array($t)) $t = (string) ($t[0] ?? '');
+                    $t = (string) $t;
+                    if ($t === '') continue;
+                    $items[] = [
+                        'type' => $t,
+                        'source' => $sourceHint,
+                        'kind' => 'rendered_jsonld',
+                        'note' => 'Detected in the page <head> JSON-LD output. Edit in the originating plugin / theme to change.',
+                        'id' => (string) ($node['@id'] ?? ''),
+                    ];
+                }
+            }
+        }
+        return $items;
+    }
+
+    /**
+     * Best-effort guess at which plugin emitted a JSON-LD script,
+     * based on @id URL fragments / nearby HTML comments. Falls back
+     * to a generic "External" tag.
+     */
+    private function guess_source(string $head_html, string $body): string
+    {
+        if (stripos($body, 'yoast') !== false || stripos($head_html, '<!-- This site is optimized with Yoast') !== false) return 'Yoast SEO';
+        if (stripos($body, 'rank-math') !== false || stripos($head_html, '<!-- Rank Math') !== false) return 'Rank Math';
+        if (stripos($body, 'aioseo') !== false || stripos($head_html, '<!-- All in One SEO') !== false) return 'All in One SEO';
+        if (stripos($body, 'wpseo') !== false) return 'Yoast SEO';
+        return 'External plugin / theme';
+    }
+
     public function seo_score(WP_REST_Request $request): WP_REST_Response
     {
         $post_id = (int) $request->get_param('id');
