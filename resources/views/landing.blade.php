@@ -43,9 +43,9 @@
 
                 <nav aria-label="Primary" class="hidden items-center gap-8 text-sm font-medium text-slate-100 md:flex">
                     <a href="{{ route('features') }}" class="transition hover:text-indigo-200">Features</a>
+                    <a href="{{ route('pricing') }}" class="transition hover:text-indigo-200">Pricing</a>
                     <a href="#wordpress" class="transition hover:text-indigo-200">WordPress</a>
                     <a href="#workflow" class="transition hover:text-indigo-200">Workflow</a>
-                    <a href="#results" class="transition hover:text-indigo-200">Results</a>
                     <a href="#faq" class="transition hover:text-indigo-200">FAQ</a>
                 </nav>
 
@@ -311,9 +311,43 @@
         </main>
 
         <footer class="border-t border-white/10 bg-slate-950">
-            <div class="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-10 text-sm text-slate-100 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-                <p>&copy; {{ date('Y') }} EBQ. All rights reserved.</p>
-                <p>Built for modern SEO teams.</p>
+            <div class="mx-auto grid max-w-7xl gap-10 px-6 py-12 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
+                <div>
+                    <a href="{{ route('landing') }}" class="flex items-center gap-3" aria-label="EBQ home">
+                        <span aria-hidden="true" class="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-cyan-400 text-xs font-bold text-white ring-1 ring-white/25">EBQ</span>
+                        <span class="text-sm font-semibold uppercase tracking-[0.2em] text-white">EBQ</span>
+                    </a>
+                    <p class="mt-3 text-slate-400">SEO workspace for teams that ship.</p>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Product</p>
+                    <ul class="mt-3 space-y-2">
+                        <li><a class="hover:text-indigo-200" href="{{ route('features') }}">Features</a></li>
+                        <li><a class="hover:text-indigo-200" href="{{ route('pricing') }}">Pricing</a></li>
+                        <li><a class="hover:text-indigo-200" href="#wordpress">WordPress plugin</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Company</p>
+                    <ul class="mt-3 space-y-2">
+                        <li><a class="hover:text-indigo-200" href="mailto:hello@ebq.io">Contact</a></li>
+                        <li><a class="hover:text-indigo-200" href="#faq">FAQ</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Legal</p>
+                    <ul class="mt-3 space-y-2">
+                        <li><a class="hover:text-indigo-200" href="{{ route('terms-conditions') }}">Terms &amp; Conditions</a></li>
+                        <li><a class="hover:text-indigo-200" href="{{ route('privacy-policy') }}">Privacy Policy</a></li>
+                        <li><a class="hover:text-indigo-200" href="{{ route('refund-policy') }}">Refund Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-white/5">
+                <div class="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-6 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between lg:px-8">
+                    <p>&copy; {{ date('Y') }} EBQ. All rights reserved.</p>
+                    <p>Built for modern SEO teams.</p>
+                </div>
             </div>
         </footer>
     </div>
