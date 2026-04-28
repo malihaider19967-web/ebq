@@ -21,7 +21,7 @@ Route::view('/contact', 'contact')->name('contact');
 Route::view('/terms-conditions', 'legal.terms')->name('terms-conditions');
 Route::view('/privacy-policy', 'legal.privacy')->name('privacy-policy');
 Route::view('/refund-policy', 'legal.refund-policy')->name('refund-policy');
-Route::view('/guide', 'guide')->middleware(['auth', 'verified'])->name('guide');
+Route::view('/guide', 'guide')->name('guide');
 
 // Always-fresh download of the latest packaged WP plugin — bypasses public/ caching.
 Route::get('/wordpress/plugin.zip', WordPressPluginDownloadController::class)->name('wordpress.plugin.download');
