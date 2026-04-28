@@ -46,6 +46,7 @@
                 <a href="{{ route('pricing') }}" class="transition hover:text-slate-900 {{ $active === 'pricing' ? 'text-slate-900' : '' }}">Pricing</a>
                 <a href="{{ route('contact') }}" class="transition hover:text-slate-900 {{ $active === 'contact' ? 'text-slate-900' : '' }}">Contact</a>
                 <a href="{{ route('landing') }}#wordpress" class="transition hover:text-slate-900">WordPress</a>
+                <a href="{{ route('wordpress.plugin.download') }}" class="transition hover:text-slate-900">Download plugin</a>
                 <a href="{{ route('landing') }}#faq" class="transition hover:text-slate-900">FAQ</a>
             </nav>
 

@@ -16,6 +16,7 @@
 /ebq-seo-wp/node_modules
 /public/hot
 /public/storage
+/public/downloads/*.zip
 /storage/*.key
 /storage/pail
 /vendor

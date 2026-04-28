@@ -37,6 +37,7 @@ class PluginReleaseController extends Controller
             'release_notes' => ['nullable', 'string'],
             'publish_mode' => ['required', Rule::in(['draft', 'now', 'schedule'])],
             'publish_at' => ['nullable', 'date'],
+            'zip' => ['nullable', 'file', 'mimes:zip', 'max:20480'],
         ]);
 
         $exists = PluginRelease::query()
@@ -48,15 +49,29 @@ class PluginReleaseController extends Controller
             return back()->withErrors(['version' => 'This version already exists for the selected channel.']);
         }
 
+        $uploaded = $request->file('zip');
         $status = PluginRelease::STATUS_DRAFT;
         $publishAt = null;
         $publishedAt = null;
+        $zipPath = PluginRelease::ZIP_PUBLIC_BUILD;
+
+        if ($uploaded !== null) {
+            // Stash the uploaded ZIP in storage so it survives draft → publish.
+            $stored = sprintf('plugin-releases/ebq-seo-%s-%s.zip', $data['version'], $data['channel']);
+            $uploaded->storeAs('plugin-releases', basename($stored), 'local');
+            $zipPath = $stored;
+        }
 
         if ($data['publish_mode'] === 'now') {
-            try {
-                $source->syncVersionAndPackage($data['version']);
-            } catch (InvalidArgumentException $e) {
-                return back()->withErrors(['version' => $e->getMessage()]);
+            if ($uploaded !== null) {
+                $this->promoteUploadedZipToPublic($zipPath);
+                $zipPath = PluginRelease::ZIP_PUBLIC_BUILD;
+            } else {
+                try {
+                    $source->syncVersionAndPackage($data['version']);
+                } catch (InvalidArgumentException $e) {
+                    return back()->withErrors(['version' => $e->getMessage()]);
+                }
             }
             $status = PluginRelease::STATUS_PUBLISHED;
             $publishedAt = now();
@@ -71,7 +86,7 @@ class PluginReleaseController extends Controller
             'channel' => $data['channel'],
             'status' => $status,
             'release_notes' => $data['release_notes'] ?? null,
-            'zip_path' => PluginRelease::ZIP_PUBLIC_BUILD,
+            'zip_path' => $zipPath,
             'publish_at' => $publishAt,
             'published_at' => $publishedAt,
             'created_by' => $request->user()?->id,
@@ -97,10 +112,15 @@ class PluginReleaseController extends Controller
         ClientActivityLogger $logger,
         WordPressPluginSourceService $source,
     ): RedirectResponse {
-        try {
-            $source->syncVersionAndPackage($pluginRelease->version);
-        } catch (InvalidArgumentException $e) {
-            return back()->withErrors(['version' => $e->getMessage()]);
+        if (str_starts_with((string) $pluginRelease->zip_path, 'plugin-releases/')
+            && Storage::disk('local')->exists($pluginRelease->zip_path)) {
+            $this->promoteUploadedZipToPublic($pluginRelease->zip_path);
+        } else {
+            try {
+                $source->syncVersionAndPackage($pluginRelease->version);
+            } catch (InvalidArgumentException $e) {
+                return back()->withErrors(['version' => $e->getMessage()]);
+            }
         }
         $pluginRelease->forceFill(['zip_path' => PluginRelease::ZIP_PUBLIC_BUILD])->save();
 
@@ -162,6 +182,23 @@ class PluginReleaseController extends Controller
         return back()->with('status', $replacement
             ? 'Rolled back; source and package restored to the previous release version.'
             : 'Release marked rolled back (no prior release to restore).');
+    }
+
+    /**
+     * Copy a stored upload (storage/app/plugin-releases/...) to the public download
+     * path so /wordpress/plugin.zip serves the operator-uploaded ZIP. Public folder
+     * is gitignored — the file lives outside source control by design.
+     */
+    private function promoteUploadedZipToPublic(string $storagePath): void
+    {
+        $absoluteSource = Storage::disk('local')->path($storagePath);
+        $destination = public_path('downloads/ebq-seo.zip');
+
+        if (! is_dir(dirname($destination))) {
+            mkdir(dirname($destination), 0755, true);
+        }
+
+        copy($absoluteSource, $destination);
     }
 
     public function destroy(PluginRelease $pluginRelease): RedirectResponse
