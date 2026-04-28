@@ -714,7 +714,8 @@ class PluginInsightsController extends Controller
         Request $request,
         string $externalPostId,
         AiBlockEditorService $service,
-    ): JsonResponse {
+    ): JsonResponse 
+    {
         $website = $this->resolveWebsite($request);
         if (! $website->isPro()) {
             return response()->json([
