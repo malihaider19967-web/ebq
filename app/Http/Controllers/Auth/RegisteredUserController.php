@@ -57,16 +57,6 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
-        $websiteId = (int) session('current_website_id', 0);
-        if ($websiteId <= 0) {
-            $first = $user->accessibleWebsitesQuery()->select('id')->orderBy('domain')->first();
-            if ($first) {
-                $websiteId = (int) $first->id;
-                session(['current_website_id' => $websiteId]);
-            }
-        }
-        $fallback = $user->firstAccessibleRoute($websiteId);
-
-        return redirect()->intended(route($fallback, absolute: false));
+        return redirect()->route('verification.notice');
     }
 }

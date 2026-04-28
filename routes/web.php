@@ -21,7 +21,7 @@ Route::view('/contact', 'contact')->name('contact');
 Route::view('/terms-conditions', 'legal.terms')->name('terms-conditions');
 Route::view('/privacy-policy', 'legal.privacy')->name('privacy-policy');
 Route::view('/refund-policy', 'legal.refund-policy')->name('refund-policy');
-Route::view('/guide', 'guide')->middleware('auth')->name('guide');
+Route::view('/guide', 'guide')->middleware(['auth', 'verified'])->name('guide');
 
 // Always-fresh download of the latest packaged WP plugin — bypasses public/ caching.
 Route::get('/wordpress/plugin.zip', WordPressPluginDownloadController::class)->name('wordpress.plugin.download');
@@ -33,7 +33,7 @@ Route::middleware(['web', 'auth'])->group(function (): void {
     Route::post('/wordpress/connect', [WordPressConnectController::class, 'approve'])->name('wordpress.connect.approve');
 });
 
-Route::middleware(['auth', 'onboarded'])->group(function () {
+Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/dashboard', 'dashboard')->middleware('feature:dashboard')->name('dashboard');
     Route::view('/keywords', 'keywords.index')->middleware('feature:keywords')->name('keywords.index');
     Route::get('/keywords/{query}', fn (string $query) => view('keywords.show', ['query' => $query]))
@@ -62,7 +62,7 @@ Route::middleware(['auth', 'onboarded'])->group(function () {
     Route::view('/settings', 'settings.index')->middleware('feature:settings')->name('settings.index');
 });
 
-Route::middleware(['auth', 'throttle:oauth'])->group(function () {
+Route::middleware(['auth', 'verified', 'throttle:oauth'])->group(function () {
     Route::view('/onboarding', 'onboarding.index')->name('onboarding');
     Route::get('/auth/google/redirect', [GoogleOAuthController::class, 'redirect'])->name('google.redirect');
     Route::get('/auth/google/callback', [GoogleOAuthController::class, 'callback'])->name('google.callback');
