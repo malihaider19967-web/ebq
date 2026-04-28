@@ -731,6 +731,10 @@ class PluginInsightsController extends Controller
             'mode' => ['required', 'string', 'in:'.implode(',', AiBlockEditorService::MODES)],
             'text' => 'nullable|string|max:20000',
             'command' => 'nullable|string|max:2000',
+            'focus_keyword' => 'nullable|string|max:200',
+            'additional_keywords' => 'nullable|array|max:20',
+            'additional_keywords.*' => 'string|max:200',
+            'title' => 'nullable|string|max:300',
         ]);
 
         @set_time_limit(120);

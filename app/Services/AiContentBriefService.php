@@ -54,6 +54,30 @@ class AiContentBriefService
      *   error?: string,
      * }
      */
+    /**
+     * Cache-only lookup — never triggers a fresh SERP/LLM run. Used by
+     * lightweight callers (e.g. block-toolbar AI ops) that want to enrich
+     * prompts when a brief exists but must not pay for one when it doesn't.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function cachedBrief(Website $website, string $focusKeyword, string $country = 'us'): ?array
+    {
+        $keyword = trim($focusKeyword);
+        if ($keyword === '') {
+            return null;
+        }
+        $country = $country !== '' ? strtolower($country) : 'us';
+        $cacheKey = sprintf(
+            'ai_content_brief_v3:%d:%s:%s',
+            $website->id,
+            hash('xxh3', mb_strtolower($keyword)),
+            $country,
+        );
+        $cached = Cache::get($cacheKey);
+        return is_array($cached) ? $cached : null;
+    }
+
     public function brief(Website $website, int $postId, array $input): array
     {
         if (! $this->llm->isAvailable()) {
