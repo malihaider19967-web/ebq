@@ -186,6 +186,37 @@ class PluginReleaseController extends Controller
             : 'Release marked rolled back (no prior release to restore).');
     }
 
+    public function uploadZip(
+        PluginRelease $pluginRelease,
+        Request $request,
+        ClientActivityLogger $logger,
+    ): RedirectResponse {
+        if (! in_array($pluginRelease->status, [PluginRelease::STATUS_DRAFT, PluginRelease::STATUS_SCHEDULED], true)) {
+            return back()->withErrors(['zip' => 'ZIP can only be attached to draft or scheduled releases.']);
+        }
+
+        $request->validate([
+            'zip' => ['required', 'file', 'mimes:zip', 'max:20480'],
+        ]);
+
+        if (str_starts_with((string) $pluginRelease->zip_path, 'plugin-releases/')
+            && Storage::disk('local')->exists($pluginRelease->zip_path)) {
+            Storage::disk('local')->delete($pluginRelease->zip_path);
+        }
+
+        $stored = sprintf('plugin-releases/ebq-seo-%s-%s.zip', $pluginRelease->version, $pluginRelease->channel);
+        $request->file('zip')->storeAs('plugin-releases', basename($stored), 'local');
+        $pluginRelease->update(['zip_path' => $stored]);
+
+        $logger->log('admin.plugin_release_zip_attached', meta: [
+            'release_id' => $pluginRelease->id,
+            'version' => $pluginRelease->version,
+            'channel' => $pluginRelease->channel,
+        ]);
+
+        return back()->with('status', 'ZIP attached. Click Publish to promote it to public/downloads/ebq-seo.zip.');
+    }
+
     /**
      * Copy a stored upload (storage/app/plugin-releases/...) to the public download
      * path so /wordpress/plugin.zip serves the operator-uploaded ZIP. Public folder

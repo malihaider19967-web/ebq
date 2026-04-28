@@ -56,21 +56,42 @@
                         <th class="px-3 py-2">Version</th>
                         <th class="px-3 py-2">Channel</th>
                         <th class="px-3 py-2">Status</th>
+                        <th class="px-3 py-2">ZIP</th>
                         <th class="px-3 py-2">Publish At</th>
                         <th class="px-3 py-2">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     @foreach ($releases as $release)
-                        <tr class="border-t border-slate-100">
+                        @php
+                            $isEditable = in_array($release->status, [\App\Models\PluginRelease::STATUS_DRAFT, \App\Models\PluginRelease::STATUS_SCHEDULED], true);
+                            $hasUploadedZip = is_string($release->zip_path) && str_starts_with($release->zip_path, 'plugin-releases/');
+                        @endphp
+                        <tr class="border-t border-slate-100 align-top">
                             <td class="px-3 py-2">{{ $release->version }}</td>
                             <td class="px-3 py-2">{{ $release->channel }}</td>
                             <td class="px-3 py-2">{{ $release->status }}</td>
+                            <td class="px-3 py-2">
+                                @if ($release->status === \App\Models\PluginRelease::STATUS_PUBLISHED)
+                                    <span class="rounded bg-emerald-50 px-1.5 py-0.5 text-xs font-medium text-emerald-700 ring-1 ring-emerald-200">Live</span>
+                                @elseif ($hasUploadedZip)
+                                    <span class="rounded bg-indigo-50 px-1.5 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-indigo-200">Attached</span>
+                                @else
+                                    <span class="rounded bg-amber-50 px-1.5 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-amber-200">Missing</span>
+                                @endif
+                                @if ($isEditable)
+                                    <form method="POST" action="{{ route('admin.plugin-releases.upload-zip', $release) }}" enctype="multipart/form-data" class="mt-2 flex items-center gap-1.5">
+                                        @csrf
+                                        <input type="file" name="zip" accept=".zip,application/zip,application/x-zip-compressed" required class="block w-full text-xs file:mr-2 file:rounded file:border-0 file:bg-slate-100 file:px-2 file:py-1 file:text-xs file:font-semibold file:text-slate-700" />
+                                        <button type="submit" class="whitespace-nowrap rounded border border-slate-300 px-2 py-1 text-xs">{{ $hasUploadedZip ? 'Replace' : 'Attach' }}</button>
+                                    </form>
+                                @endif
+                            </td>
                             <td class="px-3 py-2">{{ $release->publish_at?->format('Y-m-d H:i') ?? '-' }}</td>
                             <td class="px-3 py-2">
                                 <div class="flex flex-wrap gap-2">
-                                    @if (in_array($release->status, [\App\Models\PluginRelease::STATUS_DRAFT, \App\Models\PluginRelease::STATUS_SCHEDULED], true))
-                                        <form method="POST" action="{{ route('admin.plugin-releases.publish', $release) }}">@csrf<button type="submit" class="rounded border border-indigo-300 px-2 py-1 text-xs">Publish</button></form>
+                                    @if ($isEditable)
+                                        <form method="POST" action="{{ route('admin.plugin-releases.publish', $release) }}">@csrf<button type="submit" class="rounded border border-indigo-300 px-2 py-1 text-xs disabled:opacity-50" @if (! $hasUploadedZip) title="Attach a ZIP first" @endif>Publish</button></form>
                                     @endif
                                     @if ($release->status === \App\Models\PluginRelease::STATUS_PUBLISHED)
                                         <form method="POST" action="{{ route('admin.plugin-releases.rollback', $release) }}">@csrf<button type="submit" class="rounded border border-amber-300 px-2 py-1 text-xs">Rollback</button></form>
