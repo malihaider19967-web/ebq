@@ -41,7 +41,9 @@
                 </div>
             </div>
         </section>
-    @else
+    @endif
+
+    @unless ($freeMode)
     {{-- ── Plan cards ───────────────────────────────────────── --}}
     <section class="bg-white py-16 sm:py-20">
         <div class="mx-auto max-w-6xl px-6 lg:px-8">
@@ -286,7 +288,7 @@
             </div>
         </div>
     </section>
-    @endif
+    @endunless
 
     {{-- ── CTA ──────────────────────────────────────────────── --}}
     <section class="bg-white py-20 sm:py-24">
