@@ -37,7 +37,9 @@ class PluginReleaseController extends Controller
             'release_notes' => ['nullable', 'string'],
             'publish_mode' => ['required', Rule::in(['draft', 'now', 'schedule'])],
             'publish_at' => ['nullable', 'date'],
-            'zip' => ['nullable', 'file', 'mimes:zip', 'max:20480'],
+            'zip' => ['nullable', 'file', 'mimes:zip', 'max:20480', 'required_if:publish_mode,now,schedule'],
+        ], [
+            'zip.required_if' => 'A plugin ZIP is required when publishing now or scheduling. (Source-tree packaging is disabled from the UI in production.)',
         ]);
 
         $exists = PluginRelease::query()
