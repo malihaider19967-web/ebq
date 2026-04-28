@@ -23,7 +23,19 @@ class GoogleOAuthController extends Controller
 
         return Socialite::driver('google')
             ->redirectUrl(route('google.sso.callback', absolute: true))
-            ->scopes(['openid', 'profile', 'email'])
+            ->scopes([
+                'openid',
+                'profile',
+                'email',
+                'https://www.googleapis.com/auth/analytics.readonly',
+                'https://www.googleapis.com/auth/webmasters.readonly',
+                'https://www.googleapis.com/auth/indexing',
+            ])
+            ->with([
+                'access_type' => 'offline',
+                'prompt' => 'consent',
+                'include_granted_scopes' => 'true',
+            ])
             ->redirect();
     }
 

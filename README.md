@@ -61,6 +61,9 @@ composer run setup
 | `MAIL_*` | Outgoing mail; queued growth reports use the configured mailer |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth (Socialite) |
 | `GOOGLE_REDIRECT_URI` | Must match the redirect URI in Google Cloud Console (default: `${APP_URL}/auth/google/callback`) |
+| `GOOGLE_CAP_AUDIENCE` | Expected CAP token audience (recommended: your OAuth client ID) |
+| `GOOGLE_CAP_JWKS_URL` | Google JWK endpoint used to verify CAP token signatures |
+| `GOOGLE_CAP_ISSUERS` | Comma-separated allowed CAP issuers |
 
 Google OAuth is configured in `config/services.php` under `google` and uses these environment keys.
 
@@ -70,6 +73,8 @@ Google OAuth is configured in `config/services.php` under `google` and uses thes
 2. Add the authorized redirect URI exactly as in `GOOGLE_REDIRECT_URI` (e.g. `http://localhost:8000/auth/google/callback` when using `php artisan serve` on port 8000).
 3. Copy the client ID and secret into `.env`.
 4. The app requests readonly scopes for Analytics and Search Console (`GoogleOAuthController`). Ensure the Google account you use has access to the GA4 properties and GSC properties you intend to connect.
+5. For Cross-Account Protection (CAP), configure the receiver endpoint as `POST ${APP_URL}/auth/google/cap/events`.
+6. Set `GOOGLE_CAP_AUDIENCE` to the expected audience configured in Google CAP (typically your OAuth client ID).
 
 ## Application flow
 

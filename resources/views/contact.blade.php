@@ -16,25 +16,11 @@
             </div>
 
             <div class="mx-auto mt-12 grid max-w-4xl gap-6 md:grid-cols-3">
-                <article class="rounded-2xl border border-slate-200 bg-white p-6">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">General</p>
-                    <h2 class="mt-2 text-lg font-semibold text-slate-900">hello@ebq.io</h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-600">Product questions, demos, and account help.</p>
-                    <a href="mailto:hello@ebq.io" class="mt-4 inline-flex text-sm font-semibold text-slate-900 underline underline-offset-2">Email us</a>
-                </article>
-
-                <article class="rounded-2xl border border-slate-200 bg-white p-6">
+                <article class="rounded-2xl border border-slate-200 bg-white p-6 md:col-span-3">
                     <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Support</p>
                     <h2 class="mt-2 text-lg font-semibold text-slate-900">support@ebq.io</h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-600">Technical issues and troubleshooting.</p>
+                    <p class="mt-2 text-sm leading-6 text-slate-600">For all product questions, billing, technical issues, and troubleshooting.</p>
                     <a href="mailto:support@ebq.io" class="mt-4 inline-flex text-sm font-semibold text-slate-900 underline underline-offset-2">Get support</a>
-                </article>
-
-                <article class="rounded-2xl border border-slate-200 bg-white p-6">
-                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Sales</p>
-                    <h2 class="mt-2 text-lg font-semibold text-slate-900">sales@ebq.io</h2>
-                    <p class="mt-2 text-sm leading-6 text-slate-600">Agency plans and enterprise onboarding.</p>
-                    <a href="mailto:sales@ebq.io" class="mt-4 inline-flex text-sm font-semibold text-slate-900 underline underline-offset-2">Contact sales</a>
                 </article>
             </div>
 

@@ -39,6 +39,10 @@ return [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),
         'redirect' => env('GOOGLE_REDIRECT_URI'),
+        // Cross-Account Protection (CAP / RISC)
+        'cap_audience' => env('GOOGLE_CAP_AUDIENCE'),
+        'cap_jwks_url' => env('GOOGLE_CAP_JWKS_URL', 'https://www.googleapis.com/oauth2/v3/certs'),
+        'cap_issuers' => array_filter(array_map('trim', explode(',', (string) env('GOOGLE_CAP_ISSUERS', 'https://accounts.google.com,accounts.google.com')))),
     ],
 
     'serper' => [

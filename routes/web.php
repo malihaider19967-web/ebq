@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\GoogleOAuthController;
+use App\Http\Controllers\GoogleCapController;
 use App\Http\Controllers\PageAuditController;
 use App\Http\Controllers\Admin\ActivityController as AdminActivityController;
 use App\Http\Controllers\Admin\ClientController as AdminClientController;
@@ -66,6 +67,11 @@ Route::middleware(['auth', 'throttle:oauth'])->group(function () {
     Route::get('/auth/google/redirect', [GoogleOAuthController::class, 'redirect'])->name('google.redirect');
     Route::get('/auth/google/callback', [GoogleOAuthController::class, 'callback'])->name('google.callback');
 });
+
+// Google Cross-Account Protection (RISC/CAP) receiver endpoint.
+Route::post('/auth/google/cap/events', GoogleCapController::class)
+    ->middleware(['throttle:oauth'])
+    ->name('google.cap.events');
 
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function (): void {
     Route::get('/clients', [AdminClientController::class, 'index'])->name('clients.index');

@@ -17,6 +17,12 @@ return Application::configure(basePath: dirname(__DIR__))
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        // Google Cross-Account Protection (CAP/RISC) posts security events
+        // server-to-server and cannot provide a browser CSRF token.
+        $middleware->validateCsrfTokens(except: [
+            'auth/google/cap/events',
+        ]);
+
         $middleware->alias([
             'onboarded' => \App\Http\Middleware\EnsureOnboarded::class,
             'feature' => \App\Http\Middleware\EnsureFeatureAccess::class,
