@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\Route;
 Route::view('/', 'landing')->name('landing');
 Route::view('/features', 'features')->name('features');
 Route::view('/pricing', 'pricing')->name('pricing');
+Route::view('/contact', 'contact')->name('contact');
 Route::view('/terms-conditions', 'legal.terms')->name('terms-conditions');
 Route::view('/privacy-policy', 'legal.privacy')->name('privacy-policy');
 Route::view('/refund-policy', 'legal.refund-policy')->name('refund-policy');

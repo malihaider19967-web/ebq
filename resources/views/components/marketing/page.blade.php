@@ -43,6 +43,7 @@
             <nav aria-label="Primary" class="hidden items-center gap-7 text-sm text-slate-600 md:flex">
                 <a href="{{ route('features') }}" class="transition hover:text-slate-900 {{ $active === 'features' ? 'text-slate-900' : '' }}">Features</a>
                 <a href="{{ route('pricing') }}" class="transition hover:text-slate-900 {{ $active === 'pricing' ? 'text-slate-900' : '' }}">Pricing</a>
+                <a href="{{ route('contact') }}" class="transition hover:text-slate-900 {{ $active === 'contact' ? 'text-slate-900' : '' }}">Contact</a>
                 <a href="{{ route('landing') }}#wordpress" class="transition hover:text-slate-900">WordPress</a>
                 <a href="{{ route('landing') }}#faq" class="transition hover:text-slate-900">FAQ</a>
             </nav>
@@ -79,7 +80,7 @@
                 <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Company</p>
                 <ul class="mt-3 space-y-2.5">
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('landing') }}#faq">FAQ</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="mailto:hello@ebq.io">Contact</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('contact') }}">Contact</a></li>
                 </ul>
             </div>
             <div>
