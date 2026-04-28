@@ -1,182 +1,280 @@
 <x-marketing.page
     title="Pricing — EBQ"
-    description="Simple, transparent EBQ pricing. Start free, scale as you grow. WordPress plugin always included."
+    description="Simple annual pricing for SEO teams. Free plan available. 1-month free trial on every paid plan."
     active="pricing"
 >
-    {{-- ── Hero ────────────────────────────────────────────────── --}}
-    <section class="mx-auto max-w-7xl px-6 pb-12 pt-14 text-center lg:px-8 lg:pb-16 lg:pt-20">
-        <p class="inline-flex items-center rounded-full border border-indigo-200/40 bg-indigo-500/15 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.2em] text-indigo-100">Simple pricing</p>
-        <h1 class="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl">Pay for the sites you manage, nothing else.</h1>
-        <p class="mx-auto mt-6 max-w-2xl text-base leading-7 text-slate-200 sm:text-lg">
-            Every plan includes the EBQ WordPress plugin, the EBQ HQ dashboard, and unlimited team members. Annual subscriptions only — try free for a month before you commit.
-        </p>
-        <div class="mt-8 inline-flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-xs font-medium text-slate-200">
-            <span class="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden></span>
-            1-month free trial · Then annual billing · Cancel during trial, no charge
+    {{-- ── Hero ──────────────────────────────────────────────── --}}
+    <section class="border-b border-slate-200 bg-white">
+        <div class="mx-auto max-w-6xl px-6 py-20 text-center lg:px-8 lg:py-24">
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Pricing</p>
+            <h1 class="mx-auto mt-4 max-w-3xl text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
+                Pay for the sites you manage. Nothing else.
+            </h1>
+            <p class="mx-auto mt-5 max-w-2xl text-balance text-[17px] leading-8 text-slate-600">
+                Every plan includes the EBQ workspace, WordPress plugin, and unlimited team members. Annual subscriptions only — every paid plan starts with a 1-month free trial.
+            </p>
+            <div class="mt-7 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-medium text-slate-600">
+                <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                1-month free trial · Cancel during trial, no charge
+            </div>
         </div>
     </section>
 
-    {{-- ── Pricing tiers ───────────────────────────────────────── --}}
-    <section class="mx-auto max-w-7xl px-6 pb-20 lg:px-8 lg:pb-28">
-        <div class="grid gap-6 lg:grid-cols-4">
+    {{-- ── Plan cards ───────────────────────────────────────── --}}
+    <section class="bg-white py-16 sm:py-20">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="grid gap-6 lg:grid-cols-4">
 
-            {{-- Free --}}
-            <div class="flex flex-col rounded-2xl border border-white/10 bg-white/5 p-7">
-                <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">Free</h2>
-                <p class="mt-3 flex items-baseline gap-1.5">
-                    <span class="text-4xl font-bold text-white">$0</span>
-                    <span class="text-sm text-slate-300">forever</span>
-                </p>
-                <p class="mt-1 text-xs text-slate-400">No card required.</p>
-                <p class="mt-3 text-sm text-slate-300">For personal sites and trial runs.</p>
-                <ul class="mt-6 space-y-3 text-sm text-slate-200">
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> 1 connected website</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> WordPress plugin (live SEO score, schema generator, brief)</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> Search Console performance + indexing dashboard</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> 5 tracked keywords</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> 10 page audits / month</li>
-                    <li class="flex gap-2"><span class="text-slate-500">—</span> AI Writer (preview only)</li>
-                    <li class="flex gap-2"><span class="text-slate-500">—</span> Topical-gap analysis</li>
-                </ul>
-                <a href="{{ route('register') }}" class="mt-7 inline-flex items-center justify-center rounded-md border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
-                    Start free
-                </a>
-            </div>
+                @php
+                    $plans = [
+                        [
+                            'name' => 'Free',
+                            'price' => '$0',
+                            'suffix' => 'forever',
+                            'caption' => 'No card required.',
+                            'tagline' => 'For personal sites and trial runs.',
+                            'features' => [
+                                '1 connected website',
+                                'WordPress plugin (full)',
+                                'Search Console performance + indexing',
+                                '5 tracked keywords',
+                                '10 page audits / month',
+                            ],
+                            'excluded' => ['AI Writer (preview only)', 'Topical-gap analysis'],
+                            'cta' => ['Start free', route('register'), 'ghost'],
+                            'highlight' => false,
+                        ],
+                        [
+                            'name' => 'Starter',
+                            'price' => '$15',
+                            'suffix' => '/mo',
+                            'caption' => '$180 billed yearly',
+                            'tagline' => 'For one site you actively grow.',
+                            'features' => [
+                                'Everything in Free',
+                                '50 tracked keywords',
+                                '100 page audits / month',
+                                'Topical-gap analysis (top-5 SERP)',
+                                'AI snippet rewrites + content brief',
+                                'Backlink monitoring (own domain)',
+                            ],
+                            'excluded' => [],
+                            'cta' => ['Start 1-month trial', route('register').'?plan=starter', 'ghost'],
+                            'highlight' => false,
+                        ],
+                        [
+                            'name' => 'Pro',
+                            'price' => '$39',
+                            'suffix' => '/mo',
+                            'caption' => '$468 billed yearly',
+                            'tagline' => 'For agencies and growth teams.',
+                            'features' => [
+                                'Everything in Starter',
+                                '5 websites, 250 tracked keywords',
+                                '500 page audits / month',
+                                'AI Writer (full draft)',
+                                'Competitor backlink prospecting',
+                                'Cross-site benchmarks',
+                                'Quick-submit (Google Indexing API)',
+                                'Priority email + chat support',
+                            ],
+                            'excluded' => [],
+                            'cta' => ['Start 1-month trial', route('register').'?plan=pro', 'primary'],
+                            'highlight' => true,
+                        ],
+                        [
+                            'name' => 'Agency',
+                            'price' => '$125',
+                            'suffix' => '/mo',
+                            'caption' => '$1,500 billed yearly',
+                            'tagline' => 'For agencies managing many clients.',
+                            'features' => [
+                                'Everything in Pro',
+                                '25 websites, 1,500 tracked keywords',
+                                '2,500 page audits / month',
+                                'White-label client reports (PDF)',
+                                'Bulk operations + batch URL submit',
+                                'SSO + role-based access',
+                                'Dedicated success manager',
+                            ],
+                            'excluded' => [],
+                            'cta' => ['Talk to sales', 'mailto:sales@ebq.io?subject=Agency%20plan%20enquiry', 'ghost'],
+                            'highlight' => false,
+                        ],
+                    ];
+                @endphp
 
-            {{-- Starter --}}
-            <div class="flex flex-col rounded-2xl border border-white/10 bg-white/5 p-7">
-                <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">Starter</h2>
-                <p class="mt-3 flex items-baseline gap-1.5">
-                    <span class="text-4xl font-bold text-white">$15</span>
-                    <span class="text-sm text-slate-300">/mo</span>
-                </p>
-                <p class="mt-1 text-xs text-slate-400">$180 billed yearly · 1-month free trial</p>
-                <p class="mt-3 text-sm text-slate-300">For one site you actively grow.</p>
-                <ul class="mt-6 space-y-3 text-sm text-slate-200">
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> Everything in Free</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> 1 website, 50 tracked keywords</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> 100 page audits / month</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> Topical-gap analysis (top-5 SERP)</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> AI snippet rewrites + content brief</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> Backlink monitoring (own domain)</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> Email support</li>
-                </ul>
-                <a href="{{ route('register') }}?plan=starter" class="mt-7 inline-flex items-center justify-center rounded-md border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
-                    Start 1-month trial
-                </a>
-            </div>
+                @foreach ($plans as $plan)
+                    <div @class([
+                        'relative flex flex-col rounded-2xl border bg-white p-6',
+                        'border-slate-900 shadow-[0_24px_60px_-24px_rgba(15,23,42,0.25)]' => $plan['highlight'],
+                        'border-slate-200' => ! $plan['highlight'],
+                    ])>
+                        @if ($plan['highlight'])
+                            <span class="absolute -top-3 left-6 inline-flex items-center rounded-full bg-slate-900 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white">Most popular</span>
+                        @endif
 
-            {{-- Pro (most popular) --}}
-            <div class="relative flex flex-col rounded-2xl border-2 border-indigo-400/60 bg-gradient-to-br from-indigo-500/15 via-white/5 to-cyan-400/10 p-7 shadow-2xl shadow-indigo-500/20">
-                <span class="absolute -top-3 right-6 inline-flex items-center rounded-full bg-gradient-to-r from-indigo-500 to-cyan-400 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white">Most popular</span>
-                <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-200">Pro</h2>
-                <p class="mt-3 flex items-baseline gap-1.5">
-                    <span class="text-4xl font-bold text-white">$39</span>
-                    <span class="text-sm text-slate-200">/mo</span>
-                </p>
-                <p class="mt-1 text-xs text-slate-300">$468 billed yearly · 1-month free trial</p>
-                <p class="mt-3 text-sm text-slate-200">For agencies and growth teams.</p>
-                <ul class="mt-6 space-y-3 text-sm text-slate-100">
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> Everything in Starter</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> 5 websites, 250 tracked keywords</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> 500 page audits / month</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> AI Writer (full draft, section-by-section)</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> Competitor backlink prospecting</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> Cross-site benchmarks + topical authority</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> Quick-submit (Google Indexing API)</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> Priority email + chat support</li>
-                </ul>
-                <a href="{{ route('register') }}?plan=pro" class="mt-7 inline-flex items-center justify-center rounded-md bg-white px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
-                    Start 1-month trial
-                </a>
-            </div>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">{{ $plan['name'] }}</p>
+                        <div class="mt-4 flex items-baseline gap-1.5">
+                            <span class="text-4xl font-semibold tracking-tight text-slate-900">{{ $plan['price'] }}</span>
+                            <span class="text-sm text-slate-500">{{ $plan['suffix'] }}</span>
+                        </div>
+                        <p class="mt-1 text-xs text-slate-500">{{ $plan['caption'] }}</p>
+                        <p class="mt-4 text-sm text-slate-600">{{ $plan['tagline'] }}</p>
 
-            {{-- Agency --}}
-            <div class="flex flex-col rounded-2xl border border-white/10 bg-white/5 p-7">
-                <h2 class="text-sm font-semibold uppercase tracking-[0.2em] text-slate-300">Agency</h2>
-                <p class="mt-3 flex items-baseline gap-1.5">
-                    <span class="text-4xl font-bold text-white">$125</span>
-                    <span class="text-sm text-slate-300">/mo</span>
-                </p>
-                <p class="mt-1 text-xs text-slate-400">$1,500 billed yearly · 1-month free trial</p>
-                <p class="mt-3 text-sm text-slate-300">For agencies managing many clients.</p>
-                <ul class="mt-6 space-y-3 text-sm text-slate-200">
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> Everything in Pro</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> 25 websites, 1,500 tracked keywords</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> 2,500 page audits / month</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> White-label client reports (PDF)</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> Bulk operations + batch URL submit</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> SSO + role-based access</li>
-                    <li class="flex gap-2"><span class="text-emerald-400">✓</span> Dedicated success manager</li>
-                </ul>
-                <a href="mailto:sales@ebq.io?subject=Agency%20plan%20enquiry" class="mt-7 inline-flex items-center justify-center rounded-md border border-white/20 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10">
-                    Talk to sales
-                </a>
-            </div>
-        </div>
+                        <ul class="mt-6 space-y-2.5 text-[13px] text-slate-700">
+                            @foreach ($plan['features'] as $f)
+                                <li class="flex gap-2.5">
+                                    <svg class="mt-0.5 h-4 w-4 flex-none text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                    <span>{{ $f }}</span>
+                                </li>
+                            @endforeach
+                            @foreach ($plan['excluded'] as $e)
+                                <li class="flex gap-2.5 text-slate-400">
+                                    <svg class="mt-0.5 h-4 w-4 flex-none" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" /></svg>
+                                    <span>{{ $e }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
 
-        {{-- ── Add-ons / extras ──────────────────────────────────── --}}
-        <div class="mt-12 rounded-2xl border border-white/10 bg-white/5 p-8">
-            <h3 class="text-lg font-semibold text-white">Need more?</h3>
-            <p class="mt-2 text-sm text-slate-300">Add-ons stack onto your annual subscription, billed alongside the next renewal.</p>
-            <dl class="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                <div>
-                    <dt class="text-sm font-semibold text-white">Extra website</dt>
-                    <dd class="mt-1 text-sm text-slate-300">$96 / site / year</dd>
-                </div>
-                <div>
-                    <dt class="text-sm font-semibold text-white">Extra 100 keywords</dt>
-                    <dd class="mt-1 text-sm text-slate-300">$48 / year</dd>
-                </div>
-                <div>
-                    <dt class="text-sm font-semibold text-white">Extra 500 audits</dt>
-                    <dd class="mt-1 text-sm text-slate-300">$144 / year</dd>
-                </div>
-            </dl>
-        </div>
-
-        {{-- ── FAQ ───────────────────────────────────────────────── --}}
-        <div class="mt-16">
-            <h3 class="text-2xl font-semibold text-white">Pricing FAQ</h3>
-            <div class="mt-6 grid gap-6 lg:grid-cols-2">
-                <div class="rounded-xl border border-white/10 bg-white/5 p-6">
-                    <p class="font-semibold text-white">Is there a free trial?</p>
-                    <p class="mt-2 text-sm text-slate-300">Yes — every paid plan starts with a 1-month free trial. Your card isn't charged until the trial ends, and you can cancel anytime during the trial without being billed.</p>
-                </div>
-                <div class="rounded-xl border border-white/10 bg-white/5 p-6">
-                    <p class="font-semibold text-white">Why annual only — no monthly billing?</p>
-                    <p class="mt-2 text-sm text-slate-300">SEO is a long game and the value compounds month over month. Annual plans let us invest more in your account (deeper history, better caching, dedicated SERP capacity) at a price ~25% lower than monthly equivalents. The 1-month free trial gives you plenty of room to evaluate before committing.</p>
-                </div>
-                <div class="rounded-xl border border-white/10 bg-white/5 p-6">
-                    <p class="font-semibold text-white">Can I switch plans later?</p>
-                    <p class="mt-2 text-sm text-slate-300">Yes — upgrade anytime; we charge the pro-rated difference for the rest of your annual term. Downgrades take effect at the next renewal so you keep what you paid for.</p>
-                </div>
-                <div class="rounded-xl border border-white/10 bg-white/5 p-6">
-                    <p class="font-semibold text-white">Do I need a credit card to sign up?</p>
-                    <p class="mt-2 text-sm text-slate-300">Not for the Free plan. For paid trials we ask for a card upfront so the plan converts seamlessly when the trial ends — but the card is never charged before the 1-month trial completes, and you can cancel any time before then.</p>
-                </div>
-                <div class="rounded-xl border border-white/10 bg-white/5 p-6">
-                    <p class="font-semibold text-white">What counts as a "website"?</p>
-                    <p class="mt-2 text-sm text-slate-300">A unique domain or subdomain you connect to EBQ. Each gets its own GSC sync, audit history, keyword tracker, and HQ dashboard.</p>
-                </div>
-                <div class="rounded-xl border border-white/10 bg-white/5 p-6">
-                    <p class="font-semibold text-white">Does the WordPress plugin cost extra?</p>
-                    <p class="mt-2 text-sm text-slate-300">No. The plugin is included in every plan, including Free. Pro features inside the plugin (full AI Writer, topical gaps, brief generator) light up automatically when your account is on Pro or Agency.</p>
-                </div>
-                <div class="rounded-xl border border-white/10 bg-white/5 p-6">
-                    <p class="font-semibold text-white">Refunds?</p>
-                    <p class="mt-2 text-sm text-slate-300">Yes — see our <a href="{{ route('refund-policy') }}" class="text-indigo-200 underline">Refund Policy</a> for the 30-day money-back terms.</p>
-                </div>
+                        <a href="{{ $plan['cta'][1] }}" @class([
+                            'mt-7 inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold transition',
+                            'bg-slate-900 text-white hover:bg-slate-800' => $plan['cta'][2] === 'primary',
+                            'border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:text-slate-900' => $plan['cta'][2] === 'ghost',
+                        ])>
+                            {{ $plan['cta'][0] }}
+                        </a>
+                    </div>
+                @endforeach
             </div>
         </div>
+    </section>
 
-        {{-- ── Bottom CTA ───────────────────────────────────────── --}}
-        <div class="mt-16 rounded-2xl border border-white/10 bg-gradient-to-br from-indigo-500/20 via-white/5 to-cyan-400/10 p-10 text-center">
-            <h3 class="text-2xl font-semibold text-white sm:text-3xl">Ready to ship better SEO?</h3>
-            <p class="mx-auto mt-3 max-w-xl text-sm text-slate-200">Connect your first WordPress site in under two minutes. Free forever on the Free plan.</p>
-            <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-md bg-white px-6 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">Start free</a>
-                <a href="{{ route('features') }}" class="inline-flex items-center justify-center rounded-md border border-white/25 bg-white/5 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/10">See features</a>
+    {{-- ── Comparison table ─────────────────────────────────── --}}
+    <section class="bg-slate-50/60 py-16 sm:py-20">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="mx-auto max-w-2xl text-center">
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Compare plans</p>
+                <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">All features at a glance.</h2>
+            </div>
+
+            <div class="mt-10 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                <div class="overflow-x-auto">
+                    <table class="min-w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-slate-200 bg-slate-50/60 text-left">
+                                <th class="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Feature</th>
+                                @foreach (['Free', 'Starter', 'Pro', 'Agency'] as $col)
+                                    <th class="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ $col }}</th>
+                                @endforeach
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100 text-slate-700">
+                            @foreach ([
+                                ['Connected websites', '1', '1', '5', '25'],
+                                ['Tracked keywords', '5', '50', '250', '1,500'],
+                                ['Page audits / month', '10', '100', '500', '2,500'],
+                                ['Cross-signal insights (6 boards)', true, true, true, true],
+                                ['WordPress plugin', true, true, true, true],
+                                ['AI snippet rewrites', false, true, true, true],
+                                ['AI Writer (full draft)', false, false, true, true],
+                                ['Competitor backlink prospecting', false, false, true, true],
+                                ['White-label PDF reports', false, false, false, true],
+                                ['SSO + RBAC', false, false, false, true],
+                                ['Priority support', false, false, true, true],
+                                ['Dedicated success manager', false, false, false, true],
+                            ] as $row)
+                                <tr>
+                                    <td class="px-5 py-3.5 font-medium text-slate-800">{{ $row[0] }}</td>
+                                    @foreach (array_slice($row, 1) as $val)
+                                        <td class="px-5 py-3.5 text-center">
+                                            @if ($val === true)
+                                                <svg class="mx-auto h-4 w-4 text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                            @elseif ($val === false)
+                                                <svg class="mx-auto h-4 w-4 text-slate-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" /></svg>
+                                            @else
+                                                <span class="font-mono text-[13px] tabular-nums text-slate-700">{{ $val }}</span>
+                                            @endif
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    {{-- ── Add-ons ──────────────────────────────────────────── --}}
+    <section class="bg-white py-16 sm:py-20">
+        <div class="mx-auto max-w-6xl px-6 lg:px-8">
+            <div class="rounded-2xl border border-slate-200 bg-white p-8 sm:p-10">
+                <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Add-ons</p>
+                        <h3 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Need more capacity?</h3>
+                        <p class="mt-2 text-sm text-slate-600">Stack add-ons onto your annual plan. Billed alongside the next renewal.</p>
+                    </div>
+                </div>
+                <dl class="mt-8 grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-3">
+                    <div class="bg-white p-5">
+                        <dt class="text-sm font-semibold text-slate-900">Extra website</dt>
+                        <dd class="mt-1 text-sm text-slate-600">$96 / site / year</dd>
+                    </div>
+                    <div class="bg-white p-5">
+                        <dt class="text-sm font-semibold text-slate-900">Extra 100 keywords</dt>
+                        <dd class="mt-1 text-sm text-slate-600">$48 / year</dd>
+                    </div>
+                    <div class="bg-white p-5">
+                        <dt class="text-sm font-semibold text-slate-900">Extra 500 audits</dt>
+                        <dd class="mt-1 text-sm text-slate-600">$144 / year</dd>
+                    </div>
+                </dl>
+            </div>
+        </div>
+    </section>
+
+    {{-- ── Pricing FAQ ──────────────────────────────────────── --}}
+    <section class="bg-slate-50/60 py-16 sm:py-20">
+        <div class="mx-auto max-w-3xl px-6 lg:px-8">
+            <div class="text-center">
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">FAQ</p>
+                <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Pricing questions, answered.</h2>
+            </div>
+
+            <div class="mt-10 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+                @foreach ([
+                    ['Is there a free trial?', 'Yes — every paid plan starts with a 1-month free trial. Your card is not charged until the trial ends, and you can cancel anytime during the trial without being billed.'],
+                    ['Why annual only?', 'Annual plans let us invest more in your account (deeper history, better caching, dedicated SERP capacity) at a price ~25% lower than monthly equivalents. The 1-month trial gives plenty of room to evaluate.'],
+                    ['Can I switch plans later?', 'Yes. Upgrades pro-rate immediately for the rest of your annual term. Downgrades take effect at the next renewal so you keep what you paid for.'],
+                    ['What counts as a website?', 'A unique domain or subdomain you connect to EBQ. Each gets its own GSC sync, audit history, keyword tracker, and dashboard.'],
+                    ['Refunds?', 'See our refund policy for the 30-day money-back terms.'],
+                ] as [$q, $a])
+                    <details class="group p-6 [&_summary::-webkit-details-marker]:hidden">
+                        <summary class="flex cursor-pointer items-center justify-between gap-3 text-[15px] font-semibold text-slate-900">
+                            <span>{{ $q }}</span>
+                            <span class="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-slate-100 text-slate-600 transition group-open:rotate-45 group-open:bg-slate-900 group-open:text-white">
+                                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                            </span>
+                        </summary>
+                        <p class="mt-3 text-[14px] leading-7 text-slate-600">{{ $a }}</p>
+                    </details>
+                @endforeach
+            </div>
+        </div>
+    </section>
+
+    {{-- ── CTA ──────────────────────────────────────────────── --}}
+    <section class="bg-white py-20 sm:py-24">
+        <div class="mx-auto max-w-4xl px-6 lg:px-8">
+            <div class="rounded-3xl border border-slate-200 bg-slate-50/60 px-6 py-14 text-center sm:px-12">
+                <h2 class="text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Ready to ship better SEO?</h2>
+                <p class="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">Connect your first website in under two minutes. Free forever on the Free plan.</p>
+                <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                    <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Start free</a>
+                    <a href="{{ route('features') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">See features</a>
+                </div>
             </div>
         </div>
     </section>

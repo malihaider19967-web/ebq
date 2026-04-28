@@ -32,13 +32,13 @@
         </div>
 
         <button type="submit"
-            class="flex w-full justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+            class="flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
             Sign in
         </button>
     </form>
 
     <p class="mt-8 text-center text-sm text-slate-600">
         Don't have an account?
-        <a href="{{ route('register') }}" class="font-semibold text-indigo-600 hover:text-indigo-800">Create one</a>
+        <a href="{{ route('register') }}" class="font-semibold text-slate-900 underline-offset-2 hover:underline">Create one</a>
     </p>
 </x-layouts.guest>

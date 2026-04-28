@@ -1,134 +1,59 @@
 <x-marketing.page
     title="Privacy Policy — EBQ"
-    description="EBQ's privacy policy. What data we collect, why, how we protect it, and your rights."
+    description="How EBQ collects, uses, and protects personal data."
 >
-    <article class="mx-auto max-w-3xl px-6 pb-20 pt-14 lg:px-8 lg:pb-28 lg:pt-20">
-        <header>
-            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-200">Legal</p>
-            <h1 class="mt-3 text-4xl font-semibold tracking-tight text-white sm:text-5xl">Privacy Policy</h1>
-            <p class="mt-3 text-sm text-slate-400">Last updated: {{ \Illuminate\Support\Carbon::create(2026, 4, 28)->format('F j, Y') }}</p>
-            <p class="mt-6 text-base leading-7 text-slate-200">
-                This Privacy Policy explains what personal data EBQ ("we", "us", "our") collects, why we collect it, how we protect it, and the rights you have over your data when you use the EBQ.io platform, the EBQ WordPress plugin, and any associated services (the "Service").
-            </p>
+    <article class="bg-white">
+        <header class="border-b border-slate-200">
+            <div class="mx-auto max-w-3xl px-6 py-16 lg:px-8 lg:py-20">
+                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Legal</p>
+                <h1 class="mt-3 text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">Privacy Policy</h1>
+                <p class="mt-3 text-sm text-slate-500">Last updated: {{ \Illuminate\Support\Carbon::create(2026, 4, 28)->format('F j, Y') }}</p>
+                <p class="mt-6 text-[16px] leading-7 text-slate-600">
+                    This policy explains what information EBQ collects, why we process it, and how you can exercise your privacy rights.
+                </p>
+            </div>
         </header>
 
-        <div class="prose prose-invert mt-10 max-w-none text-slate-200 prose-headings:text-white prose-h2:mt-12 prose-h2:text-2xl prose-h3:mt-8 prose-h3:text-lg prose-a:text-indigo-200 hover:prose-a:text-indigo-100 prose-strong:text-white">
+        <div class="mx-auto max-w-3xl px-6 py-16 lg:px-8 lg:py-20">
+            <div class="prose prose-slate max-w-none prose-headings:tracking-tight prose-h2:mt-12 prose-h2:text-xl prose-h2:font-semibold prose-h2:text-slate-900 prose-p:text-slate-600 prose-li:text-slate-600 prose-a:text-slate-900 prose-a:underline-offset-2">
+                <h2>1. Data we collect</h2>
+                <ul>
+                    <li>Account data: name, email, authentication details, workspace metadata.</li>
+                    <li>Connected data: Google Search Console, Google Analytics, and Indexing API data you authorize.</li>
+                    <li>Operational telemetry: IP, request logs, and performance diagnostics.</li>
+                    <li>Billing metadata processed by your payment provider.</li>
+                </ul>
 
-            <h2>1. Data we collect</h2>
+                <h2>2. How we use data</h2>
+                <ul>
+                    <li>Deliver product features such as dashboards, insights, and reporting.</li>
+                    <li>Secure and operate the service.</li>
+                    <li>Send service communications and billing notifications.</li>
+                    <li>Improve user-facing product quality through aggregated analysis.</li>
+                </ul>
 
-            <h3>1.1 Account data</h3>
-            <p>When you sign up we collect your name, email, password (hashed), and the workspace / company details you provide. If you sign in with Google we receive your basic profile (name, email, profile picture) from Google.</p>
+                <h2>3. Google API data policy</h2>
+                <p>
+                    EBQ's use of Google data follows the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener noreferrer">Google API Services User Data Policy</a>, including Limited Use requirements.
+                </p>
+                <ul>
+                    <li>We use Google data only to provide user-visible EBQ features.</li>
+                    <li>We do not sell Google data or use it for advertising profiling.</li>
+                    <li>We do not use Google data to train general-purpose AI models.</li>
+                </ul>
 
-            <h3>1.2 Connected-service data</h3>
-            <p>To compute SEO scores and reports we connect, with your consent, to:</p>
-            <ul>
-                <li><strong>Google Search Console</strong> (scope <code>webmasters.readonly</code>) — query, page, clicks, impressions, position, country, device. Used to populate dashboards, score pages, detect cannibalization, and identify content opportunities.</li>
-                <li><strong>Google Analytics</strong> (scope <code>analytics.readonly</code>) — pageviews, sessions, sources when you connect it. Used to enrich page-level performance reporting.</li>
-                <li><strong>Google Indexing API</strong> (scope <code>indexing</code>) — URL submission requests <em>you</em> initiate from EBQ HQ when you publish or update a page. We submit only the URLs you choose; we never auto-submit on your behalf.</li>
-                <li><strong>Keywords Everywhere</strong> — keyword volume / CPC / backlink data for queries you research.</li>
-                <li><strong>Serper</strong> — live SERP results for keywords you enter.</li>
-            </ul>
-            <p>The data flows from those providers to our servers and stays in your workspace. We do not pool it across customers.</p>
+                <h2>4. Sharing and processors</h2>
+                <p>We share data only with sub-processors needed to run the service (hosting, email, payments, monitoring) or when required by law.</p>
 
-            <h3>1.3 Google API Services User Data Policy</h3>
-            <p>EBQ's use and transfer of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener noreferrer">Google API Services User Data Policy</a>, including the <strong>Limited Use</strong> requirements. Specifically:</p>
-            <ul>
-                <li>We use Google user data <strong>only</strong> to provide and improve user-facing features within EBQ that are clearly visible to you.</li>
-                <li>We do <strong>not</strong> transfer Google user data to third parties except as necessary to provide the Service (sub-processors listed below), to comply with applicable law, or as part of a merger / acquisition where the receiving party agrees to honour this policy.</li>
-                <li>We do <strong>not</strong> use Google user data to serve advertisements, including retargeting or interest-based ads.</li>
-                <li>We do <strong>not</strong> allow humans to read Google user data unless we have your specific consent to do so for support purposes, it is necessary for security (e.g. investigating abuse), it is required by law, or the data has been aggregated and anonymised.</li>
-                <li>We do <strong>not</strong> use Google user data to train any general-purpose AI / ML model. Any AI features in EBQ operate on content you yourself provide or generate, never on Google API data passed through to model providers.</li>
-                <li>You can <strong>revoke EBQ's access</strong> to your Google account anytime from <a href="https://myaccount.google.com/permissions" rel="noopener noreferrer">your Google Account permissions page</a>. Once revoked, we stop pulling new data immediately and will delete your stored Google API data within 30 days on request.</li>
-            </ul>
+                <h2>5. Retention</h2>
+                <p>We retain data while your account is active and delete or anonymize it based on legal and operational retention requirements after account closure.</p>
 
-            <h3>1.4 Content data</h3>
-            <p>The WordPress plugin sends post content, titles, meta descriptions, focus keyphrases, and similar editor fields to EBQ when you use scoring, brief, AI Writer, or schema features. We process this data to return the requested analysis and store cached results so re-runs are fast.</p>
+                <h2>6. Your rights</h2>
+                <p>You can request access, correction, deletion, restriction, or portability by contacting <a href="mailto:privacy@ebq.io">privacy@ebq.io</a>.</p>
 
-            <h3>1.5 Usage data</h3>
-            <p>We log standard server-side telemetry — IP address, user-agent, request paths, HTTP status, latency — for operational reasons (debugging, abuse prevention, capacity planning). We aggregate this for product analytics; we do not build behavioural profiles.</p>
-
-            <h3>1.6 Billing data</h3>
-            <p>Payments are processed by our payment processor (e.g. Stripe). We receive only the last 4 digits of your card, brand, expiry, billing address, and the resulting charge / invoice metadata. We do not store full card numbers.</p>
-
-            <h2>2. How we use the data</h2>
-            <ul>
-                <li><strong>To provide the Service</strong> — render dashboards, generate audits, score posts, deliver AI output, sync GSC data, etc.</li>
-                <li><strong>To operate and secure the Service</strong> — authenticate, prevent abuse, debug incidents, maintain uptime.</li>
-                <li><strong>To bill</strong> — manage subscriptions, send invoices, collect payment.</li>
-                <li><strong>To communicate</strong> — service announcements, security alerts, billing receipts. Marketing email only with your opt-in, with a one-click unsubscribe in every message.</li>
-                <li><strong>To improve the product</strong> — aggregate, anonymised metrics on feature use. We do not train AI models on Customer Content.</li>
-            </ul>
-
-            <h2>3. Legal bases (GDPR)</h2>
-            <p>Where the GDPR applies, we process personal data under the following bases:</p>
-            <ul>
-                <li><strong>Contract performance</strong> — to deliver the Service you asked for.</li>
-                <li><strong>Legitimate interests</strong> — security, fraud prevention, product analytics. We balance these against your rights.</li>
-                <li><strong>Consent</strong> — for connecting third-party data sources (Google, Keywords Everywhere) and for marketing email. You can withdraw consent at any time.</li>
-                <li><strong>Legal obligation</strong> — tax, accounting, compliance with regulator requests.</li>
-            </ul>
-
-            <h2>4. Sharing</h2>
-            <p>We share data only with:</p>
-            <ul>
-                <li><strong>Sub-processors</strong> we rely on to operate the Service (cloud hosting, payment processing, transactional email, error monitoring, AI inference). Each is bound by a Data Processing Agreement.</li>
-                <li><strong>Authorities</strong> when legally required (subpoena, court order). We will challenge over-broad requests where possible.</li>
-                <li><strong>Successors</strong> in case of a merger, acquisition, or asset sale — and only on terms at least as protective as this policy.</li>
-            </ul>
-            <p>We do not sell your personal data. We do not share Customer Content (post drafts, audits, GSC rows, AI outputs) with anyone outside your workspace.</p>
-
-            <h3>4.1 Sub-processors we use</h3>
-            <ul>
-                <li>Cloud hosting and database (e.g. AWS / DigitalOcean)</li>
-                <li>Payment processing (e.g. Stripe)</li>
-                <li>Transactional email (e.g. Postmark / Resend / AWS SES)</li>
-                <li>Error and performance monitoring (e.g. Sentry)</li>
-                <li>AI inference (e.g. Mistral)</li>
-                <li>SERP data (Serper)</li>
-                <li>Keyword data (Keywords Everywhere)</li>
-            </ul>
-            <p>An up-to-date sub-processor list is available on request.</p>
-
-            <h2>5. International transfers</h2>
-            <p>EBQ stores data in cloud regions chosen for performance and cost. When data moves outside your region we rely on Standard Contractual Clauses (or an equivalent legal mechanism) with our hosting and sub-processors. Email <a href="mailto:privacy@ebq.io">privacy@ebq.io</a> for current region details.</p>
-
-            <h2>6. Retention</h2>
-            <ul>
-                <li><strong>Active accounts</strong> — retained while your subscription is active.</li>
-                <li><strong>Cancelled accounts</strong> — Customer Content is retained for 30 days after cancellation, then deleted (excluding billing records we're legally required to keep).</li>
-                <li><strong>GSC / Analytics syncs</strong> — historical rows are kept for the rolling window your plan supports (typically 16 months, matching Google's own retention).</li>
-                <li><strong>Server logs</strong> — 30 days, then aggregated.</li>
-                <li><strong>Billing records</strong> — 7 years (or longer where required by tax law).</li>
-            </ul>
-
-            <h2>7. Your rights</h2>
-            <p>Depending on where you live, you may have the right to:</p>
-            <ul>
-                <li>Access the personal data we hold about you.</li>
-                <li>Correct inaccurate data.</li>
-                <li>Delete your data ("right to be forgotten").</li>
-                <li>Restrict or object to certain processing.</li>
-                <li>Receive a portable copy of your data.</li>
-                <li>Withdraw consent (without affecting prior lawful processing).</li>
-                <li>Lodge a complaint with your local data-protection authority.</li>
-            </ul>
-            <p>To exercise any of these rights, email <a href="mailto:privacy@ebq.io">privacy@ebq.io</a>. We respond within 30 days.</p>
-
-            <h2>8. Security</h2>
-            <p>We protect data with TLS in transit, at-rest encryption on managed databases, scoped per-website API tokens, role-based access control, and audit logging. Infrastructure access is restricted to a small number of personnel with 2FA. We run regular dependency updates and security reviews.</p>
-            <p>No system is perfectly secure. If we discover a breach affecting your data, we will notify you and the appropriate authorities without undue delay, in line with applicable law.</p>
-
-            <h2>9. Cookies</h2>
-            <p>EBQ.io uses essential cookies for sign-in sessions and CSRF protection, plus a small number of first-party analytics cookies for product usage metrics. We do not use third-party advertising cookies. You can clear cookies in your browser at any time; doing so will sign you out.</p>
-
-            <h2>10. Children</h2>
-            <p>The Service is not directed to anyone under 16. We do not knowingly collect personal data from children under 16. If you believe we have, contact <a href="mailto:privacy@ebq.io">privacy@ebq.io</a> and we will delete it.</p>
-
-            <h2>11. Changes to this policy</h2>
-            <p>We will post any changes on this page and, for material changes, notify account owners by email at least 14 days before they take effect.</p>
-
-            <h2>12. Contact</h2>
-            <p>For privacy questions or requests, email <a href="mailto:privacy@ebq.io">privacy@ebq.io</a>. We'll route the request to the right person and respond as quickly as we can.</p>
+                <h2>7. Contact</h2>
+                <p>Privacy requests: <a href="mailto:privacy@ebq.io">privacy@ebq.io</a>.</p>
+            </div>
         </div>
     </article>
 </x-marketing.page>

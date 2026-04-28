@@ -10,7 +10,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="theme-color" content="#020617">
+    <meta name="theme-color" content="#ffffff">
 
     @include('partials.favicon-links')
 
@@ -30,75 +30,73 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
 </head>
-<body class="min-h-full bg-slate-950 font-sans text-slate-50 antialiased selection:bg-indigo-500/30 selection:text-white">
-    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-slate-950">Skip to content</a>
+<body class="min-h-full bg-white font-sans text-slate-900 antialiased selection:bg-slate-900 selection:text-white">
+    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-slate-900 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">Skip to content</a>
 
-    <div class="relative overflow-x-clip">
-        <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[34rem] bg-[radial-gradient(circle_at_20%_0,rgba(99,102,241,0.28),transparent_45%),radial-gradient(circle_at_80%_0,rgba(14,165,233,0.22),transparent_40%)]"></div>
+    <header class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
+        <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4 lg:px-8">
+            <a href="{{ route('landing') }}" class="inline-flex items-center gap-2.5" aria-label="EBQ home">
+                <img src="{{ asset('logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 rounded-lg ring-1 ring-slate-200">
+                <span class="text-[15px] font-semibold tracking-tight text-slate-900">EBQ</span>
+            </a>
 
-        <header class="sticky top-0 z-40 border-b border-white/10 bg-slate-950/85 backdrop-blur">
-            <div class="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4 lg:px-8">
-                <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="EBQ home">
-                    <img src="{{ asset('logo.png') }}" alt="EBQ" width="48" height="48" class="h-12 w-12 rounded-lg">
+            <nav aria-label="Primary" class="hidden items-center gap-7 text-sm text-slate-600 md:flex">
+                <a href="{{ route('features') }}" class="transition hover:text-slate-900 {{ $active === 'features' ? 'text-slate-900' : '' }}">Features</a>
+                <a href="{{ route('pricing') }}" class="transition hover:text-slate-900 {{ $active === 'pricing' ? 'text-slate-900' : '' }}">Pricing</a>
+                <a href="{{ route('landing') }}#wordpress" class="transition hover:text-slate-900">WordPress</a>
+                <a href="{{ route('landing') }}#faq" class="transition hover:text-slate-900">FAQ</a>
+            </nav>
+
+            <div class="flex items-center gap-2">
+                <a href="{{ route('login') }}" class="hidden rounded-lg px-3 py-2 text-sm font-medium text-slate-700 transition hover:text-slate-900 sm:inline-flex">Sign in</a>
+                <a href="{{ route('register') }}" class="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-slate-800">Get started</a>
+            </div>
+        </div>
+    </header>
+
+    <main id="main">
+        {{ $slot }}
+    </main>
+
+    <footer class="border-t border-slate-200 bg-white">
+        <div class="mx-auto grid max-w-6xl gap-10 px-6 py-14 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-5 lg:px-8">
+            <div class="lg:col-span-2">
+                <a href="{{ route('landing') }}" class="inline-flex items-center gap-2.5" aria-label="EBQ home">
+                    <img src="{{ asset('logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 rounded-lg ring-1 ring-slate-200">
+                    <span class="text-[15px] font-semibold tracking-tight text-slate-900">EBQ</span>
                 </a>
-
-                <nav aria-label="Primary" class="hidden items-center gap-8 text-sm font-medium text-slate-100 md:flex">
-                    <a href="{{ route('features') }}" class="transition hover:text-indigo-200 {{ $active === 'features' ? 'text-indigo-200' : '' }}">Features</a>
-                    <a href="{{ route('pricing') }}" class="transition hover:text-indigo-200 {{ $active === 'pricing' ? 'text-indigo-200' : '' }}">Pricing</a>
-                    <a href="{{ route('landing') }}#wordpress" class="transition hover:text-indigo-200">WordPress</a>
-                    <a href="{{ route('landing') }}#faq" class="transition hover:text-indigo-200">FAQ</a>
-                </nav>
-
-                <div class="flex items-center gap-2">
-                    <a href="{{ route('login') }}" class="hidden rounded-md px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 sm:inline-flex">Sign in</a>
-                    <a href="{{ route('register') }}" class="inline-flex items-center rounded-md bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">Start free</a>
-                </div>
+                <p class="mt-4 max-w-xs text-slate-500">The SEO command center for teams that ship every week. Discover, prioritize, execute, measure.</p>
             </div>
-        </header>
-
-        <main id="main">
-            {{ $slot }}
-        </main>
-
-        <footer class="border-t border-white/10 bg-slate-950">
-            <div class="mx-auto grid max-w-7xl gap-10 px-6 py-12 text-sm text-slate-200 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
-                <div>
-                    <a href="{{ route('landing') }}" class="inline-flex items-center" aria-label="EBQ home">
-                        <img src="{{ asset('logo.png') }}" alt="EBQ" width="48" height="48" class="h-12 w-12 rounded-lg">
-                    </a>
-                    <p class="mt-3 text-slate-400">SEO workspace for teams that ship.</p>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Product</p>
-                    <ul class="mt-3 space-y-2">
-                        <li><a class="hover:text-indigo-200" href="{{ route('features') }}">Features</a></li>
-                        <li><a class="hover:text-indigo-200" href="{{ route('pricing') }}">Pricing</a></li>
-                        <li><a class="hover:text-indigo-200" href="{{ route('landing') }}#wordpress">WordPress plugin</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Company</p>
-                    <ul class="mt-3 space-y-2">
-                        <li><a class="hover:text-indigo-200" href="mailto:hello@ebq.io">Contact</a></li>
-                        <li><a class="hover:text-indigo-200" href="{{ route('landing') }}#faq">FAQ</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-400">Legal</p>
-                    <ul class="mt-3 space-y-2">
-                        <li><a class="hover:text-indigo-200" href="{{ route('terms-conditions') }}">Terms &amp; Conditions</a></li>
-                        <li><a class="hover:text-indigo-200" href="{{ route('privacy-policy') }}">Privacy Policy</a></li>
-                        <li><a class="hover:text-indigo-200" href="{{ route('refund-policy') }}">Refund Policy</a></li>
-                    </ul>
-                </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Product</p>
+                <ul class="mt-3 space-y-2.5">
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('features') }}">Features</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('pricing') }}">Pricing</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('landing') }}#wordpress">WordPress plugin</a></li>
+                </ul>
             </div>
-            <div class="border-t border-white/5">
-                <div class="mx-auto flex max-w-7xl flex-col gap-3 px-6 py-6 text-xs text-slate-400 sm:flex-row sm:items-center sm:justify-between lg:px-8">
-                    <p>&copy; {{ date('Y') }} EBQ. All rights reserved.</p>
-                    <p>Built for modern SEO teams.</p>
-                </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Company</p>
+                <ul class="mt-3 space-y-2.5">
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('landing') }}#faq">FAQ</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="mailto:hello@ebq.io">Contact</a></li>
+                </ul>
             </div>
-        </footer>
-    </div>
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Legal</p>
+                <ul class="mt-3 space-y-2.5">
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('terms-conditions') }}">Terms</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('privacy-policy') }}">Privacy</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('refund-policy') }}">Refunds</a></li>
+                </ul>
+            </div>
+        </div>
+        <div class="border-t border-slate-200">
+            <div class="mx-auto flex max-w-6xl flex-col gap-3 px-6 py-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between lg:px-8">
+                <p>&copy; {{ date('Y') }} EBQ. All rights reserved.</p>
+                <p>Built for SEO teams that ship weekly.</p>
+            </div>
+        </div>
+    </footer>
 </body>
 </html>

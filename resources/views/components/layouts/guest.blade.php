@@ -12,37 +12,50 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     @endif
 </head>
-<body class="h-full bg-gradient-to-br from-slate-50 via-white to-indigo-50 text-slate-900 antialiased">
+<body class="h-full bg-white text-slate-900 antialiased">
     <div class="flex min-h-full">
-        <div class="hidden w-1/2 bg-indigo-600 lg:flex lg:flex-col lg:justify-between lg:p-12">
-            <div>
-                <img src="{{ asset('logo.png') }}" alt="EBQ" width="48" height="48" class="h-12 w-12 rounded-lg">
-                <p class="mt-2 text-indigo-200">SEO & Analytics Dashboard</p>
+        {{-- Brand panel --}}
+        <div class="hidden w-1/2 flex-col justify-between border-r border-slate-200 bg-slate-50 p-12 lg:flex">
+            <a href="{{ route('landing') }}" class="inline-flex items-center gap-2.5">
+                <img src="{{ asset('logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 rounded-lg ring-1 ring-slate-200">
+                <span class="text-[15px] font-semibold tracking-tight text-slate-900">EBQ</span>
+            </a>
+
+            <div class="max-w-md">
+                <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">SEO command center</p>
+                <h2 class="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
+                    The clearest way to run SEO across every site you own.
+                </h2>
+                <p class="mt-4 text-[15px] leading-7 text-slate-600">
+                    Connect Search Console and Analytics. Get prioritized actions, ranking trends, audits, and reporting in one workspace.
+                </p>
+
+                <dl class="mt-10 grid grid-cols-3 gap-4 text-center">
+                    <div class="rounded-xl border border-slate-200 bg-white p-4">
+                        <dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Sources</dt>
+                        <dd class="mt-1.5 text-base font-semibold text-slate-900">GA4 · GSC</dd>
+                    </div>
+                    <div class="rounded-xl border border-slate-200 bg-white p-4">
+                        <dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Insights</dt>
+                        <dd class="mt-1.5 text-base font-semibold text-slate-900">6 boards</dd>
+                    </div>
+                    <div class="rounded-xl border border-slate-200 bg-white p-4">
+                        <dt class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Setup</dt>
+                        <dd class="mt-1.5 text-base font-semibold text-slate-900">&lt; 10 min</dd>
+                    </div>
+                </dl>
             </div>
-            <div>
-                <blockquote class="text-lg font-medium leading-relaxed text-indigo-100">
-                    "Track your search performance, analyze keywords, and grow your organic traffic — all in one place."
-                </blockquote>
-                <div class="mt-6 flex gap-4">
-                    <div class="rounded-lg bg-indigo-500/30 px-4 py-3 text-center">
-                        <p class="text-2xl font-bold text-white">GA4</p>
-                        <p class="text-xs text-indigo-200">Analytics</p>
-                    </div>
-                    <div class="rounded-lg bg-indigo-500/30 px-4 py-3 text-center">
-                        <p class="text-2xl font-bold text-white">GSC</p>
-                        <p class="text-xs text-indigo-200">Search Console</p>
-                    </div>
-                    <div class="rounded-lg bg-indigo-500/30 px-4 py-3 text-center">
-                        <p class="text-2xl font-bold text-white">SEO</p>
-                        <p class="text-xs text-indigo-200">Insights</p>
-                    </div>
-                </div>
-            </div>
-            <p class="text-xs text-indigo-300">&copy; {{ date('Y') }} EBQ. All rights reserved.</p>
+
+            <p class="text-xs text-slate-500">&copy; {{ date('Y') }} EBQ. All rights reserved.</p>
         </div>
-        <div class="flex w-full flex-col items-center justify-center p-6 lg:w-1/2 lg:p-12">
+
+        {{-- Form panel --}}
+        <div class="flex w-full flex-col items-center justify-center bg-white p-6 lg:w-1/2 lg:p-12">
             <div class="mb-8 lg:hidden">
-                <img src="{{ asset('logo.png') }}" alt="EBQ" width="40" height="40" class="h-10 w-10 rounded-lg">
+                <a href="{{ route('landing') }}" class="inline-flex items-center gap-2.5">
+                    <img src="{{ asset('logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 rounded-lg ring-1 ring-slate-200">
+                    <span class="text-[15px] font-semibold tracking-tight text-slate-900">EBQ</span>
+                </a>
             </div>
             <div class="w-full max-w-md">
                 {{ $slot }}
