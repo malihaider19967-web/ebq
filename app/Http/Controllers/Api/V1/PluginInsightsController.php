@@ -7,6 +7,7 @@ use App\Jobs\MatchRedirectFor404Job;
 use App\Models\RedirectSuggestion;
 use App\Models\Website;
 use App\Services\AiBlockEditorService;
+use App\Services\AiChatService;
 use App\Services\AiContentBriefService;
 use App\Services\AiSnippetRewriterService;
 use App\Services\AiWriterService;
@@ -899,6 +900,45 @@ class PluginInsightsController extends Controller
             'url' => $signed,
             'expires_at' => Carbon::now()->addMinutes(5)->toIso8601String(),
         ]);
+    }
+
+    /**
+     * SEO-helper chatbot — multi-turn conversation grounded in the post
+     * being edited inside WordPress. Pro-tier gated to match other AI
+     * features (ai-block, rewrite-snippet).
+     *   POST /api/v1/posts/{externalPostId}/chat
+     *   body: { messages: [{role, content}, ...], context: {...} }
+     */
+    public function aiChat(
+        Request $request,
+        string $externalPostId,
+        AiChatService $service,
+    ): JsonResponse {
+        $website = $this->resolveWebsite($request);
+        if (! $website->isPro()) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'tier_required',
+                'tier' => $website->tier,
+                'required_tier' => Website::TIER_PRO,
+                'message' => 'The EBQ Assistant chat is available on Pro. Upgrade to unlock.',
+            ], 402);
+        }
+
+        $data = $request->validate([
+            'messages' => ['required', 'array', 'min:1', 'max:40'],
+            'messages.*.role' => ['required', 'string', 'in:user,assistant'],
+            'messages.*.content' => ['required', 'string', 'max:6000'],
+            'context' => ['nullable', 'array'],
+        ]);
+
+        @set_time_limit(90);
+
+        return response()->json($service->chat(
+            $website,
+            $data['messages'],
+            is_array($data['context'] ?? null) ? $data['context'] : [],
+        ));
     }
 
     private function resolveWebsite(Request $request): Website

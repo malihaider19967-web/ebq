@@ -46,6 +46,9 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/posts/{externalPostId}/ai-block', [PluginInsightsController::class, 'aiBlock'])
             ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
             ->name('api.v1.posts.ai-block');
+        Route::post('/posts/{externalPostId}/chat', [PluginInsightsController::class, 'aiChat'])
+            ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
+            ->name('api.v1.posts.chat');
         Route::get('/posts/{externalPostId}/entity-coverage', [PluginInsightsController::class, 'entityCoverage'])
             ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
             ->name('api.v1.posts.entity-coverage');
