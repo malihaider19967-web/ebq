@@ -735,6 +735,8 @@ class PluginInsightsController extends Controller
             'additional_keywords' => 'nullable|array|max:20',
             'additional_keywords.*' => 'string|max:200',
             'title' => 'nullable|string|max:300',
+            'target_language' => 'nullable|string|max:50',
+            'tone' => 'nullable|string|max:50',
         ]);
 
         @set_time_limit(120);

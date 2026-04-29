@@ -24,6 +24,12 @@ class AiBlockEditorService
     public const MODE_SUMMARISE = 'summarise';
     public const MODE_GRAMMAR = 'grammar';
     public const MODE_REWRITE = 'rewrite';
+    public const MODE_SHORTER = 'shorter';
+    public const MODE_LONGER = 'longer';
+    public const MODE_TRANSLATE = 'translate';
+    public const MODE_TONE = 'tone';
+    public const MODE_CONVERT_TO_LIST = 'convert_to_list';
+    public const MODE_CONVERT_TO_TABLE = 'convert_to_table';
 
     public const MODES = [
         self::MODE_COMMAND,
@@ -31,6 +37,12 @@ class AiBlockEditorService
         self::MODE_SUMMARISE,
         self::MODE_GRAMMAR,
         self::MODE_REWRITE,
+        self::MODE_SHORTER,
+        self::MODE_LONGER,
+        self::MODE_TRANSLATE,
+        self::MODE_TONE,
+        self::MODE_CONVERT_TO_LIST,
+        self::MODE_CONVERT_TO_TABLE,
     ];
 
     public function __construct(
@@ -47,6 +59,8 @@ class AiBlockEditorService
      *     focus_keyword?: string|null,
      *     additional_keywords?: array<int, string>|null,
      *     title?: string|null,
+     *     target_language?: string|null,
+     *     tone?: string|null,
      * }  $input
      * @return array{ok: bool, text?: string, error?: string}
      */
@@ -65,17 +79,29 @@ class AiBlockEditorService
         $command = trim((string) ($input['command'] ?? ''));
         $focusKeyword = trim((string) ($input['focus_keyword'] ?? ''));
         $title = trim((string) ($input['title'] ?? ''));
+        $targetLanguage = trim((string) ($input['target_language'] ?? ''));
+        $tone = trim((string) ($input['tone'] ?? ''));
         $additionalKeywords = array_values(array_filter(
             array_map(static fn ($k) => trim((string) $k), (array) ($input['additional_keywords'] ?? [])),
             static fn (string $k): bool => $k !== '',
         ));
 
-        $needsText = in_array($mode, [self::MODE_EXTEND, self::MODE_SUMMARISE, self::MODE_GRAMMAR, self::MODE_REWRITE], true);
+        $needsText = in_array($mode, [
+            self::MODE_EXTEND, self::MODE_SUMMARISE, self::MODE_GRAMMAR, self::MODE_REWRITE,
+            self::MODE_SHORTER, self::MODE_LONGER, self::MODE_TRANSLATE, self::MODE_TONE,
+            self::MODE_CONVERT_TO_LIST, self::MODE_CONVERT_TO_TABLE,
+        ], true);
         if ($needsText && $text === '') {
             return ['ok' => false, 'error' => 'missing_text'];
         }
         if ($mode === self::MODE_COMMAND && $command === '') {
             return ['ok' => false, 'error' => 'missing_command'];
+        }
+        if ($mode === self::MODE_TRANSLATE && $targetLanguage === '') {
+            return ['ok' => false, 'error' => 'missing_target_language'];
+        }
+        if ($mode === self::MODE_TONE && $tone === '') {
+            return ['ok' => false, 'error' => 'missing_tone'];
         }
 
         // Cache-only lookup — never triggers a fresh brief run. We only
@@ -86,7 +112,7 @@ class AiBlockEditorService
             : null;
         $briefContext = $this->extractBriefContext($brief);
 
-        [$system, $user] = $this->buildPrompt($mode, $text, $command, $focusKeyword, $title, $additionalKeywords, $briefContext);
+        [$system, $user] = $this->buildPrompt($mode, $text, $command, $focusKeyword, $title, $additionalKeywords, $briefContext, $targetLanguage, $tone);
 
         $response = $this->llm->complete([
             ['role' => 'system', 'content' => $system],
@@ -151,7 +177,7 @@ class AiBlockEditorService
      * @param  array{subtopics: list<string>, entities: list<string>, paa: list<string>, recommended_word_count: int, angle: string}|null  $briefContext
      * @return array{0: string, 1: string} [systemPrompt, userPrompt]
      */
-    private function buildPrompt(string $mode, string $text, string $command, string $focusKeyword = '', string $title = '', array $additionalKeywords = [], ?array $briefContext = null): array
+    private function buildPrompt(string $mode, string $text, string $command, string $focusKeyword = '', string $title = '', array $additionalKeywords = [], ?array $briefContext = null, string $targetLanguage = '', string $tone = ''): array
     {
         // SEO-first system prompt. Every block is part of a page that needs to
         // rank for a target query — the model should think like a search-led
@@ -241,6 +267,30 @@ class AiBlockEditorService
                 $system,
                 $seoContext."Rewrite the following text into a stronger version: clearer, more engaging, tighter, and better aligned to the search intent for the focus keyword. Keep the same meaning, claims, and approximate length. Improve specificity (replace vague phrases with concrete ones), add natural semantic variants of the focus keyword where helpful, and trim filler. Do not invent facts. Return only the rewritten text.\n\nText:\n{$text}",
             ],
+            self::MODE_SHORTER => [
+                $system,
+                $seoContext."Make the following text 30–50% shorter. Preserve all key facts, the focus keyword, named entities, and specific numbers. Remove filler, redundancy, and adjectives that don't add information. Maintain the same tone. Return only the shortened text.\n\nText:\n{$text}",
+            ],
+            self::MODE_LONGER => [
+                $system,
+                $seoContext."Expand the following text by 30–50% with relevant, search-useful detail (specifics, examples, named entities, sub-aspects of the topic). Preserve the existing meaning and tone — do not contradict or replace what's there. Naturally include the focus keyword or a semantic variant where it fits. Do not invent facts. Return only the expanded text.\n\nText:\n{$text}",
+            ],
+            self::MODE_TRANSLATE => [
+                $system,
+                "Translate the following text to {$targetLanguage}. Preserve names, brand terms, URLs, code, numbers, and HTML tags exactly as written. Match the natural style and idiom of native {$targetLanguage} speakers — do not produce a literal word-for-word translation. Return only the translated text.\n\nText:\n{$text}",
+            ],
+            self::MODE_TONE => [
+                $system,
+                $seoContext."Rewrite the following text in a {$tone} tone. Keep the meaning, claims, approximate length, and the focus keyword. Adjust word choice, sentence rhythm, and openness/formality to fit a {$tone} register. Do not invent facts. Return only the rewritten text.\n\nText:\n{$text}",
+            ],
+            self::MODE_CONVERT_TO_LIST => [
+                $system,
+                $seoContext."Restructure the following text into a clear bulleted list using <ul><li>…</li></ul> HTML. Each <li> should be a self-contained point — short enough to scan, long enough to be useful. Preserve all key facts and the focus keyword. Group closely-related items together. If the text is genuinely a sequence of steps, use <ol><li>…</li></ol> instead. Return only the resulting HTML.\n\nText:\n{$text}",
+            ],
+            self::MODE_CONVERT_TO_TABLE => [
+                $system,
+                $seoContext."Restructure the following text into a comparison table using <table><thead><tr><th>…</th></tr></thead><tbody><tr><td>…</td></tr></tbody></table> HTML. Pick logical column headers based on what's being compared in the source. If the text doesn't have parallel comparable items, infer the most useful columns (e.g., Feature / Description / Benefit) and decompose the prose into rows. Preserve all key facts. Return only the table HTML — no preamble paragraph.\n\nText:\n{$text}",
+            ],
             default => [$system, $text],
         };
     }
@@ -248,9 +298,9 @@ class AiBlockEditorService
     private function temperatureFor(string $mode): float
     {
         return match ($mode) {
-            self::MODE_GRAMMAR => 0.1,
-            self::MODE_SUMMARISE => 0.3,
-            self::MODE_REWRITE, self::MODE_EXTEND => 0.6,
+            self::MODE_GRAMMAR, self::MODE_TRANSLATE => 0.1,
+            self::MODE_SUMMARISE, self::MODE_SHORTER, self::MODE_CONVERT_TO_LIST, self::MODE_CONVERT_TO_TABLE => 0.3,
+            self::MODE_REWRITE, self::MODE_EXTEND, self::MODE_LONGER, self::MODE_TONE => 0.6,
             self::MODE_COMMAND => 0.7,
             default => 0.5,
         };
