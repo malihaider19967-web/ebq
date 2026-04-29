@@ -43,6 +43,7 @@ class AiChatService
     public const ACTION_ROBOTS_NOINDEX = 'update_robots_noindex';
     public const ACTION_ROBOTS_NOFOLLOW = 'update_robots_nofollow';
     public const ACTION_PREPEND_HEADING = 'prepend_heading';
+    public const ACTION_RERUN_LIVE_AUDIT = 'rerun_live_audit';
 
     public const ACTION_TYPES = [
         self::ACTION_POST_TITLE,
@@ -61,6 +62,7 @@ class AiChatService
         self::ACTION_ROBOTS_NOINDEX,
         self::ACTION_ROBOTS_NOFOLLOW,
         self::ACTION_PREPEND_HEADING,
+        self::ACTION_RERUN_LIVE_AUDIT,
     ];
 
     private const STRING_ACTION_LIMITS = [
@@ -208,6 +210,20 @@ class AiChatService
             $summary = mb_substr($summary, 0, 200);
         }
 
+        // Re-run the live audit fetch on the client. Value MUST be true —
+        // false is a no-op and we don't want to render an Apply card for it.
+        if ($type === self::ACTION_RERUN_LIVE_AUDIT) {
+            $value = filter_var($raw['value'] ?? null, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($value !== true) {
+                return null;
+            }
+            return [
+                'type' => $type,
+                'value' => true,
+                'summary' => $summary !== '' ? $summary : 'Re-fetch the live audit (Lighthouse + GSC + composite SEO score)',
+            ];
+        }
+
         // Content-level: prepend an H1/H2/H3 element to the start of the post body.
         if ($type === self::ACTION_PREPEND_HEADING) {
             $value = $raw['value'] ?? null;
@@ -322,6 +338,7 @@ class AiChatService
             self::ACTION_ROBOTS_NOINDEX => 'Toggle robots noindex',
             self::ACTION_ROBOTS_NOFOLLOW => 'Toggle robots nofollow',
             self::ACTION_PREPEND_HEADING => 'Insert heading at top of post',
+            self::ACTION_RERUN_LIVE_AUDIT => 'Re-fetch the live audit',
             default => 'Apply update',
         };
     }
@@ -433,7 +450,8 @@ class AiChatService
             ."- update_schema_type (string, one of: Article | BlogPosting | NewsArticle | WebPage | Product | Recipe | HowTo | FAQPage | Event | Course | Person | Organization | LocalBusiness | VideoObject | ImageObject | Review)\n"
             ."- update_robots_noindex (boolean; true to hide from search engines)\n"
             ."- update_robots_nofollow (boolean; true to instruct engines not to follow links from this page)\n"
-            ."- prepend_heading (object: { level: 1|2|3, text: plain string ≤200 chars }) — inserts a real <h1>/<h2>/<h3> element at the very top of the post body content. Use this — and ONLY this — when the user wants to add an H1/H2/H3 heading inside the post content.";
+            ."- prepend_heading (object: { level: 1|2|3, text: plain string ≤200 chars }) — inserts a real <h1>/<h2>/<h3> element at the very top of the post body content. Use this — and ONLY this — when the user wants to add an H1/H2/H3 heading inside the post content.\n"
+            ."- rerun_live_audit (boolean: true) — re-fetches the live audit data (Lighthouse mobile/desktop, Core Web Vitals, GSC totals, composite SEO score). Use this when the user asks to refresh / re-run / re-check the audit, or when you suspect the cached audit numbers are stale (e.g., after they applied a structural change like prepend_heading). Note: this re-fetches the latest server-side audit; a fresh Lighthouse re-crawl on the EBQ backend may be queued and take several minutes to complete.";
 
         return "You are Rank Assist, a senior SEO editor embedded in the WordPress post editor. Talk and reason like a professional SEO expert reviewing a draft over the user's shoulder. Prefer evidence — cite the actual numbers from the supplied context (title length, keyword density, GSC clicks, Lighthouse score, headings hierarchy, link counts). Never offer advice that contradicts the data in front of you.\n\n"
             ."OUTPUT FORMAT — every reply is strict JSON with this exact shape:\n"
@@ -633,6 +651,24 @@ class AiChatService
                         (float) ($row['ctr'] ?? 0),
                     );
                 }
+            }
+        }
+
+        // Authoritative log of actions the user already approved this session.
+        // Rendered last so the model treats it as the most recent state — when
+        // the values above are derived from a stale source (e.g. classic-editor
+        // DOM lag, or cached savedMeta from page load), this section is the
+        // tie-breaker.
+        $appliedActions = is_array($context['applied_actions'] ?? null) ? $context['applied_actions'] : [];
+        if (! empty($appliedActions)) {
+            $lines[] = '';
+            $lines[] = 'CHANGES THE USER ALREADY APPLIED IN THIS SESSION (these are LIVE in the editor — the field values above already reflect them. Do not propose them again, and do not tell the user to set them — they are SET):';
+            foreach ($appliedActions as $a) {
+                if (! is_array($a)) continue;
+                $type = (string) ($a['type'] ?? '');
+                $summary = trim((string) ($a['summary'] ?? ''));
+                if ($type === '') continue;
+                $lines[] = '  · '.$type.($summary !== '' ? " — {$summary}" : '');
             }
         }
 
