@@ -173,7 +173,7 @@ class AiBlockEditorService
             ."  · Multi-section content → <h2>/<h3> for section titles, plain prose between\n"
             ."  · Inline emphasis → <strong>, <em>, <a href=\"…\">\n"
             ."- Never use <html>, <head>, <body>, <div>, <span>, inline style attributes, classes, scripts, or any wrapper containers.\n"
-            ."- Never wrap your output in markdown code fences (no ``` blocks).\n"
+            ."- Never use markdown syntax. Specifically: NO pipe tables (` | col | col | `), NO `-` or `*` bullet lines, NO `#` headings, NO `**bold**`, NO `*italic*`, NO ``` code fences, NO `[text](url)` links. ALWAYS use the equivalent HTML tags: <table>/<tr>/<td>, <ul>/<li>, <ol>/<li>, <h2>, <strong>, <em>, <a href=\"…\">.\n"
             ."- Match the input language.\n"
             ."- Return ONLY the result — no preamble, no explanation.";
 
