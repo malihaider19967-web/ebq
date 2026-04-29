@@ -30,6 +30,7 @@ class AiBlockEditorService
     public const MODE_TONE = 'tone';
     public const MODE_CONVERT_TO_LIST = 'convert_to_list';
     public const MODE_CONVERT_TO_TABLE = 'convert_to_table';
+    public const MODE_TITLE = 'title';
 
     public const MODES = [
         self::MODE_COMMAND,
@@ -43,6 +44,7 @@ class AiBlockEditorService
         self::MODE_TONE,
         self::MODE_CONVERT_TO_LIST,
         self::MODE_CONVERT_TO_TABLE,
+        self::MODE_TITLE,
     ];
 
     public function __construct(
@@ -91,6 +93,11 @@ class AiBlockEditorService
             self::MODE_SHORTER, self::MODE_LONGER, self::MODE_TRANSLATE, self::MODE_TONE,
             self::MODE_CONVERT_TO_LIST, self::MODE_CONVERT_TO_TABLE,
         ], true);
+        // Title mode is a special case: it needs EITHER content text OR
+        // the focus keyword to produce useful suggestions.
+        if ($mode === self::MODE_TITLE && $text === '' && $focusKeyword === '') {
+            return ['ok' => false, 'error' => 'missing_title_inputs'];
+        }
         if ($needsText && $text === '') {
             return ['ok' => false, 'error' => 'missing_text'];
         }
@@ -291,6 +298,24 @@ class AiBlockEditorService
                 $system,
                 $seoContext."Restructure the following text into a comparison table using <table><thead><tr><th>…</th></tr></thead><tbody><tr><td>…</td></tr></tbody></table> HTML. Pick logical column headers based on what's being compared in the source. If the text doesn't have parallel comparable items, infer the most useful columns (e.g., Feature / Description / Benefit) and decompose the prose into rows. Preserve all key facts. Return only the table HTML — no preamble paragraph.\n\nText:\n{$text}",
             ],
+            self::MODE_TITLE => [
+                $system,
+                $seoContext."Generate exactly 5 SEO-optimized title suggestions for this page. Each title MUST:\n"
+                    ."- Be 50–65 characters (Google's title display window)\n"
+                    ."- Naturally include the focus keyword (or a very close variant) somewhere — ideally in the first 60 chars\n"
+                    ."- Match the search intent indicated by the SEO context\n"
+                    ."- Be compelling and click-worthy without resorting to clickbait or vague hype\n"
+                    ."- Use sentence case (only first letter capitalized) unless a brand name requires capitals\n"
+                    ."- Avoid quotation marks, brackets, or trailing punctuation\n\n"
+                    ."The 5 titles MUST be different in style:\n"
+                    ."  1. Straightforward / informational\n"
+                    ."  2. Question form\n"
+                    ."  3. Number-led or year-led (e.g., '7 things…' or '… in 2026')\n"
+                    ."  4. Benefit-focused (lead with the user outcome)\n"
+                    ."  5. Curiosity / contrast-driven\n\n"
+                    ."Return ONLY the 5 titles, one per line. No numbering, no quotes, no commentary, no preamble.\n\n"
+                    .($text !== '' ? "Page content excerpt for context:\n{$text}" : "(No page content yet — base titles on the focus keyword and SEO context only.)"),
+            ],
             default => [$system, $text],
         };
     }
@@ -301,7 +326,7 @@ class AiBlockEditorService
             self::MODE_GRAMMAR, self::MODE_TRANSLATE => 0.1,
             self::MODE_SUMMARISE, self::MODE_SHORTER, self::MODE_CONVERT_TO_LIST, self::MODE_CONVERT_TO_TABLE => 0.3,
             self::MODE_REWRITE, self::MODE_EXTEND, self::MODE_LONGER, self::MODE_TONE => 0.6,
-            self::MODE_COMMAND => 0.7,
+            self::MODE_COMMAND, self::MODE_TITLE => 0.7,
             default => 0.5,
         };
     }
