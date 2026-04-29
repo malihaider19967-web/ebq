@@ -42,6 +42,7 @@ class AiChatService
     public const ACTION_SCHEMA_TYPE = 'update_schema_type';
     public const ACTION_ROBOTS_NOINDEX = 'update_robots_noindex';
     public const ACTION_ROBOTS_NOFOLLOW = 'update_robots_nofollow';
+    public const ACTION_PREPEND_HEADING = 'prepend_heading';
 
     public const ACTION_TYPES = [
         self::ACTION_POST_TITLE,
@@ -59,6 +60,7 @@ class AiChatService
         self::ACTION_SCHEMA_TYPE,
         self::ACTION_ROBOTS_NOINDEX,
         self::ACTION_ROBOTS_NOFOLLOW,
+        self::ACTION_PREPEND_HEADING,
     ];
 
     private const STRING_ACTION_LIMITS = [
@@ -206,6 +208,31 @@ class AiChatService
             $summary = mb_substr($summary, 0, 200);
         }
 
+        // Content-level: prepend an H1/H2/H3 element to the start of the post body.
+        if ($type === self::ACTION_PREPEND_HEADING) {
+            $value = $raw['value'] ?? null;
+            if (! is_array($value)) {
+                return null;
+            }
+            $level = (int) ($value['level'] ?? 0);
+            $text = trim((string) ($value['text'] ?? ''));
+            if (! in_array($level, [1, 2, 3], true)) {
+                return null;
+            }
+            if ($text === '' || mb_strlen($text) > 200) {
+                return null;
+            }
+            if (preg_match('/<[^>]+>/', $text)) {
+                // Heading text must be plain — no inline HTML, no nested tags.
+                return null;
+            }
+            return [
+                'type' => $type,
+                'value' => ['level' => $level, 'text' => $text],
+                'summary' => $summary !== '' ? $summary : "Insert an H{$level} at the top of the post body",
+            ];
+        }
+
         // Boolean actions (robots flags).
         if (in_array($type, [self::ACTION_ROBOTS_NOINDEX, self::ACTION_ROBOTS_NOFOLLOW], true)) {
             $value = filter_var($raw['value'] ?? null, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
@@ -294,6 +321,7 @@ class AiChatService
             self::ACTION_SCHEMA_TYPE => 'Update schema type',
             self::ACTION_ROBOTS_NOINDEX => 'Toggle robots noindex',
             self::ACTION_ROBOTS_NOFOLLOW => 'Toggle robots nofollow',
+            self::ACTION_PREPEND_HEADING => 'Insert heading at top of post',
             default => 'Apply update',
         };
     }
@@ -404,7 +432,8 @@ class AiChatService
             ."- update_twitter_card (string, one of: summary | summary_large_image)\n"
             ."- update_schema_type (string, one of: Article | BlogPosting | NewsArticle | WebPage | Product | Recipe | HowTo | FAQPage | Event | Course | Person | Organization | LocalBusiness | VideoObject | ImageObject | Review)\n"
             ."- update_robots_noindex (boolean; true to hide from search engines)\n"
-            ."- update_robots_nofollow (boolean; true to instruct engines not to follow links from this page)";
+            ."- update_robots_nofollow (boolean; true to instruct engines not to follow links from this page)\n"
+            ."- prepend_heading (object: { level: 1|2|3, text: plain string ≤200 chars }) — inserts a real <h1>/<h2>/<h3> element at the very top of the post body content. Use this — and ONLY this — when the user wants to add an H1/H2/H3 heading inside the post content.";
 
         return "You are Rank Assist, a senior SEO editor embedded in the WordPress post editor. Talk and reason like a professional SEO expert reviewing a draft over the user's shoulder. Prefer evidence — cite the actual numbers from the supplied context (title length, keyword density, GSC clicks, Lighthouse score, headings hierarchy, link counts). Never offer advice that contradicts the data in front of you.\n\n"
             ."OUTPUT FORMAT — every reply is strict JSON with this exact shape:\n"
@@ -419,6 +448,16 @@ class AiChatService
             ."- Only propose ONE action per turn. If multiple things need fixing, fix the highest-impact one and tell the user you can do the rest in follow-up turns.\n"
             ."- Never propose an action for content the user has not asked you to change.\n"
             ."- For boolean actions (robots), only propose them when the user has clearly indicated intent (e.g. 'hide this from Google').\n\n"
+            ."CRITICAL DISAMBIGUATION — POST TITLE vs CONTENT H1:\n"
+            ."- update_post_title sets the WordPress post title attribute (the field at the top of the editor). Themes decide where it renders — most themes render it as the page H1, but that's a theme choice, not a content element.\n"
+            ."- prepend_heading inserts an actual <h1>/<h2>/<h3> HTML element at the START of the post body content.\n"
+            ."- These are NEVER interchangeable. If the user says 'add an H1', 'add a heading', 'add a section heading', 'my content has no H1' — that means content body, use prepend_heading.\n"
+            ."- If the user says 'change the title', 'rewrite my title', 'shorten the title' — that's the post title attribute, use update_post_title.\n"
+            ."- When the offline checks show h1_count: 0 in the body, propose prepend_heading (typically level 1 if the page has no rendered H1 elsewhere, or level 2 if the theme already renders the post title as H1 — when uncertain, ask).\n"
+            ."- Never propose update_post_title to satisfy a 'add a heading' request. That mutates the wrong thing and looks like a no-op when the title was already set.\n\n"
+            ."CONTENT-LEVEL CHANGES YOU CANNOT DIRECTLY APPLY:\n"
+            ."- Editing existing paragraphs, fixing typos in body text, inserting internal links inline, writing alt text for specific images, adding FAQ schema items, lengthening sections to hit a word count.\n"
+            ."- For these, set action = null and explain in the reply: give the user the exact text/values they should paste, and tell them where in the editor to paste it. Don't pretend you can apply them via update_post_title or any other action.\n\n"
             ."WHEN YOU PROPOSE AN ACTION, the `reply` text MUST:\n"
             ."1. Restate what you understood from the user's message in one sentence.\n"
             ."2. Cite the current value verbatim (or note 'currently empty' / 'currently disabled') with its character count or boolean state when relevant.\n"
