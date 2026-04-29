@@ -43,6 +43,7 @@ class AiChatService
     public const ACTION_ROBOTS_NOINDEX = 'update_robots_noindex';
     public const ACTION_ROBOTS_NOFOLLOW = 'update_robots_nofollow';
     public const ACTION_PREPEND_HEADING = 'prepend_heading';
+    public const ACTION_REWRITE_PARAGRAPH = 'rewrite_paragraph';
     public const ACTION_RERUN_LIVE_AUDIT = 'rerun_live_audit';
 
     public const ACTION_TYPES = [
@@ -62,7 +63,15 @@ class AiChatService
         self::ACTION_ROBOTS_NOINDEX,
         self::ACTION_ROBOTS_NOFOLLOW,
         self::ACTION_PREPEND_HEADING,
+        self::ACTION_REWRITE_PARAGRAPH,
         self::ACTION_RERUN_LIVE_AUDIT,
+    ];
+
+    private const REWRITE_PARAGRAPH_ALLOWED_TAGS = [
+        'p', 'h2', 'h3', 'h4', 'h5', 'h6',
+        'ul', 'ol', 'li',
+        'strong', 'em', 'b', 'i',
+        'a', 'br', 'blockquote', 'code',
     ];
 
     private const STRING_ACTION_LIMITS = [
@@ -224,6 +233,47 @@ class AiChatService
             ];
         }
 
+        // Content-level: replace one existing block (paragraph / heading /
+        // list) in the post body with new HTML — typically used to split a
+        // long paragraph into shorter ones, swap prose for a bullet list, or
+        // tighten sentences for readability.
+        if ($type === self::ACTION_REWRITE_PARAGRAPH) {
+            $value = $raw['value'] ?? null;
+            if (! is_array($value)) {
+                return null;
+            }
+            $match = trim((string) ($value['match_text'] ?? ''));
+            $newHtml = trim((string) ($value['new_html'] ?? ''));
+            if (mb_strlen($match) < 20 || mb_strlen($match) > 400) {
+                return null;
+            }
+            if ($newHtml === '' || mb_strlen($newHtml) > 6000) {
+                return null;
+            }
+            // Tag whitelist — extract every tag name and require all to be
+            // in the safe list. Inline event handlers, scripts, styles,
+            // iframes, divs/spans with class spam — all rejected.
+            preg_match_all('/<\/?([a-zA-Z][a-zA-Z0-9]*)\b/', $newHtml, $matches);
+            $tags = array_unique(array_map('strtolower', $matches[1] ?? []));
+            foreach ($tags as $tag) {
+                if (! in_array($tag, self::REWRITE_PARAGRAPH_ALLOWED_TAGS, true)) {
+                    return null;
+                }
+            }
+            // No on* event handlers, no javascript: hrefs.
+            if (preg_match('/\son[a-z]+\s*=/i', $newHtml)) return null;
+            if (preg_match('/javascript\s*:/i', $newHtml)) return null;
+
+            return [
+                'type' => $type,
+                'value' => [
+                    'match_text' => $match,
+                    'new_html' => $newHtml,
+                ],
+                'summary' => $summary !== '' ? $summary : 'Rewrite a paragraph block',
+            ];
+        }
+
         // Content-level: prepend an H1/H2/H3 element to the start of the post body.
         if ($type === self::ACTION_PREPEND_HEADING) {
             $value = $raw['value'] ?? null;
@@ -338,6 +388,7 @@ class AiChatService
             self::ACTION_ROBOTS_NOINDEX => 'Toggle robots noindex',
             self::ACTION_ROBOTS_NOFOLLOW => 'Toggle robots nofollow',
             self::ACTION_PREPEND_HEADING => 'Insert heading at top of post',
+            self::ACTION_REWRITE_PARAGRAPH => 'Rewrite a paragraph block',
             self::ACTION_RERUN_LIVE_AUDIT => 'Re-fetch the live audit',
             default => 'Apply update',
         };
@@ -451,6 +502,7 @@ class AiChatService
             ."- update_robots_noindex (boolean; true to hide from search engines)\n"
             ."- update_robots_nofollow (boolean; true to instruct engines not to follow links from this page)\n"
             ."- prepend_heading (object: { level: 1|2|3, text: plain string ≤200 chars }) — inserts a real <h1>/<h2>/<h3> element at the very top of the post body content. Use this — and ONLY this — when the user wants to add an H1/H2/H3 heading inside the post content.\n"
+            ."- rewrite_paragraph (object: { match_text: 20–400 chars, new_html: HTML string ≤6000 chars }) — REPLACES one existing block in the post body with new HTML. Use this for paragraph rewrites, splitting long paragraphs into shorter ones, swapping prose for a bullet list, tightening sentences for readability, or restructuring a section. match_text MUST be the first 30–150 chars of the existing block's plain text (taken verbatim from the content excerpt in the context — enough to identify the block uniquely). new_html may contain only these tags: p, h2-h6, ul, ol, li, strong, em, b, i, a, br, blockquote, code. NO div, span, script, style, iframe, image, class/id/style attributes, or inline event handlers — those are rejected by the validator and the action will be silently dropped. Quote attribute values with double quotes.\n"
             ."- rerun_live_audit (boolean: true) — re-fetches the live audit data (Lighthouse mobile/desktop, Core Web Vitals, GSC totals, composite SEO score). Use this when the user asks to refresh / re-run / re-check the audit, or when you suspect the cached audit numbers are stale (e.g., after they applied a structural change like prepend_heading). Note: this re-fetches the latest server-side audit; a fresh Lighthouse re-crawl on the EBQ backend may be queued and take several minutes to complete.";
 
         return "You are Rank Assist, a senior SEO editor embedded in the WordPress post editor. Talk and reason like a professional SEO expert reviewing a draft over the user's shoulder. Prefer evidence — cite the actual numbers from the supplied context (title length, keyword density, GSC clicks, Lighthouse score, headings hierarchy, link counts). Never offer advice that contradicts the data in front of you.\n\n"
@@ -478,9 +530,16 @@ class AiChatService
             ."- Only treat 'no H1' as an actionable issue when the body has NO headings of any level (h1_count == 0 AND h2_count == 0 AND h3_count == 0) AND the post is long enough (>250 words) to benefit from structure. In that case, propose an H2 (level 2) via prepend_heading — the theme will provide the H1.\n"
             ."- A real heading problem worth flagging is h1_count > 1 in the body (likely a duplicate page H1 once the theme adds its own).\n"
             ."- If the user says 'my post has an H1' or 'I already have a heading', BELIEVE THEM — they may be looking at the rendered page (theme-supplied H1) which we can't see. Do not insist they need an H1 unless headings_skip_levels is true or the body is fully heading-less.\n\n"
-            ."CONTENT-LEVEL CHANGES YOU CANNOT DIRECTLY APPLY:\n"
-            ."- Editing existing paragraphs, fixing typos in body text, inserting internal links inline, writing alt text for specific images, adding FAQ schema items, lengthening sections to hit a word count.\n"
-            ."- For these, set action = null and explain in the reply: give the user the exact text/values they should paste, and tell them where in the editor to paste it. Don't pretend you can apply them via update_post_title or any other action.\n\n"
+            ."CONTENT-LEVEL CHANGES YOU CAN DIRECTLY APPLY:\n"
+            ."- Inserting an H1/H2/H3 at the top of the body → prepend_heading.\n"
+            ."- Rewriting a single existing paragraph or block (split for readability, convert prose to a list, tighten sentences) → rewrite_paragraph.\n"
+            ."- Replacing one section's leading block (e.g., the paragraph immediately after an H2) → rewrite_paragraph; pick a unique match_text from that block.\n\n"
+            ."CONTENT-LEVEL CHANGES YOU CANNOT DIRECTLY APPLY (set action = null and provide pastable values + paste-location instructions):\n"
+            ."- Fixing typos scattered across the post (no surgical typo-fix action — give a list of corrections).\n"
+            ."- Inserting internal links inline mid-paragraph (no inline-link action — name the anchor text and target URL the user should add manually).\n"
+            ."- Writing alt text for specific images (no per-image action — list the alt text per image filename).\n"
+            ."- Adding FAQ schema items, JSON-LD schema bodies, or other structured-data fields beyond schema_type.\n"
+            ."- Bulk-rewriting many paragraphs in one turn — pick the highest-impact one and rewrite it via rewrite_paragraph; tell the user you'll handle the rest in follow-ups.\n\n"
             ."WHEN YOU PROPOSE AN ACTION, the `reply` text MUST:\n"
             ."1. Restate what you understood from the user's message in one sentence.\n"
             ."2. Cite the current value verbatim (or note 'currently empty' / 'currently disabled') with its character count or boolean state when relevant.\n"
