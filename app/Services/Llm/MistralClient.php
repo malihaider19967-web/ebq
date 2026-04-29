@@ -62,6 +62,13 @@ final class MistralClient implements LlmClient
             // Mistral mirrors OpenAI's response_format contract.
             $body['response_format'] = ['type' => 'json_object'];
         }
+        // Function calling: Mistral supports OpenAI-style tools array. When
+        // present we also surface the raw assistant message back to the
+        // caller (so the tool-loop can replay it into the next request).
+        if (! empty($options['tools']) && is_array($options['tools'])) {
+            $body['tools'] = array_values($options['tools']);
+            $body['tool_choice'] = $options['tool_choice'] ?? 'auto';
+        }
 
         try {
             $response = Http::withToken($this->apiKey)
@@ -96,7 +103,9 @@ final class MistralClient implements LlmClient
         }
 
         $json = (array) $response->json();
-        $choice = $json['choices'][0]['message']['content'] ?? '';
+        $message = (array) ($json['choices'][0]['message'] ?? []);
+        $choice = $message['content'] ?? '';
+        $toolCalls = is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [];
         $usage = (array) ($json['usage'] ?? []);
 
         return [
@@ -108,6 +117,118 @@ final class MistralClient implements LlmClient
                 'completion' => (int) ($usage['completion_tokens'] ?? 0),
                 'total' => (int) ($usage['total_tokens'] ?? 0),
             ],
+            'tool_calls' => $toolCalls,
+            'message' => $message,
+        ];
+    }
+
+    public function completeWithTools(array $messages, array $tools, callable $dispatcher, array $options = []): array
+    {
+        $maxRounds = max(1, min(6, (int) ($options['max_tool_rounds'] ?? 4)));
+        $callOptions = $options;
+        $callOptions['tools'] = $tools;
+        // Stripping json_object — JSON-mode + tools is supported by Mistral but
+        // the reliability benefit isn't worth it; we control output shape via
+        // the system prompt and parse the final content tolerantly.
+        unset($callOptions['json_object']);
+
+        $current = $messages;
+        $log = [];
+        $totalUsage = ['prompt' => 0, 'completion' => 0, 'total' => 0];
+        $lastModel = $this->defaultModel;
+
+        for ($round = 0; $round < $maxRounds; $round++) {
+            $resp = $this->complete($current, $callOptions);
+            if (! ($resp['ok'] ?? false)) {
+                return [
+                    'ok' => false,
+                    'decoded' => null,
+                    'content' => '',
+                    'model' => (string) ($resp['model'] ?? $lastModel),
+                    'usage' => $totalUsage,
+                    'tool_calls' => $log,
+                    'error' => (string) ($resp['error'] ?? 'mistral_failed'),
+                ];
+            }
+
+            $lastModel = (string) ($resp['model'] ?? $lastModel);
+            foreach (['prompt', 'completion', 'total'] as $k) {
+                $totalUsage[$k] += (int) ($resp['usage'][$k] ?? 0);
+            }
+
+            $assistantMessage = is_array($resp['message'] ?? null) ? $resp['message'] : [];
+            $toolCalls = is_array($resp['tool_calls'] ?? null) ? $resp['tool_calls'] : [];
+
+            // Final answer — no more tool calls. Decode JSON and return.
+            if (empty($toolCalls)) {
+                $raw = (string) ($resp['content'] ?? '');
+                $decoded = $this->tolerantJsonDecode($raw);
+                if ($decoded === null) {
+                    Log::warning('Mistral completeWithTools: parse failed', [
+                        'model' => $lastModel,
+                        'raw_preview' => mb_substr($raw, 0, 800),
+                    ]);
+                }
+                return [
+                    'ok' => true,
+                    'decoded' => $decoded,
+                    'content' => $raw,
+                    'model' => $lastModel,
+                    'usage' => $totalUsage,
+                    'tool_calls' => $log,
+                ];
+            }
+
+            // Replay assistant turn so the tool result is anchored to it.
+            $current[] = [
+                'role' => 'assistant',
+                'content' => (string) ($assistantMessage['content'] ?? ''),
+                'tool_calls' => $toolCalls,
+            ];
+
+            foreach ($toolCalls as $call) {
+                $name = (string) ($call['function']['name'] ?? '');
+                $argsRaw = (string) ($call['function']['arguments'] ?? '{}');
+                $args = json_decode($argsRaw, true);
+                if (! is_array($args)) {
+                    $args = [];
+                }
+
+                try {
+                    $toolResult = $dispatcher($name, $args);
+                } catch (\Throwable $e) {
+                    Log::warning('Mistral tool dispatcher threw', [
+                        'tool' => $name,
+                        'msg' => $e->getMessage(),
+                    ]);
+                    $toolResult = ['error' => 'tool_failed', 'message' => $e->getMessage()];
+                }
+
+                $log[] = [
+                    'name' => $name,
+                    'args' => $args,
+                    'ok' => ! (is_array($toolResult) && isset($toolResult['error'])),
+                ];
+
+                $current[] = [
+                    'role' => 'tool',
+                    'tool_call_id' => (string) ($call['id'] ?? ''),
+                    'name' => $name,
+                    'content' => is_string($toolResult)
+                        ? $toolResult
+                        : (string) json_encode($toolResult, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+                ];
+            }
+        }
+
+        return [
+            'ok' => false,
+            'decoded' => null,
+            'content' => '',
+            'model' => $lastModel,
+            'usage' => $totalUsage,
+            'tool_calls' => $log,
+            'error' => 'max_tool_rounds_exceeded',
         ];
     }
 

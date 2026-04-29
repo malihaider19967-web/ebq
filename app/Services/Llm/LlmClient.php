@@ -50,4 +50,39 @@ interface LlmClient
 
     /** True when the client is properly configured (api key set, etc.). */
     public function isAvailable(): bool;
+
+    /**
+     * Run a chat-completion loop with function-calling tools. The dispatcher
+     * is invoked for every tool call the model emits; its return value is
+     * fed back into the conversation as a `role: tool` message and the loop
+     * continues until the model either produces a final reply or the tool
+     * round budget is exhausted.
+     *
+     * The final reply is parsed as JSON (tolerantly — same recovery path as
+     * `completeJson`). Implementations MUST cap rounds defensively so a
+     * misbehaving model can't burn tokens forever.
+     *
+     * @param  list<array{role:string, content?:string, tool_calls?:array, tool_call_id?:string, name?:string}>  $messages
+     * @param  list<array{type:string, function:array{name:string, description:string, parameters:array<string,mixed>}}>  $tools
+     * @param  callable(string, array<string,mixed>): (array<string,mixed>|string)  $dispatcher  Called as ($name, $args) -> tool result
+     * @param  array{
+     *     temperature?: float,
+     *     max_tokens?: int,
+     *     model?: string,
+     *     timeout?: int,
+     *     max_tool_rounds?: int,
+     *     tool_choice?: string|array<string,mixed>,
+     * }  $options
+     *
+     * @return array{
+     *     ok: bool,
+     *     decoded: array<int|string, mixed>|null,  // parsed JSON of the final reply, when ok
+     *     content: string,                          // raw final reply text
+     *     model: string,
+     *     usage: array{prompt:int, completion:int, total:int},
+     *     tool_calls: list<array<string, mixed>>,    // log of every tool call made
+     *     error?: string,
+     * }
+     */
+    public function completeWithTools(array $messages, array $tools, callable $dispatcher, array $options = []): array;
 }

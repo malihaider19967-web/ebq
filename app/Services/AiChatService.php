@@ -2,23 +2,25 @@
 
 namespace App\Services;
 
+use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Services\Llm\LlmClient;
+use Illuminate\Support\Carbon;
 
 /**
  * Rank Assist — SEO-helper chatbot for the WordPress plugin's floating
- * assistant.
+ * assistant. Acts like a senior SEO editor with the post open in front of
+ * it: it sees live editor state + EBQ meta + offline checks (headings,
+ * links, images, readability) + live audit (GSC + Lighthouse + CWV) + the
+ * cached SERP-derived content brief if one exists, plus the page's actual
+ * top 90-day GSC queries.
  *
- * Multi-turn conversation grounded in the post being edited. The system
- * prompt locks the assistant to SEO/content topics and structures every
- * reply as JSON: { reply: string, action: null|object }.
- *
- * When the user asks for a fix (rewrite my meta description, shorten my
- * title, change focus keyword, etc.) the model emits an `action` proposal
- * — the WordPress side renders it with Apply / Discard buttons so the
- * change is never silent. The reply text restates what the model
- * understood, cites the current value, names the proposed value, and
- * explains the rationale before any change lands.
+ * Output is strict JSON: { reply, action }. The `action` field is a
+ * structured proposal — the WP side renders Apply/Discard so nothing
+ * mutates the editor silently. When the model needs semantic variants for
+ * a keyword the user is exploring, it can call the `get_related_keywords`
+ * tool via Mistral function calling — the tool dispatcher reaches into
+ * PluginInsightResolver for actual GSC + related queries data.
  */
 class AiChatService
 {
@@ -30,6 +32,16 @@ class AiChatService
     public const ACTION_ADDITIONAL_KEYWORDS = 'update_additional_keywords';
     public const ACTION_META_TITLE = 'update_meta_title';
     public const ACTION_META_DESCRIPTION = 'update_meta_description';
+    public const ACTION_SLUG = 'update_slug';
+    public const ACTION_CANONICAL = 'update_canonical';
+    public const ACTION_OG_TITLE = 'update_og_title';
+    public const ACTION_OG_DESCRIPTION = 'update_og_description';
+    public const ACTION_TWITTER_TITLE = 'update_twitter_title';
+    public const ACTION_TWITTER_DESCRIPTION = 'update_twitter_description';
+    public const ACTION_TWITTER_CARD = 'update_twitter_card';
+    public const ACTION_SCHEMA_TYPE = 'update_schema_type';
+    public const ACTION_ROBOTS_NOINDEX = 'update_robots_noindex';
+    public const ACTION_ROBOTS_NOFOLLOW = 'update_robots_nofollow';
 
     public const ACTION_TYPES = [
         self::ACTION_POST_TITLE,
@@ -37,13 +49,39 @@ class AiChatService
         self::ACTION_ADDITIONAL_KEYWORDS,
         self::ACTION_META_TITLE,
         self::ACTION_META_DESCRIPTION,
+        self::ACTION_SLUG,
+        self::ACTION_CANONICAL,
+        self::ACTION_OG_TITLE,
+        self::ACTION_OG_DESCRIPTION,
+        self::ACTION_TWITTER_TITLE,
+        self::ACTION_TWITTER_DESCRIPTION,
+        self::ACTION_TWITTER_CARD,
+        self::ACTION_SCHEMA_TYPE,
+        self::ACTION_ROBOTS_NOINDEX,
+        self::ACTION_ROBOTS_NOFOLLOW,
     ];
 
-    private const ACTION_LIMITS = [
+    private const STRING_ACTION_LIMITS = [
         self::ACTION_POST_TITLE => 200,
         self::ACTION_FOCUS_KEYWORD => 100,
         self::ACTION_META_TITLE => 200,
         self::ACTION_META_DESCRIPTION => 320,
+        self::ACTION_SLUG => 200,
+        self::ACTION_CANONICAL => 2048,
+        self::ACTION_OG_TITLE => 200,
+        self::ACTION_OG_DESCRIPTION => 320,
+        self::ACTION_TWITTER_TITLE => 200,
+        self::ACTION_TWITTER_DESCRIPTION => 320,
+        self::ACTION_TWITTER_CARD => 32,
+        self::ACTION_SCHEMA_TYPE => 64,
+    ];
+
+    private const TWITTER_CARDS = ['summary', 'summary_large_image'];
+    private const SCHEMA_TYPES = [
+        'Article', 'BlogPosting', 'NewsArticle', 'WebPage',
+        'Product', 'Recipe', 'HowTo', 'FAQPage', 'Event',
+        'Course', 'Person', 'Organization', 'LocalBusiness',
+        'VideoObject', 'ImageObject', 'Review',
     ];
 
     private const MAX_HISTORY = 20;
@@ -52,13 +90,15 @@ class AiChatService
 
     public function __construct(
         private readonly LlmClient $llm,
+        private readonly PluginInsightResolver $insights,
+        private readonly AiContentBriefService $briefs,
     ) {
     }
 
     /**
      * @param  list<array{role: string, content: string}>  $messages
      * @param  array<string, mixed>  $context
-     * @return array{ok: bool, reply?: string, action?: array<string, mixed>|null, error?: string}
+     * @return array{ok: bool, reply?: string, action?: array<string, mixed>|null, tool_calls?: list<array<string,mixed>>, error?: string}
      */
     public function chat(Website $website, array $messages, array $context = []): array
     {
@@ -80,14 +120,34 @@ class AiChatService
             $history,
         );
 
-        $decoded = $this->llm->completeJson($payload, [
+        $tools = $this->toolDefinitions();
+        $dispatcher = $this->makeDispatcher($website, $context);
+
+        $result = $this->llm->completeWithTools($payload, $tools, $dispatcher, [
             'temperature' => 0.3,
-            'max_tokens' => 900,
-            'timeout' => 60,
+            'max_tokens' => 1100,
+            'timeout' => 70,
+            'max_tool_rounds' => 4,
         ]);
 
+        if (! ($result['ok'] ?? false)) {
+            return ['ok' => false, 'error' => (string) ($result['error'] ?? 'llm_failed')];
+        }
+
+        $decoded = is_array($result['decoded'] ?? null) ? $result['decoded'] : null;
         if ($decoded === null) {
-            return ['ok' => false, 'error' => 'llm_failed'];
+            // Fallback: model produced free-text instead of JSON. Salvage it
+            // as a plain reply with no action — better than failing the turn.
+            $raw = trim((string) ($result['content'] ?? ''));
+            if ($raw === '') {
+                return ['ok' => false, 'error' => 'llm_empty_response'];
+            }
+            return [
+                'ok' => true,
+                'reply' => $raw,
+                'action' => null,
+                'tool_calls' => $result['tool_calls'] ?? [],
+            ];
         }
 
         $reply = trim((string) ($decoded['reply'] ?? ''));
@@ -95,12 +155,11 @@ class AiChatService
             return ['ok' => false, 'error' => 'llm_empty_response'];
         }
 
-        $action = $this->validateAction($decoded['action'] ?? null);
-
         return [
             'ok' => true,
             'reply' => $reply,
-            'action' => $action,
+            'action' => $this->validateAction($decoded['action'] ?? null),
+            'tool_calls' => $result['tool_calls'] ?? [],
         ];
     }
 
@@ -130,10 +189,6 @@ class AiChatService
     }
 
     /**
-     * Strict validation of any action the model proposes. Drop on shape or
-     * size violations — better silent dismissal than letting a malformed
-     * action render in the UI.
-     *
      * @return array<string, mixed>|null
      */
     private function validateAction(mixed $raw): ?array
@@ -151,6 +206,20 @@ class AiChatService
             $summary = mb_substr($summary, 0, 200);
         }
 
+        // Boolean actions (robots flags).
+        if (in_array($type, [self::ACTION_ROBOTS_NOINDEX, self::ACTION_ROBOTS_NOFOLLOW], true)) {
+            $value = filter_var($raw['value'] ?? null, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE);
+            if ($value === null) {
+                return null;
+            }
+            return [
+                'type' => $type,
+                'value' => $value,
+                'summary' => $summary !== '' ? $summary : $this->defaultSummary($type),
+            ];
+        }
+
+        // Array action: additional keyphrases.
         if ($type === self::ACTION_ADDITIONAL_KEYWORDS) {
             $value = $raw['value'] ?? null;
             if (! is_array($value)) {
@@ -176,13 +245,29 @@ class AiChatService
             ];
         }
 
+        // String actions — length-limited; some are enum-validated.
         $value = trim((string) ($raw['value'] ?? ''));
         if ($value === '') {
             return null;
         }
-        $limit = self::ACTION_LIMITS[$type] ?? 1000;
+        $limit = self::STRING_ACTION_LIMITS[$type] ?? 1000;
         if (mb_strlen($value) > $limit) {
             return null;
+        }
+
+        if ($type === self::ACTION_TWITTER_CARD && ! in_array($value, self::TWITTER_CARDS, true)) {
+            return null;
+        }
+        if ($type === self::ACTION_SCHEMA_TYPE && ! in_array($value, self::SCHEMA_TYPES, true)) {
+            return null;
+        }
+        if ($type === self::ACTION_CANONICAL && ! filter_var($value, FILTER_VALIDATE_URL)) {
+            return null;
+        }
+        if ($type === self::ACTION_SLUG) {
+            if (! preg_match('/^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/', $value)) {
+                return null;
+            }
         }
 
         return [
@@ -199,55 +284,171 @@ class AiChatService
             self::ACTION_FOCUS_KEYWORD => 'Update focus keyword',
             self::ACTION_META_TITLE => 'Update SEO meta title',
             self::ACTION_META_DESCRIPTION => 'Update SEO meta description',
+            self::ACTION_SLUG => 'Update post slug',
+            self::ACTION_CANONICAL => 'Update canonical URL',
+            self::ACTION_OG_TITLE => 'Update Open Graph title',
+            self::ACTION_OG_DESCRIPTION => 'Update Open Graph description',
+            self::ACTION_TWITTER_TITLE => 'Update Twitter title',
+            self::ACTION_TWITTER_DESCRIPTION => 'Update Twitter description',
+            self::ACTION_TWITTER_CARD => 'Update Twitter card type',
+            self::ACTION_SCHEMA_TYPE => 'Update schema type',
+            self::ACTION_ROBOTS_NOINDEX => 'Toggle robots noindex',
+            self::ACTION_ROBOTS_NOFOLLOW => 'Toggle robots nofollow',
             default => 'Apply update',
         };
     }
 
+    /* ────────────────────── tools (Mistral function calling) ─────────────────── */
+
+    /**
+     * @return list<array{type:string, function:array{name:string, description:string, parameters:array<string,mixed>}}>
+     */
+    private function toolDefinitions(): array
+    {
+        return [
+            [
+                'type' => 'function',
+                'function' => [
+                    'name' => 'get_related_keywords',
+                    'description' => 'Look up semantic variants and related search queries for a keyword by combining real Search Console queries on this site with related-keyword data. Use this when the user is exploring keyword alternatives, asking what other keywords they could target, or you need to suggest semantic variants for the focus keyword. Returns a ranked list with volume, position, clicks, impressions, and source (gsc/related/paa).',
+                    'parameters' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'keyword' => [
+                                'type' => 'string',
+                                'description' => 'The seed keyword to find variants for. Defaults to the post\'s current focus keyword if omitted.',
+                            ],
+                            'limit' => [
+                                'type' => 'integer',
+                                'description' => 'Maximum number of variants to return (1–20). Defaults to 12.',
+                                'minimum' => 1,
+                                'maximum' => 20,
+                            ],
+                        ],
+                        'required' => [],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function makeDispatcher(Website $website, array $context): callable
+    {
+        return function (string $name, array $args) use ($website, $context): array|string {
+            return match ($name) {
+                'get_related_keywords' => $this->dispatchRelatedKeywords($website, $context, $args),
+                default => ['error' => 'unknown_tool', 'name' => $name],
+            };
+        };
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     * @param  array<string, mixed>  $args
+     */
+    private function dispatchRelatedKeywords(Website $website, array $context, array $args): array
+    {
+        $keyword = trim((string) ($args['keyword'] ?? ''));
+        if ($keyword === '') {
+            $keyword = trim((string) ($context['focus_keyword'] ?? ''));
+        }
+        if ($keyword === '') {
+            return ['error' => 'missing_keyword', 'message' => 'No keyword supplied and no focus keyword set on this post.'];
+        }
+        $limit = (int) ($args['limit'] ?? 12);
+        if ($limit < 1 || $limit > 20) {
+            $limit = 12;
+        }
+
+        $url = trim((string) ($context['url'] ?? ''));
+        try {
+            $rows = $this->insights->relatedKeywords($website, $keyword, $url !== '' ? $url : null, $limit);
+        } catch (\Throwable $e) {
+            return ['error' => 'lookup_failed', 'message' => $e->getMessage()];
+        }
+
+        return [
+            'ok' => true,
+            'keyword' => $keyword,
+            'count' => count($rows),
+            'variants' => array_map(static function (array $row): array {
+                return [
+                    'query' => (string) ($row['query'] ?? ''),
+                    'volume' => $row['volume'] ?? null,
+                    'clicks' => $row['clicks'] ?? null,
+                    'impressions' => $row['impressions'] ?? null,
+                    'position' => $row['position'] ?? null,
+                    'source' => (string) ($row['source'] ?? ''),
+                    'score' => $row['score'] ?? null,
+                ];
+            }, $rows),
+        ];
+    }
+
+    /* ────────────────────── prompts ──────────────────────────────────────────── */
+
     private function systemPrompt(): string
     {
-        $actions = "- update_post_title (value: string, ≤200 chars)\n"
-            ."- update_focus_keyword (value: string, ≤100 chars)\n"
-            ."- update_additional_keywords (value: array of strings, max 5 items)\n"
-            ."- update_meta_title (value: string, ≤200 chars; SEO display sweet spot 50–60)\n"
-            ."- update_meta_description (value: string, ≤320 chars; SEO display sweet spot 150–160)";
+        $actions = "- update_post_title (string ≤200; sweet spot 50–60 chars on the rendered title)\n"
+            ."- update_focus_keyword (string ≤100; one primary head term)\n"
+            ."- update_additional_keywords (array of 1–5 strings; closely-related modifiers, not synonyms)\n"
+            ."- update_meta_title (string ≤200; SERP display sweet spot 50–60)\n"
+            ."- update_meta_description (string ≤320; SERP display sweet spot 150–160)\n"
+            ."- update_slug (string, lowercase ASCII + hyphens only; ideally 3–6 words, includes the focus keyword)\n"
+            ."- update_canonical (absolute URL; only when the user wants to point this page at a different canonical)\n"
+            ."- update_og_title / update_og_description (Facebook/LinkedIn social card overrides)\n"
+            ."- update_twitter_title / update_twitter_description (X/Twitter social card overrides)\n"
+            ."- update_twitter_card (string, one of: summary | summary_large_image)\n"
+            ."- update_schema_type (string, one of: Article | BlogPosting | NewsArticle | WebPage | Product | Recipe | HowTo | FAQPage | Event | Course | Person | Organization | LocalBusiness | VideoObject | ImageObject | Review)\n"
+            ."- update_robots_noindex (boolean; true to hide from search engines)\n"
+            ."- update_robots_nofollow (boolean; true to instruct engines not to follow links from this page)";
 
-        return "You are Rank Assist, a focused SEO and content-quality helper embedded in the WordPress post editor. Your ONLY job is to help the user improve the SEO, search ranking potential, readability, structure, and editorial quality of the post they are currently editing.\n\n"
+        return "You are Rank Assist, a senior SEO editor embedded in the WordPress post editor. Talk and reason like a professional SEO expert reviewing a draft over the user's shoulder. Prefer evidence — cite the actual numbers from the supplied context (title length, keyword density, GSC clicks, Lighthouse score, headings hierarchy, link counts). Never offer advice that contradicts the data in front of you.\n\n"
             ."OUTPUT FORMAT — every reply is strict JSON with this exact shape:\n"
             ."{\n"
             ."  \"reply\": \"<message shown to the user>\",\n"
             ."  \"action\": null OR { \"type\": \"<one of the action types>\", \"value\": <value>, \"summary\": \"<one-line label for the Apply button>\" }\n"
             ."}\n"
-            ."Allowed action types and value shapes:\n{$actions}\n"
-            ."If you are NOT proposing a concrete edit, set action to null.\n\n"
+            ."Allowed action types and value shapes:\n{$actions}\n\n"
             ."WHEN TO PROPOSE AN ACTION:\n"
-            ."- The user explicitly asks you to fix, rewrite, change, update, set, or apply something the actions above can do (the title, focus keyword, additional keywords, meta title, or meta description).\n"
-            ."- You have enough context to write the new value yourself. If you don't, ask a clarifying question instead (action = null).\n"
-            ."- Only propose ONE action per turn. If multiple things need fixing, pick the highest-impact one and tell the user you can do the rest in follow-up turns.\n"
-            ."- Never propose an action for content the user has not asked to change.\n\n"
+            ."- The user explicitly asks you to fix, rewrite, change, set, draft, or apply something the actions above can handle.\n"
+            ."- You have enough context to write the new value yourself. If you don't, ask one focused clarifying question instead (action = null).\n"
+            ."- Only propose ONE action per turn. If multiple things need fixing, fix the highest-impact one and tell the user you can do the rest in follow-up turns.\n"
+            ."- Never propose an action for content the user has not asked you to change.\n"
+            ."- For boolean actions (robots), only propose them when the user has clearly indicated intent (e.g. 'hide this from Google').\n\n"
             ."WHEN YOU PROPOSE AN ACTION, the `reply` text MUST:\n"
-            ."1. Restate what you understood from the user's message in one sentence (\"You'd like me to rewrite the meta description.\").\n"
-            ."2. Cite the current value verbatim (or note 'currently empty') with its character count when relevant.\n"
-            ."3. State the proposed new value (or a quoted preview) and its character count.\n"
-            ."4. Explain in one short sentence WHY this change helps SEO (length, keyword placement, intent fit, clarity, etc.).\n"
-            ."5. Make it clear the change is NOT yet applied — phrase it as a proposal awaiting the user's confirmation. Never say 'I've updated' or 'I changed'.\n"
-            ."The Apply button shows your `summary` text — keep it tight, e.g. 'Replace meta description (42 → 158 chars)' or 'Set focus keyword to \"thai green curry recipe\"'.\n\n"
-            ."WHEN YOU DON'T PROPOSE AN ACTION:\n"
-            ."- Answer the user's question directly using the post context provided. Concrete, post-specific, no fluff.\n"
-            ."- If the user asks for advice you could *propose as an action* but you need clarification (e.g. 'fix my title' but you don't know which direction), ask one focused clarifying question.\n\n"
-            ."SCOPE — what you DO:\n"
-            ."- Analyse focus keyword usage, semantic variants, search intent fit.\n"
-            ."- Critique title, meta description, headings, internal/external linking, schema, canonical, slug.\n"
-            ."- Suggest improvements to readability, structure, depth of coverage, E-E-A-T signals.\n"
-            ."- Interpret offline checks (length, keyword presence, heading hierarchy) and live audit data (Core Web Vitals, GSC performance, audit score) supplied in the context.\n\n"
-            ."SCOPE — what you DECLINE:\n"
-            ."- Off-topic chat (general coding help, personal advice, jokes, news, anything unrelated to this post's SEO).\n"
-            ."- Generating full long-form drafts (point users to the AI Writer feature instead).\n"
+            ."1. Restate what you understood from the user's message in one sentence.\n"
+            ."2. Cite the current value verbatim (or note 'currently empty' / 'currently disabled') with its character count or boolean state when relevant.\n"
+            ."3. State the proposed new value (preview the text) and its character count.\n"
+            ."4. Explain in one sentence WHY this change helps SEO — be specific (length, keyword placement, intent fit, click-worthiness, schema fit, social CTR, indexation strategy).\n"
+            ."5. Make it clear the change is NOT yet applied — phrase as a proposal awaiting user confirmation. Never say 'I've updated', 'I changed', 'I set'.\n"
+            ."Keep the `summary` tight, e.g. 'Replace meta description (42 → 158 chars)' or 'Set focus keyword to \"thai green curry recipe\"'.\n\n"
+            ."FUNCTION CALLING:\n"
+            ."- You have access to one tool: `get_related_keywords(keyword, limit)`. Call it when the user wants to explore alternative keywords, the focus keyword has poor data, or you need to validate a proposed keyword change against real GSC + related-query data on this site.\n"
+            ."- Don't call tools the user didn't ask for indirectly. A simple title-tweak request doesn't need keyword research.\n"
+            ."- Tool results stream back as JSON; integrate them into your reply, don't dump them raw.\n\n"
+            ."WHAT YOU DO (scope):\n"
+            ."- Title, meta description, slug, canonical, robots, social cards, schema type — anything in the action list.\n"
+            ."- Focus keyword choice & semantic variants (use the related-keywords tool when helpful).\n"
+            ."- Heading hierarchy critique (H1 count, missing H2/H3, level-skipping).\n"
+            ."- Internal/external link structure, anchor text quality.\n"
+            ."- Image alt-text coverage (you'll see how many images lack alt).\n"
+            ."- Readability (Flesch reading ease, sentence length, paragraph density).\n"
+            ."- Search-intent alignment, content depth vs. recommended word count, E-E-A-T signals, freshness.\n"
+            ."- Interpretation of GSC data (clicks, impressions, CTR, average position) and Core Web Vitals (LCP, CLS, INP).\n"
+            ."- Cannibalization, striking-distance opportunities, content-brief gaps.\n\n"
+            ."WHAT YOU DECLINE:\n"
+            ."- Off-topic chat (general coding, personal advice, jokes, news unrelated to this post).\n"
+            ."- Generating long-form drafts — point users to the EBQ AI Writer feature instead.\n"
             ."- Politics, medical/legal/financial advice unrelated to SEO copy review.\n"
-            ."When asked anything off-topic, briefly say you're an SEO helper for this post and steer back to the post's SEO — do not lecture, set action to null.\n\n"
+            ."When asked something off-topic, briefly steer back to this post's SEO and set action to null. Don't lecture.\n\n"
             ."STYLE:\n"
-            ."- Concise. The reply field should be 2–6 short sentences. Don't pad.\n"
-            ."- Reference the actual post data you were given (title, focus keyword, audit numbers) — do not invent facts.\n"
-            ."- If a relevant signal is missing from the context (e.g. no focus keyword set), say so and ask the user to set it (or propose an action to set one if they've hinted at the keyword).\n"
+            ."- Concise. The `reply` is 2–6 short sentences or a tight bulleted list. No padding, no boilerplate openings.\n"
+            ."- Reference the actual post data (title text, focus keyword, GSC numbers, Lighthouse scores) — never invent.\n"
+            ."- If a relevant signal is missing (e.g. no focus keyword set), name the gap and offer to fix it.\n"
             ."- Plain text or simple Markdown lists in `reply`. No HTML tags, no code fences.\n\n"
             ."Always emit valid JSON. Never include any text outside the JSON object.";
     }
@@ -258,11 +459,11 @@ class AiChatService
     private function contextPrompt(Website $website, array $context): string
     {
         $lines = [];
-        $lines[] = 'CURRENT POST CONTEXT (from the WordPress editor — refer to this when answering):';
+        $lines[] = 'CURRENT POST CONTEXT (live data from the WordPress editor + the EBQ backend — refer to these when answering, do not invent values):';
 
         $site = trim((string) ($website->domain ?? ''));
         if ($site !== '') {
-            $lines[] = "- Site: {$site}";
+            $lines[] = "- Site: {$site} (tier: ".(string) ($website->tier ?? 'free').')';
         }
 
         $title = trim((string) ($context['title'] ?? ''));
@@ -274,6 +475,10 @@ class AiChatService
         if ($url !== '') {
             $lines[] = "- URL: {$url}";
         }
+        $slug = trim((string) ($context['slug'] ?? ''));
+        if ($slug !== '') {
+            $lines[] = "- Slug: {$slug}";
+        }
 
         $postType = trim((string) ($context['post_type'] ?? ''));
         if ($postType !== '') {
@@ -284,7 +489,7 @@ class AiChatService
         if ($focus !== '') {
             $lines[] = "- Focus keyword: {$focus}";
         } else {
-            $lines[] = '- Focus keyword: NOT SET (recommend the user set one — you may propose update_focus_keyword if they hint at the topic)';
+            $lines[] = '- Focus keyword: NOT SET (recommend setting one — you may propose update_focus_keyword if the user hints at the topic)';
         }
 
         $additional = $context['additional_keywords'] ?? [];
@@ -296,17 +501,44 @@ class AiChatService
         }
 
         $metaTitle = trim((string) ($context['meta_title'] ?? ''));
-        if ($metaTitle !== '') {
-            $lines[] = "- SEO meta title: {$metaTitle} (".mb_strlen($metaTitle).' chars)';
-        } else {
-            $lines[] = '- SEO meta title: NOT SET';
-        }
+        $lines[] = $metaTitle !== ''
+            ? "- SEO meta title: {$metaTitle} (".mb_strlen($metaTitle).' chars)'
+            : '- SEO meta title: NOT SET (the rendered <title> falls back to the post title)';
 
         $metaDescription = trim((string) ($context['meta_description'] ?? ''));
-        if ($metaDescription !== '') {
-            $lines[] = "- SEO meta description: {$metaDescription} (".mb_strlen($metaDescription).' chars)';
-        } else {
-            $lines[] = '- SEO meta description: NOT SET';
+        $lines[] = $metaDescription !== ''
+            ? "- SEO meta description: {$metaDescription} (".mb_strlen($metaDescription).' chars)'
+            : '- SEO meta description: NOT SET (Google will autogenerate a snippet; setting one is almost always better)';
+
+        $canonical = trim((string) ($context['canonical'] ?? ''));
+        if ($canonical !== '') {
+            $lines[] = "- Canonical override: {$canonical}";
+        }
+
+        // Robots flags — only call out when active (rare).
+        $robots = is_array($context['robots'] ?? null) ? $context['robots'] : [];
+        $robotFlags = [];
+        if (! empty($robots['noindex'])) $robotFlags[] = 'noindex';
+        if (! empty($robots['nofollow'])) $robotFlags[] = 'nofollow';
+        if (! empty($robotFlags)) {
+            $lines[] = '- Robots directives: '.implode(', ', $robotFlags).' — this page is currently restricted from search engines or link-following.';
+        }
+
+        // Social-card overrides.
+        $social = is_array($context['social'] ?? null) ? $context['social'] : [];
+        $socialBits = [];
+        foreach (['og_title', 'og_description', 'og_image', 'twitter_title', 'twitter_description', 'twitter_image', 'twitter_card'] as $k) {
+            if (! empty($social[$k])) {
+                $socialBits[] = "{$k}=".(is_string($social[$k]) ? $social[$k] : json_encode($social[$k]));
+            }
+        }
+        if (! empty($socialBits)) {
+            $lines[] = '- Social-card overrides set: '.implode('; ', $socialBits);
+        }
+
+        $schemaType = trim((string) ($context['schema_type'] ?? ''));
+        if ($schemaType !== '') {
+            $lines[] = "- Configured schema type: {$schemaType}";
         }
 
         $excerpt = trim((string) ($context['content_excerpt'] ?? ''));
@@ -319,7 +551,7 @@ class AiChatService
 
         $offline = $context['offline_audit'] ?? null;
         if (is_array($offline) && ! empty($offline)) {
-            $lines[] = '- Offline checks (computed client-side from current editor state):';
+            $lines[] = '- Offline checks (computed from live editor DOM — these are the freshest signals):';
             foreach ($offline as $key => $value) {
                 $k = is_string($key) ? $key : (string) $key;
                 $v = $this->scalarise($value);
@@ -331,7 +563,7 @@ class AiChatService
 
         $live = $context['live_audit'] ?? null;
         if (is_array($live) && ! empty($live)) {
-            $lines[] = '- Live audit (from EBQ backend — GSC + Lighthouse + on-page audit):';
+            $lines[] = '- Live audit (EBQ backend — Lighthouse + GSC totals + composite SEO score):';
             foreach ($live as $key => $value) {
                 $k = is_string($key) ? $key : (string) $key;
                 $v = $this->scalarise($value);
@@ -341,14 +573,120 @@ class AiChatService
             }
         }
 
+        // Server-side enrichment: cached SERP brief + page's actual top GSC queries.
+        $brief = $focus !== '' ? $this->briefs->cachedBrief($website, $focus) : null;
+        $briefSummary = $this->summariseBrief($brief);
+        if ($briefSummary !== '') {
+            $lines[] = "- Cached SERP-derived content brief for \"{$focus}\":\n{$briefSummary}";
+        }
+
+        if ($url !== '') {
+            $topQueries = $this->topGscQueries($website, $url, 10);
+            if (! empty($topQueries)) {
+                $lines[] = '- Top 90-day Search Console queries actually driving traffic to this page (clicks · impressions · avg position · CTR%):';
+                foreach ($topQueries as $row) {
+                    $lines[] = sprintf(
+                        '  · "%s" — %d · %d · %.1f · %.2f%%',
+                        (string) $row['query'],
+                        (int) $row['clicks'],
+                        (int) $row['impressions'],
+                        (float) ($row['position'] ?? 0),
+                        (float) ($row['ctr'] ?? 0),
+                    );
+                }
+            }
+        }
+
         $lines[] = '';
-        $lines[] = 'When the user asks about "this post", "the title", "the content", etc., use the data above. Do not invent values that are not listed. Remember: any concrete edit must be proposed via the action field — never describe the change as already applied.';
+        $lines[] = 'When the user asks about "this post", "the title", "my keyword", "my score" — use the data above. Any concrete edit must be proposed via the action field, never described as already applied. If you need semantic variants for a different keyword, call the get_related_keywords tool.';
 
         return implode("\n", $lines);
     }
 
+    /**
+     * @param  array<string, mixed>|null  $brief
+     */
+    private function summariseBrief(?array $brief): string
+    {
+        if (! is_array($brief) || ! isset($brief['brief']) || ! is_array($brief['brief'])) {
+            return '';
+        }
+        $b = $brief['brief'];
+        $bits = [];
+        $angle = trim((string) ($b['angle'] ?? ''));
+        if ($angle !== '') {
+            $bits[] = "  · Search intent: {$angle}";
+        }
+        $wc = (int) ($b['recommended_word_count'] ?? 0);
+        if ($wc > 0) {
+            $bits[] = "  · Recommended word count: {$wc}";
+        }
+        $list = static function ($v, int $cap): array {
+            if (! is_array($v)) return [];
+            $out = [];
+            foreach ($v as $item) {
+                $s = trim((string) $item);
+                if ($s !== '') {
+                    $out[] = $s;
+                    if (count($out) >= $cap) break;
+                }
+            }
+            return $out;
+        };
+        $subtopics = $list($b['subtopics'] ?? [], 6);
+        if (! empty($subtopics)) {
+            $bits[] = '  · Subtopics top SERP results cover: '.implode(' · ', $subtopics);
+        }
+        $entities = $list($b['must_have_entities'] ?? [], 8);
+        if (! empty($entities)) {
+            $bits[] = '  · Entities to mention if relevant: '.implode(', ', $entities);
+        }
+        $paa = $list($b['people_also_ask'] ?? [], 4);
+        if (! empty($paa)) {
+            $bits[] = '  · People also ask: '.implode(' | ', $paa);
+        }
+        return empty($bits) ? '' : implode("\n", $bits);
+    }
+
+    /**
+     * @return list<array{query:string, clicks:int, impressions:int, position:float|null, ctr:float|null}>
+     */
+    private function topGscQueries(Website $website, string $url, int $limit): array
+    {
+        try {
+            $tz = config('app.timezone');
+            $end = Carbon::yesterday($tz)->endOfDay();
+            $start = $end->copy()->subDays(89)->startOfDay();
+
+            $rows = SearchConsoleData::query()
+                ->where('website_id', $website->id)
+                ->whereDate('date', '>=', $start->toDateString())
+                ->whereDate('date', '<=', $end->toDateString())
+                ->where('query', '!=', '')
+                ->tap(fn ($q) => $this->insights->__publicApplyPageMatch($q, $url))
+                ->selectRaw('query, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as position, AVG(ctr) as ctr')
+                ->groupBy('query')
+                ->orderByDesc('clicks')
+                ->limit($limit)
+                ->get();
+
+            return $rows->map(static fn ($r) => [
+                'query' => (string) $r->query,
+                'clicks' => (int) $r->clicks,
+                'impressions' => (int) $r->impressions,
+                'position' => $r->position !== null ? round((float) $r->position, 1) : null,
+                'ctr' => $r->ctr !== null ? round((float) $r->ctr * 100, 2) : null,
+            ])->all();
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
     private function scalarise(mixed $value): string
     {
+        if (is_bool($value)) {
+            return $value ? 'yes' : 'no';
+        }
         if (is_scalar($value)) {
             return (string) $value;
         }
