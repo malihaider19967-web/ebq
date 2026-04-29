@@ -216,7 +216,7 @@ class AiBlockEditorService
             ],
             self::MODE_EXTEND => [
                 $system,
-                $seoContext."Extend the following text with one or two more paragraphs of closely related content that deepens topical coverage. The existing text MUST appear unchanged at the very start of your output. The new paragraphs should add specific, search-useful detail (numbers, examples, sub-aspects of the topic) and naturally include the focus keyword or a semantic variant where it fits — never forced. Do not repeat sentences from the existing text in the new portion.\n\nExisting text:\n{$text}",
+                $seoContext."Continue the following text with one or two more paragraphs of closely related content that deepens topical coverage. CRITICAL: return ONLY the NEW continuation paragraphs. DO NOT include, repeat, paraphrase, or rewrite any part of the existing text — it will be appended automatically by the editor. Your output should read naturally as the next thing the reader sees after the existing text. Add specific, search-useful detail (numbers, examples, sub-aspects of the topic) and naturally include the focus keyword or a semantic variant where it fits — never forced. Do not start with phrases like 'In addition' or 'Furthermore' that signal you are continuing — write as if these are standalone paragraphs.\n\nExisting text (for context only — do not output this):\n{$text}",
             ],
             self::MODE_SUMMARISE => [
                 $system,
