@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Plan;
 use App\Models\User;
 use App\Models\WebsiteInvitation;
 use Illuminate\Auth\Events\Registered;
@@ -26,9 +27,16 @@ class RegisteredUserController extends Controller
             }
         }
 
+        // Carry the plan slug from the /pricing CTA (`/register?plan=pro`)
+        // through register → store() → billing checkout. Stored in session
+        // so it survives the form POST without being a hidden field that
+        // an attacker could swap for a different plan slug client-side.
+        $planSlug = $this->capturePendingPlan($request);
+
         return view('auth.register', [
             'inviteToken' => $inviteToken,
             'invitationEmail' => $invitationEmail,
+            'pendingPlan' => $planSlug,
         ]);
     }
 
@@ -57,6 +65,52 @@ class RegisteredUserController extends Controller
 
         Auth::login($user);
 
+        // Pay-first flow: when the user picked a paid plan on /pricing,
+        // jump straight to Stripe Checkout. BillingController auto-creates
+        // a placeholder Website to attach the subscription to, and after
+        // Stripe success the user lands on /onboarding to fill in their
+        // real domain — which UPDATES the placeholder so the subscription
+        // stays linked to the same row. Email verification still happens
+        // later via the standard verified-route middleware; we don't gate
+        // checkout on it (Stripe collects a verified email of its own).
+        $pendingPlan = (string) $request->session()->pull('pending_plan', '');
+        if ($pendingPlan !== '' && $this->isCheckoutablePlan($pendingPlan)) {
+            return redirect()->route('billing.checkout', ['plan' => $pendingPlan]);
+        }
+
         return redirect()->route('verification.notice');
+    }
+
+    /**
+     * Read `?plan=` from the request, validate against an active plan, and
+     * stash it in session so the subsequent POST → store() can pick it up.
+     * Returns the slug (or '') so the view can show a "you'll be billed
+     * for the X plan after sign-up" hint.
+     */
+    private function capturePendingPlan(Request $request): string
+    {
+        $slug = trim((string) $request->query('plan', ''));
+        if ($slug === '') {
+            return (string) $request->session()->get('pending_plan', '');
+        }
+        if (! $this->isCheckoutablePlan($slug)) {
+            return '';
+        }
+        $request->session()->put('pending_plan', $slug);
+        return $slug;
+    }
+
+    /**
+     * True when `$slug` matches an active, checkout-ready paid plan. Free
+     * tiers and unknown slugs return false so we never redirect register
+     * through a broken Stripe session.
+     */
+    private function isCheckoutablePlan(string $slug): bool
+    {
+        if ($slug === '' || $slug === 'free') {
+            return false;
+        }
+        $plan = Plan::where('slug', $slug)->where('is_active', true)->first();
+        return $plan !== null && $plan->isCheckoutReady();
     }
 }

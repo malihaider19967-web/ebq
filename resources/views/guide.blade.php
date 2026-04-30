@@ -3,6 +3,20 @@
     description="The complete EBQ user guide: connect Search Console, Analytics, and the Indexing API; track keywords and backlinks; run page audits; turn on alerts; schedule reports; install the WordPress plugin."
     active="guide"
 >
+    @php
+        $guideVisuals = [
+            ['anchor' => 'dashboard', 'title' => 'Dashboard overview', 'file' => 'images/guide/dashboard-overview.png', 'alt' => 'EBQ dashboard overview cards and charts'],
+            ['anchor' => 'insight-cards', 'title' => 'Action insights', 'file' => 'images/guide/action-insights.png', 'alt' => 'Dashboard action insights cards in EBQ'],
+            ['anchor' => 'keywords', 'title' => 'Keywords', 'file' => 'images/guide/keywords-workspace.png', 'alt' => 'Keywords workspace table in EBQ'],
+            ['anchor' => 'pages', 'title' => 'Pages', 'file' => 'images/guide/pages-workspace.png', 'alt' => 'Pages workspace performance table in EBQ'],
+            ['anchor' => 'rank-tracking', 'title' => 'Rank tracking', 'file' => 'images/guide/rank-tracking.png', 'alt' => 'Rank tracking trend and keyword positions in EBQ'],
+            ['anchor' => 'custom-audit', 'title' => 'Custom audit', 'file' => 'images/guide/custom-audit.png', 'alt' => 'Custom page audit form in EBQ'],
+            ['anchor' => 'audit-report-sections', 'title' => 'Audit report', 'file' => 'images/guide/audit-report-sections.png', 'alt' => 'Page audit detail report sections in EBQ'],
+            ['anchor' => 'insights-panel', 'title' => 'Reports insights', 'file' => 'images/guide/reports-insights.png', 'alt' => 'Reports insights tab in EBQ'],
+            ['anchor' => 'growth-reports', 'title' => 'Growth reports', 'file' => 'images/guide/growth-reports.png', 'alt' => 'Custom growth report builder tab in EBQ'],
+        ];
+    @endphp
+
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-slate-200 bg-white">
         <div class="mx-auto max-w-3xl px-6 py-16 lg:px-8 lg:py-20">
@@ -20,6 +34,36 @@
         </div>
     </section>
 
+    <section class="border-b border-slate-200 bg-slate-50/50">
+        <div class="mx-auto max-w-6xl px-6 py-10 lg:px-8">
+            <h2 class="text-xl font-semibold tracking-tight text-slate-900">Section visual map</h2>
+            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                Each dashboard info icon opens one of these sections. Place real screenshots at the listed paths to upgrade placeholders automatically.
+            </p>
+            <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                @foreach ($guideVisuals as $visual)
+                    <a href="#{{ $visual['anchor'] }}" class="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:shadow-sm">
+                        @if (file_exists(public_path($visual['file'])))
+                            <figure>
+                                <img src="{{ asset($visual['file']) }}" alt="{{ $visual['alt'] }}" class="h-36 w-full rounded-lg border border-slate-200 object-cover">
+                                <figcaption class="mt-1 text-[11px] text-slate-500">{{ $visual['alt'] }}</figcaption>
+                            </figure>
+                        @else
+                            <div class="flex h-36 w-full items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-center">
+                                <div>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Screenshot needed</p>
+                                    <p class="mt-1 font-mono text-[10px] text-slate-400">{{ $visual['file'] }}</p>
+                                </div>
+                            </div>
+                        @endif
+                        <p class="mt-3 text-sm font-semibold text-slate-900">{{ $visual['title'] }}</p>
+                        <p class="mt-1 text-xs text-slate-500">Jump to section</p>
+                    </a>
+                @endforeach
+            </div>
+        </div>
+    </section>
+
     {{-- ── Two-column body: TOC + content ───────────────────── --}}
     <section class="bg-white">
         <div class="mx-auto grid max-w-6xl gap-12 px-6 py-16 lg:grid-cols-[16rem_minmax(0,1fr)] lg:gap-16 lg:px-8 lg:py-20">
@@ -29,6 +73,17 @@
                 <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">In this guide</p>
                 <nav aria-label="Guide sections" class="mt-3 flex flex-col gap-1 text-sm">
                     @php
+                        $tocWorkspace = [
+                            ['#dashboard', 'Dashboard overview'],
+                            ['#insight-cards', 'Action insights cards'],
+                            ['#keywords', 'Keywords workspace'],
+                            ['#pages', 'Pages workspace'],
+                            ['#rank-tracking', 'Rank tracking'],
+                            ['#custom-audit', 'Custom page audit'],
+                            ['#audit-report-sections', 'Page audit report sections'],
+                            ['#insights-panel', 'Reports insights panel'],
+                            ['#growth-reports', 'Custom growth reports'],
+                        ];
                         $tocSetup = [
                             ['#step-1', '01', 'Add your first website'],
                             ['#step-2', '02', 'Connect Search Console + GA4'],
@@ -46,6 +101,13 @@
                             ['#weekly-rhythm', 'A weekly rhythm'],
                         ];
                     @endphp
+                    @foreach ($tocWorkspace as [$href, $label])
+                        <a href="{{ $href }}" class="flex items-center gap-3 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
+                            <span class="font-mono text-[11px] text-slate-400">→</span>
+                            <span>{{ $label }}</span>
+                        </a>
+                    @endforeach
+                    <div class="my-3 h-px bg-slate-200"></div>
                     @foreach ($tocSetup as [$href, $n, $label])
                         <a href="{{ $href }}" class="flex items-center gap-3 rounded-lg px-2 py-1.5 text-slate-600 transition hover:bg-slate-50 hover:text-slate-900">
                             <span class="font-mono text-[11px] text-slate-400">{{ $n }}</span>
@@ -365,6 +427,36 @@
                         <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Pro tip</p>
                         <p class="mt-1 text-[14px] leading-6 text-slate-700">Always provide a <em>target keyword</em>. Without it the keyword-strategy review and topical-gap analysis are skipped, and you lose half the value of an audit.</p>
                     </div>
+
+                    <span id="audit-report-sections" class="block scroll-mt-24"></span>
+                    <h3 class="mt-8 text-lg font-semibold text-slate-900">Audit report sections explained</h3>
+                    <p class="mt-2 text-[14px] leading-7 text-slate-700">
+                        This is the exact structure used in the page audit detail screen so the "Guide to this report" icon maps one-to-one with what you are reading.
+                    </p>
+                    <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <figure class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                            <div class="flex items-center justify-between">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Visual · Page audit report layout</p>
+                                <span class="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">Screenshot slot</span>
+                            </div>
+                            <p class="mt-2 text-[12px] text-slate-600">Use this slot for a full-page screenshot from `Page audit` so users can visually match each panel listed below.</p>
+                        </figure>
+                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
+                            @foreach ([
+                                ['Summary score', 'Top-level score, benchmark keyword, and market context for this run.'],
+                                ['Core Web Vitals', 'LCP, CLS, INP, and supporting speed diagnostics with thresholds.'],
+                                ['On-page checks', 'Title, meta, headings, canonical, schema, image alt, and internal links.'],
+                                ['SERP snapshot', 'Current organic competitors and readability averages for the keyword and country.'],
+                                ['Prioritized fixes', 'Action list ordered by impact and implementation effort.'],
+                                ['Re-audit + resubmit', 'Run a fresh audit after deploying and submit URL to indexing from the same flow.'],
+                            ] as [$title, $text])
+                                <div class="rounded-lg border border-slate-200 bg-white p-3">
+                                    <p class="text-[12px] font-semibold text-slate-900">{{ $title }}</p>
+                                    <p class="mt-1 text-[12px] leading-6 text-slate-700">{{ $text }}</p>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
                 </section>
 
                 {{-- ── STEP 5 ─────────────────────────────────── --}}
@@ -498,6 +590,27 @@
                         <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Tip</p>
                         <p class="mt-1 text-[14px] leading-6 text-slate-700">Most teams ship 1–3 wins from striking-distance in the first week. If you see fewer than 5 candidates total, your keyword set is too narrow — go back to step 3 and broaden.</p>
                     </div>
+
+                    <span id="insight-cards" class="block scroll-mt-24"></span>
+                    <h3 class="mt-8 text-lg font-semibold text-slate-900">Action insights cards (dashboard)</h3>
+                    <p class="mt-2 text-[14px] leading-7 text-slate-700">
+                        The dashboard "Action insights" row is your daily triage queue. Prioritize cards by fastest measurable impact, not by severity color alone.
+                    </p>
+                    <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <figure class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                            <div class="flex items-center justify-between">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Visual · Action insights cards</p>
+                                <span class="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">Screenshot slot</span>
+                            </div>
+                            <p class="mt-2 text-[12px] text-slate-600">Add a screenshot of the dashboard insights card row with labels visible.</p>
+                        </figure>
+                        <ul class="mt-4 space-y-2 text-[13px] leading-6 text-slate-700">
+                            <li><strong>Striking distance:</strong> execute first. Small edits can move queries from positions 5-20 into top 3.</li>
+                            <li><strong>Cannibalization:</strong> merge overlapping pages or set canonical to consolidate signals.</li>
+                            <li><strong>Indexing issues:</strong> validate canonical and noindex rules, then resubmit.</li>
+                            <li><strong>Audit vs traffic:</strong> fix technical blockers on pages already receiving demand.</li>
+                        </ul>
+                    </div>
                 </section>
 
                 {{-- ── STEP 7 ─────────────────────────────────── --}}
@@ -568,6 +681,38 @@
                         <li class="rounded-xl border border-slate-200 bg-white px-4 py-3"><strong>Z-score</strong> — the deviation is at least 2 standard deviations from the baseline.</li>
                         <li class="rounded-xl border border-slate-200 bg-white px-4 py-3"><strong>24-hour deduplication</strong> — one alert per metric per anomaly, never a flood.</li>
                     </ul>
+
+                    <span id="insights-panel" class="block scroll-mt-24"></span>
+                    <h3 class="mt-8 text-lg font-semibold text-slate-900">Reports insights panel (action list view)</h3>
+                    <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <figure class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                            <div class="flex items-center justify-between">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Visual · Reports insights tab</p>
+                                <span class="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">Screenshot slot</span>
+                            </div>
+                            <p class="mt-2 text-[12px] text-slate-600">Capture the `Reports` page with the `Insights` tab selected and at least one actionable row.</p>
+                        </figure>
+                        <p class="mt-4 text-[13px] leading-6 text-slate-700">
+                            Use this panel for prioritization meetings. It is designed for "what to ship this week" and should map directly to tickets or sprint tasks.
+                        </p>
+                    </div>
+
+                    <span id="growth-reports" class="block scroll-mt-24"></span>
+                    <h3 class="mt-8 text-lg font-semibold text-slate-900">Custom growth reports (email tab)</h3>
+                    <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                        <figure class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
+                            <div class="flex items-center justify-between">
+                                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Visual · Custom report builder</p>
+                                <span class="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">Screenshot slot</span>
+                            </div>
+                            <p class="mt-2 text-[12px] text-slate-600">Capture the `Custom report` tab showing recipient list, schedule, and content blocks.</p>
+                        </figure>
+                        <ol class="mt-4 space-y-2 text-[13px] leading-6 text-slate-700">
+                            <li><span class="font-mono text-slate-400">1.</span> Select audience and cadence based on decision-making frequency.</li>
+                            <li><span class="font-mono text-slate-400">2.</span> Include only sections teams act on; remove noisy vanity blocks.</li>
+                            <li><span class="font-mono text-slate-400">3.</span> Align schedule timezone with stakeholder working hours.</li>
+                        </ol>
+                    </div>
                 </section>
 
                 {{-- ── STEP 8 ─────────────────────────────────── --}}

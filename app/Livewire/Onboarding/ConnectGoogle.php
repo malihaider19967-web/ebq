@@ -62,10 +62,32 @@ class ConnectGoogle extends Component
             'gscSiteUrl' => ['required', 'string', 'max:255'],
         ]);
 
-        $website = Website::updateOrCreate(
-            ['user_id' => Auth::id(), 'domain' => $this->domain],
-            ['ga_property_id' => $this->gaPropertyId, 'gsc_site_url' => $this->gscSiteUrl]
-        );
+        // Pay-first flow may have already created a placeholder Website
+        // (domain='') with the Stripe subscription attached. We must
+        // UPDATE that row — not create a new one — otherwise the
+        // subscription gets orphaned on a row the user can't see.
+        // updateOrCreate keyed on `domain` would have created a second
+        // row in that case.
+        $userId = Auth::id();
+        $existing = Website::query()
+            ->where('user_id', $userId)
+            ->orderByRaw("CASE WHEN domain = '' THEN 0 ELSE 1 END") // placeholder first
+            ->first();
+
+        if ($existing) {
+            $existing->fill([
+                'domain' => $this->domain,
+                'ga_property_id' => $this->gaPropertyId,
+                'gsc_site_url' => $this->gscSiteUrl,
+            ])->save();
+        } else {
+            Website::create([
+                'user_id' => $userId,
+                'domain' => $this->domain,
+                'ga_property_id' => $this->gaPropertyId,
+                'gsc_site_url' => $this->gscSiteUrl,
+            ]);
+        }
 
         $this->redirectRoute('dashboard');
     }

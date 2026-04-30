@@ -118,6 +118,14 @@ class BillingController extends Controller
             return redirect()->away($returnTo.(str_contains($returnTo, '?') ? '&' : '?').'ebq_billing=success');
         }
 
+        // Pay-first flow: when the user paid before doing onboarding, the
+        // Website is still a placeholder with no domain. Send them into
+        // onboarding so they can hook up their site — onboarding updates
+        // this same row, so the subscription stays attached.
+        if (trim((string) $website->domain) === '') {
+            return redirect()->route('onboarding')->with('status', 'Subscription active — let\'s connect your site.');
+        }
+
         return view('billing.success', [
             'website' => $website,
         ]);
@@ -134,6 +142,17 @@ class BillingController extends Controller
         if ($returnTo) {
             return redirect()->away($returnTo.(str_contains($returnTo, '?') ? '&' : '?').'ebq_billing=cancelled');
         }
+
+        // Pay-first flow: a freshly-registered user backed out of Stripe
+        // Checkout. Their placeholder Website has no domain yet, so don't
+        // dump them on a generic "cancelled" page — bring them into
+        // onboarding so they can still use the free tier without going
+        // through register again.
+        $user = $request->user();
+        if ($user && ! $user->hasAccessibleWebsites()) {
+            return redirect()->route('onboarding')->with('status', 'No subscription started — you can still use the free tier or upgrade later from Billing.');
+        }
+
         return view('billing.cancel');
     }
 
@@ -158,6 +177,11 @@ class BillingController extends Controller
      * Priority:
      *   1. `?website_id=N` passed by the WP plugin wizard (must belong to user).
      *   2. The user's first owned website.
+     *   3. None — auto-create a placeholder so the pay-first flow (where
+     *      a freshly-registered user comes here before onboarding) has
+     *      something to attach a Stripe subscription to. The placeholder
+     *      has `domain=''`; onboarding fills the domain in afterwards by
+     *      updating the same row, keeping the subscription linked.
      */
     private function resolveBillableWebsite(Request $request): ?Website
     {
@@ -174,7 +198,16 @@ class BillingController extends Controller
                 ->first();
         }
 
-        return Website::query()->where('user_id', $user->id)->first();
+        $existing = Website::query()->where('user_id', $user->id)->first();
+        if ($existing) {
+            return $existing;
+        }
+
+        return Website::create([
+            'user_id' => $user->id,
+            'domain' => '',
+            'tier' => Website::TIER_FREE,
+        ]);
     }
 
     /**

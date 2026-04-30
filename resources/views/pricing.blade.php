@@ -1,5 +1,15 @@
 @php
     $free          = (bool) config('app.free');
+    // CTAs land logged-out users on /register?plan=X (where store()
+    // bounces them to /billing/checkout right after auth) and existing
+    // logged-in users straight onto /billing/checkout?plan=X. Either way
+    // payment happens before onboarding.
+    $authed        = auth()->check();
+    $ctaForPlan    = function (string $slug) use ($authed) {
+        return $authed
+            ? route('billing.checkout', ['plan' => $slug])
+            : route('register', ['plan' => $slug]);
+    };
     $registerUrl   = route('register');
     $featuresUrl   = route('features');
     $contactUrl    = route('contact');
@@ -54,7 +64,7 @@
             ],
             'excluded'  => [],
             'cta_label' => 'Start 1-month trial',
-            'cta_url'   => $registerUrl . '?plan=starter',
+            'cta_url'   => $ctaForPlan('starter'),
             'cta_style' => 'ghost',
             'highlight' => false,
         ],
@@ -76,7 +86,7 @@
             ],
             'excluded'  => [],
             'cta_label' => 'Start 1-month trial',
-            'cta_url'   => $registerUrl . '?plan=pro',
+            'cta_url'   => $ctaForPlan('pro'),
             'cta_style' => 'primary',
             'highlight' => true,
         ],
