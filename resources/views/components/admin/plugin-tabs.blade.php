@@ -32,12 +32,11 @@
             'label' => 'Billing',
             'desc'  => 'Subscriptions, trials, Stripe state',
         ],
-        [
-            'key'   => 'plans',
-            'route' => 'admin.plans.index',
-            'label' => 'Plans',
-            'desc'  => 'Pricing, Stripe price IDs, features',
-        ],
+        // Plans are deliberately NOT here — they're a global SaaS-wide
+        // concern (marketing /pricing, plugin wizard, Stripe checkout,
+        // any future product surface). Lives at the top-level admin
+        // sidebar entry "Plans" instead. Don't add it back without
+        // taking it out of `app.blade.php`'s `$adminItems`.
     ];
 @endphp
 

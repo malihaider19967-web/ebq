@@ -1,6 +1,4 @@
 <x-layouts.app>
-    <x-admin.plugin-tabs current="plans" />
-
     @php
         /**
          * @var \App\Models\Plan $plan
@@ -11,9 +9,15 @@
     @endphp
 
     <div class="space-y-6 max-w-3xl">
+        <div class="flex items-center gap-2 text-xs text-slate-500">
+            <a href="{{ route('admin.plans.index') }}" class="hover:underline">Plans</a>
+            <span>›</span>
+            <span>{{ $isNew ? 'New' : $plan->name }}</span>
+        </div>
+
         <div>
-            <h2 class="text-lg font-semibold">{{ $isNew ? 'New plan' : 'Edit plan: '.$plan->name }}</h2>
-            <p class="text-sm text-slate-500">
+            <h1 class="text-2xl font-bold text-slate-900">{{ $isNew ? 'New plan' : 'Edit plan: '.$plan->name }}</h1>
+            <p class="text-sm text-slate-500 mt-1">
                 @if ($isNew)
                     Add a new pricing tier. After creating it, paste the Stripe price ID you generated for this product to enable checkout.
                 @else

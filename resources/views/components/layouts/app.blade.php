@@ -49,6 +49,14 @@
                 // `match_routes` lets the active-state logic highlight the
                 // sidebar entry whenever any of the unified routes is the
                 // current page — a single nav item, three landing pages.
+                // Plans is a global SaaS concern (drives marketing
+                // /pricing, the WP plugin wizard, and Stripe checkout).
+                // Top-level entry, not folded into the WordPress Plugin
+                // master page even though the plugin consumes them.
+                //
+                // `match_routes` lets the active-state logic highlight the
+                // sidebar entry whenever any of the unified routes is the
+                // current page — a single nav item, three landing pages.
                 $adminItems = [
                     ['route' => 'admin.clients.index', 'label' => 'Clients'],
                     ['route' => 'admin.activities.index', 'label' => 'Activities'],
@@ -60,7 +68,13 @@
                             'admin.plugin-releases.',
                             'admin.plugin-adoption.',
                             'admin.website-features.',
+                            'admin.billing.',
                         ],
+                    ],
+                    [
+                        'route' => 'admin.plans.index',
+                        'label' => 'Plans',
+                        'match_routes' => ['admin.plans.'],
                     ],
                 ];
             @endphp

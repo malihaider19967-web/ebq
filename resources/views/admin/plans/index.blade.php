@@ -1,6 +1,4 @@
 <x-layouts.app>
-    <x-admin.plugin-tabs current="plans" />
-
     @php
         /**
          * @var \Illuminate\Database\Eloquent\Collection $plans
@@ -11,8 +9,8 @@
     <div class="space-y-6">
         <div class="flex items-end justify-between gap-4">
             <div>
-                <h2 class="text-lg font-semibold">Subscription plans</h2>
-                <p class="text-sm text-slate-500">
+                <h1 class="text-2xl font-bold text-slate-900">Subscription plans</h1>
+                <p class="text-sm text-slate-500 mt-1">
                     Drives the marketing /pricing page, the public
                     <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs">/api/v1/plans</code>
                     endpoint (read by the WordPress plugin's setup wizard), and the
