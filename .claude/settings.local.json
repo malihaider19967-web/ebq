@@ -127,7 +127,8 @@
       "WebFetch(domain:prnt.sc)",
       "WebFetch(domain:img.lightshot.app)",
       "Bash(grep -r \"echo\\\\s*\\\\$\" \"C:/Users/malih/Desktop/ebq/ebq-seo-wp/src\")",
-      "Bash(node scripts/make-pot.cjs)"
+      "Bash(node scripts/make-pot.cjs)",
+      "Bash(composer install *)"
     ]
   }
 }
