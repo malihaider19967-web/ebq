@@ -32,10 +32,10 @@
 
         <div class="rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3 text-sm text-amber-800">
             <strong class="font-semibold">Stripe price IDs:</strong>
-            create products + monthly prices in your Stripe dashboard, then paste each
+            EBQ only sells <em>yearly</em> subscriptions. Create products + yearly prices in your Stripe dashboard, then paste each
             <code class="rounded bg-amber-100 px-1 py-0.5 font-mono text-xs">price_…</code>
-            ID into its plan row below. Plans without a Stripe price ID will show as
-            "Coming soon" on the pricing page and can't accept checkout sessions.
+            ID into its plan row below. Plans without a yearly Stripe price ID show as
+            "Coming soon" on the pricing page and can't accept checkout sessions. The monthly price column is display-only ("$X/mo, billed yearly").
         </div>
 
         <div class="overflow-auto rounded-lg border border-slate-200 bg-white shadow-sm">
@@ -81,17 +81,17 @@
                                 {{ $plan->trial_days ? $plan->trial_days.' days' : '—' }}
                             </td>
                             <td class="px-3 py-2.5">
-                                @if ($plan->stripe_price_id_monthly)
+                                @if ($plan->stripe_price_id_yearly)
                                     <span class="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-medium text-emerald-800">
-                                        ✓ {{ \Illuminate\Support\Str::limit($plan->stripe_price_id_monthly, 18) }}
+                                        ✓ {{ \Illuminate\Support\Str::limit($plan->stripe_price_id_yearly, 18) }}
                                     </span>
-                                @elseif ($plan->price_monthly_usd === 0)
+                                @elseif ((int) $plan->price_yearly_usd === 0)
                                     <span class="inline-flex items-center rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">
                                         Free tier
                                     </span>
                                 @else
                                     <span class="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-800">
-                                        Missing
+                                        Missing yearly ID
                                     </span>
                                 @endif
                             </td>

@@ -109,23 +109,22 @@
                 </div>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Stripe price ID (monthly)</label>
-                    <input type="text" name="stripe_price_id_monthly" value="{{ old('stripe_price_id_monthly', $plan->stripe_price_id_monthly) }}"
-                           pattern="price_.*"
-                           class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
-                           placeholder="price_1AbCd…" />
-                    <p class="text-[11px] text-slate-500 mt-1">Paste from Stripe Dashboard → Products → your monthly price.</p>
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Stripe price ID (yearly, optional)</label>
-                    <input type="text" name="stripe_price_id_yearly" value="{{ old('stripe_price_id_yearly', $plan->stripe_price_id_yearly) }}"
-                           pattern="price_.*"
-                           class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
-                           placeholder="price_1AbCd…" />
-                </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Stripe price ID (yearly)</label>
+                <input type="text" name="stripe_price_id_yearly" value="{{ old('stripe_price_id_yearly', $plan->stripe_price_id_yearly) }}"
+                       pattern="price_.*"
+                       class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
+                       placeholder="price_1AbCd…" />
+                <p class="text-[11px] text-slate-500 mt-1">
+                    EBQ only sells yearly subscriptions. Paste the Stripe yearly price ID — without it, the plan card on /pricing
+                    grays out and the WordPress wizard hides the CTA. Monthly price above is display-only ("$X/mo, billed yearly").
+                </p>
             </div>
+
+            {{-- Hidden so PlanController::update() still receives the field even though we're hiding the input.
+                 The monthly Stripe price ID is now legacy: never used to mint a subscription, but kept on the
+                 row for historical Stripe Dashboard linkage. --}}
+            <input type="hidden" name="stripe_price_id_monthly" value="{{ old('stripe_price_id_monthly', $plan->stripe_price_id_monthly) }}" />
 
             <div>
                 <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Features (one per line)</label>

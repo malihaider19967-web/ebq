@@ -72,8 +72,13 @@ class BillingController extends Controller
         ]));
 
         try {
+            // EBQ only sells yearly subscriptions. The monthly price on
+            // the Plan row is for "$X/mo, billed yearly" display copy
+            // only — never used to mint a Stripe subscription. Plan::
+            // isCheckoutReady() above already verified the yearly price
+            // ID is set, so this is safe.
             return $website
-                ->newSubscription('default', $plan->stripe_price_id_monthly)
+                ->newSubscription('default', $plan->stripe_price_id_yearly)
                 ->trialDays($plan->trial_days)
                 ->checkout([
                     'success_url' => $successUrl,

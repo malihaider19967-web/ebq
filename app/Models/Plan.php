@@ -62,10 +62,14 @@ class Plan extends Model
     /**
      * True when the plan has a real Stripe price configured and can
      * support a checkout session. Free tier always returns false.
+     *
+     * EBQ only sells yearly subscriptions — the monthly price column
+     * exists purely so we can show "$X/mo, billed yearly" copy on the
+     * pricing card. Checkout is always gated on the yearly price ID.
      */
     public function isCheckoutReady(): bool
     {
-        return $this->price_monthly_usd > 0
-            && ! empty($this->stripe_price_id_monthly);
+        return $this->price_yearly_usd > 0
+            && ! empty($this->stripe_price_id_yearly);
     }
 }
