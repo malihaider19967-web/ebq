@@ -10,15 +10,18 @@
     @endphp
 
     <div class="px-4 sm:px-6 lg:px-8 py-6">
+        <x-admin.plugin-tabs current="feature-flags" />
+
         <div class="flex items-end justify-between mb-4">
             <div>
-                <h1 class="text-2xl font-semibold text-gray-900">Website feature flags</h1>
+                <h2 class="text-lg font-semibold text-gray-900">Per-website feature flags</h2>
                 <p class="mt-1 text-sm text-gray-500">
                     Toggle individual WordPress-plugin features per connected website.
                     A turned-OFF cell takes effect on the next API call from that site
                     (or up to 12 hours later when the cached transient on the WP side
                     expires). Core SEO output (sitemap, schema, meta tags, breadcrumbs)
-                    is never gated here — it's always-on.
+                    is never gated here — it's always-on. The global kill-switch panel
+                    above overrides every row here.
                 </p>
             </div>
             <form method="GET" action="{{ route('admin.website-features.index') }}"

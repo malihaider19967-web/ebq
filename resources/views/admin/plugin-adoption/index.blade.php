@@ -1,7 +1,9 @@
 <x-layouts.app>
+    <x-admin.plugin-tabs current="adoption" />
+
     <div class="space-y-6">
         <div>
-            <h1 class="text-2xl font-bold">Plugin Adoption</h1>
+            <h2 class="text-lg font-semibold">Plugin Adoption</h2>
             <p class="text-sm text-slate-500">Track plugin connections and installed versions per client website.</p>
         </div>
 

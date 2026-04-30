@@ -1,7 +1,9 @@
 <x-layouts.app>
+    <x-admin.plugin-tabs current="releases" />
+
     <div class="space-y-6">
         <div>
-            <h1 class="text-2xl font-bold">Plugin Releases</h1>
+            <h2 class="text-lg font-semibold">Plugin Releases</h2>
             <p class="text-sm text-slate-500">
                 Set the version in <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs dark:bg-slate-800">ebq-seo-wp/ebq-seo.php</code> and run
                 <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-xs dark:bg-slate-800">php artisan ebq:package-plugin</code> automatically when you publish or when a scheduled release goes live.
