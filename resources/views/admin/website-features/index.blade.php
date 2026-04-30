@@ -5,6 +5,7 @@
          * @var string $q
          * @var array<int, string> $feature_keys
          * @var array<string, string> $feature_labels
+         * @var array<string, bool>  $global_flags
          */
     @endphp
 
@@ -37,6 +38,50 @@
                 {{ session('status') }}
             </div>
         @endif
+
+        {{-- Global master kill-switch panel. Overrides every per-website
+             flag below — toggling a feature OFF here disables it across
+             every install (connected AND unconnected). Visually distinct
+             so admins understand the blast radius. --}}
+        <form method="POST" action="{{ route('admin.website-features.global-update') }}"
+              class="mb-6 rounded-lg border border-violet-200 bg-violet-50/60 shadow-sm">
+            @csrf
+            @method('PUT')
+            <div class="px-4 py-3 border-b border-violet-200 flex items-center justify-between">
+                <div>
+                    <h2 class="text-sm font-semibold text-violet-900">⚠️ Global feature kill-switch</h2>
+                    <p class="text-xs text-violet-700 mt-0.5">
+                        Master toggles that override every per-website flag below. Reaches connected sites
+                        within seconds (next API call) and unconnected sites within ~6 hours (next plugin
+                        update check). Turning a feature OFF here hides it from every installation, even ones
+                        that have it enabled in their per-site row.
+                    </p>
+                </div>
+                <button type="submit"
+                        class="text-xs font-medium px-3 py-1.5 rounded-md bg-violet-700 text-white hover:bg-violet-600 whitespace-nowrap">
+                    Save global flags
+                </button>
+            </div>
+            <div class="px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                @foreach ($feature_keys as $key)
+                    <label class="flex items-start gap-2 cursor-pointer">
+                        <input type="checkbox"
+                               name="global_features[{{ $key }}]"
+                               value="1"
+                               @checked($global_flags[$key] ?? true)
+                               class="mt-0.5 h-4 w-4 rounded border-violet-300 text-violet-600 focus:ring-violet-500">
+                        <div>
+                            <div class="text-xs font-medium text-violet-900">
+                                {{ $feature_labels[$key] ?? $key }}
+                            </div>
+                            <div class="text-[10px] uppercase tracking-wide text-violet-600/70 mt-0.5">
+                                {{ $key }}
+                            </div>
+                        </div>
+                    </label>
+                @endforeach
+            </div>
+        </form>
 
         <div class="overflow-x-auto bg-white shadow ring-1 ring-gray-200 sm:rounded-lg">
             <table class="min-w-full divide-y divide-gray-200">

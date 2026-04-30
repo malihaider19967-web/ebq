@@ -96,6 +96,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // never de-index a customer's site.
     Route::get('/website-features', [AdminWebsiteFeatureController::class, 'index'])
         ->name('website-features.index');
+    // Global master kill-switch — overrides per-site flags. Lives at a
+    // distinct path so the route model binding for `{website}` below
+    // doesn't claim the literal "global" segment.
+    Route::put('/website-features/global', [AdminWebsiteFeatureController::class, 'globalUpdate'])
+        ->name('website-features.global-update');
     Route::put('/website-features/{website}', [AdminWebsiteFeatureController::class, 'update'])
         ->name('website-features.update');
 });

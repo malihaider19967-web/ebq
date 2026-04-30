@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Website;
 use App\Services\PluginReleaseResolver;
 use Illuminate\Http\JsonResponse;
 
@@ -46,6 +47,14 @@ class WordPressPluginVersionController extends Controller
             'homepage' => url('/features').'#wordpress',
             'changelog_url' => url('/features').'#wordpress',
             'release_notes' => $release?->release_notes,
+            // Master per-feature kill-switch broadcast to every install
+            // — connected and unconnected. The plugin's EBQ_Updater
+            // captures this map every ~6 h via its existing transient
+            // and stores it in `ebq_global_feature_flags`. The plugin's
+            // is_enabled() AND's this against per-site flags so a
+            // global FALSE always wins. Anonymous: no install identifier
+            // is captured server-side from this endpoint.
+            'global_features' => Website::globalFeatureFlags(),
         ])->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
     }
 

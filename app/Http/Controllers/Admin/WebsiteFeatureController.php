@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\Setting;
 use App\Models\Website;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -43,7 +44,30 @@ class WebsiteFeatureController extends Controller
             'q'             => $q,
             'feature_keys'  => Website::FEATURE_KEYS,
             'feature_labels' => self::featureLabels(),
+            'global_flags'  => Website::globalFeatureFlags(),
         ]);
+    }
+
+    /**
+     * Update the master global kill-switch map. Stored in the `settings`
+     * table under key `global_feature_flags`. Read by both the per-site
+     * `effectiveFeatureFlags()` AND'ing logic (which rejects a per-site
+     * `true` when global says false) and the public version-check
+     * endpoint that broadcasts to unconnected installs.
+     */
+    public function globalUpdate(Request $request): RedirectResponse
+    {
+        $posted = (array) $request->input('global_features', []);
+        $clean = [];
+        foreach (Website::FEATURE_KEYS as $key) {
+            $clean[$key] = array_key_exists($key, $posted);
+        }
+
+        Setting::set('global_feature_flags', $clean);
+
+        return redirect()
+            ->route('admin.website-features.index')
+            ->with('status', 'Global feature flags saved. Connected sites pick up the change on the next API call (~seconds). Unconnected sites pick it up on the next plugin update check (~6 h).');
     }
 
     /**

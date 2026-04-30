@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\Setting;
 
 class Website extends Model
 {
@@ -89,18 +90,57 @@ class Website extends Model
     ];
 
     /**
-     * Resolve the effective feature-flag map for this website. Starts
-     * from `FEATURE_DEFAULTS`; explicit values in the stored JSON
-     * override the default per key. Unknown keys in storage are
-     * ignored — keeps the WP plugin's KNOWN_FEATURES whitelist as the
-     * source of truth.
+     * Resolve the effective feature-flag map for this website.
+     *
+     * Composition (kill-switch precedence):
+     *   defaults → per-site overrides → AND'd against global flags
+     *
+     * If a feature is globally disabled (e.g., emergency kill-switch
+     * flipped in `/admin/website-features` global panel), it's hidden
+     * regardless of per-site state. A per-site `true` cannot override
+     * a global `false`. A per-site `false` always wins (admin can
+     * disable features per customer even when global allows them).
      *
      * @return array<string, bool>
      */
     public function effectiveFeatureFlags(): array
     {
-        $defaults = self::FEATURE_DEFAULTS;
+        $effective = self::FEATURE_DEFAULTS;
         $stored = $this->feature_flags;
+        if (is_array($stored)) {
+            foreach ($stored as $key => $value) {
+                if (array_key_exists($key, $effective)) {
+                    $effective[$key] = (bool) $value;
+                }
+            }
+        }
+        // AND with global kill-switch — global FALSE always wins.
+        $global = self::globalFeatureFlags();
+        foreach ($effective as $key => $value) {
+            if (($global[$key] ?? true) === false) {
+                $effective[$key] = false;
+            }
+        }
+        return $effective;
+    }
+
+    /**
+     * Global per-feature kill-switch map, the same shape as
+     * FEATURE_DEFAULTS. Persisted in the `settings` table under the
+     * `global_feature_flags` key; cached forever in Laravel's cache,
+     * invalidated on admin save. Returns FEATURE_DEFAULTS when no
+     * row exists yet (fresh database, pre-seeding).
+     *
+     * Used by both `effectiveFeatureFlags()` (per-site AND'ing) and
+     * `WordPressPluginVersionController` (broadcast to unconnected
+     * installs via the public version-check endpoint).
+     *
+     * @return array<string, bool>
+     */
+    public static function globalFeatureFlags(): array
+    {
+        $stored = Setting::get('global_feature_flags', null);
+        $defaults = self::FEATURE_DEFAULTS;
         if (! is_array($stored)) {
             return $defaults;
         }
