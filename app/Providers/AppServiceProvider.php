@@ -14,6 +14,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use Laravel\Cashier\Cashier;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -25,6 +26,13 @@ class AppServiceProvider extends ServiceProvider
         require_once base_path('app/Support/helpers.php');
 
         $this->app->singleton(\App\Services\LanguageDetectorService::class);
+
+        // Cashier 16+ does NOT auto-load its own migrations — they're
+        // only made available via `vendor:publish --tag=cashier-migrations`.
+        // We've manually copied the subscription / subscription-item /
+        // meter migrations we need into `database/migrations/` (skipping
+        // the customer_columns one because we have our own version on
+        // `websites`). So no migration-skipping API call is needed here.
 
         // LLM client — bind the interface to Mistral by default. Per-task
         // services that want a different provider for a specific endpoint
@@ -52,5 +60,12 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('oauth', function (Request $request) {
             return Limit::perMinute(20)->by($request->user()?->id ?: $request->ip());
         });
+
+        // Bind Cashier to Website as the billable model. Tier is per-
+        // website (not per-user) so a single user with multiple sites
+        // can run distinct subscriptions per site. Cashier's
+        // `subscriptions.user_id` column then references `websites.id`
+        // — the column name is a Cashier legacy and stays as-is.
+        Cashier::useCustomerModel(Website::class);
     }
 }
