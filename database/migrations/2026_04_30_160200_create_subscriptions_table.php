@@ -13,7 +13,12 @@ return new class extends Migration
     {
         Schema::create('subscriptions', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('user_id');
+            // Cashier's published default is `user_id`. We bill Website,
+            // so the FK is `website_id` — Cashier's Billable trait derives
+            // the FK from the model class name. The follow-on rename
+            // migration handles installs that already ran the original
+            // unmodified Cashier migration.
+            $table->foreignId('website_id');
             $table->string('type');
             $table->string('stripe_id')->unique();
             $table->string('stripe_status');
@@ -23,7 +28,7 @@ return new class extends Migration
             $table->timestamp('ends_at')->nullable();
             $table->timestamps();
 
-            $table->index(['user_id', 'stripe_status']);
+            $table->index(['website_id', 'stripe_status']);
         });
     }
 
