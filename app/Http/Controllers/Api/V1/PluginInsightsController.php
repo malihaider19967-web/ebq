@@ -903,6 +903,37 @@ class PluginInsightsController extends Controller
     }
 
     /**
+     * Per-website feature-flag map for the WordPress plugin. The plugin
+     * caches this result for 12 hours and gates each value-add feature
+     * (Rank Assist, AI Writer, AI inline toolbar, live audit, EBQ HQ,
+     * redirects, dashboard widget, posts-list column) by reading from
+     * the cached map. Absence of a key reads as TRUE on the plugin side
+     * (default-ON safety) — so we only need to return explicit FALSE
+     * values when an admin has actively disabled something.
+     *
+     * Today this returns a static all-true map (no admin UI to toggle
+     * yet). Once the EBQ admin grid lands, swap the body for a read of
+     * the website's `feature_flags` column / related table.
+     *
+     *   GET /api/v1/website-features
+     */
+    public function websiteFeatures(Request $request): JsonResponse
+    {
+        $website = $this->resolveWebsite($request);
+
+        // `effectiveFeatureFlags()` merges the canonical defaults
+        // (everything true) with the website's stored `feature_flags`
+        // JSON column — admins toggle individual features OFF in the
+        // /admin/website-features grid; everything else stays default-ON.
+        return response()->json([
+            'ok' => true,
+            'features' => $website->effectiveFeatureFlags(),
+            'cached_until' => Carbon::now()->addHours(12)->toIso8601String(),
+            'tier' => $website->tier,
+        ]);
+    }
+
+    /**
      * SEO-helper chatbot — multi-turn conversation grounded in the post
      * being edited inside WordPress. Pro-tier gated to match other AI
      * features (ai-block, rewrite-snippet).

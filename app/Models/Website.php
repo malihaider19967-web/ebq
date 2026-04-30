@@ -36,6 +36,7 @@ class Website extends Model
         'user_id',
         'domain',
         'tier',
+        'feature_flags',
         'ga_property_id',
         'gsc_site_url',
         'gsc_keyword_lookback_days',
@@ -45,6 +46,47 @@ class Website extends Model
         'last_traffic_drop_alert_at',
         'last_rank_drop_alert_at',
     ];
+
+    /**
+     * Canonical list of toggleable features kept in sync with the
+     * WordPress plugin's `EBQ_Feature_Flags::KNOWN_FEATURES`. The admin
+     * UI iterates this list to render the toggle grid; the API endpoint
+     * merges stored overrides on top of these defaults.
+     */
+    public const FEATURE_KEYS = [
+        'chatbot',
+        'ai_writer',
+        'ai_inline',
+        'live_audit',
+        'hq',
+        'redirects',
+        'dashboard_widget',
+        'post_column',
+    ];
+
+    /**
+     * Resolve the effective feature-flag map for this website. Defaults
+     * are all-true so a fresh website with no overrides gets every
+     * value-add feature; explicit `false` in the stored JSON overrides
+     * the default. Unknown keys in the stored JSON are ignored — keeps
+     * the WP plugin's KNOWN_FEATURES whitelist as the source of truth.
+     *
+     * @return array<string, bool>
+     */
+    public function effectiveFeatureFlags(): array
+    {
+        $defaults = array_fill_keys(self::FEATURE_KEYS, true);
+        $stored = $this->feature_flags;
+        if (! is_array($stored)) {
+            return $defaults;
+        }
+        foreach ($stored as $key => $value) {
+            if (array_key_exists($key, $defaults)) {
+                $defaults[$key] = (bool) $value;
+            }
+        }
+        return $defaults;
+    }
 
     /**
      * True when this website's tier unlocks paid AI features (snippet
@@ -61,6 +103,7 @@ class Website extends Model
     {
         return [
             'report_recipients' => 'array',
+            'feature_flags' => 'array',
             'gsc_keyword_lookback_days' => 'integer',
             'last_analytics_sync_at' => 'datetime',
             'last_search_console_sync_at' => 'datetime',

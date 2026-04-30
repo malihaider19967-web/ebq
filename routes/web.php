@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\ClientImpersonationController;
 use App\Http\Controllers\Admin\PluginAdoptionController as AdminPluginAdoptionController;
 use App\Http\Controllers\Admin\PluginReleaseController as AdminPluginReleaseController;
 use App\Http\Controllers\Admin\UsageController as AdminUsageController;
+use App\Http\Controllers\Admin\WebsiteFeatureController as AdminWebsiteFeatureController;
 use App\Http\Controllers\WordPressConnectController;
 use App\Http\Controllers\WordPressPluginDownloadController;
 use App\Http\Controllers\WordPressPluginVersionController;
@@ -88,6 +89,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/plugin-releases/{pluginRelease}/rollback', [AdminPluginReleaseController::class, 'rollback'])->name('plugin-releases.rollback');
     Route::delete('/plugin-releases/{pluginRelease}', [AdminPluginReleaseController::class, 'destroy'])->name('plugin-releases.destroy');
     Route::get('/plugin-adoption', [AdminPluginAdoptionController::class, 'index'])->name('plugin-adoption.index');
+
+    // Per-website WordPress-plugin feature toggles. Admin enables/disables
+    // value-add features (chatbot, AI writer, etc.) on a per-site basis.
+    // Core SEO output is never gated server-side, so disabling here can
+    // never de-index a customer's site.
+    Route::get('/website-features', [AdminWebsiteFeatureController::class, 'index'])
+        ->name('website-features.index');
+    Route::put('/website-features/{website}', [AdminWebsiteFeatureController::class, 'update'])
+        ->name('website-features.update');
 });
 
 Route::middleware('auth')->post('/admin/impersonation/stop', [ClientImpersonationController::class, 'stop'])->name('admin.impersonation.stop');

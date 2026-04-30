@@ -68,6 +68,14 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/plugin/heartbeat', PluginHeartbeatController::class)
             ->name('api.v1.plugin.heartbeat');
 
+        // Per-website feature toggle map. The WordPress plugin reads this
+        // to enable/disable value-add features site-by-site (Rank Assist,
+        // AI Writer, AI inline toolbar, live audit, EBQ HQ, redirects,
+        // dashboard widget, posts-list column). Core SEO output is never
+        // gated server-side. Default-ON when a website has no overrides.
+        Route::get('/website-features', [PluginInsightsController::class, 'websiteFeatures'])
+            ->name('api.v1.website-features');
+
         // EBQ HQ — top-level WP-admin analytics dashboards.
         Route::prefix('hq')->name('api.v1.hq.')->group(function (): void {
             Route::get('/overview', [PluginHqController::class, 'overview'])->name('overview');
