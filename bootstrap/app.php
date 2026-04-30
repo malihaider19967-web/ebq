@@ -27,6 +27,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'onboarded' => \App\Http\Middleware\EnsureOnboarded::class,
             'feature' => \App\Http\Middleware\EnsureFeatureAccess::class,
             'website.api' => \App\Http\Middleware\WebsiteApiAuth::class,
+            'website.features' => \App\Http\Middleware\InjectFeatureFlags::class,
             'admin' => \App\Http\Middleware\EnsureAdmin::class,
         ]);
     })

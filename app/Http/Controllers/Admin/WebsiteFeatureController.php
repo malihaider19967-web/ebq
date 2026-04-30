@@ -49,13 +49,18 @@ class WebsiteFeatureController extends Controller
     /**
      * Update the feature-flag map on a single website. Posts as a form
      * with `feature_flags[<key>] = "1"` (checkbox checked). Unchecked
-     * boxes don't submit, so absence of a key in $_POST means OFF.
+     * boxes don't submit so absence of a key in $_POST means OFF.
      *
-     * Stored shape: `{ <key>: bool, ... }`. Only keys in FEATURE_KEYS
-     * land in the column — keeps JSON predictable. Storing TRUE is
-     * implicit (same as default), so we save space by only persisting
-     * explicit FALSE values. The WP plugin's `effectiveFeatureFlags()`
-     * + `store()` both treat absent keys as enabled.
+     * Stored shape: `{ <key>: bool, ... }` — the FULL 8-key map. We
+     * store both TRUE and FALSE explicitly because per-key defaults
+     * differ (chatbot/ai_writer default-off, others default-on); if we
+     * stored only FALSE values, toggling chatbot ON in the grid would
+     * leave the column empty and `effectiveFeatureFlags` would resolve
+     * back to the default-OFF — i.e., the user's "ON" intent would
+     * silently vanish on the next save.
+     *
+     * Only keys in FEATURE_KEYS land in the column — junk POSTed
+     * keys can't poison the JSON.
      */
     public function update(Request $request, Website $website): RedirectResponse
     {
@@ -63,15 +68,13 @@ class WebsiteFeatureController extends Controller
         $clean = [];
         foreach (Website::FEATURE_KEYS as $key) {
             // Checkbox unchecked → the key is missing from $posted →
-            // the feature is OFF for this website. Checked → present
-            // → ON; we don't store the explicit TRUE since absence
-            // already means default-ON downstream.
-            if (! array_key_exists($key, $posted)) {
-                $clean[$key] = false;
-            }
+            // store FALSE explicitly. Checkbox checked → key present
+            // → store TRUE explicitly. The full 8-key map is stored so
+            // intent always round-trips, regardless of per-key default.
+            $clean[$key] = array_key_exists($key, $posted);
         }
 
-        $website->feature_flags = empty($clean) ? null : $clean;
+        $website->feature_flags = $clean;
         $website->save();
 
         return redirect()

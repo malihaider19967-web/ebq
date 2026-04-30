@@ -65,17 +65,41 @@ class Website extends Model
     ];
 
     /**
-     * Resolve the effective feature-flag map for this website. Defaults
-     * are all-true so a fresh website with no overrides gets every
-     * value-add feature; explicit `false` in the stored JSON overrides
-     * the default. Unknown keys in the stored JSON are ignored — keeps
-     * the WP plugin's KNOWN_FEATURES whitelist as the source of truth.
+     * Per-feature defaults applied when a website hasn't customised the
+     * flag explicitly. Heavy AI surfaces (the floating chatbot + the
+     * full-post AI Writer) default OFF so customers explicitly enable
+     * them via the admin grid; everything else defaults ON because they
+     * are core editor enhancements with low risk.
+     *
+     * Keep this in sync with the marketing default tier presentation —
+     * if a customer signs up and the plugin shows nothing they expected,
+     * the bug is here.
+     *
+     * @var array<string, bool>
+     */
+    public const FEATURE_DEFAULTS = [
+        'chatbot'          => false,
+        'ai_writer'        => false,
+        'ai_inline'        => true,
+        'live_audit'       => true,
+        'hq'               => true,
+        'redirects'        => true,
+        'dashboard_widget' => true,
+        'post_column'      => true,
+    ];
+
+    /**
+     * Resolve the effective feature-flag map for this website. Starts
+     * from `FEATURE_DEFAULTS`; explicit values in the stored JSON
+     * override the default per key. Unknown keys in storage are
+     * ignored — keeps the WP plugin's KNOWN_FEATURES whitelist as the
+     * source of truth.
      *
      * @return array<string, bool>
      */
     public function effectiveFeatureFlags(): array
     {
-        $defaults = array_fill_keys(self::FEATURE_KEYS, true);
+        $defaults = self::FEATURE_DEFAULTS;
         $stored = $this->feature_flags;
         if (! is_array($stored)) {
             return $defaults;

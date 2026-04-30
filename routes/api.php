@@ -7,7 +7,11 @@ use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
     // Plugin-facing endpoints — bearer token issued by the /wordpress/connect flow.
-    Route::middleware(['website.api:read:insights', 'throttle:60,1'])->group(function (): void {
+    // `website.features` runs after the controller and stamps the resolved
+    // feature-flag map onto every JSON response, so the WP plugin's passive
+    // sync (`EBQ_Feature_Flags::store` from `handle_response`) refreshes its
+    // local cache on every API call.
+    Route::middleware(['website.api:read:insights', 'website.features', 'throttle:60,1'])->group(function (): void {
         Route::get('/posts/{externalPostId}/insights', [PluginInsightsController::class, 'showPost'])
             ->where('externalPostId', '[A-Za-z0-9_\-\.]+')
             ->name('api.v1.posts.show');
