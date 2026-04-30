@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
 use Illuminate\View\View;
+use Laravel\Cashier\Checkout;
 use Laravel\Cashier\Exceptions\IncompletePayment;
 
 /**
@@ -38,7 +39,7 @@ class BillingController extends Controller
      * redirect. Trial days are read from the Plan row so the marketing
      * page, the WP plugin, and the actual Stripe trial all stay in sync.
      */
-    public function checkout(Request $request): RedirectResponse|Response
+    public function checkout(Request $request): RedirectResponse|Response|Checkout
     {
         $request->validate([
             'plan' => 'required|string|max:32',
