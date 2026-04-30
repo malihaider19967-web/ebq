@@ -32,6 +32,12 @@
             'label' => 'Billing',
             'desc'  => 'Subscriptions, trials, Stripe state',
         ],
+        [
+            'key'   => 'plans',
+            'route' => 'admin.plans.index',
+            'label' => 'Plans',
+            'desc'  => 'Pricing, Stripe price IDs, features',
+        ],
     ];
 @endphp
 

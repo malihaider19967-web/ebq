@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\PluginReleaseController as AdminPluginReleaseCont
 use App\Http\Controllers\Admin\UsageController as AdminUsageController;
 use App\Http\Controllers\Admin\WebsiteFeatureController as AdminWebsiteFeatureController;
 use App\Http\Controllers\Admin\BillingController as AdminBillingController;
+use App\Http\Controllers\Admin\PlanController as AdminPlanController;
 use App\Http\Controllers\WordPressConnectController;
 use App\Http\Controllers\WordPressPluginDownloadController;
 use App\Http\Controllers\WordPressPluginVersionController;
@@ -135,6 +136,16 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Per-website subscription overview — sits as a tab on the
     // WordPress Plugin master page. Read-only in v1.
     Route::get('/billing', [AdminBillingController::class, 'index'])->name('billing.index');
+
+    // Plan management — drives the marketing /pricing page, the public
+    // /api/v1/plans endpoint, and the Stripe checkout flow. Editable
+    // per-row: name, pricing, Stripe price IDs, trial days, features,
+    // active/highlighted state.
+    Route::get('/plans', [AdminPlanController::class, 'index'])->name('plans.index');
+    Route::get('/plans/create', [AdminPlanController::class, 'create'])->name('plans.create');
+    Route::post('/plans', [AdminPlanController::class, 'store'])->name('plans.store');
+    Route::get('/plans/{plan}/edit', [AdminPlanController::class, 'edit'])->name('plans.edit');
+    Route::put('/plans/{plan}', [AdminPlanController::class, 'update'])->name('plans.update');
 });
 
 Route::middleware('auth')->post('/admin/impersonation/stop', [ClientImpersonationController::class, 'stop'])->name('admin.impersonation.stop');
