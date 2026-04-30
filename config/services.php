@@ -18,6 +18,24 @@ return [
         'key' => env('POSTMARK_API_KEY'),
     ],
 
+    /*
+     * Stripe — billing infrastructure for Cashier.
+     *
+     * Cashier itself reads these via `cashier.php` config (published from
+     * `php artisan vendor:publish --tag="cashier-config"`). We mirror them
+     * here for direct access from controllers and to keep the dotenv
+     * surface consolidated. Webhook signing secret is mandatory for
+     * production webhook verification.
+     */
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        'webhook' => [
+            'secret' => env('STRIPE_WEBHOOK_SECRET'),
+            'tolerance' => env('STRIPE_WEBHOOK_TOLERANCE', 300),
+        ],
+    ],
+
     'resend' => [
         'key' => env('RESEND_API_KEY'),
     ],

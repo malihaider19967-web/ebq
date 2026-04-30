@@ -26,6 +26,12 @@
             'label' => 'Feature flags',
             'desc'  => 'Per-website + global kill-switch',
         ],
+        [
+            'key'   => 'billing',
+            'route' => 'admin.billing.index',
+            'label' => 'Billing',
+            'desc'  => 'Subscriptions, trials, Stripe state',
+        ],
     ];
 @endphp
 

@@ -12,12 +12,18 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
+use Laravel\Cashier\Billable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\Setting;
 
 class Website extends Model
 {
-    use HasApiTokens, HasFactory;
+    // Billable mixes in Cashier's Stripe helpers (newSubscription, subscribed,
+    // onTrial, subscription, etc.). Tier is per-website so the model is the
+    // billable target — a single user with multiple sites can run distinct
+    // subscriptions per site. Cashier reads from the stripe_id, pm_type,
+    // pm_last_four, trial_ends_at columns added by the migration.
+    use Billable, HasApiTokens, HasFactory;
 
     protected static function booted(): void
     {
@@ -38,6 +44,10 @@ class Website extends Model
         'domain',
         'tier',
         'feature_flags',
+        'stripe_id',
+        'pm_type',
+        'pm_last_four',
+        'trial_ends_at',
         'ga_property_id',
         'gsc_site_url',
         'gsc_keyword_lookback_days',
@@ -173,6 +183,7 @@ class Website extends Model
             'last_search_console_sync_at' => 'datetime',
             'last_traffic_drop_alert_at' => 'datetime',
             'last_rank_drop_alert_at' => 'datetime',
+            'trial_ends_at' => 'datetime',
         ];
     }
 

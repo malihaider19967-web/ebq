@@ -19,8 +19,12 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         // Google Cross-Account Protection (CAP/RISC) posts security events
         // server-to-server and cannot provide a browser CSRF token.
+        // Stripe webhooks are signed via STRIPE_WEBHOOK_SECRET — Cashier's
+        // controller verifies the signature, so CSRF protection is both
+        // unnecessary and impossible (Stripe doesn't carry a CSRF cookie).
         $middleware->validateCsrfTokens(except: [
             'auth/google/cap/events',
+            'stripe/webhook',
         ]);
 
         $middleware->alias([

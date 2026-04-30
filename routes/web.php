@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\PluginAdoptionController as AdminPluginAdoptionCo
 use App\Http\Controllers\Admin\PluginReleaseController as AdminPluginReleaseController;
 use App\Http\Controllers\Admin\UsageController as AdminUsageController;
 use App\Http\Controllers\Admin\WebsiteFeatureController as AdminWebsiteFeatureController;
+use App\Http\Controllers\Admin\BillingController as AdminBillingController;
 use App\Http\Controllers\WordPressConnectController;
 use App\Http\Controllers\WordPressPluginDownloadController;
 use App\Http\Controllers\WordPressPluginVersionController;
@@ -27,6 +28,33 @@ Route::view('/guide', 'guide')->name('guide');
 // Always-fresh download of the latest packaged WP plugin — bypasses public/ caching.
 Route::get('/wordpress/plugin.zip', WordPressPluginDownloadController::class)->name('wordpress.plugin.download');
 Route::get('/wordpress/plugin/version', WordPressPluginVersionController::class)->name('wordpress.plugin.version');
+
+// Public pricing API — anonymous, drives the WordPress plugin's setup
+// wizard pricing step + any external integration that needs the plan
+// list. No identifier captured (matches /wordpress/plugin/version).
+Route::get('/api/v1/plans', [\App\Http\Controllers\Api\V1\PricingController::class, 'public'])
+    ->name('api.v1.plans');
+
+// Stripe webhook — extends Cashier's controller. CSRF-exempted in
+// bootstrap/app.php. Stripe signs the request body; the controller
+// verifies via STRIPE_WEBHOOK_SECRET so no extra auth needed.
+Route::post('/stripe/webhook', [\App\Http\Controllers\StripeWebhookController::class, 'handleWebhook'])
+    ->name('cashier.webhook');
+
+// Billing — Stripe Checkout + Customer Portal redirects. Auth required
+// because we need the user context to resolve which Website is being
+// billed. The /checkout endpoint mints a Stripe Hosted Checkout session
+// and redirects; /success and /cancel handle the post-checkout return.
+Route::middleware(['web', 'auth'])->group(function (): void {
+    Route::get('/billing/checkout', [\App\Http\Controllers\BillingController::class, 'checkout'])
+        ->name('billing.checkout');
+    Route::get('/billing/success', [\App\Http\Controllers\BillingController::class, 'success'])
+        ->name('billing.success');
+    Route::get('/billing/cancel', [\App\Http\Controllers\BillingController::class, 'cancel'])
+        ->name('billing.cancel');
+    Route::get('/billing/portal', [\App\Http\Controllers\BillingController::class, 'portal'])
+        ->name('billing.portal');
+});
 
 // OAuth-style one-click link from the WordPress plugin.
 Route::middleware(['web', 'auth'])->group(function (): void {
@@ -103,6 +131,10 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         ->name('website-features.global-update');
     Route::put('/website-features/{website}', [AdminWebsiteFeatureController::class, 'update'])
         ->name('website-features.update');
+
+    // Per-website subscription overview — sits as a tab on the
+    // WordPress Plugin master page. Read-only in v1.
+    Route::get('/billing', [AdminBillingController::class, 'index'])->name('billing.index');
 });
 
 Route::middleware('auth')->post('/admin/impersonation/stop', [ClientImpersonationController::class, 'stop'])->name('admin.impersonation.stop');
