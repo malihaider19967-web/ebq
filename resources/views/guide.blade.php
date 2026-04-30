@@ -51,7 +51,7 @@
                         @else
                             <div class="flex h-36 w-full items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-center">
                                 <div>
-                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Screenshot needed</p>
+                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Guide visual</p>
                                     <p class="mt-1 font-mono text-[10px] text-slate-400">{{ $visual['file'] }}</p>
                                 </div>
                             </div>
@@ -437,7 +437,6 @@
                         <figure class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
                             <div class="flex items-center justify-between">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Visual · Page audit report layout</p>
-                                <span class="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">Screenshot slot</span>
                             </div>
                             <p class="mt-2 text-[12px] text-slate-600">Use this slot for a full-page screenshot from `Page audit` so users can visually match each panel listed below.</p>
                         </figure>
@@ -600,7 +599,6 @@
                         <figure class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
                             <div class="flex items-center justify-between">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Visual · Action insights cards</p>
-                                <span class="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">Screenshot slot</span>
                             </div>
                             <p class="mt-2 text-[12px] text-slate-600">Add a screenshot of the dashboard insights card row with labels visible.</p>
                         </figure>
@@ -688,7 +686,6 @@
                         <figure class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
                             <div class="flex items-center justify-between">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Visual · Reports insights tab</p>
-                                <span class="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">Screenshot slot</span>
                             </div>
                             <p class="mt-2 text-[12px] text-slate-600">Capture the `Reports` page with the `Insights` tab selected and at least one actionable row.</p>
                         </figure>
@@ -703,7 +700,6 @@
                         <figure class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
                             <div class="flex items-center justify-between">
                                 <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Visual · Custom report builder</p>
-                                <span class="rounded-md bg-slate-100 px-2 py-1 text-[10px] font-semibold text-slate-600">Screenshot slot</span>
                             </div>
                             <p class="mt-2 text-[12px] text-slate-600">Capture the `Custom report` tab showing recipient list, schedule, and content blocks.</p>
                         </figure>
