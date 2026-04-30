@@ -3,20 +3,6 @@
     description="The complete EBQ user guide: connect Search Console, Analytics, and the Indexing API; track keywords and backlinks; run page audits; turn on alerts; schedule reports; install the WordPress plugin."
     active="guide"
 >
-    @php
-        $guideVisuals = [
-            ['anchor' => 'dashboard', 'title' => 'Dashboard overview', 'file' => 'images/guide/dashboard-overview.png', 'alt' => 'EBQ dashboard overview cards and charts'],
-            ['anchor' => 'insight-cards', 'title' => 'Action insights', 'file' => 'images/guide/action-insights.png', 'alt' => 'Dashboard action insights cards in EBQ'],
-            ['anchor' => 'keywords', 'title' => 'Keywords', 'file' => 'images/guide/keywords-workspace.png', 'alt' => 'Keywords workspace table in EBQ'],
-            ['anchor' => 'pages', 'title' => 'Pages', 'file' => 'images/guide/pages-workspace.png', 'alt' => 'Pages workspace performance table in EBQ'],
-            ['anchor' => 'rank-tracking', 'title' => 'Rank tracking', 'file' => 'images/guide/rank-tracking.png', 'alt' => 'Rank tracking trend and keyword positions in EBQ'],
-            ['anchor' => 'custom-audit', 'title' => 'Custom audit', 'file' => 'images/guide/custom-audit.png', 'alt' => 'Custom page audit form in EBQ'],
-            ['anchor' => 'audit-report-sections', 'title' => 'Audit report', 'file' => 'images/guide/audit-report-sections.png', 'alt' => 'Page audit detail report sections in EBQ'],
-            ['anchor' => 'insights-panel', 'title' => 'Reports insights', 'file' => 'images/guide/reports-insights.png', 'alt' => 'Reports insights tab in EBQ'],
-            ['anchor' => 'growth-reports', 'title' => 'Growth reports', 'file' => 'images/guide/growth-reports.png', 'alt' => 'Custom growth report builder tab in EBQ'],
-        ];
-    @endphp
-
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-slate-200 bg-white">
         <div class="mx-auto max-w-3xl px-6 py-16 lg:px-8 lg:py-20">
@@ -30,36 +16,6 @@
             <div class="mt-8 flex flex-col items-center gap-3 sm:flex-row">
                 <a href="#step-1" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Start with step 1</a>
                 <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">Create a free account</a>
-            </div>
-        </div>
-    </section>
-
-    <section class="border-b border-slate-200 bg-slate-50/50">
-        <div class="mx-auto max-w-6xl px-6 py-10 lg:px-8">
-            <h2 class="text-xl font-semibold tracking-tight text-slate-900">Section visual map</h2>
-            <p class="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Each dashboard info icon opens one of these sections. Place real screenshots at the listed paths to upgrade placeholders automatically.
-            </p>
-            <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                @foreach ($guideVisuals as $visual)
-                    <a href="#{{ $visual['anchor'] }}" class="rounded-xl border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:shadow-sm">
-                        @if (file_exists(public_path($visual['file'])))
-                            <figure>
-                                <img src="{{ asset($visual['file']) }}" alt="{{ $visual['alt'] }}" class="h-36 w-full rounded-lg border border-slate-200 object-cover">
-                                <figcaption class="mt-1 text-[11px] text-slate-500">{{ $visual['alt'] }}</figcaption>
-                            </figure>
-                        @else
-                            <div class="flex h-36 w-full items-center justify-center rounded-lg border border-dashed border-slate-300 bg-slate-50 text-center">
-                                <div>
-                                    <p class="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Guide visual</p>
-                                    <p class="mt-1 font-mono text-[10px] text-slate-400">{{ $visual['file'] }}</p>
-                                </div>
-                            </div>
-                        @endif
-                        <p class="mt-3 text-sm font-semibold text-slate-900">{{ $visual['title'] }}</p>
-                        <p class="mt-1 text-xs text-slate-500">Jump to section</p>
-                    </a>
-                @endforeach
             </div>
         </div>
     </section>
