@@ -75,6 +75,14 @@ class AiSnippetRewriterService
     public const INTENT_AUTO = 'auto';
 
     /**
+     * How many distinct title+meta rewrites we ask the model to produce
+     * (and accept) per request. Bumped from 3 to 10 so users have a real
+     * shortlist to A/B from. Each rewrite is a JSON object so 10 fits
+     * comfortably under the model's max_tokens budget.
+     */
+    private const REWRITES_PER_RUN = 10;
+
+    /**
      * Curated CTR-boosting "power words" the model can lean on when a
      * title/meta would otherwise read flat. Grouped here for legibility,
      * but the prompt sees them as a single shuffled subset so the model
@@ -275,9 +283,11 @@ class AiSnippetRewriterService
         $payload = $this->llm->completeJson($messages, [
             'model' => 'mistral-medium-latest',
             'temperature' => 0.6,
-            'max_tokens' => 1100,
+            // 10 rewrites × ~280 output tokens each (title + meta +
+            // rationale + JSON envelope) leaves comfortable headroom.
+            'max_tokens' => 3200,
             'json_object' => true,
-            'timeout' => 45,
+            'timeout' => 60,
         ]);
 
         if (! is_array($payload) || ! isset($payload['rewrites']) || ! is_array($payload['rewrites'])) {
@@ -404,17 +414,19 @@ Universal constraints:
 - Lean on power words for CTR but never sacrifice clarity. At most one or
   two per title and one per meta — titles must read as real human-written
   headlines, not a clickbait stack.
-- When additional keyphrases are provided, weave AT MOST ONE into ONE of the
-  three rewrites where it fits naturally. Never force them, and never repeat
-  the same additional keyphrase across multiple rewrites. Additional
+- When additional keyphrases are provided, weave each one into AT MOST ONE
+  of the rewrites where it fits naturally. Never force them, and never
+  repeat the same additional keyphrase across multiple rewrites. Additional
   keyphrases come AFTER the focus keyword — they never replace it.
 - Differentiate from the competitor titles when given — do not just rephrase.
 - Return STRICTLY valid JSON with the schema below. No prose, no markdown.
 SYS;
 
+        $count = self::REWRITES_PER_RUN;
+
         // Two prompt modes:
-        //   - AUTO  → 3 different angles from the full registry, model picks
-        //   - INTENT → 3 distinct VARIATIONS of the same single intent
+        //   - AUTO  → N different angles from the full registry, model picks
+        //   - INTENT → N distinct VARIATIONS of the same single intent
         if ($intent === self::INTENT_AUTO) {
             $intentList = implode(', ', array_keys(self::INTENTS));
             // Heredoc identifier MUST NOT collide with any token at the
@@ -423,10 +435,12 @@ SYS;
             // parsed the rest as code. `EBQ_PROMPT_MODE_BLOCK` is unique.
             $modeBlock = <<<EBQ_PROMPT_MODE_BLOCK
 MODE: auto-mix.
-Pick THREE different angles from this registry:
+Pick {$count} DIFFERENT angles from this registry — every rewrite uses a
+different one (no two rewrites share an angle):
   {$intentList}
-Each rewrite uses a different angle. Set the "angle" field to the chosen
-angle key from the list above.
+Set the "angle" field on each rewrite to the chosen angle key from the
+list above. The {$count} angles you pick MUST be visibly different in
+framing — not paraphrases of each other.
 EBQ_PROMPT_MODE_BLOCK;
         } else {
             $intentMeta = self::INTENTS[$intent];
@@ -439,10 +453,10 @@ Selected intent: "{$intent}" — {$intentLabel}.
 What this angle is: {$intentDesc}
 STRUCTURAL RULE for every rewrite (non-negotiable): {$intentRule}
 
-Produce THREE distinct VARIATIONS of this same intent. Each variation
+Produce {$count} distinct VARIATIONS of this same intent. Each variation
 should differ from the others in at least two of: opening word, length
 mix (shorter title vs longer meta vs vice versa), specificity (concrete
-numbers / named examples), and the rationale focus. All three MUST set
+numbers / named examples), and the rationale focus. All {$count} MUST set
 "angle": "{$intent}".
 EBQ_PROMPT_MODE_BLOCK;
         }
@@ -478,7 +492,7 @@ CHARACTER LENGTH (HARD LIMIT — verify before returning):
 Count BEFORE returning. If a draft is outside the range, rewrite it
 until it fits — never round up/down by one char and submit anyway.
 
-Return JSON exactly in this shape:
+Return JSON exactly in this shape (EXACTLY {$count} entries — no fewer):
 {
   "rewrites": [
     {
@@ -487,7 +501,7 @@ Return JSON exactly in this shape:
       "meta": "...",    // 130–155 chars, verbatim focus keyword
       "rationale": "Why this rewrite works against the SERP, in one sentence."
     },
-    ... (exactly 3 entries)
+    ... (exactly {$count} entries)
   ]
 }
 USER;
@@ -587,9 +601,10 @@ USER;
                 implode("\n    - ", $bad['reasons'])
             );
         }
+        $count = self::REWRITES_PER_RUN;
         $feedback = <<<FEEDBACK
 Your previous response had rewrites that violated the hard rules. Fix them
-and return EXACTLY 3 valid rewrites in the same JSON shape.
+and return EXACTLY {$count} valid rewrites in the same JSON shape.
 
 Hard rules — every returned rewrite MUST satisfy ALL:
 - title and meta both contain the EXACT focus keyword "{$focusKeyword}" verbatim
@@ -615,9 +630,9 @@ FEEDBACK;
         $payload = $this->llm->completeJson($messagesWithFeedback, [
             'model' => 'mistral-medium-latest',
             'temperature' => 0.4,         // tighter for the corrective pass
-            'max_tokens' => 1100,
+            'max_tokens' => 3200,
             'json_object' => true,
-            'timeout' => 45,
+            'timeout' => 60,
         ]);
         return is_array($payload) ? $payload : null;
     }
