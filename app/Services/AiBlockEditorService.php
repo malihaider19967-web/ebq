@@ -121,14 +121,20 @@ class AiBlockEditorService
 
         [$system, $user] = $this->buildPrompt($mode, $text, $command, $focusKeyword, $title, $additionalKeywords, $briefContext, $targetLanguage, $tone);
 
+        // Title mode benefits from the medium-tier model — better
+        // length-constraint adherence is worth the modest cost overhead.
+        // Other modes (rewrite/extend/grammar/etc.) stay on the default
+        // tier where speed matters more and constraints are looser.
+        $modelOverride = $mode === self::MODE_TITLE ? ['model' => 'mistral-medium-latest'] : [];
+
         $response = $this->llm->complete([
             ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => $user],
-        ], [
+        ], array_merge([
             'temperature' => $this->temperatureFor($mode),
             'max_tokens' => 1500,
             'timeout' => 90,
-        ]);
+        ], $modelOverride));
 
         if (! ($response['ok'] ?? false)) {
             return ['ok' => false, 'error' => (string) ($response['error'] ?? 'llm_failed')];
@@ -140,31 +146,46 @@ class AiBlockEditorService
             return ['ok' => false, 'error' => 'llm_empty_response'];
         }
 
-        // Title mode emits one suggestion per line. Two-stage validation:
-        //   1. Focus keyword presence — non-fixable; drop the line.
-        //   2. Length — auto-coerced to 30–60 via word-boundary truncation
-        //      when too long, or safe-suffix padding when too short, so
-        //      users never see a "regenerate" length error.
+        // Title mode: validate keyword + length, retry with concrete
+        // feedback when any drift. No truncation — chopping a title
+        // mid-thought is worse than re-asking the model to write a
+        // proper one.
         if ($mode === self::MODE_TITLE) {
-            $lines = preg_split('/\r?\n/', $generated) ?: [];
-            $kept = [];
-            $rejectedKeyword = 0;
-            foreach ($lines as $line) {
-                $clean = trim($line);
-                if ($clean === '') continue;
-                if ($focusKeyword !== '' && ! $this->lineContainsKeyword($clean, $focusKeyword)) {
-                    $rejectedKeyword++;
-                    continue;
+            $kept = $this->filterTitlesValid($generated, $focusKeyword);
+            if (count($kept) < 5) {
+                $invalidLines = $this->extractInvalidTitleLines($generated, $focusKeyword);
+                if ($invalidLines !== []) {
+                    $retryFeedback = $this->buildTitleRetryFeedback($invalidLines, $focusKeyword);
+                    $retryResp = $this->llm->complete([
+                        ['role' => 'system', 'content' => $system],
+                        ['role' => 'user', 'content' => $user],
+                        ['role' => 'assistant', 'content' => $generated],
+                        ['role' => 'user', 'content' => $retryFeedback],
+                    ], [
+                        'model' => 'mistral-medium-latest',
+                        'temperature' => 0.4,
+                        'max_tokens' => 1500,
+                        'timeout' => 60,
+                    ]);
+                    if (($retryResp['ok'] ?? false) && trim((string) ($retryResp['content'] ?? '')) !== '') {
+                        $retryText = $this->stripCodeFences(trim((string) $retryResp['content']));
+                        $retryKept = $this->filterTitlesValid($retryText, $focusKeyword);
+                        // Merge retried lines first (newer + corrected), dedupe.
+                        $seen = [];
+                        $merged = [];
+                        foreach (array_merge($retryKept, $kept) as $line) {
+                            $k = mb_strtolower($line);
+                            if (isset($seen[$k])) continue;
+                            $seen[$k] = true;
+                            $merged[] = $line;
+                            if (count($merged) >= 5) break;
+                        }
+                        $kept = $merged;
+                    }
                 }
-                $coerced = $this->coerceTitleLength($clean, $focusKeyword);
-                if ($coerced === null) continue;
-                $kept[] = $coerced;
             }
-            if (count($kept) === 0) {
-                if ($rejectedKeyword > 0) {
-                    return ['ok' => false, 'error' => 'focus_keyword_missing', 'message' => 'The model returned title suggestions that did not contain your focus keyword. Try regenerating.'];
-                }
-                return ['ok' => false, 'error' => 'titles_invalid', 'message' => 'The model returned no usable title suggestions. Try regenerating.'];
+            if ($kept === []) {
+                return ['ok' => false, 'error' => 'titles_invalid', 'message' => 'The model could not produce in-spec title suggestions. Try a shorter focus keyphrase.'];
             }
             $generated = implode("\n", $kept);
         }
@@ -173,58 +194,85 @@ class AiBlockEditorService
     }
 
     /**
-     * Coerce a title to the 30–60 char window. Truncate at a word
-     * boundary when too long; pad with a safe SEO-friendly suffix when
-     * too short. Verifies the focus keyword survives any truncation.
-     * Returns null only when no in-range result is achievable while
-     * keeping the focus keyword present.
+     * Return only the title lines that pass keyword + length validation
+     * (focus keyword present, 30–60 chars). Whitespace-trimmed; never
+     * truncates or pads — drift gets fed back to the model on retry.
      *
-     * Mirrors AiSnippetRewriterService::coerceTitleLength so both AI
-     * title surfaces apply the same coercion standard.
+     * @return list<string>
      */
-    private function coerceTitleLength(string $title, string $focusKeyword): ?string
+    private function filterTitlesValid(string $generated, string $focusKeyword): array
     {
-        $len = mb_strlen($title);
-        if ($len >= 30 && $len <= 60) {
-            return $title;
+        $kept = [];
+        foreach (preg_split('/\r?\n/', $generated) ?: [] as $line) {
+            $clean = trim($line);
+            if ($clean === '') continue;
+            if ($focusKeyword !== '' && ! $this->lineContainsKeyword($clean, $focusKeyword)) {
+                continue;
+            }
+            $len = mb_strlen($clean);
+            if ($len < 30 || $len > 60) continue;
+            $kept[] = $clean;
         }
+        return $kept;
+    }
 
-        if ($len > 60) {
-            $cut = mb_substr($title, 0, 60);
-            $lastSpace = mb_strrpos($cut, ' ');
-            $floor = (int) (60 * 0.7);
-            if ($lastSpace !== false && $lastSpace >= $floor) {
-                $cut = mb_substr($cut, 0, $lastSpace);
+    /**
+     * Extract the lines that DIDN'T pass validation, with a per-line
+     * diagnostic reason ready to fold into the retry feedback prompt.
+     *
+     * @return list<array{line:string, reasons:list<string>}>
+     */
+    private function extractInvalidTitleLines(string $generated, string $focusKeyword): array
+    {
+        $invalid = [];
+        foreach (preg_split('/\r?\n/', $generated) ?: [] as $line) {
+            $clean = trim($line);
+            if ($clean === '') continue;
+            $reasons = [];
+            if ($focusKeyword !== '' && ! $this->lineContainsKeyword($clean, $focusKeyword)) {
+                $reasons[] = "missing focus keyword \"{$focusKeyword}\"";
             }
-            $cut = rtrim($cut, " \t\n\r\0\x0B,;:.!?-—–|");
-            $cutLen = mb_strlen($cut);
-            if ($cutLen >= 30 && $cutLen <= 60) {
-                if ($focusKeyword === '' || $this->lineContainsKeyword($cut, $focusKeyword)) {
-                    return $cut;
-                }
+            $len = mb_strlen($clean);
+            if ($len < 30) {
+                $reasons[] = "too short ({$len} chars; needs 30–60)";
+            } elseif ($len > 60) {
+                $reasons[] = "too long ({$len} chars; needs 30–60)";
             }
-            return null;
+            if ($reasons !== []) {
+                $invalid[] = ['line' => $clean, 'reasons' => $reasons];
+            }
         }
+        return $invalid;
+    }
 
-        // Too short — append a safe suffix until in [30, 60].
-        $year = date('Y');
-        $suffixes = [
-            ' — Complete Guide',
-            ' Explained',
-            ' (' . $year . ' Guide)',
-            ' — What to Know',
-            ' for Beginners',
-            ' — Quick Guide',
-            ' (' . $year . ')',
-        ];
-        foreach ($suffixes as $suffix) {
-            $candidate = rtrim($title, " \t\n\r\0\x0B,;:.!?-—–|") . $suffix;
-            $cLen = mb_strlen($candidate);
-            if ($cLen >= 30 && $cLen <= 60) {
-                return $candidate;
-            }
+    /**
+     * Format a corrective feedback message for the retry call, naming
+     * each invalid line and the specific drifts it has so the model
+     * fixes them rather than repeating the same mistakes.
+     *
+     * @param  list<array{line:string, reasons:list<string>}>  $invalid
+     */
+    private function buildTitleRetryFeedback(array $invalid, string $focusKeyword): string
+    {
+        $list = '';
+        foreach ($invalid as $i => $bad) {
+            $list .= sprintf(
+                "  %d. \"%s\" — %s\n",
+                $i + 1,
+                str_replace(["\r", "\n", '"'], [' ', ' ', "'"], $bad['line']),
+                implode('; ', $bad['reasons'])
+            );
         }
-        return null;
+        return <<<FEEDBACK
+Some of those titles broke the rules. Re-do them as 5 titles total, each:
+- between 30 and 60 characters inclusive (count chars yourself before sending)
+- containing the EXACT focus keyword "{$focusKeyword}" verbatim
+- complete, polished sentences — never truncated mid-thought, never padded with filler
+
+Fix these specifically:
+{$list}
+Return ONLY the 5 titles, one per line, no numbering, no quotes, no preamble.
+FEEDBACK;
     }
 
     /**

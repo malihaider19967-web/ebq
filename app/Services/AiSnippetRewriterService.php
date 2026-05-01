@@ -62,8 +62,14 @@ class AiSnippetRewriterService
      * when the model drifts, post-processing pulls the title/meta into
      * range. Only a missing focus keyword is still grounds for skipping
      * a rewrite (since splicing in a keyword would break grammar).
+     * v7 — 2026-04-30: removed truncation/padding (caused incomplete
+     * sentences). Switched primary model to mistral-medium-latest and
+     * added a feedback-driven retry — when any rewrite drifts, the
+     * model is re-prompted with concrete per-rewrite drift descriptions
+     * ("title 67 chars, over by 7") and asked to rewrite from scratch
+     * rather than have its output post-trimmed.
      */
-    private const PROMPT_VERSION = 'v6';
+    private const PROMPT_VERSION = 'v7';
 
     /** Sentinel for the "give me a mixed-angle set" mode. */
     public const INTENT_AUTO = 'auto';
@@ -261,11 +267,17 @@ class AiSnippetRewriterService
         }
 
         $messages = $this->buildPrompt($focusKeyword, $currentTitle, $currentMeta, $contentExcerpt, $competitorTitles, $intent, $additionalKeywords);
+        // Snippet rewrites need solid constraint adherence (verbatim focus
+        // keyword + 30–60 / 130–155 char windows). Mistral-small-latest
+        // routinely drifts on length; medium is markedly better at
+        // constraint following at modest cost overhead. Worth it for a
+        // user-facing "Improve with AI" surface.
         $payload = $this->llm->completeJson($messages, [
-            'temperature' => 0.7,
+            'model' => 'mistral-medium-latest',
+            'temperature' => 0.6,
             'max_tokens' => 1100,
             'json_object' => true,
-            'timeout' => 30,
+            'timeout' => 45,
         ]);
 
         if (! is_array($payload) || ! isset($payload['rewrites']) || ! is_array($payload['rewrites'])) {
@@ -281,57 +293,43 @@ class AiSnippetRewriterService
         // the UI can still chip-tag rewrites even if the model omits it.
         $defaultAngle = $intent !== self::INTENT_AUTO ? $intent : 'general';
 
-        // Two-stage validation:
-        //   1. Focus keyword presence — non-fixable. If a rewrite drops
-        //      the focus keyword, drop the whole rewrite (we can't safely
-        //      splice it back in without breaking grammar).
-        //   2. Character length — auto-coerced. Title 30–60, meta 130–155.
-        //      Out-of-range rewrites are TRUNCATED at clean boundaries
-        //      when too long, or PADDED with a curated suffix/CTA when
-        //      too short, so the user always gets in-range output even
-        //      when the model drifts. Models occasionally produce 32 or
-        //      62 char titles despite the prompt — coercion makes that
-        //      a non-event instead of a "regenerate" error.
-        $rejectedKeyword = 0;
-        $rewrites = [];
-        foreach ($payload['rewrites'] as $r) {
-            if (! is_array($r)) continue;
-            $title = trim((string) ($r['title'] ?? ''));
-            $meta = trim((string) ($r['meta'] ?? ''));
-            if ($title === '' || $meta === '') continue;
-            if (! $this->containsKeyword($title, $focusKeyword) || ! $this->containsKeyword($meta, $focusKeyword)) {
-                $rejectedKeyword++;
-                continue;
+        // Validate against two hard rules:
+        //   1. Focus keyword presence (verbatim).
+        //   2. Length: title 30–60, meta 130–155.
+        // When ALL rewrites fail OR every passing rewrite has a defect,
+        // run ONE retry with concrete per-rewrite feedback ("title was 67
+        // chars — over by 7"). This nudges the model to fix the real
+        // issue without artificial truncation that would chop sentences
+        // mid-thought. After retry, accept whatever passes.
+        [$rewrites, $invalid] = $this->validateRewrites($payload['rewrites'], $focusKeyword, $defaultAngle);
+
+        if (count($rewrites) < 3 && $invalid !== []) {
+            $retryPayload = $this->retryWithFeedback($messages, $invalid, $focusKeyword);
+            if (is_array($retryPayload) && isset($retryPayload['rewrites']) && is_array($retryPayload['rewrites'])) {
+                [$retried, $_] = $this->validateRewrites($retryPayload['rewrites'], $focusKeyword, $defaultAngle);
+                // Merge retried rewrites in front (they're newer and feedback-targeted),
+                // dedupe by title, cap at 3.
+                $seenTitles = [];
+                $merged = [];
+                foreach (array_merge($retried, $rewrites) as $rw) {
+                    $key = mb_strtolower($rw['title']);
+                    if (isset($seenTitles[$key])) continue;
+                    $seenTitles[$key] = true;
+                    $merged[] = $rw;
+                    if (count($merged) >= 3) break;
+                }
+                $rewrites = $merged;
             }
-            $coercedTitle = $this->coerceTitleLength($title, $focusKeyword);
-            $coercedMeta = $this->coerceMetaLength($meta, $focusKeyword);
-            if ($coercedTitle === null || $coercedMeta === null) {
-                // Coercion couldn't reach the window without breaking the
-                // focus keyword. Skip — extremely rare with Yoast's wide
-                // 30–60 title window.
-                continue;
-            }
-            $rewrites[] = [
-                'title' => $coercedTitle,
-                'meta' => $coercedMeta,
-                'rationale' => mb_substr(trim((string) ($r['rationale'] ?? '')), 0, 220),
-                'angle' => mb_substr(trim((string) ($r['angle'] ?? $defaultAngle)), 0, 32),
-            ];
-            if (count($rewrites) >= 3) break;
         }
 
         if ($rewrites === []) {
-            Log::warning('AiSnippetRewriterService: all rewrites failed validation post-coerce', [
+            Log::warning('AiSnippetRewriterService: zero valid rewrites after retry', [
                 'post_id' => $postId,
                 'focus_keyword' => $focusKeyword,
                 'intent' => $intent,
-                'rejected_keyword' => $rejectedKeyword,
-                'rewrites_count' => is_array($payload['rewrites'] ?? null) ? count($payload['rewrites']) : 0,
+                'invalid_count' => count($invalid),
             ]);
-            if ($rejectedKeyword > 0) {
-                return ['ok' => false, 'error' => 'focus_keyword_missing', 'message' => 'The model returned rewrites that did not contain the focus keyword. Try regenerating.'];
-            }
-            return ['ok' => false, 'error' => 'no_rewrites_returned'];
+            return ['ok' => false, 'error' => 'rewrites_invalid', 'message' => 'The model could not produce in-spec rewrites for this focus keyword. Try a shorter focus keyphrase or different intent.'];
         }
 
         $result = [
@@ -501,176 +499,127 @@ USER;
     }
 
     /**
-     * Title length coercion. Returns the title shortened to ≤60 chars at a
-     * clean word boundary, or padded with a curated suffix to push it to
-     * ≥30 chars. Returns null only when neither operation can produce a
-     * 30–60 result that still contains the focus keyword.
+     * Validate every rewrite against keyword + length rules. Returns
+     * [valid_rewrites, invalid_rewrites_with_reasons]. The invalid list is
+     * fed back to the model on retry so it can fix specific drifts (e.g.
+     * "title was 67 chars — over by 7"). No truncation, no padding —
+     * we never serve incomplete sentences or artificially-padded copy.
      *
-     * Truncation strategy:
-     *   - Cut at the last word boundary at-or-before the 60-char mark.
-     *   - Strip trailing punctuation/dashes so we don't end mid-clause.
-     *   - Verify the focus keyword survived; if it didn't, give up
-     *     (rather than silently drop the keyword the user is ranking for).
-     *
-     * Padding strategy (too-short titles, e.g. when the focus keyword is
-     * itself the whole title):
-     *   - Append from a small list of safe, generic SEO-friendly suffixes
-     *     until length reaches ≥30 — guide framing or year stamp.
-     *   - Each candidate is tried in order; first one that lands in
-     *     [30, 60] wins.
+     * @param  array<int, mixed>  $rawRewrites
+     * @return array{
+     *   0: list<array{title:string, meta:string, rationale:string, angle:string}>,
+     *   1: list<array{title:string, meta:string, reasons:list<string>}>
+     * }
      */
-    private function coerceTitleLength(string $title, string $focusKeyword): ?string
+    private function validateRewrites(array $rawRewrites, string $focusKeyword, string $defaultAngle): array
     {
-        $len = mb_strlen($title);
-        if ($len >= 30 && $len <= 60) {
-            return $title;
-        }
+        $valid = [];
+        $invalid = [];
+        foreach ($rawRewrites as $r) {
+            if (! is_array($r)) continue;
+            $title = trim((string) ($r['title'] ?? ''));
+            $meta = trim((string) ($r['meta'] ?? ''));
+            if ($title === '' || $meta === '') continue;
 
-        if ($len > 60) {
-            $truncated = $this->truncateAtWordBoundary($title, 60);
-            $truncated = rtrim($truncated, " \t\n\r\0\x0B,;:.!?-—–|");
-            if (mb_strlen($truncated) >= 30 && mb_strlen($truncated) <= 60
-                && $this->containsKeyword($truncated, $focusKeyword)) {
-                return $truncated;
+            $reasons = [];
+            $titleLen = mb_strlen($title);
+            $metaLen = mb_strlen($meta);
+
+            if (! $this->containsKeyword($title, $focusKeyword)) {
+                $reasons[] = "title is missing the focus keyword \"{$focusKeyword}\"";
             }
+            if (! $this->containsKeyword($meta, $focusKeyword)) {
+                $reasons[] = "meta is missing the focus keyword \"{$focusKeyword}\"";
+            }
+            if ($titleLen < 30) {
+                $reasons[] = "title is {$titleLen} chars (under by " . (30 - $titleLen) . "); expand to 30–60 chars";
+            } elseif ($titleLen > 60) {
+                $reasons[] = "title is {$titleLen} chars (over by " . ($titleLen - 60) . "); shorten to 30–60 chars without ending mid-thought";
+            }
+            if ($metaLen < 130) {
+                $reasons[] = "meta is {$metaLen} chars (under by " . (130 - $metaLen) . "); expand to 130–155 chars with a CTA or extra detail";
+            } elseif ($metaLen > 155) {
+                $reasons[] = "meta is {$metaLen} chars (over by " . ($metaLen - 155) . "); rewrite tighter to 130–155 chars while keeping a complete sentence and CTA";
+            }
+
+            if ($reasons === []) {
+                $valid[] = [
+                    'title' => $title,
+                    'meta' => $meta,
+                    'rationale' => mb_substr(trim((string) ($r['rationale'] ?? '')), 0, 220),
+                    'angle' => mb_substr(trim((string) ($r['angle'] ?? $defaultAngle)), 0, 32),
+                ];
+            } else {
+                $invalid[] = [
+                    'title' => $title,
+                    'meta' => $meta,
+                    'reasons' => $reasons,
+                ];
+            }
+        }
+        return [$valid, $invalid];
+    }
+
+    /**
+     * Build a follow-up "fix these specific issues" message and re-call
+     * the LLM. Reuses the same conversation history (system + original
+     * user prompt) so the model retains all the SEO context we already
+     * paid to send, then sees a concrete punch list of what to fix.
+     *
+     * @param  list<array{role:string, content:string}>  $messages
+     * @param  list<array{title:string, meta:string, reasons:list<string>}>  $invalid
+     * @return array<string, mixed>|null
+     */
+    private function retryWithFeedback(array $messages, array $invalid, string $focusKeyword): ?array
+    {
+        if ($invalid === []) {
             return null;
         }
+        $issuesBlock = '';
+        foreach ($invalid as $i => $bad) {
+            $issuesBlock .= sprintf(
+                "\nRewrite %d (drop or fix):\n  title (%d chars): \"%s\"\n  meta  (%d chars): \"%s\"\n  problems:\n    - %s\n",
+                $i + 1,
+                mb_strlen($bad['title']),
+                str_replace(["\r", "\n", '"'], [' ', ' ', "'"], $bad['title']),
+                mb_strlen($bad['meta']),
+                str_replace(["\r", "\n", '"'], [' ', ' ', "'"], $bad['meta']),
+                implode("\n    - ", $bad['reasons'])
+            );
+        }
+        $feedback = <<<FEEDBACK
+Your previous response had rewrites that violated the hard rules. Fix them
+and return EXACTLY 3 valid rewrites in the same JSON shape.
 
-        // Too short — append a safe suffix until we land in [30, 60].
-        $year = date('Y');
-        $suffixes = [
-            ' — Complete Guide',
-            ' Explained',
-            ' (' . $year . ' Guide)',
-            ' — What to Know',
-            ' for Beginners',
-            ' — Quick Guide',
-            ' (' . $year . ')',
-            ' — Step-by-Step',
-        ];
-        foreach ($suffixes as $suffix) {
-            $candidate = rtrim($title, " \t\n\r\0\x0B,;:.!?-—–|") . $suffix;
-            $cLen = mb_strlen($candidate);
-            if ($cLen >= 30 && $cLen <= 60) {
-                return $candidate;
-            }
-        }
-        // Last resort: glue the year on; if still under 30, fail.
-        $fallback = rtrim($title, " \t\n\r\0\x0B,;:.!?-—–|") . ' (' . $year . ')';
-        if (mb_strlen($fallback) >= 30 && mb_strlen($fallback) <= 60) {
-            return $fallback;
-        }
-        return null;
-    }
+Hard rules — every returned rewrite MUST satisfy ALL:
+- title and meta both contain the EXACT focus keyword "{$focusKeyword}" verbatim
+- title is 30–60 characters inclusive
+- meta is 130–155 characters inclusive
+- title and meta are complete, natural-sounding sentences — never truncated mid-thought
 
-    /**
-     * Meta description length coercion. Truncate to ≤155 at a sentence
-     * boundary if possible, else word boundary; pad with a CTA from a
-     * curated list when too short. Returns null only when no in-range
-     * result is achievable while keeping the focus keyword present.
-     */
-    private function coerceMetaLength(string $meta, string $focusKeyword): ?string
-    {
-        $len = mb_strlen($meta);
-        if ($len >= 130 && $len <= 155) {
-            return $meta;
-        }
+Specific drifts to correct:
+{$issuesBlock}
 
-        if ($len > 155) {
-            $truncated = $this->truncateAtSentenceBoundary($meta, 155);
-            // If sentence boundary couldn't get us there, fall back to word.
-            if (mb_strlen($truncated) > 155 || mb_strlen($truncated) < 130) {
-                $truncated = $this->truncateAtWordBoundary($meta, 155);
-                $truncated = rtrim($truncated, " \t\n\r\0\x0B,;:-—–|");
-                if (! preg_match('/[.!?]$/u', $truncated)) {
-                    $truncated .= '.';
-                }
-            }
-            if (mb_strlen($truncated) >= 130 && mb_strlen($truncated) <= 155
-                && $this->containsKeyword($truncated, $focusKeyword)) {
-                return $truncated;
-            }
-            return null;
-        }
+If a rewrite is too long, REWRITE it tighter — do not just chop the end.
+If a rewrite is too short, REWRITE it with more value-adding content — do
+not just append filler. Both fields must read as polished, human-written
+copy in the final response.
 
-        // Too short — append a CTA from a curated list. CTAs are short
-        // enough that several can be tried to land in the 130–155 window.
-        $ctas = [
-            ' Read the full breakdown.',
-            ' Learn how it works today.',
-            ' Get the complete details here.',
-            ' See the full guide for more.',
-            ' Find out everything you need to know.',
-            ' Discover the practical steps inside.',
-            ' Explore the full tutorial below.',
-        ];
-        $base = rtrim($meta, " \t\n\r\0\x0B");
-        if (! preg_match('/[.!?]$/u', $base)) {
-            $base .= '.';
-        }
-        foreach ($ctas as $cta) {
-            $candidate = $base . $cta;
-            $cLen = mb_strlen($candidate);
-            if ($cLen >= 130 && $cLen <= 155) {
-                return $candidate;
-            }
-        }
-        // Stack two CTAs as a last resort for very-short metas.
-        foreach ($ctas as $cta1) {
-            foreach ($ctas as $cta2) {
-                if ($cta1 === $cta2) continue;
-                $candidate = $base . $cta1 . $cta2;
-                $cLen = mb_strlen($candidate);
-                if ($cLen >= 130 && $cLen <= 155) {
-                    return $candidate;
-                }
-            }
-        }
-        return null;
-    }
+Return JSON in the exact shape from the previous instruction.
+FEEDBACK;
 
-    /**
-     * Truncate a string to ≤$max chars, preferring a word boundary near
-     * the end. Falls back to a hard cut at $max if no usable space exists
-     * in the last 30% of the budget.
-     */
-    private function truncateAtWordBoundary(string $s, int $max): string
-    {
-        if (mb_strlen($s) <= $max) {
-            return $s;
-        }
-        $cut = mb_substr($s, 0, $max);
-        $lastSpace = mb_strrpos($cut, ' ');
-        $floor = (int) ($max * 0.7);
-        if ($lastSpace !== false && $lastSpace >= $floor) {
-            return mb_substr($cut, 0, $lastSpace);
-        }
-        return $cut;
-    }
+        $messagesWithFeedback = array_merge($messages, [
+            ['role' => 'user', 'content' => $feedback],
+        ]);
 
-    /**
-     * Truncate a string to ≤$max chars, preferring the last sentence
-     * terminator (`.`, `!`, `?`) within the budget. Falls back to the
-     * caller for word-boundary if no sentence boundary is workable.
-     */
-    private function truncateAtSentenceBoundary(string $s, int $max): string
-    {
-        if (mb_strlen($s) <= $max) {
-            return $s;
-        }
-        $cut = mb_substr($s, 0, $max);
-        $best = -1;
-        foreach (['. ', '! ', '? ', '.', '!', '?'] as $marker) {
-            $pos = mb_strrpos($cut, $marker);
-            if ($pos !== false && $pos > $best) {
-                $best = $pos + mb_strlen($marker) - 1;
-            }
-        }
-        $floor = (int) ($max * 0.7);
-        if ($best >= $floor) {
-            return rtrim(mb_substr($s, 0, $best + 1));
-        }
-        return $cut;
+        $payload = $this->llm->completeJson($messagesWithFeedback, [
+            'model' => 'mistral-medium-latest',
+            'temperature' => 0.4,         // tighter for the corrective pass
+            'max_tokens' => 1100,
+            'json_object' => true,
+            'timeout' => 45,
+        ]);
+        return is_array($payload) ? $payload : null;
     }
 
     /**
