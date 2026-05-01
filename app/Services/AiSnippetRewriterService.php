@@ -43,6 +43,48 @@ class AiSnippetRewriterService
     public const INTENT_AUTO = 'auto';
 
     /**
+     * Curated CTR-boosting "power words" the model can lean on when a
+     * title/meta would otherwise read flat. Grouped here for legibility,
+     * but the prompt sees them as a single shuffled subset so the model
+     * doesn't bias toward any one bucket.
+     *
+     * Picked for SEO snippet relevance — words that show up in click-heavy
+     * SERP titles and read as natural English. We deliberately exclude
+     * over-used clickbait ("INSANE", "SHOCKING", "NEVER BEFORE SEEN")
+     * because Google penalizes title-tag clickbait via the rewrite layer.
+     *
+     * @var list<string>
+     */
+    private const POWER_WORDS = [
+        // Value / outcome
+        'proven', 'effective', 'practical', 'actionable', 'real',
+        'powerful', 'reliable', 'trusted', 'guaranteed',
+
+        // Speed / ease
+        'fast', 'quick', 'simple', 'easy', 'straightforward',
+        'instant', 'in minutes', 'step-by-step',
+
+        // Comprehensiveness / authority
+        'complete', 'definitive', 'ultimate', 'essential', 'comprehensive',
+        'expert', 'tested', 'data-driven', 'researched',
+
+        // Curiosity / contrast
+        'avoid', 'mistake', 'truth', 'overlooked', 'forgotten',
+        'underrated', 'real reason', 'actually',
+
+        // Currency / freshness
+        'updated', 'latest', 'new', '2026', 'modern',
+
+        // Specificity hooks
+        'every', 'top', 'best', 'free', 'exclusive',
+        'beginner', 'advanced', 'pro', 'small-team',
+
+        // Action verbs that read well in titles
+        'master', 'boost', 'cut', 'fix', 'unlock',
+        'save', 'speed up', 'rank', 'win', 'grow',
+    ];
+
+    /**
      * Intent registry. Each value:
      *   - label    : short human label for the picker UI
      *   - desc     : one-line description (also shown as picker tooltip)
@@ -164,6 +206,12 @@ class AiSnippetRewriterService
         $contentExcerpt = mb_substr(trim((string) ($input['content_excerpt'] ?? '')), 0, 4000);
         $competitorTitles = is_array($input['competitor_titles'] ?? null) ? $input['competitor_titles'] : [];
         $competitorTitles = array_slice(array_values(array_filter(array_map('strval', $competitorTitles))), 0, 3);
+        $additionalKeywords = is_array($input['additional_keywords'] ?? null) ? $input['additional_keywords'] : [];
+        $additionalKeywords = array_values(array_unique(array_filter(
+            array_map(static fn ($v) => trim((string) $v), $additionalKeywords),
+            static fn (string $v) => $v !== '' && mb_strtolower($v) !== mb_strtolower($focusKeyword)
+        )));
+        $additionalKeywords = array_slice($additionalKeywords, 0, 10);
 
         // Validate / normalize the requested intent. Anything not in the
         // registry collapses to AUTO so a stale client can't crash us.
@@ -179,14 +227,14 @@ class AiSnippetRewriterService
             return ['ok' => false, 'error' => 'content_too_short'];
         }
 
-        $cacheKey = $this->cacheKey($postId, $focusKeyword, $currentTitle, $currentMeta, $contentExcerpt, $competitorTitles, $intent);
+        $cacheKey = $this->cacheKey($postId, $focusKeyword, $currentTitle, $currentMeta, $contentExcerpt, $competitorTitles, $intent, $additionalKeywords);
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             $cached['cached'] = true;
             return $cached;
         }
 
-        $messages = $this->buildPrompt($focusKeyword, $currentTitle, $currentMeta, $contentExcerpt, $competitorTitles, $intent);
+        $messages = $this->buildPrompt($focusKeyword, $currentTitle, $currentMeta, $contentExcerpt, $competitorTitles, $intent, $additionalKeywords);
         $payload = $this->llm->completeJson($messages, [
             'temperature' => 0.7,
             'max_tokens' => 1100,
@@ -241,13 +289,27 @@ class AiSnippetRewriterService
 
     /**
      * @param  list<string>  $competitorTitles
+     * @param  list<string>  $additionalKeywords
      * @return list<array{role: string, content: string}>
      */
-    private function buildPrompt(string $keyword, string $currentTitle, string $currentMeta, string $excerpt, array $competitorTitles, string $intent): array
+    private function buildPrompt(string $keyword, string $currentTitle, string $currentMeta, string $excerpt, array $competitorTitles, string $intent, array $additionalKeywords = []): array
     {
         $competitorBlock = $competitorTitles === []
             ? "(no competitor titles available)"
             : implode("\n", array_map(fn ($t, $i) => sprintf('  %d. %s', $i + 1, $t), $competitorTitles, array_keys($competitorTitles)));
+
+        // Shuffle a 20-word subset of the power-words registry into the
+        // prompt — the model picks zero/one/two per rewrite as it sees
+        // fit. Sending all ~60 would just bias toward stuffing; a smaller
+        // rotation per call keeps each generation feeling fresh.
+        $shuffled = self::POWER_WORDS;
+        shuffle($shuffled);
+        $powerWordSubset = array_slice($shuffled, 0, 20);
+        $powerWordsBlock = implode(', ', $powerWordSubset);
+
+        $additionalBlock = $additionalKeywords === []
+            ? '(none provided)'
+            : implode(', ', $additionalKeywords);
 
         $system = <<<'SYS'
 You are a senior SEO copywriter. You produce snappy, click-worthy SEO titles
@@ -258,6 +320,12 @@ Universal constraints:
   No ALL CAPS, no lying, no generic clickbait.
 - Meta description: 130–155 characters. Reinforce the focus keyword once,
   state the value the user gets, end with an implicit or explicit CTA.
+- Lean on power words for CTR but never sacrifice clarity. At most one or
+  two per title and one per meta — titles must read as real human-written
+  headlines, not a clickbait stack.
+- When additional keyphrases are provided, weave AT MOST ONE into ONE of the
+  three rewrites where it fits naturally. Never force them, and never repeat
+  the same additional keyphrase across multiple rewrites.
 - Differentiate from the competitor titles when given — do not just rephrase.
 - Return STRICTLY valid JSON with the schema below. No prose, no markdown.
 SYS;
@@ -300,6 +368,12 @@ EBQ_PROMPT_MODE_BLOCK;
         $user = <<<USER
 Focus keyword: "{$keyword}"
 
+Additional keyphrases (weave AT MOST ONE into ONE of the three rewrites
+where it fits — never forced, never across multiple rewrites): {$additionalBlock}
+
+Power words you may draw on (zero, one, or two per title; one per meta;
+never stuffed): {$powerWordsBlock}
+
 Current SEO title: "{$currentTitle}"
 Current meta description: "{$currentMeta}"
 
@@ -335,11 +409,16 @@ USER;
 
     /**
      * @param  list<string>  $competitorTitles
+     * @param  list<string>  $additionalKeywords
      */
-    private function cacheKey(int $postId, string $keyword, string $title, string $meta, string $excerpt, array $competitorTitles, string $intent): string
+    private function cacheKey(int $postId, string $keyword, string $title, string $meta, string $excerpt, array $competitorTitles, string $intent, array $additionalKeywords = []): string
     {
         $contentHash = hash('xxh3', $title . "\n" . $meta . "\n" . $excerpt);
         $compHash = hash('xxh3', implode('|', $competitorTitles));
-        return sprintf('ai_snippet_rewrite:%d:%s:%s:%s:%s', $postId, hash('xxh3', $keyword), $contentHash, $compHash, $intent);
+        // Sort so the same set in different order returns the same cached result.
+        $sortedAdditional = $additionalKeywords;
+        sort($sortedAdditional, SORT_STRING);
+        $additionalHash = hash('xxh3', implode('|', $sortedAdditional));
+        return sprintf('ai_snippet_rewrite:%d:%s:%s:%s:%s:%s', $postId, hash('xxh3', $keyword), $contentHash, $compHash, $additionalHash, $intent);
     }
 }

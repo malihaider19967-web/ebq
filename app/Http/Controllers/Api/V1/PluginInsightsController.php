@@ -378,11 +378,14 @@ class PluginInsightsController extends Controller
             'content_excerpt' => 'required|string|min:50|max:8000',
             'competitor_titles' => 'nullable|array|max:5',
             'competitor_titles.*' => 'string|max:200',
+            'additional_keywords' => 'nullable|array|max:10',
+            'additional_keywords.*' => 'string|max:200',
             'intent' => 'nullable|string|in:' . implode(',', $intentKeys),
         ]);
 
         $payload = $service->rewrite((int) $externalPostId, [
             'focus_keyword' => $data['focus_keyword'],
+            'additional_keywords' => $data['additional_keywords'] ?? [],
             'current_title' => $data['current_title'] ?? '',
             'current_meta' => $data['current_meta'] ?? '',
             'content_excerpt' => $data['content_excerpt'],
