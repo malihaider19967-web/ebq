@@ -9,6 +9,7 @@ use App\Models\Website;
 use App\Services\AiBlockEditorService;
 use App\Services\AiChatService;
 use App\Services\AiContentBriefService;
+use App\Services\AiRelatedKeywordsService;
 use App\Services\AiSnippetRewriterService;
 use App\Services\AiWriterService;
 use App\Services\EntityCoverageService;
@@ -189,28 +190,35 @@ class PluginInsightsController extends Controller
     }
 
     /**
-     * Related keyphrase suggestions for a focus keyword — Yoast-Premium
-     * "related keyphrases" backed by GSC + rank-tracker SERP captures
-     * (no Semrush, no per-keystroke external API spend).
-     *   GET /api/v1/posts/{externalPostId}/related-keywords?keyword=...&url=...
+     * Related keyphrase suggestions for a focus keyword.
+     *
+     * Source: AI-generated semantic + intent variants of the entered
+     * keyphrase. We dropped the GSC + rank-tracker SERP pull because
+     * users on a fresh post (the most common case for this surface)
+     * have no Search Console history yet, so the previous logic returned
+     * empty exactly when it was most useful. The AI generator works
+     * from the focus keyphrase alone and is cached 7d per (site × keyword).
+     *
+     * Returns `diagnostic: 'missing_keyword'` when no keyphrase was
+     * provided so the WP UI can render an "enter a focus keyphrase
+     * first" message instead of a generic empty state.
+     *
+     *   GET /api/v1/posts/{externalPostId}/related-keywords?keyword=...
      */
-    public function relatedKeywords(Request $request, string $externalPostId): JsonResponse
+    public function relatedKeywords(Request $request, string $externalPostId, AiRelatedKeywordsService $service): JsonResponse
     {
         $website = $this->resolveWebsite($request);
-        $keyword = (string) $request->query('keyword', '');
-        $url = (string) $request->query('url', '');
+        $keyword = trim((string) $request->query('keyword', ''));
 
         $diagnostic = null;
         $suggestions = [];
 
-        if (trim($keyword) === '') {
+        if ($keyword === '') {
             $diagnostic = 'missing_keyword';
+        } elseif (mb_strlen($keyword) < 3) {
+            $diagnostic = 'keyword_too_short';
         } else {
-            $suggestions = $this->resolver->relatedKeywords(
-                $website,
-                $keyword,
-                $url !== '' ? $url : null,
-            );
+            $suggestions = $service->suggest($website->id, $keyword);
             if (empty($suggestions)) {
                 $diagnostic = 'no_related_data';
             }

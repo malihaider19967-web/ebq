@@ -129,7 +129,8 @@
       "Bash(grep -r \"echo\\\\s*\\\\$\" \"C:/Users/malih/Desktop/ebq/ebq-seo-wp/src\")",
       "Bash(node scripts/make-pot.cjs)",
       "Bash(composer install *)",
-      "Bash(grep -n 'count\\($valid\\)\\\\|count\\($rewrites\\)\\\\|>= 3\\\\|=== 3\\\\|$rewrites\\\\[\\\\] = ' C:/Users/malih/Desktop/ebq/app/Services/AiSnippetRewriterService.php)"
+      "Bash(grep -n 'count\\($valid\\)\\\\|count\\($rewrites\\)\\\\|>= 3\\\\|=== 3\\\\|$rewrites\\\\[\\\\] = ' C:/Users/malih/Desktop/ebq/app/Services/AiSnippetRewriterService.php)",
+      "Bash(grep -n \"use App\\\\\\\\\\\\\\\\Services\\\\\\\\\\\\\\\\\\\\|LlmClient\\\\|InsightsResolver\\\\|resolver:\" C:/Users/malih/Desktop/ebq/app/Http/Controllers/Api/V1/PluginInsightsController.php)"
     ]
   }
 }
