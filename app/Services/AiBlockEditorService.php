@@ -152,7 +152,9 @@ class AiBlockEditorService
         // proper one.
         if ($mode === self::MODE_TITLE) {
             $kept = $this->filterTitlesValid($generated, $focusKeyword);
-            if (count($kept) < 5) {
+            // Bumped target from 5 to 10 — users want a real shortlist.
+            $titleTarget = 10;
+            if (count($kept) < $titleTarget) {
                 $invalidLines = $this->extractInvalidTitleLines($generated, $focusKeyword);
                 if ($invalidLines !== []) {
                     $retryFeedback = $this->buildTitleRetryFeedback($invalidLines, $focusKeyword);
@@ -170,15 +172,16 @@ class AiBlockEditorService
                     if (($retryResp['ok'] ?? false) && trim((string) ($retryResp['content'] ?? '')) !== '') {
                         $retryText = $this->stripCodeFences(trim((string) $retryResp['content']));
                         $retryKept = $this->filterTitlesValid($retryText, $focusKeyword);
-                        // Merge retried lines first (newer + corrected), dedupe.
+                        // Keep first-pass winners first (they covered the
+                        // 10-angle spread) then fill with retry winners.
                         $seen = [];
                         $merged = [];
-                        foreach (array_merge($retryKept, $kept) as $line) {
+                        foreach (array_merge($kept, $retryKept) as $line) {
                             $k = mb_strtolower($line);
                             if (isset($seen[$k])) continue;
                             $seen[$k] = true;
                             $merged[] = $line;
-                            if (count($merged) >= 5) break;
+                            if (count($merged) >= $titleTarget) break;
                         }
                         $kept = $merged;
                     }
@@ -264,14 +267,15 @@ class AiBlockEditorService
             );
         }
         return <<<FEEDBACK
-Some of those titles broke the rules. Re-do them as 5 titles total, each:
+Some of those titles broke the rules. Re-do them as 10 titles total, each:
 - between 30 and 60 characters inclusive (count chars yourself before sending)
 - containing the EXACT focus keyword "{$focusKeyword}" verbatim
 - complete, polished sentences — never truncated mid-thought, never padded with filler
+- visibly different in style across the set — vary opening word, framing (question / list / how-to / comparison / benefit / curiosity / authority / mistake-to-avoid / year-led / straightforward) so the user has a real shortlist to A/B from
 
 Fix these specifically:
 {$list}
-Return ONLY the 5 titles, one per line, no numbering, no quotes, no preamble.
+Return ONLY the 10 titles, one per line, no numbering, no quotes, no preamble.
 FEEDBACK;
     }
 
@@ -455,7 +459,7 @@ FEEDBACK;
             ],
             self::MODE_TITLE => [
                 $system,
-                $seoContext."Generate exactly 5 SEO-optimized title suggestions for this page. Each title MUST:\n"
+                $seoContext."Generate exactly 10 SEO-optimized title suggestions for this page. Each title MUST:\n"
                     ."- Be 30–60 characters inclusive (Yoast's industry-standard SEO range; Google truncates anything longer than ~60 on SERPs). Count every character — letters, digits, spaces, punctuation. Aim for 50–60 as the sweet spot. Verify the count BEFORE returning each title and rewrite if outside range\n"
                     ."- Contain the EXACT focus keyword verbatim (case-insensitive match) — no paraphrases, no synonyms, no partial matches. The full phrase must appear, ideally in the first 60 characters\n"
                     ."- Match the search intent indicated by the SEO context\n"
@@ -465,13 +469,18 @@ FEEDBACK;
                     ."- Lean on at most one or two power words where they make the title sharper "
                         ."(e.g., proven, essential, complete, exclusive, fast, easy, definitive, avoid, guide, ultimate, expert, tested, free) — "
                         ."never more than two, never stuffed, never sacrificing clarity for the boost\n\n"
-                    ."The 5 titles MUST be different in style:\n"
+                    ."The 10 titles MUST be visibly different in style — cover this set of angles:\n"
                     ."  1. Straightforward / informational\n"
-                    ."  2. Question form\n"
-                    ."  3. Number-led or year-led (e.g., '7 things…' or '… in 2026')\n"
-                    ."  4. Benefit-focused (lead with the user outcome)\n"
-                    ."  5. Curiosity / contrast-driven\n\n"
-                    ."Return ONLY the 5 titles, one per line. No numbering, no quotes, no commentary, no preamble.\n\n"
+                    ."  2. Question form (ends with a question mark)\n"
+                    ."  3. Number-led list (e.g., '7 things…')\n"
+                    ."  4. Year-led / current ('… in 2026', '… 2026 Guide')\n"
+                    ."  5. Benefit-focused (lead with the user outcome)\n"
+                    ."  6. How-to / tutorial framing\n"
+                    ."  7. Comparison or 'X vs Y' framing\n"
+                    ."  8. Authority / expert-tested framing\n"
+                    ."  9. Mistake-to-avoid / warning framing\n"
+                    ." 10. Curiosity / contrast-driven hook\n\n"
+                    ."Return ONLY the 10 titles, one per line. No numbering, no quotes, no commentary, no preamble.\n\n"
                     .($text !== '' ? "Page content excerpt for context:\n{$text}" : "(No page content yet — base titles on the focus keyword and SEO context only.)"),
             ],
             default => [$system, $text],

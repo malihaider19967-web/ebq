@@ -68,8 +68,10 @@ class AiSnippetRewriterService
      * model is re-prompted with concrete per-rewrite drift descriptions
      * ("title 67 chars, over by 7") and asked to rewrite from scratch
      * rather than have its output post-trimmed.
+     * v8 — 2026-04-30: rewrites per run bumped from 3 to 10 so users
+     * get a real shortlist; max_tokens scaled accordingly.
      */
-    private const PROMPT_VERSION = 'v7';
+    private const PROMPT_VERSION = 'v8';
 
     /** Sentinel for the "give me a mixed-angle set" mode. */
     public const INTENT_AUTO = 'auto';
@@ -313,20 +315,26 @@ class AiSnippetRewriterService
         // mid-thought. After retry, accept whatever passes.
         [$rewrites, $invalid] = $this->validateRewrites($payload['rewrites'], $focusKeyword, $defaultAngle);
 
-        if (count($rewrites) < 3 && $invalid !== []) {
+        // Retry whenever we haven't hit the target count AND there's at
+        // least one invalid rewrite to feed back to the model. Keep both
+        // sets after retry — first-pass winners + retry winners — so the
+        // user gets a full N-variation shortlist even when the first
+        // pass nailed 7 and dropped 3.
+        if (count($rewrites) < self::REWRITES_PER_RUN && $invalid !== []) {
             $retryPayload = $this->retryWithFeedback($messages, $invalid, $focusKeyword);
             if (is_array($retryPayload) && isset($retryPayload['rewrites']) && is_array($retryPayload['rewrites'])) {
                 [$retried, $_] = $this->validateRewrites($retryPayload['rewrites'], $focusKeyword, $defaultAngle);
-                // Merge retried rewrites in front (they're newer and feedback-targeted),
-                // dedupe by title, cap at 3.
+                // Keep first-pass winners first (they were generated with
+                // the full angle diversity in mind), then fill with retry
+                // winners. Dedupe by title.
                 $seenTitles = [];
                 $merged = [];
-                foreach (array_merge($retried, $rewrites) as $rw) {
+                foreach (array_merge($rewrites, $retried) as $rw) {
                     $key = mb_strtolower($rw['title']);
                     if (isset($seenTitles[$key])) continue;
                     $seenTitles[$key] = true;
                     $merged[] = $rw;
-                    if (count($merged) >= 3) break;
+                    if (count($merged) >= self::REWRITES_PER_RUN) break;
                 }
                 $rewrites = $merged;
             }
