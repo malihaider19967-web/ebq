@@ -98,8 +98,20 @@ class ConnectGoogle extends Component
         // (with no Google account / no ga_property_id), so the boot-time
         // dispatch is a no-op. We dispatch again here, after the real
         // GA/GSC IDs are saved, to actually start fetching data.
+        // NOTE: requires a running queue worker (`php artisan queue:work`)
+        // since QUEUE_CONNECTION=database. Without a worker, jobs sit in
+        // the `jobs` table and the dashboard stays empty regardless of
+        // what's in GSC/GA.
         SyncAnalyticsData::dispatch($website->id, 365);
         SyncSearchConsoleData::dispatch($website->id, 365);
+
+        // Pin this website as the user's "current" so the dashboard's
+        // Livewire components (KpiCards, TrafficChart, etc.) read the
+        // correct website_id on their first render. The EnsureFeatureAccess
+        // middleware also self-heals this on subsequent requests, but
+        // setting it inline here removes a round-trip's worth of empty
+        // dashboard for the first hit.
+        session(['current_website_id' => $website->id]);
 
         // Flag the session so the dashboard knows to show the welcome
         // / "your data is being pulled" modal on the next request. Single

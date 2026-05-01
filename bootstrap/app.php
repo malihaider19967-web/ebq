@@ -36,5 +36,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        // Forward unhandled exceptions to Sentry. The SDK respects the
+        // `ignore_exceptions` list in config/sentry.php (404s, validation,
+        // auth challenges) and is a no-op when SENTRY_LARAVEL_DSN is empty,
+        // so this is safe in local/dev environments without configuration.
+        \Sentry\Laravel\Integration::handles($exceptions);
     })->create();
