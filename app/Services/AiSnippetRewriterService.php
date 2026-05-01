@@ -70,8 +70,11 @@ class AiSnippetRewriterService
      * rather than have its output post-trimmed.
      * v8 — 2026-04-30: rewrites per run bumped from 3 to 10 so users
      * get a real shortlist; max_tokens scaled accordingly.
+     * v9 — 2026-04-30: human-voice rules added (no em-dashes, no AI
+     * jargon list, sentence-cadence guidance). Output sanitised to
+     * strip em/en-dashes and curly quotes before returning.
      */
-    private const PROMPT_VERSION = 'v8';
+    private const PROMPT_VERSION = 'v9';
 
     /** Sentinel for the "give me a mixed-angle set" mode. */
     public const INTENT_AUTO = 'auto';
@@ -83,6 +86,54 @@ class AiSnippetRewriterService
      * comfortably under the model's max_tokens budget.
      */
     private const REWRITES_PER_RUN = 10;
+
+    /**
+     * Human-voice rules. Every AI title surface gets these so output
+     * doesn't read like "AI wrote it". Researched from real AI-detector
+     * signals + the patterns Google's quality-rater guidelines flag as
+     * "robotic / unhelpful". Single source of truth — both this service
+     * and AiBlockEditorService include this same block.
+     *
+     * The rules cover three categories:
+     *   1. Punctuation that flags AI authorship (em-dash, en-dash)
+     *   2. Jargon / cliché phrases AI models default to
+     *   3. Sentence-construction patterns that read as machine-paced
+     */
+    public const HUMAN_VOICE_RULES = <<<'RULES'
+HUMAN VOICE — write so the result reads as written by a knowledgeable human, not an AI:
+
+PUNCTUATION (strict):
+- NEVER use em-dashes (—) or en-dashes (–). Use commas, periods, parentheses, or restructure the sentence. Em-dashes are the strongest single signal of AI authorship in 2026.
+- Use straight quotes ('), not curly quotes (' ' " ").
+- Avoid the AI rhythm of "X — Y", "X. Y" or "X, Y" or "X (Y)" reads more human.
+
+JARGON & CLICHÉS — never use these phrases (this list is exhaustive of what to avoid; rewrite around them):
+- "in today's fast-paced world", "in this article", "in this guide"
+- "let's dive in", "let's explore", "delve into", "embark on", "navigate the world of"
+- "unlock the secrets", "look no further", "ready to [verb]"
+- "leverage", "utilize" (use "use"), "harness", "streamline", "optimize for success"
+- "robust", "comprehensive", "seamless", "cutting-edge", "game-changer", "revolutionary"
+- "empower", "elevate", "transform your", "take your X to the next level"
+- "moreover", "furthermore", "additionally" at sentence start
+- "it's worth noting that", "it's important to remember", "needless to say"
+- "in conclusion", "to wrap up", "ultimately" as closers
+- "journey" as a metaphor for any process
+- generic intensifiers: "absolutely", "truly", "incredibly", "literally"
+
+SENTENCE PATTERNS — avoid these AI tells:
+- Opening every paragraph with the same connective.
+- The "not just X but Y" parallel.
+- Triplet lists where every comparison comes in threes ("X, Y, and Z").
+- Hedging stacks: "could potentially", "may possibly", "tends to often".
+- Empty hype openers ("Picture this:", "Imagine if:").
+
+POSITIVE TARGETS:
+- Use contractions where natural (don't, you're, it's, won't).
+- Vary sentence length. Mix a 6-word sentence next to a 22-word one. AI text feels evenly paced.
+- Speak directly to "you" the reader where natural.
+- Prefer concrete, specific nouns over abstract ones (use "deadlines" not "scheduling priorities").
+- Cut adverb pairs ("very important" → "important"; "quite useful" → "useful").
+RULES;
 
     /**
      * Curated CTR-boosting "power words" the model can lean on when a
@@ -140,7 +191,7 @@ class AiSnippetRewriterService
         // — User-requested 10 —
         'list_based' => [
             'label' => 'List-based',
-            'desc'  => 'Listicle / "Top N" framing — scannable and high-CTR for comparison queries.',
+            'desc'  => 'Listicle or "Top N" framing, scannable and high-CTR for comparison queries.',
             'rule'  => 'Title MUST start with a number ("7", "12", etc.) followed by a noun phrase. Meta MUST hint at what the list contains.',
         ],
         'problem_solution' => [
@@ -170,7 +221,7 @@ class AiSnippetRewriterService
         ],
         'freshness_updated' => [
             'label' => 'Freshness / updated',
-            'desc'  => 'Recency-CTR play — current year + "updated" / "new for". Best for fast-moving topics.',
+            'desc'  => 'Recency-CTR play with the current year and "updated" or "new for". Best for fast-moving topics.',
             'rule'  => 'Title MUST contain the current year or "Updated" / "New for". Meta MUST signal what was refreshed (data, picks, methods).',
         ],
         'use_case_focused' => [
@@ -180,12 +231,12 @@ class AiSnippetRewriterService
         ],
         'myth_busting' => [
             'label' => 'Myth-busting',
-            'desc'  => 'Contrarian hook — "X isn\'t true / Y is the real answer". Pattern-interrupt for saturated SERPs.',
+            'desc'  => 'Contrarian hook ("X isn\'t true, Y is the real answer"). Pattern-interrupt for saturated SERPs.',
             'rule'  => 'Title MUST contain a contradiction or "isn\'t / not / wrong" hook. Meta MUST tease the corrected truth without spoiling the page.',
         ],
         'comparison_verdict' => [
             'label' => 'Comparison with verdict',
-            'desc'  => 'X vs Y framing with a clear winner. Decisive comparison — beats wishy-washy "X vs Y compared" titles.',
+            'desc'  => 'X vs Y framing with a clear winner. Decisive comparison, beats wishy-washy "X vs Y compared" titles.',
             'rule'  => 'Title MUST contain "vs" or "or" between two named options AND signal a verdict ("which wins", "we picked", "the clear winner"). Meta MUST hint at the verdict\'s reasoning.',
         ],
 
@@ -202,7 +253,7 @@ class AiSnippetRewriterService
         ],
         'curiosity' => [
             'label' => 'Curiosity',
-            'desc'  => 'Open-loop hook — withhold the answer slightly to drive the click. Use sparingly.',
+            'desc'  => 'Open-loop hook that withholds the answer slightly to drive the click. Use sparingly.',
             'rule'  => 'Title MUST create an information gap (surprising claim, counterintuitive frame). Meta MUST tease the resolution without revealing it.',
         ],
         'guide' => [
@@ -392,25 +443,25 @@ You are a senior SEO copywriter. You produce snappy, click-worthy SEO titles
 and meta descriptions that beat what's already ranking for the target query.
 
 NON-NEGOTIABLE RULES (a rewrite that breaks ANY of these is invalid and will
-be rejected — never return one):
+be rejected, never return one):
 - Every title MUST contain the EXACT focus keyword (case-insensitive match).
   No paraphrases, no synonyms, no plurals where the focus is singular,
   no rearranging the words. The full phrase must appear verbatim, ideally
   in the first 60 characters of the title.
 - Every meta description MUST contain the EXACT focus keyword (case-
-  insensitive match) at least once. Same rule — verbatim phrase, no
+  insensitive match) at least once. Same rule, verbatim phrase, no
   paraphrases or partial matches.
-- Both fields MUST work as natural English with the keyword in place — do
+- Both fields MUST work as natural English with the keyword in place. Do
   not bolt the keyword onto a sentence that doesn't grammatically support
   it. Rewrite the surrounding words if needed to integrate cleanly.
 - Title character count MUST be between 30 and 60 inclusive (Yoast's
   industry-standard SEO range; Google truncates anything longer than ~60
   on SERPs). Count every character: letters, digits, spaces, punctuation.
-  Aim for 50–60 as the sweet spot — closer to 60 maximizes use of the
+  Aim for 50 to 60 as the sweet spot, closer to 60 maximizes use of the
   display window, but never go over. Before returning, count the
   characters and rewrite if outside range.
 - Meta description character count MUST be between 130 and 155 inclusive
-  (Google's snippet window — under 130 wastes the SERP real estate, over
+  (Google's snippet window; under 130 wastes the SERP real estate, over
   155 truncates). Count every character. Aim for 145 ± 5. Before returning,
   count the characters and rewrite if outside range.
 
@@ -420,15 +471,16 @@ Universal constraints:
 - Meta description reinforces the focus keyword, states the value the user
   gets, and ends with an implicit or explicit CTA.
 - Lean on power words for CTR but never sacrifice clarity. At most one or
-  two per title and one per meta — titles must read as real human-written
+  two per title and one per meta. Titles must read as real human-written
   headlines, not a clickbait stack.
 - When additional keyphrases are provided, weave each one into AT MOST ONE
   of the rewrites where it fits naturally. Never force them, and never
   repeat the same additional keyphrase across multiple rewrites. Additional
-  keyphrases come AFTER the focus keyword — they never replace it.
-- Differentiate from the competitor titles when given — do not just rephrase.
+  keyphrases come AFTER the focus keyword, they never replace it.
+- Differentiate from the competitor titles when given, do not just rephrase.
 - Return STRICTLY valid JSON with the schema below. No prose, no markdown.
 SYS;
+        $system .= "\n\n" . self::HUMAN_VOICE_RULES;
 
         $count = self::REWRITES_PER_RUN;
 
@@ -443,12 +495,12 @@ SYS;
             // parsed the rest as code. `EBQ_PROMPT_MODE_BLOCK` is unique.
             $modeBlock = <<<EBQ_PROMPT_MODE_BLOCK
 MODE: auto-mix.
-Pick {$count} DIFFERENT angles from this registry — every rewrite uses a
+Pick {$count} DIFFERENT angles from this registry. Every rewrite uses a
 different one (no two rewrites share an angle):
   {$intentList}
 Set the "angle" field on each rewrite to the chosen angle key from the
 list above. The {$count} angles you pick MUST be visibly different in
-framing — not paraphrases of each other.
+framing, not paraphrases of each other.
 EBQ_PROMPT_MODE_BLOCK;
         } else {
             $intentMeta = self::INTENTS[$intent];
@@ -457,7 +509,7 @@ EBQ_PROMPT_MODE_BLOCK;
             $intentRule = $intentMeta['rule'];
             $modeBlock = <<<EBQ_PROMPT_MODE_BLOCK
 MODE: single-intent variations.
-Selected intent: "{$intent}" — {$intentLabel}.
+Selected intent: "{$intent}" ({$intentLabel}).
 What this angle is: {$intentDesc}
 STRUCTURAL RULE for every rewrite (non-negotiable): {$intentRule}
 
@@ -470,12 +522,12 @@ EBQ_PROMPT_MODE_BLOCK;
         }
 
         $user = <<<USER
-Focus keyword (MUST appear verbatim in every title AND every meta — case-
+Focus keyword (MUST appear verbatim in every title AND every meta, case-
 insensitive match, no paraphrases, no partial matches, no synonyms):
   "{$keyword}"
 
 Additional keyphrases (weave AT MOST ONE into ONE of the three rewrites
-where it fits — never forced, never across multiple rewrites, never as a
+where it fits, never forced, never across multiple rewrites, never as a
 replacement for the focus keyword): {$additionalBlock}
 
 Power words you may draw on (zero, one, or two per title; one per meta;
@@ -487,26 +539,26 @@ Current meta description: "{$currentMeta}"
 Top-ranking competitor titles for this query:
 {$competitorBlock}
 
-Content excerpt (use only for intent grounding — do not echo verbatim):
+Content excerpt (use only for intent grounding, do not echo verbatim):
 ---
 {$excerpt}
 ---
 
 {$modeBlock}
 
-CHARACTER LENGTH (HARD LIMIT — verify before returning):
-- title: between 30 and 60 characters inclusive (sweet spot 50–60)
+CHARACTER LENGTH (HARD LIMIT, verify before returning):
+- title: between 30 and 60 characters inclusive (sweet spot 50 to 60)
 - meta:  between 130 and 155 characters inclusive (sweet spot 145 ± 5)
 Count BEFORE returning. If a draft is outside the range, rewrite it
-until it fits — never round up/down by one char and submit anyway.
+until it fits, never round up/down by one char and submit anyway.
 
-Return JSON exactly in this shape (EXACTLY {$count} entries — no fewer):
+Return JSON exactly in this shape (EXACTLY {$count} entries, no fewer):
 {
   "rewrites": [
     {
       "angle": "<angle_key_from_registry>",
-      "title": "...",   // 30–60 chars, verbatim focus keyword
-      "meta": "...",    // 130–155 chars, verbatim focus keyword
+      "title": "...",   // 30 to 60 chars, verbatim focus keyword
+      "meta": "...",    // 130 to 155 chars, verbatim focus keyword
       "rationale": "Why this rewrite works against the SERP, in one sentence."
     },
     ... (exactly {$count} entries)
@@ -539,8 +591,11 @@ USER;
         $invalid = [];
         foreach ($rawRewrites as $r) {
             if (! is_array($r)) continue;
-            $title = trim((string) ($r['title'] ?? ''));
-            $meta = trim((string) ($r['meta'] ?? ''));
+            // Humanize before validating: stripping em-dashes can shift
+            // length by a few chars, so we measure the humanized version
+            // (which is what the user will actually see).
+            $title = self::humanizePunctuation(trim((string) ($r['title'] ?? '')));
+            $meta = self::humanizePunctuation(trim((string) ($r['meta'] ?? '')));
             if ($title === '' || $meta === '') continue;
 
             $reasons = [];
@@ -554,21 +609,21 @@ USER;
                 $reasons[] = "meta is missing the focus keyword \"{$focusKeyword}\"";
             }
             if ($titleLen < 30) {
-                $reasons[] = "title is {$titleLen} chars (under by " . (30 - $titleLen) . "); expand to 30–60 chars";
+                $reasons[] = "title is {$titleLen} chars (under by " . (30 - $titleLen) . "); expand to 30 to 60 chars";
             } elseif ($titleLen > 60) {
-                $reasons[] = "title is {$titleLen} chars (over by " . ($titleLen - 60) . "); shorten to 30–60 chars without ending mid-thought";
+                $reasons[] = "title is {$titleLen} chars (over by " . ($titleLen - 60) . "); shorten to 30 to 60 chars without ending mid-thought";
             }
             if ($metaLen < 130) {
-                $reasons[] = "meta is {$metaLen} chars (under by " . (130 - $metaLen) . "); expand to 130–155 chars with a CTA or extra detail";
+                $reasons[] = "meta is {$metaLen} chars (under by " . (130 - $metaLen) . "); expand to 130 to 155 chars with a CTA or extra detail";
             } elseif ($metaLen > 155) {
-                $reasons[] = "meta is {$metaLen} chars (over by " . ($metaLen - 155) . "); rewrite tighter to 130–155 chars while keeping a complete sentence and CTA";
+                $reasons[] = "meta is {$metaLen} chars (over by " . ($metaLen - 155) . "); rewrite tighter to 130 to 155 chars while keeping a complete sentence and CTA";
             }
 
             if ($reasons === []) {
                 $valid[] = [
                     'title' => $title,
                     'meta' => $meta,
-                    'rationale' => mb_substr(trim((string) ($r['rationale'] ?? '')), 0, 220),
+                    'rationale' => mb_substr(self::humanizePunctuation(trim((string) ($r['rationale'] ?? ''))), 0, 220),
                     'angle' => mb_substr(trim((string) ($r['angle'] ?? $defaultAngle)), 0, 32),
                 ];
             } else {
@@ -646,10 +701,43 @@ FEEDBACK;
     }
 
     /**
+     * Strip the punctuation that flags "this was AI-written" most loudly:
+     * em-dashes (—) and en-dashes (–) get replaced with safer ASCII
+     * equivalents, smart quotes get straightened. The model is asked not
+     * to use these in the prompt, but enforcement here means they never
+     * leak through to the user even when the model drifts. Applied to
+     * every accepted title/meta/rationale before returning.
+     *
+     * Replacement strategy:
+     *   - " — " (em-dash with surrounding spaces, parenthetical aside) → ", "
+     *   - "—" with no spaces (compound style) → ", "
+     *   - en-dash variants likewise (used as ranges or asides)
+     *   - curly quotes → straight ASCII
+     */
+    public static function humanizePunctuation(string $s): string
+    {
+        // Em-dash and en-dash with surrounding spaces — most common AI
+        // pattern, behaves as a parenthetical comma in a human-written
+        // line.
+        $s = (string) preg_replace('/\s*[\x{2014}\x{2013}]\s*/u', ', ', $s);
+        // Stripped pattern collapsed double-commas / leading-comma fragments.
+        $s = (string) preg_replace('/,\s*,/u', ',', $s);
+        $s = (string) preg_replace('/^,\s*/u', '', $s);
+        // Curly quotes to straight.
+        $s = (string) preg_replace('/[\x{2018}-\x{201B}]/u', "'", $s);
+        $s = (string) preg_replace('/[\x{201C}-\x{201F}]/u', '"', $s);
+        // NBSP to space.
+        $s = (string) preg_replace('/\x{00A0}/u', ' ', $s);
+        // Collapse whitespace runs introduced by the substitutions.
+        $s = (string) preg_replace('/\s{2,}/u', ' ', $s);
+        return trim($s);
+    }
+
+    /**
      * Case-insensitive, whitespace-tolerant check for whether `$haystack`
      * contains the exact `$needle` keyphrase. Both sides are lowered and
      * whitespace runs collapsed so "Focus  Keyword" matches "focus keyword"
-     * — but synonyms and partial matches still fail. Used to validate AI
+     * but synonyms and partial matches still fail. Used to validate AI
      * rewrites against the user's focus keyword.
      */
     private function containsKeyword(string $haystack, string $needle): bool
