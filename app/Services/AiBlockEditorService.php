@@ -140,24 +140,37 @@ class AiBlockEditorService
             return ['ok' => false, 'error' => 'llm_empty_response'];
         }
 
-        // Title mode emits one suggestion per line. The prompt requires
-        // every title to contain the exact focus keyword verbatim, but
-        // models occasionally drift. Filter out any line that doesn't
-        // contain the focus keyword (case-insensitive, Unicode-quote
-        // tolerant) so the user never sees a "title suggestion" missing
-        // the term they're trying to rank for.
-        if ($mode === self::MODE_TITLE && $focusKeyword !== '') {
+        // Title mode emits one suggestion per line. Two hard rules:
+        //   1. Must contain the EXACT focus keyword (Unicode-quote tolerant).
+        //   2. Must be 50–65 chars (Google's title display window).
+        // Models drift on both — filter rather than serve broken suggestions.
+        if ($mode === self::MODE_TITLE) {
             $lines = preg_split('/\r?\n/', $generated) ?: [];
             $kept = [];
+            $rejectedKeyword = 0;
+            $rejectedLength = 0;
             foreach ($lines as $line) {
                 $clean = trim($line);
                 if ($clean === '') continue;
-                if ($this->lineContainsKeyword($clean, $focusKeyword)) {
-                    $kept[] = $clean;
+                if ($focusKeyword !== '' && ! $this->lineContainsKeyword($clean, $focusKeyword)) {
+                    $rejectedKeyword++;
+                    continue;
                 }
+                $len = mb_strlen($clean);
+                if ($len < 50 || $len > 65) {
+                    $rejectedLength++;
+                    continue;
+                }
+                $kept[] = $clean;
             }
             if (count($kept) === 0) {
-                return ['ok' => false, 'error' => 'focus_keyword_missing', 'message' => 'The model returned title suggestions that did not contain your focus keyword. Try regenerating.'];
+                if ($rejectedKeyword > 0 && $rejectedLength === 0) {
+                    return ['ok' => false, 'error' => 'focus_keyword_missing', 'message' => 'The model returned title suggestions that did not contain your focus keyword. Try regenerating.'];
+                }
+                if ($rejectedLength > 0 && $rejectedKeyword === 0) {
+                    return ['ok' => false, 'error' => 'length_out_of_range', 'message' => 'The model returned title suggestions outside the 50–65 character window. Try regenerating.'];
+                }
+                return ['ok' => false, 'error' => 'titles_invalid', 'message' => 'The model returned title suggestions that failed our SEO rules. Try regenerating.'];
             }
             $generated = implode("\n", $kept);
         }
@@ -346,7 +359,7 @@ class AiBlockEditorService
             self::MODE_TITLE => [
                 $system,
                 $seoContext."Generate exactly 5 SEO-optimized title suggestions for this page. Each title MUST:\n"
-                    ."- Be 50–65 characters (Google's title display window)\n"
+                    ."- Be 50–65 characters inclusive (Google's title display window). Count every character — letters, digits, spaces, punctuation. Anything shorter looks weak; anything longer truncates with an ellipsis on SERPs. Verify the count BEFORE returning each title and rewrite if outside range\n"
                     ."- Contain the EXACT focus keyword verbatim (case-insensitive match) — no paraphrases, no synonyms, no partial matches. The full phrase must appear, ideally in the first 60 characters\n"
                     ."- Match the search intent indicated by the SEO context\n"
                     ."- Be compelling and click-worthy without resorting to clickbait or vague hype\n"

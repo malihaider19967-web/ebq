@@ -51,8 +51,11 @@ class AiSnippetRewriterService
      *
      * v3 — 2026-04-30: focus keyword now MUST appear verbatim in both
      * title and meta; post-validation drops rewrites that fail the check.
+     * v4 — 2026-04-30: title and meta length (50–60 / 130–155) promoted
+     * to non-negotiable rules with hard post-validation; out-of-range
+     * rewrites are dropped rather than served and truncated downstream.
      */
-    private const PROMPT_VERSION = 'v3';
+    private const PROMPT_VERSION = 'v4';
 
     /** Sentinel for the "give me a mixed-angle set" mode. */
     public const INTENT_AUTO = 'auto';
@@ -270,13 +273,15 @@ class AiSnippetRewriterService
         // the UI can still chip-tag rewrites even if the model omits it.
         $defaultAngle = $intent !== self::INTENT_AUTO ? $intent : 'general';
 
-        // Validate every returned rewrite includes the exact focus keyword
-        // in BOTH the title and the meta. Despite the prompt's hard rule,
-        // models occasionally drift to synonyms/paraphrases — surface that
-        // as a failure rather than silently returning a rewrite the user
-        // would have to manually fix. We do this case-insensitively and
-        // collapse whitespace so "focus keyword" matches "Focus  Keyword".
-        $rejected = 0;
+        // Validate every returned rewrite against two non-negotiable rules:
+        //   1. Title and meta must contain the EXACT focus keyword.
+        //   2. Title is 50–60 chars; meta is 130–155 chars.
+        // Models drift on both even with the prompt screaming about them.
+        // Drop offenders rather than returning rewrites the user would
+        // have to manually fix — and surface a specific error code per
+        // failure mode so the UI can suggest "Regenerate".
+        $rejectedKeyword = 0;
+        $rejectedLength = 0;
         $rewrites = [];
         foreach ($payload['rewrites'] as $r) {
             if (! is_array($r)) continue;
@@ -284,12 +289,18 @@ class AiSnippetRewriterService
             $meta = trim((string) ($r['meta'] ?? ''));
             if ($title === '' || $meta === '') continue;
             if (! $this->containsKeyword($title, $focusKeyword) || ! $this->containsKeyword($meta, $focusKeyword)) {
-                $rejected++;
+                $rejectedKeyword++;
+                continue;
+            }
+            $titleLen = mb_strlen($title);
+            $metaLen = mb_strlen($meta);
+            if ($titleLen < 50 || $titleLen > 60 || $metaLen < 130 || $metaLen > 155) {
+                $rejectedLength++;
                 continue;
             }
             $rewrites[] = [
-                'title' => mb_substr($title, 0, 90),
-                'meta' => mb_substr($meta, 0, 200),
+                'title' => $title,
+                'meta' => $meta,
                 'rationale' => mb_substr(trim((string) ($r['rationale'] ?? '')), 0, 220),
                 'angle' => mb_substr(trim((string) ($r['angle'] ?? $defaultAngle)), 0, 32),
             ];
@@ -297,14 +308,21 @@ class AiSnippetRewriterService
         }
 
         if ($rewrites === []) {
-            if ($rejected > 0) {
-                Log::warning('AiSnippetRewriterService: all rewrites missing focus keyword', [
+            if ($rejectedKeyword > 0 || $rejectedLength > 0) {
+                Log::warning('AiSnippetRewriterService: all rewrites failed validation', [
                     'post_id' => $postId,
                     'focus_keyword' => $focusKeyword,
                     'intent' => $intent,
-                    'rejected_count' => $rejected,
+                    'rejected_keyword' => $rejectedKeyword,
+                    'rejected_length' => $rejectedLength,
                 ]);
-                return ['ok' => false, 'error' => 'focus_keyword_missing', 'message' => 'The model returned rewrites that did not contain the focus keyword. Try regenerating.'];
+                if ($rejectedKeyword > 0 && $rejectedLength === 0) {
+                    return ['ok' => false, 'error' => 'focus_keyword_missing', 'message' => 'The model returned rewrites that did not contain the focus keyword. Try regenerating.'];
+                }
+                if ($rejectedLength > 0 && $rejectedKeyword === 0) {
+                    return ['ok' => false, 'error' => 'length_out_of_range', 'message' => 'The model returned rewrites outside the 50–60 (title) / 130–155 (meta) character windows. Try regenerating.'];
+                }
+                return ['ok' => false, 'error' => 'rewrites_invalid', 'message' => 'The model returned rewrites that failed our SEO rules (focus keyword and/or length). Try regenerating.'];
             }
             return ['ok' => false, 'error' => 'no_rewrites_returned'];
         }
@@ -362,12 +380,21 @@ be rejected — never return one):
 - Both fields MUST work as natural English with the keyword in place — do
   not bolt the keyword onto a sentence that doesn't grammatically support
   it. Rewrite the surrounding words if needed to integrate cleanly.
+- Title character count MUST be between 50 and 60 inclusive (Google's
+  display window — anything shorter looks weak, anything longer truncates
+  with an ellipsis on SERPs). Count every character: letters, digits,
+  spaces, punctuation. Aim for 55 ± 3 as the sweet spot. Before returning,
+  count the characters and rewrite if outside range.
+- Meta description character count MUST be between 130 and 155 inclusive
+  (Google's snippet window — under 130 wastes the SERP real estate, over
+  155 truncates). Count every character. Aim for 145 ± 5. Before returning,
+  count the characters and rewrite if outside range.
 
 Universal constraints:
-- Title: 50–60 characters. Lead with the focus keyword where it reads
-  naturally. No ALL CAPS, no lying, no generic clickbait.
-- Meta description: 130–155 characters. Reinforce the focus keyword,
-  state the value the user gets, end with an implicit or explicit CTA.
+- Lead the title with the focus keyword where it reads naturally. No ALL
+  CAPS, no lying, no generic clickbait.
+- Meta description reinforces the focus keyword, states the value the user
+  gets, and ends with an implicit or explicit CTA.
 - Lean on power words for CTR but never sacrifice clarity. At most one or
   two per title and one per meta — titles must read as real human-written
   headlines, not a clickbait stack.
@@ -439,13 +466,19 @@ Content excerpt (use only for intent grounding — do not echo verbatim):
 
 {$modeBlock}
 
+CHARACTER LENGTH (HARD RULE — verify before returning):
+- title: between 50 and 60 characters inclusive (sweet spot 55 ± 3)
+- meta:  between 130 and 155 characters inclusive (sweet spot 145 ± 5)
+Count BEFORE returning. If a draft is outside the range, rewrite it
+until it fits — never round up/down by one char and submit anyway.
+
 Return JSON exactly in this shape:
 {
   "rewrites": [
     {
       "angle": "<angle_key_from_registry>",
-      "title": "...",
-      "meta": "...",
+      "title": "...",   // 50–60 chars, verbatim focus keyword
+      "meta": "...",    // 130–155 chars, verbatim focus keyword
       "rationale": "Why this rewrite works against the SERP, in one sentence."
     },
     ... (exactly 3 entries)
