@@ -2,6 +2,8 @@
 
 namespace App\Livewire\Onboarding;
 
+use App\Jobs\SyncAnalyticsData;
+use App\Jobs\SyncSearchConsoleData;
 use App\Models\Website;
 use App\Services\Google\GoogleAnalyticsService;
 use App\Services\Google\SearchConsoleService;
@@ -80,14 +82,30 @@ class ConnectGoogle extends Component
                 'ga_property_id' => $this->gaPropertyId,
                 'gsc_site_url' => $this->gscSiteUrl,
             ])->save();
+            $website = $existing;
         } else {
-            Website::create([
+            $website = Website::create([
                 'user_id' => $userId,
                 'domain' => $this->domain,
                 'ga_property_id' => $this->gaPropertyId,
                 'gsc_site_url' => $this->gscSiteUrl,
             ]);
         }
+
+        // Kick off the 365-day backfill explicitly. The Website model's
+        // `booted::created` hook already dispatches these for fresh rows,
+        // but the pay-first flow creates a placeholder Website earlier
+        // (with no Google account / no ga_property_id), so the boot-time
+        // dispatch is a no-op. We dispatch again here, after the real
+        // GA/GSC IDs are saved, to actually start fetching data.
+        SyncAnalyticsData::dispatch($website->id, 365);
+        SyncSearchConsoleData::dispatch($website->id, 365);
+
+        // Flag the session so the dashboard knows to show the welcome
+        // / "your data is being pulled" modal on the next request. Single
+        // shot — `flash()` clears it after one request so the modal
+        // never re-appears on subsequent dashboard visits.
+        session()->flash('just_onboarded', true);
 
         $this->redirectRoute('dashboard');
     }

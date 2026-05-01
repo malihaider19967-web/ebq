@@ -107,16 +107,13 @@
                 </p>
                 <ul>
                     <li>
-                        <strong>Cloud hosting infrastructure</strong> (currently DigitalOcean). Cached Google data lives on managed servers operated by our hosting provider under their security and data-protection terms. Hosting providers do not access this data for their own purposes.
+                        <strong>Hetzner Online GmbH</strong> (cloud hosting infrastructure, EU). EBQ runs on Hetzner Cloud servers; cached Google data and the application database live on this infrastructure under Hetzner's <a href="https://www.hetzner.com/legal/privacy-policy/" rel="noopener noreferrer">data-protection terms</a> and DPA. Hetzner provides infrastructure only and does not access stored data for its own purposes.
                     </li>
                     <li>
-                        <strong>Managed database service</strong> for the same reason &mdash; encrypted-at-rest storage of cached query/traffic results.
+                        <strong>Error monitoring</strong> may receive a stack trace if a request involving Google data fails. Stack traces are scrubbed of secrets and personally identifiable information before transmission, and the monitoring vendor processes them strictly to alert us about errors.
                     </li>
                     <li>
-                        <strong>Error monitoring</strong> (e.g. Sentry-equivalent) may receive a stack trace if a request involving Google data fails. Stack traces are scrubbed of secrets and PII before transmission.
-                    </li>
-                    <li>
-                        <strong>Other end users you authorise</strong> &mdash; if you invite a teammate to your EBQ workspace, they will see the Google-derived dashboards for the websites you grant them access to. You control invitations and can revoke them at any time.
+                        <strong>Other end users you authorise</strong>: if you invite a teammate to your EBQ workspace, they will see the Google-derived dashboards for the websites you grant them access to. You control invitations and can revoke them at any time.
                     </li>
                 </ul>
                 <p>
@@ -135,7 +132,7 @@
 
                 <h3>4.1 Storage location</h3>
                 <ul>
-                    <li>Application servers and primary databases are hosted in EU/US datacenters operated by our cloud provider.</li>
+                    <li>Application servers and the primary database are hosted on Hetzner Cloud infrastructure in EU datacenters (Germany / Finland).</li>
                     <li>Google user data (cached Search Console / Analytics responses, OAuth refresh tokens) is stored alongside your EBQ workspace on the same infrastructure.</li>
                 </ul>
 
