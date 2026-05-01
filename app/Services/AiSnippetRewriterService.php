@@ -255,12 +255,23 @@ class AiSnippetRewriterService
         // the UI can still chip-tag rewrites even if the model omits it.
         $defaultAngle = $intent !== self::INTENT_AUTO ? $intent : 'general';
 
+        // Validate every returned rewrite includes the exact focus keyword
+        // in BOTH the title and the meta. Despite the prompt's hard rule,
+        // models occasionally drift to synonyms/paraphrases — surface that
+        // as a failure rather than silently returning a rewrite the user
+        // would have to manually fix. We do this case-insensitively and
+        // collapse whitespace so "focus keyword" matches "Focus  Keyword".
+        $rejected = 0;
         $rewrites = [];
         foreach ($payload['rewrites'] as $r) {
             if (! is_array($r)) continue;
             $title = trim((string) ($r['title'] ?? ''));
             $meta = trim((string) ($r['meta'] ?? ''));
             if ($title === '' || $meta === '') continue;
+            if (! $this->containsKeyword($title, $focusKeyword) || ! $this->containsKeyword($meta, $focusKeyword)) {
+                $rejected++;
+                continue;
+            }
             $rewrites[] = [
                 'title' => mb_substr($title, 0, 90),
                 'meta' => mb_substr($meta, 0, 200),
@@ -271,6 +282,15 @@ class AiSnippetRewriterService
         }
 
         if ($rewrites === []) {
+            if ($rejected > 0) {
+                Log::warning('AiSnippetRewriterService: all rewrites missing focus keyword', [
+                    'post_id' => $postId,
+                    'focus_keyword' => $focusKeyword,
+                    'intent' => $intent,
+                    'rejected_count' => $rejected,
+                ]);
+                return ['ok' => false, 'error' => 'focus_keyword_missing', 'message' => 'The model returned rewrites that did not contain the focus keyword. Try regenerating.'];
+            }
             return ['ok' => false, 'error' => 'no_rewrites_returned'];
         }
 
@@ -315,17 +335,31 @@ class AiSnippetRewriterService
 You are a senior SEO copywriter. You produce snappy, click-worthy SEO titles
 and meta descriptions that beat what's already ranking for the target query.
 
+NON-NEGOTIABLE RULES (a rewrite that breaks ANY of these is invalid and will
+be rejected — never return one):
+- Every title MUST contain the EXACT focus keyword (case-insensitive match).
+  No paraphrases, no synonyms, no plurals where the focus is singular,
+  no rearranging the words. The full phrase must appear verbatim, ideally
+  in the first 60 characters of the title.
+- Every meta description MUST contain the EXACT focus keyword (case-
+  insensitive match) at least once. Same rule — verbatim phrase, no
+  paraphrases or partial matches.
+- Both fields MUST work as natural English with the keyword in place — do
+  not bolt the keyword onto a sentence that doesn't grammatically support
+  it. Rewrite the surrounding words if needed to integrate cleanly.
+
 Universal constraints:
-- Title: 50–60 characters. Lead with the focus keyword (or its close variant).
-  No ALL CAPS, no lying, no generic clickbait.
-- Meta description: 130–155 characters. Reinforce the focus keyword once,
+- Title: 50–60 characters. Lead with the focus keyword where it reads
+  naturally. No ALL CAPS, no lying, no generic clickbait.
+- Meta description: 130–155 characters. Reinforce the focus keyword,
   state the value the user gets, end with an implicit or explicit CTA.
 - Lean on power words for CTR but never sacrifice clarity. At most one or
   two per title and one per meta — titles must read as real human-written
   headlines, not a clickbait stack.
 - When additional keyphrases are provided, weave AT MOST ONE into ONE of the
   three rewrites where it fits naturally. Never force them, and never repeat
-  the same additional keyphrase across multiple rewrites.
+  the same additional keyphrase across multiple rewrites. Additional
+  keyphrases come AFTER the focus keyword — they never replace it.
 - Differentiate from the competitor titles when given — do not just rephrase.
 - Return STRICTLY valid JSON with the schema below. No prose, no markdown.
 SYS;
@@ -366,10 +400,13 @@ EBQ_PROMPT_MODE_BLOCK;
         }
 
         $user = <<<USER
-Focus keyword: "{$keyword}"
+Focus keyword (MUST appear verbatim in every title AND every meta — case-
+insensitive match, no paraphrases, no partial matches, no synonyms):
+  "{$keyword}"
 
 Additional keyphrases (weave AT MOST ONE into ONE of the three rewrites
-where it fits — never forced, never across multiple rewrites): {$additionalBlock}
+where it fits — never forced, never across multiple rewrites, never as a
+replacement for the focus keyword): {$additionalBlock}
 
 Power words you may draw on (zero, one, or two per title; one per meta;
 never stuffed): {$powerWordsBlock}
@@ -405,6 +442,24 @@ USER;
             ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => $user],
         ];
+    }
+
+    /**
+     * Case-insensitive, whitespace-tolerant check for whether `$haystack`
+     * contains the exact `$needle` keyphrase. Both sides are lowered and
+     * whitespace runs collapsed so "Focus  Keyword" matches "focus keyword"
+     * — but synonyms and partial matches still fail. Used to validate AI
+     * rewrites against the user's focus keyword.
+     */
+    private function containsKeyword(string $haystack, string $needle): bool
+    {
+        if ($needle === '') {
+            return true;
+        }
+        $normalize = static fn (string $s): string => mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $s)));
+        $h = $normalize($haystack);
+        $n = $normalize($needle);
+        return $n !== '' && mb_strpos($h, $n) !== false;
     }
 
     /**

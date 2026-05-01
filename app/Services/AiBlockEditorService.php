@@ -302,7 +302,7 @@ class AiBlockEditorService
                 $system,
                 $seoContext."Generate exactly 5 SEO-optimized title suggestions for this page. Each title MUST:\n"
                     ."- Be 50–65 characters (Google's title display window)\n"
-                    ."- Naturally include the focus keyword (or a very close variant) somewhere — ideally in the first 60 chars\n"
+                    ."- Contain the EXACT focus keyword verbatim (case-insensitive match) — no paraphrases, no synonyms, no partial matches. The full phrase must appear, ideally in the first 60 characters\n"
                     ."- Match the search intent indicated by the SEO context\n"
                     ."- Be compelling and click-worthy without resorting to clickbait or vague hype\n"
                     ."- Use sentence case (only first letter capitalized) unless a brand name requires capitals\n"
