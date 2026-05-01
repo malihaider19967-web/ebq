@@ -140,15 +140,15 @@ class AiBlockEditorService
             return ['ok' => false, 'error' => 'llm_empty_response'];
         }
 
-        // Title mode emits one suggestion per line. Two hard rules:
-        //   1. Must contain the EXACT focus keyword (Unicode-quote tolerant).
-        //   2. Must be 30–60 chars (Yoast's industry-standard SEO range).
-        // Models drift on both — filter rather than serve broken suggestions.
+        // Title mode emits one suggestion per line. Two-stage validation:
+        //   1. Focus keyword presence — non-fixable; drop the line.
+        //   2. Length — auto-coerced to 30–60 via word-boundary truncation
+        //      when too long, or safe-suffix padding when too short, so
+        //      users never see a "regenerate" length error.
         if ($mode === self::MODE_TITLE) {
             $lines = preg_split('/\r?\n/', $generated) ?: [];
             $kept = [];
             $rejectedKeyword = 0;
-            $rejectedLength = 0;
             foreach ($lines as $line) {
                 $clean = trim($line);
                 if ($clean === '') continue;
@@ -156,26 +156,75 @@ class AiBlockEditorService
                     $rejectedKeyword++;
                     continue;
                 }
-                $len = mb_strlen($clean);
-                if ($len < 30 || $len > 60) {
-                    $rejectedLength++;
-                    continue;
-                }
-                $kept[] = $clean;
+                $coerced = $this->coerceTitleLength($clean, $focusKeyword);
+                if ($coerced === null) continue;
+                $kept[] = $coerced;
             }
             if (count($kept) === 0) {
-                if ($rejectedKeyword > 0 && $rejectedLength === 0) {
+                if ($rejectedKeyword > 0) {
                     return ['ok' => false, 'error' => 'focus_keyword_missing', 'message' => 'The model returned title suggestions that did not contain your focus keyword. Try regenerating.'];
                 }
-                if ($rejectedLength > 0 && $rejectedKeyword === 0) {
-                    return ['ok' => false, 'error' => 'length_out_of_range', 'message' => 'The model returned title suggestions outside the 30–60 character window. Try regenerating.'];
-                }
-                return ['ok' => false, 'error' => 'titles_invalid', 'message' => 'The model returned title suggestions that failed our SEO rules. Try regenerating.'];
+                return ['ok' => false, 'error' => 'titles_invalid', 'message' => 'The model returned no usable title suggestions. Try regenerating.'];
             }
             $generated = implode("\n", $kept);
         }
 
         return ['ok' => true, 'text' => $generated];
+    }
+
+    /**
+     * Coerce a title to the 30–60 char window. Truncate at a word
+     * boundary when too long; pad with a safe SEO-friendly suffix when
+     * too short. Verifies the focus keyword survives any truncation.
+     * Returns null only when no in-range result is achievable while
+     * keeping the focus keyword present.
+     *
+     * Mirrors AiSnippetRewriterService::coerceTitleLength so both AI
+     * title surfaces apply the same coercion standard.
+     */
+    private function coerceTitleLength(string $title, string $focusKeyword): ?string
+    {
+        $len = mb_strlen($title);
+        if ($len >= 30 && $len <= 60) {
+            return $title;
+        }
+
+        if ($len > 60) {
+            $cut = mb_substr($title, 0, 60);
+            $lastSpace = mb_strrpos($cut, ' ');
+            $floor = (int) (60 * 0.7);
+            if ($lastSpace !== false && $lastSpace >= $floor) {
+                $cut = mb_substr($cut, 0, $lastSpace);
+            }
+            $cut = rtrim($cut, " \t\n\r\0\x0B,;:.!?-—–|");
+            $cutLen = mb_strlen($cut);
+            if ($cutLen >= 30 && $cutLen <= 60) {
+                if ($focusKeyword === '' || $this->lineContainsKeyword($cut, $focusKeyword)) {
+                    return $cut;
+                }
+            }
+            return null;
+        }
+
+        // Too short — append a safe suffix until in [30, 60].
+        $year = date('Y');
+        $suffixes = [
+            ' — Complete Guide',
+            ' Explained',
+            ' (' . $year . ' Guide)',
+            ' — What to Know',
+            ' for Beginners',
+            ' — Quick Guide',
+            ' (' . $year . ')',
+        ];
+        foreach ($suffixes as $suffix) {
+            $candidate = rtrim($title, " \t\n\r\0\x0B,;:.!?-—–|") . $suffix;
+            $cLen = mb_strlen($candidate);
+            if ($cLen >= 30 && $cLen <= 60) {
+                return $candidate;
+            }
+        }
+        return null;
     }
 
     /**

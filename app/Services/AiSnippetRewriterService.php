@@ -56,8 +56,14 @@ class AiSnippetRewriterService
      * rewrites are dropped rather than served and truncated downstream.
      * v5 — 2026-04-30: title window widened to 30–60 (Yoast's range);
      * meta stays at 130–155.
+     * v6 — 2026-04-30: backend now COERCES out-of-range output back into
+     * the window via word/sentence-boundary truncation or curated suffix/
+     * CTA padding. Users never see a "regenerate" length error — even
+     * when the model drifts, post-processing pulls the title/meta into
+     * range. Only a missing focus keyword is still grounds for skipping
+     * a rewrite (since splicing in a keyword would break grammar).
      */
-    private const PROMPT_VERSION = 'v5';
+    private const PROMPT_VERSION = 'v6';
 
     /** Sentinel for the "give me a mixed-angle set" mode. */
     public const INTENT_AUTO = 'auto';
@@ -275,15 +281,18 @@ class AiSnippetRewriterService
         // the UI can still chip-tag rewrites even if the model omits it.
         $defaultAngle = $intent !== self::INTENT_AUTO ? $intent : 'general';
 
-        // Validate every returned rewrite against two non-negotiable rules:
-        //   1. Title and meta must contain the EXACT focus keyword.
-        //   2. Title is 30–60 chars; meta is 130–155 chars.
-        // Models drift on both even with the prompt screaming about them.
-        // Drop offenders rather than returning rewrites the user would
-        // have to manually fix — and surface a specific error code per
-        // failure mode so the UI can suggest "Regenerate".
+        // Two-stage validation:
+        //   1. Focus keyword presence — non-fixable. If a rewrite drops
+        //      the focus keyword, drop the whole rewrite (we can't safely
+        //      splice it back in without breaking grammar).
+        //   2. Character length — auto-coerced. Title 30–60, meta 130–155.
+        //      Out-of-range rewrites are TRUNCATED at clean boundaries
+        //      when too long, or PADDED with a curated suffix/CTA when
+        //      too short, so the user always gets in-range output even
+        //      when the model drifts. Models occasionally produce 32 or
+        //      62 char titles despite the prompt — coercion makes that
+        //      a non-event instead of a "regenerate" error.
         $rejectedKeyword = 0;
-        $rejectedLength = 0;
         $rewrites = [];
         foreach ($payload['rewrites'] as $r) {
             if (! is_array($r)) continue;
@@ -294,15 +303,17 @@ class AiSnippetRewriterService
                 $rejectedKeyword++;
                 continue;
             }
-            $titleLen = mb_strlen($title);
-            $metaLen = mb_strlen($meta);
-            if ($titleLen < 30 || $titleLen > 60 || $metaLen < 130 || $metaLen > 155) {
-                $rejectedLength++;
+            $coercedTitle = $this->coerceTitleLength($title, $focusKeyword);
+            $coercedMeta = $this->coerceMetaLength($meta, $focusKeyword);
+            if ($coercedTitle === null || $coercedMeta === null) {
+                // Coercion couldn't reach the window without breaking the
+                // focus keyword. Skip — extremely rare with Yoast's wide
+                // 30–60 title window.
                 continue;
             }
             $rewrites[] = [
-                'title' => $title,
-                'meta' => $meta,
+                'title' => $coercedTitle,
+                'meta' => $coercedMeta,
                 'rationale' => mb_substr(trim((string) ($r['rationale'] ?? '')), 0, 220),
                 'angle' => mb_substr(trim((string) ($r['angle'] ?? $defaultAngle)), 0, 32),
             ];
@@ -310,21 +321,15 @@ class AiSnippetRewriterService
         }
 
         if ($rewrites === []) {
-            if ($rejectedKeyword > 0 || $rejectedLength > 0) {
-                Log::warning('AiSnippetRewriterService: all rewrites failed validation', [
-                    'post_id' => $postId,
-                    'focus_keyword' => $focusKeyword,
-                    'intent' => $intent,
-                    'rejected_keyword' => $rejectedKeyword,
-                    'rejected_length' => $rejectedLength,
-                ]);
-                if ($rejectedKeyword > 0 && $rejectedLength === 0) {
-                    return ['ok' => false, 'error' => 'focus_keyword_missing', 'message' => 'The model returned rewrites that did not contain the focus keyword. Try regenerating.'];
-                }
-                if ($rejectedLength > 0 && $rejectedKeyword === 0) {
-                    return ['ok' => false, 'error' => 'length_out_of_range', 'message' => 'The model returned rewrites outside the 30–60 (title) / 130–155 (meta) character windows. Try regenerating.'];
-                }
-                return ['ok' => false, 'error' => 'rewrites_invalid', 'message' => 'The model returned rewrites that failed our SEO rules (focus keyword and/or length). Try regenerating.'];
+            Log::warning('AiSnippetRewriterService: all rewrites failed validation post-coerce', [
+                'post_id' => $postId,
+                'focus_keyword' => $focusKeyword,
+                'intent' => $intent,
+                'rejected_keyword' => $rejectedKeyword,
+                'rewrites_count' => is_array($payload['rewrites'] ?? null) ? count($payload['rewrites']) : 0,
+            ]);
+            if ($rejectedKeyword > 0) {
+                return ['ok' => false, 'error' => 'focus_keyword_missing', 'message' => 'The model returned rewrites that did not contain the focus keyword. Try regenerating.'];
             }
             return ['ok' => false, 'error' => 'no_rewrites_returned'];
         }
@@ -493,6 +498,179 @@ USER;
             ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => $user],
         ];
+    }
+
+    /**
+     * Title length coercion. Returns the title shortened to ≤60 chars at a
+     * clean word boundary, or padded with a curated suffix to push it to
+     * ≥30 chars. Returns null only when neither operation can produce a
+     * 30–60 result that still contains the focus keyword.
+     *
+     * Truncation strategy:
+     *   - Cut at the last word boundary at-or-before the 60-char mark.
+     *   - Strip trailing punctuation/dashes so we don't end mid-clause.
+     *   - Verify the focus keyword survived; if it didn't, give up
+     *     (rather than silently drop the keyword the user is ranking for).
+     *
+     * Padding strategy (too-short titles, e.g. when the focus keyword is
+     * itself the whole title):
+     *   - Append from a small list of safe, generic SEO-friendly suffixes
+     *     until length reaches ≥30 — guide framing or year stamp.
+     *   - Each candidate is tried in order; first one that lands in
+     *     [30, 60] wins.
+     */
+    private function coerceTitleLength(string $title, string $focusKeyword): ?string
+    {
+        $len = mb_strlen($title);
+        if ($len >= 30 && $len <= 60) {
+            return $title;
+        }
+
+        if ($len > 60) {
+            $truncated = $this->truncateAtWordBoundary($title, 60);
+            $truncated = rtrim($truncated, " \t\n\r\0\x0B,;:.!?-—–|");
+            if (mb_strlen($truncated) >= 30 && mb_strlen($truncated) <= 60
+                && $this->containsKeyword($truncated, $focusKeyword)) {
+                return $truncated;
+            }
+            return null;
+        }
+
+        // Too short — append a safe suffix until we land in [30, 60].
+        $year = date('Y');
+        $suffixes = [
+            ' — Complete Guide',
+            ' Explained',
+            ' (' . $year . ' Guide)',
+            ' — What to Know',
+            ' for Beginners',
+            ' — Quick Guide',
+            ' (' . $year . ')',
+            ' — Step-by-Step',
+        ];
+        foreach ($suffixes as $suffix) {
+            $candidate = rtrim($title, " \t\n\r\0\x0B,;:.!?-—–|") . $suffix;
+            $cLen = mb_strlen($candidate);
+            if ($cLen >= 30 && $cLen <= 60) {
+                return $candidate;
+            }
+        }
+        // Last resort: glue the year on; if still under 30, fail.
+        $fallback = rtrim($title, " \t\n\r\0\x0B,;:.!?-—–|") . ' (' . $year . ')';
+        if (mb_strlen($fallback) >= 30 && mb_strlen($fallback) <= 60) {
+            return $fallback;
+        }
+        return null;
+    }
+
+    /**
+     * Meta description length coercion. Truncate to ≤155 at a sentence
+     * boundary if possible, else word boundary; pad with a CTA from a
+     * curated list when too short. Returns null only when no in-range
+     * result is achievable while keeping the focus keyword present.
+     */
+    private function coerceMetaLength(string $meta, string $focusKeyword): ?string
+    {
+        $len = mb_strlen($meta);
+        if ($len >= 130 && $len <= 155) {
+            return $meta;
+        }
+
+        if ($len > 155) {
+            $truncated = $this->truncateAtSentenceBoundary($meta, 155);
+            // If sentence boundary couldn't get us there, fall back to word.
+            if (mb_strlen($truncated) > 155 || mb_strlen($truncated) < 130) {
+                $truncated = $this->truncateAtWordBoundary($meta, 155);
+                $truncated = rtrim($truncated, " \t\n\r\0\x0B,;:-—–|");
+                if (! preg_match('/[.!?]$/u', $truncated)) {
+                    $truncated .= '.';
+                }
+            }
+            if (mb_strlen($truncated) >= 130 && mb_strlen($truncated) <= 155
+                && $this->containsKeyword($truncated, $focusKeyword)) {
+                return $truncated;
+            }
+            return null;
+        }
+
+        // Too short — append a CTA from a curated list. CTAs are short
+        // enough that several can be tried to land in the 130–155 window.
+        $ctas = [
+            ' Read the full breakdown.',
+            ' Learn how it works today.',
+            ' Get the complete details here.',
+            ' See the full guide for more.',
+            ' Find out everything you need to know.',
+            ' Discover the practical steps inside.',
+            ' Explore the full tutorial below.',
+        ];
+        $base = rtrim($meta, " \t\n\r\0\x0B");
+        if (! preg_match('/[.!?]$/u', $base)) {
+            $base .= '.';
+        }
+        foreach ($ctas as $cta) {
+            $candidate = $base . $cta;
+            $cLen = mb_strlen($candidate);
+            if ($cLen >= 130 && $cLen <= 155) {
+                return $candidate;
+            }
+        }
+        // Stack two CTAs as a last resort for very-short metas.
+        foreach ($ctas as $cta1) {
+            foreach ($ctas as $cta2) {
+                if ($cta1 === $cta2) continue;
+                $candidate = $base . $cta1 . $cta2;
+                $cLen = mb_strlen($candidate);
+                if ($cLen >= 130 && $cLen <= 155) {
+                    return $candidate;
+                }
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Truncate a string to ≤$max chars, preferring a word boundary near
+     * the end. Falls back to a hard cut at $max if no usable space exists
+     * in the last 30% of the budget.
+     */
+    private function truncateAtWordBoundary(string $s, int $max): string
+    {
+        if (mb_strlen($s) <= $max) {
+            return $s;
+        }
+        $cut = mb_substr($s, 0, $max);
+        $lastSpace = mb_strrpos($cut, ' ');
+        $floor = (int) ($max * 0.7);
+        if ($lastSpace !== false && $lastSpace >= $floor) {
+            return mb_substr($cut, 0, $lastSpace);
+        }
+        return $cut;
+    }
+
+    /**
+     * Truncate a string to ≤$max chars, preferring the last sentence
+     * terminator (`.`, `!`, `?`) within the budget. Falls back to the
+     * caller for word-boundary if no sentence boundary is workable.
+     */
+    private function truncateAtSentenceBoundary(string $s, int $max): string
+    {
+        if (mb_strlen($s) <= $max) {
+            return $s;
+        }
+        $cut = mb_substr($s, 0, $max);
+        $best = -1;
+        foreach (['. ', '! ', '? ', '.', '!', '?'] as $marker) {
+            $pos = mb_strrpos($cut, $marker);
+            if ($pos !== false && $pos > $best) {
+                $best = $pos + mb_strlen($marker) - 1;
+            }
+        }
+        $floor = (int) ($max * 0.7);
+        if ($best >= $floor) {
+            return rtrim(mb_substr($s, 0, $best + 1));
+        }
+        return $cut;
     }
 
     /**
