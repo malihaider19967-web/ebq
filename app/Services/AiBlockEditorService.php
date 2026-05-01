@@ -140,7 +140,52 @@ class AiBlockEditorService
             return ['ok' => false, 'error' => 'llm_empty_response'];
         }
 
+        // Title mode emits one suggestion per line. The prompt requires
+        // every title to contain the exact focus keyword verbatim, but
+        // models occasionally drift. Filter out any line that doesn't
+        // contain the focus keyword (case-insensitive, Unicode-quote
+        // tolerant) so the user never sees a "title suggestion" missing
+        // the term they're trying to rank for.
+        if ($mode === self::MODE_TITLE && $focusKeyword !== '') {
+            $lines = preg_split('/\r?\n/', $generated) ?: [];
+            $kept = [];
+            foreach ($lines as $line) {
+                $clean = trim($line);
+                if ($clean === '') continue;
+                if ($this->lineContainsKeyword($clean, $focusKeyword)) {
+                    $kept[] = $clean;
+                }
+            }
+            if (count($kept) === 0) {
+                return ['ok' => false, 'error' => 'focus_keyword_missing', 'message' => 'The model returned title suggestions that did not contain your focus keyword. Try regenerating.'];
+            }
+            $generated = implode("\n", $kept);
+        }
+
         return ['ok' => true, 'text' => $generated];
+    }
+
+    /**
+     * Case-insensitive verbatim keyword check, tolerant of Unicode quote
+     * / dash variants the model often substitutes. Mirrors the
+     * AiSnippetRewriterService validator so both AI title surfaces apply
+     * the same standard.
+     */
+    private function lineContainsKeyword(string $haystack, string $needle): bool
+    {
+        if ($needle === '') {
+            return true;
+        }
+        $normalize = static function (string $s): string {
+            $s = (string) preg_replace('/\x{00A0}/u', ' ', $s);
+            $s = (string) preg_replace('/[\x{2018}-\x{201B}]/u', "'", $s);
+            $s = (string) preg_replace('/[\x{201C}-\x{201F}]/u', '"', $s);
+            $s = (string) preg_replace('/[\x{2013}\x{2014}\x{2212}]/u', '-', $s);
+            $s = mb_strtolower($s);
+            $s = (string) preg_replace('/\s+/u', ' ', $s);
+            return trim($s);
+        };
+        return mb_strpos($normalize($haystack), $normalize($needle)) !== false;
     }
 
     /**

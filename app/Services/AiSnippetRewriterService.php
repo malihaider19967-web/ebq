@@ -39,6 +39,21 @@ class AiSnippetRewriterService
 {
     private const CACHE_TTL_DAYS = 7;
 
+    /**
+     * Prompt revision token — bake into the cache key so any prompt-policy
+     * change (stricter focus-keyword enforcement, new constraint, new
+     * power-word list…) automatically invalidates cached generations.
+     * Without this, users see week-old rewrites that predate the new
+     * rules and complain "this still doesn't follow the rule".
+     *
+     * Bump whenever you change buildPrompt() in a way that should produce
+     * different output for the same content.
+     *
+     * v3 — 2026-04-30: focus keyword now MUST appear verbatim in both
+     * title and meta; post-validation drops rewrites that fail the check.
+     */
+    private const PROMPT_VERSION = 'v3';
+
     /** Sentinel for the "give me a mixed-angle set" mode. */
     public const INTENT_AUTO = 'auto';
 
@@ -456,7 +471,23 @@ USER;
         if ($needle === '') {
             return true;
         }
-        $normalize = static fn (string $s): string => mb_strtolower(trim((string) preg_replace('/\s+/u', ' ', $s)));
+        // Normalise common Unicode lookalikes the model substitutes:
+        //   curly quotes → straight, en/em dashes → hyphen, NBSP → space.
+        // Also lowercases, collapses whitespace runs, and strips outer
+        // punctuation so trailing "?" / "." / quotes don't break the match.
+        $normalize = static function (string $s): string {
+            // NBSP → space.
+            $s = (string) preg_replace('/\x{00A0}/u', ' ', $s);
+            // Curly single quotes (U+2018, U+2019, U+201A, U+201B) → ASCII '.
+            $s = (string) preg_replace('/[\x{2018}-\x{201B}]/u', "'", $s);
+            // Curly double quotes (U+201C..U+201F) → ASCII ".
+            $s = (string) preg_replace('/[\x{201C}-\x{201F}]/u', '"', $s);
+            // En-dash / em-dash / minus → ASCII -.
+            $s = (string) preg_replace('/[\x{2013}\x{2014}\x{2212}]/u', '-', $s);
+            $s = mb_strtolower($s);
+            $s = (string) preg_replace('/\s+/u', ' ', $s);
+            return trim($s);
+        };
         $h = $normalize($haystack);
         $n = $normalize($needle);
         return $n !== '' && mb_strpos($h, $n) !== false;
@@ -474,6 +505,15 @@ USER;
         $sortedAdditional = $additionalKeywords;
         sort($sortedAdditional, SORT_STRING);
         $additionalHash = hash('xxh3', implode('|', $sortedAdditional));
-        return sprintf('ai_snippet_rewrite:%d:%s:%s:%s:%s:%s', $postId, hash('xxh3', $keyword), $contentHash, $compHash, $additionalHash, $intent);
+        return sprintf(
+            'ai_snippet_rewrite:%s:%d:%s:%s:%s:%s:%s',
+            self::PROMPT_VERSION,
+            $postId,
+            hash('xxh3', $keyword),
+            $contentHash,
+            $compHash,
+            $additionalHash,
+            $intent
+        );
     }
 }
