@@ -54,8 +54,10 @@ class AiSnippetRewriterService
      * v4 — 2026-04-30: title and meta length (50–60 / 130–155) promoted
      * to non-negotiable rules with hard post-validation; out-of-range
      * rewrites are dropped rather than served and truncated downstream.
+     * v5 — 2026-04-30: title window widened to 30–60 (Yoast's range);
+     * meta stays at 130–155.
      */
-    private const PROMPT_VERSION = 'v4';
+    private const PROMPT_VERSION = 'v5';
 
     /** Sentinel for the "give me a mixed-angle set" mode. */
     public const INTENT_AUTO = 'auto';
@@ -275,7 +277,7 @@ class AiSnippetRewriterService
 
         // Validate every returned rewrite against two non-negotiable rules:
         //   1. Title and meta must contain the EXACT focus keyword.
-        //   2. Title is 50–60 chars; meta is 130–155 chars.
+        //   2. Title is 30–60 chars; meta is 130–155 chars.
         // Models drift on both even with the prompt screaming about them.
         // Drop offenders rather than returning rewrites the user would
         // have to manually fix — and surface a specific error code per
@@ -294,7 +296,7 @@ class AiSnippetRewriterService
             }
             $titleLen = mb_strlen($title);
             $metaLen = mb_strlen($meta);
-            if ($titleLen < 50 || $titleLen > 60 || $metaLen < 130 || $metaLen > 155) {
+            if ($titleLen < 30 || $titleLen > 60 || $metaLen < 130 || $metaLen > 155) {
                 $rejectedLength++;
                 continue;
             }
@@ -320,7 +322,7 @@ class AiSnippetRewriterService
                     return ['ok' => false, 'error' => 'focus_keyword_missing', 'message' => 'The model returned rewrites that did not contain the focus keyword. Try regenerating.'];
                 }
                 if ($rejectedLength > 0 && $rejectedKeyword === 0) {
-                    return ['ok' => false, 'error' => 'length_out_of_range', 'message' => 'The model returned rewrites outside the 50–60 (title) / 130–155 (meta) character windows. Try regenerating.'];
+                    return ['ok' => false, 'error' => 'length_out_of_range', 'message' => 'The model returned rewrites outside the 30–60 (title) / 130–155 (meta) character windows. Try regenerating.'];
                 }
                 return ['ok' => false, 'error' => 'rewrites_invalid', 'message' => 'The model returned rewrites that failed our SEO rules (focus keyword and/or length). Try regenerating.'];
             }
@@ -380,11 +382,12 @@ be rejected — never return one):
 - Both fields MUST work as natural English with the keyword in place — do
   not bolt the keyword onto a sentence that doesn't grammatically support
   it. Rewrite the surrounding words if needed to integrate cleanly.
-- Title character count MUST be between 50 and 60 inclusive (Google's
-  display window — anything shorter looks weak, anything longer truncates
-  with an ellipsis on SERPs). Count every character: letters, digits,
-  spaces, punctuation. Aim for 55 ± 3 as the sweet spot. Before returning,
-  count the characters and rewrite if outside range.
+- Title character count MUST be between 30 and 60 inclusive (Yoast's
+  industry-standard SEO range; Google truncates anything longer than ~60
+  on SERPs). Count every character: letters, digits, spaces, punctuation.
+  Aim for 50–60 as the sweet spot — closer to 60 maximizes use of the
+  display window, but never go over. Before returning, count the
+  characters and rewrite if outside range.
 - Meta description character count MUST be between 130 and 155 inclusive
   (Google's snippet window — under 130 wastes the SERP real estate, over
   155 truncates). Count every character. Aim for 145 ± 5. Before returning,
@@ -466,8 +469,8 @@ Content excerpt (use only for intent grounding — do not echo verbatim):
 
 {$modeBlock}
 
-CHARACTER LENGTH (HARD RULE — verify before returning):
-- title: between 50 and 60 characters inclusive (sweet spot 55 ± 3)
+CHARACTER LENGTH (HARD LIMIT — verify before returning):
+- title: between 30 and 60 characters inclusive (sweet spot 50–60)
 - meta:  between 130 and 155 characters inclusive (sweet spot 145 ± 5)
 Count BEFORE returning. If a draft is outside the range, rewrite it
 until it fits — never round up/down by one char and submit anyway.
@@ -477,7 +480,7 @@ Return JSON exactly in this shape:
   "rewrites": [
     {
       "angle": "<angle_key_from_registry>",
-      "title": "...",   // 50–60 chars, verbatim focus keyword
+      "title": "...",   // 30–60 chars, verbatim focus keyword
       "meta": "...",    // 130–155 chars, verbatim focus keyword
       "rationale": "Why this rewrite works against the SERP, in one sentence."
     },

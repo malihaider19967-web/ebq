@@ -142,7 +142,7 @@ class AiBlockEditorService
 
         // Title mode emits one suggestion per line. Two hard rules:
         //   1. Must contain the EXACT focus keyword (Unicode-quote tolerant).
-        //   2. Must be 50–65 chars (Google's title display window).
+        //   2. Must be 30–60 chars (Yoast's industry-standard SEO range).
         // Models drift on both — filter rather than serve broken suggestions.
         if ($mode === self::MODE_TITLE) {
             $lines = preg_split('/\r?\n/', $generated) ?: [];
@@ -157,7 +157,7 @@ class AiBlockEditorService
                     continue;
                 }
                 $len = mb_strlen($clean);
-                if ($len < 50 || $len > 65) {
+                if ($len < 30 || $len > 60) {
                     $rejectedLength++;
                     continue;
                 }
@@ -168,7 +168,7 @@ class AiBlockEditorService
                     return ['ok' => false, 'error' => 'focus_keyword_missing', 'message' => 'The model returned title suggestions that did not contain your focus keyword. Try regenerating.'];
                 }
                 if ($rejectedLength > 0 && $rejectedKeyword === 0) {
-                    return ['ok' => false, 'error' => 'length_out_of_range', 'message' => 'The model returned title suggestions outside the 50–65 character window. Try regenerating.'];
+                    return ['ok' => false, 'error' => 'length_out_of_range', 'message' => 'The model returned title suggestions outside the 30–60 character window. Try regenerating.'];
                 }
                 return ['ok' => false, 'error' => 'titles_invalid', 'message' => 'The model returned title suggestions that failed our SEO rules. Try regenerating.'];
             }
@@ -359,7 +359,7 @@ class AiBlockEditorService
             self::MODE_TITLE => [
                 $system,
                 $seoContext."Generate exactly 5 SEO-optimized title suggestions for this page. Each title MUST:\n"
-                    ."- Be 50–65 characters inclusive (Google's title display window). Count every character — letters, digits, spaces, punctuation. Anything shorter looks weak; anything longer truncates with an ellipsis on SERPs. Verify the count BEFORE returning each title and rewrite if outside range\n"
+                    ."- Be 30–60 characters inclusive (Yoast's industry-standard SEO range; Google truncates anything longer than ~60 on SERPs). Count every character — letters, digits, spaces, punctuation. Aim for 50–60 as the sweet spot. Verify the count BEFORE returning each title and rewrite if outside range\n"
                     ."- Contain the EXACT focus keyword verbatim (case-insensitive match) — no paraphrases, no synonyms, no partial matches. The full phrase must appear, ideally in the first 60 characters\n"
                     ."- Match the search intent indicated by the SEO context\n"
                     ."- Be compelling and click-worthy without resorting to clickbait or vague hype\n"
