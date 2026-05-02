@@ -110,46 +110,48 @@
                 <tbody class="divide-y divide-gray-200">
                     @forelse ($websites as $website)
                         @php
+                            // Effective flags = global flags AND'd with
+                            // freeze state. Per-website overrides were
+                            // retired in the per-user-billing migration;
+                            // this row is now display-only. Use the
+                            // global toggles at the top of the page to
+                            // enable/disable features fleet-wide.
                             $effective = $website->effectiveFeatureFlags();
+                            $effectiveTier = $website->effectiveTier();
+                            $isFrozen = $website->isFrozen();
                         @endphp
                         <tr>
-                            <form method="POST" action="{{ route('admin.website-features.update', $website) }}">
-                                @csrf
-                                @method('PUT')
-                                <td class="sticky left-0 bg-white z-10 px-4 py-3 whitespace-nowrap">
-                                    <div class="text-sm font-medium text-gray-900">{{ $website->domain }}</div>
-                                    <div class="text-xs text-gray-500">
-                                        @if ($website->owner)
-                                            {{ $website->owner->name ?: $website->owner->email }}
-                                        @else
-                                            <span class="italic text-gray-400">no owner</span>
-                                        @endif
-                                    </div>
+                            <td class="sticky left-0 bg-white z-10 px-4 py-3 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">{{ $website->domain }}</div>
+                                <div class="text-xs text-gray-500">
+                                    @if ($website->owner)
+                                        {{ $website->owner->name ?: $website->owner->email }}
+                                    @else
+                                        <span class="italic text-gray-400">no owner</span>
+                                    @endif
+                                    @if ($isFrozen)
+                                        <span class="ml-1 inline-flex items-center rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700">frozen</span>
+                                    @endif
+                                </div>
+                            </td>
+                            <td class="px-2 py-3 text-xs">
+                                <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
+                                             {{ $effectiveTier === 'pro' ? 'bg-violet-100 text-violet-800' : 'bg-gray-100 text-gray-700' }}">
+                                    {{ $effectiveTier }}
+                                </span>
+                            </td>
+                            @foreach ($feature_keys as $key)
+                                <td class="px-2 py-3 text-center">
+                                    @if (! empty($effective[$key]))
+                                        <span class="inline-block h-2.5 w-2.5 rounded-full bg-emerald-500" title="{{ $feature_labels[$key] ?? $key }} — on for this site"></span>
+                                    @else
+                                        <span class="inline-block h-2.5 w-2.5 rounded-full bg-gray-300" title="{{ $feature_labels[$key] ?? $key }} — off for this site"></span>
+                                    @endif
                                 </td>
-                                <td class="px-2 py-3 text-xs">
-                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
-                                                 {{ $website->tier === 'pro' ? 'bg-violet-100 text-violet-800' : 'bg-gray-100 text-gray-700' }}">
-                                        {{ $website->tier }}
-                                    </span>
-                                </td>
-                                @foreach ($feature_keys as $key)
-                                    <td class="px-2 py-3 text-center">
-                                        <label class="inline-flex items-center justify-center cursor-pointer">
-                                            <input type="checkbox"
-                                                   name="feature_flags[{{ $key }}]"
-                                                   value="1"
-                                                   @checked($effective[$key] ?? true)
-                                                   class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                        </label>
-                                    </td>
-                                @endforeach
-                                <td class="px-3 py-3 text-right">
-                                    <button type="submit"
-                                            class="text-xs font-medium px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-500">
-                                        Save
-                                    </button>
-                                </td>
-                            </form>
+                            @endforeach
+                            <td class="px-3 py-3 text-right">
+                                <span class="text-[11px] text-gray-400">read-only</span>
+                            </td>
                         </tr>
                     @empty
                         <tr>

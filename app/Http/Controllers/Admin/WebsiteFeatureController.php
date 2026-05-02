@@ -29,8 +29,15 @@ class WebsiteFeatureController extends Controller
     {
         $q = trim((string) $request->query('q', ''));
 
+        // The per-user-billing migration dropped `tier` and
+        // `feature_flags` columns from `websites`. Tier is now derived
+        // (Website::effectiveTier()); per-website feature overrides
+        // were retired in favour of the single global-flags map. The
+        // view consequently reads tier through the method and renders
+        // the global-flags map (read-only per row) instead of a
+        // per-site override toggle.
         $websites = Website::query()
-            ->select(['id', 'domain', 'tier', 'feature_flags', 'user_id', 'created_at'])
+            ->select(['id', 'domain', 'user_id', 'created_at'])
             ->with(['owner:id,name,email'])
             ->when($q !== '', static function ($qq) use ($q) {
                 $qq->where('domain', 'like', '%'.$q.'%');
@@ -86,24 +93,21 @@ class WebsiteFeatureController extends Controller
      * Only keys in FEATURE_KEYS land in the column — junk POSTed
      * keys can't poison the JSON.
      */
+    /**
+     * Per-website feature override path. Retired during the per-user-
+     * billing migration that dropped the `feature_flags` column from
+     * `websites`. The route is kept (legacy form posts) but the
+     * handler no-ops with a notice — admins should use the global
+     * toggle row at the top of the grid instead.
+     *
+     * If a future workstream restores per-site overrides, this is the
+     * single place to wire it back up.
+     */
     public function update(Request $request, Website $website): RedirectResponse
     {
-        $posted = (array) $request->input('feature_flags', []);
-        $clean = [];
-        foreach (Website::FEATURE_KEYS as $key) {
-            // Checkbox unchecked → the key is missing from $posted →
-            // store FALSE explicitly. Checkbox checked → key present
-            // → store TRUE explicitly. The full 8-key map is stored so
-            // intent always round-trips, regardless of per-key default.
-            $clean[$key] = array_key_exists($key, $posted);
-        }
-
-        $website->feature_flags = $clean;
-        $website->save();
-
         return redirect()
             ->route('admin.website-features.index', $request->query())
-            ->with('status', sprintf('Feature flags saved for %s.', $website->domain));
+            ->with('status', 'Per-website feature overrides have been retired. Use the global toggle row at the top of this page to enable / disable features for every site at once.');
     }
 
     /**
