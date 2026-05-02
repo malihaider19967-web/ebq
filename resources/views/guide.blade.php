@@ -1,17 +1,17 @@
 <x-marketing.page
     title="Guide — EBQ"
-    description="The complete EBQ user guide: connect Search Console, Analytics, and the Indexing API; track keywords and backlinks; run page audits; turn on alerts; schedule reports; install the WordPress plugin."
+    description="Customer documentation for the EBQ portal: dashboards, keywords, pages, rank tracking, audits, reports, alerts, and optional CMS integration—what each screen shows and how to use it."
     active="guide"
 >
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-slate-200 bg-white">
         <div class="mx-auto max-w-3xl px-6 py-16 lg:px-8 lg:py-20">
-            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">User guide · 15 min read</p>
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">User guide · full reference</p>
             <h1 class="mt-4 text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
                 The complete EBQ guide.
             </h1>
             <p class="mt-5 text-balance text-[17px] leading-8 text-slate-600">
-                Everything a new team needs to set up EBQ end to end and run a productive weekly SEO loop. Each step has the screen you'll see, what to click, what to expect, and the common mistakes to avoid.
+                Start with the product reference for dashboard, keywords, pages, rank tracking, audits, and reports—real UI layouts with every column explained—then follow the numbered setup path for integrations, tracking, and publishing workflows.
             </p>
             <div class="mt-8 flex flex-col items-center gap-3 sm:flex-row">
                 <a href="#step-1" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">Start with step 1</a>
@@ -42,7 +42,7 @@
                         ];
                         $tocSetup = [
                             ['#step-1', '01', 'Add your first website'],
-                            ['#step-2', '02', 'Connect Search Console + GA4'],
+                            ['#step-2', '02', 'Connect search and analytics'],
                             ['#step-3', '03', 'Track keywords + competitors'],
                             ['#step-4', '04', 'Run a page audit'],
                             ['#step-5', '05', 'Import or track backlinks'],
@@ -82,6 +82,8 @@
 
             {{-- Main content --}}
             <div class="prose prose-slate max-w-none prose-headings:tracking-tight prose-h2:text-3xl prose-h2:font-semibold prose-h2:mt-0 prose-h3:text-lg prose-h3:font-semibold">
+
+                @include('partials.guide-portal-reference')
 
                 {{-- ── STEP 1 ─────────────────────────────────── --}}
                 <span id="websites" class="block scroll-mt-24"></span>
@@ -133,7 +135,7 @@
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Pitfall</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Mismatched protocol (http vs https) or host (with vs without www) is the #1 reason GSC sync returns zero rows.</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Mismatched protocol (http vs https) or host (with vs without www) is the #1 reason search sync returns zero rows.</p>
                         </div>
                     </div>
                 </section>
@@ -146,9 +148,9 @@
                         <span class="font-mono text-sm font-semibold text-slate-400">02</span>
                         <span class="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-600">~ 2 min</span>
                     </div>
-                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Connect Search Console + GA4</h2>
+                    <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Connect search and analytics</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        EBQ uses three Google scopes, all granted in a single OAuth consent screen. Refresh tokens are encrypted at rest and rotated automatically — and you can revoke any time from the same screen.
+                        In one authorization step you grant read access to your connected search and analytics properties, plus permission to request indexing when you use that workflow. Refresh tokens are encrypted at rest and rotated automatically, and you can revoke access from the same screen.
                     </p>
 
                     {{-- Mockup: OAuth consent --}}
@@ -157,16 +159,16 @@
                             <span class="h-2 w-2 rounded-full bg-rose-400"></span>
                             <span class="h-2 w-2 rounded-full bg-amber-400"></span>
                             <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-                            <span class="ml-2 text-[11px] font-medium text-slate-500">accounts.google.com — EBQ wants access to your Google Account</span>
+                            <span class="ml-2 text-[11px] font-medium text-slate-500">Authorization — grant access for EBQ</span>
                         </div>
                         <div class="px-5 py-5">
                             <p class="text-[13px] text-slate-700">EBQ would like to:</p>
                             <ul class="mt-3 space-y-2.5 text-[12px]">
                                 @foreach ([
-                                    ['See and download your Google Analytics data', 'analytics.readonly', 'sensitive'],
-                                    ['View Search Console data for your verified sites', 'webmasters.readonly', 'standard'],
-                                    ['Submit data to Google for indexing', 'indexing', 'standard'],
-                                ] as [$desc, $scope, $tone])
+                                    ['Read-only access to your connected analytics property', 'sensitive'],
+                                    ['Read-only access to your verified search property', 'standard'],
+                                    ['Permission to request indexing for URLs you choose', 'standard'],
+                                ] as [$desc, $tone])
                                     <li class="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2.5">
                                         <span @class([
                                             'mt-0.5 h-4 w-4 flex-none rounded',
@@ -175,7 +177,6 @@
                                         ])></span>
                                         <div>
                                             <p class="font-medium text-slate-800">{{ $desc }}</p>
-                                            <p class="font-mono text-[10.5px] text-slate-500">{{ $scope }}</p>
                                         </div>
                                     </li>
                                 @endforeach
@@ -189,8 +190,8 @@
 
                     <div class="mt-6 grid gap-4 sm:grid-cols-3">
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Why three scopes</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700"><strong>analytics.readonly</strong> for sessions/users, <strong>webmasters.readonly</strong> for clicks &amp; positions, <strong>indexing</strong> for one-click resubmit from page audits.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Why three permissions</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Analytics for sessions and users, search property data for queries and positions, and indexing so you can request a URL refresh from audit workflows.</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Token safety</p>
@@ -204,13 +205,11 @@
 
                     <div class="mt-6 rounded-xl border border-amber-200 bg-amber-50/60 px-5 py-4">
                         <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-amber-700">Heads up</p>
-                        <p class="mt-1 text-[14px] leading-6 text-slate-700">Use the same Google account that owns the GSC property and the GA4 view you want to track. EBQ matches by URL prefix in GSC and by property ID in GA4 — if those don't appear in the dropdown after consent, you're signed in with the wrong account.</p>
+                        <p class="mt-1 text-[14px] leading-6 text-slate-700">Use the same account that owns the search property and analytics view you want to connect. If the right sites do not appear in the picker after consent, you are usually signed in with a different account.</p>
                     </div>
                 </section>
 
                 {{-- ── STEP 3 ─────────────────────────────────── --}}
-                <span id="keywords" class="block scroll-mt-24"></span>
-                <span id="rank-tracking" class="block scroll-mt-24"></span>
                 <section id="step-3" class="not-prose mt-20 scroll-mt-24">
                     <div class="flex items-baseline gap-4">
                         <span class="font-mono text-sm font-semibold text-slate-400">03</span>
@@ -218,7 +217,7 @@
                     </div>
                     <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Track keywords and competitors</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        Real SERPs captured per device, country, language, and (optional) city. EBQ overlays your GSC clicks for the same query so a rank gain is judged on traffic, not just position.
+                        Live results pages are captured per device, country, language, and optional city. EBQ overlays search clicks for the same query when available so a rank gain is judged on traffic, not only position.
                     </p>
 
                     {{-- Mockup: keyword grid --}}
@@ -294,8 +293,6 @@
 
                 {{-- ── STEP 4 ─────────────────────────────────── --}}
                 <span id="audits" class="block scroll-mt-24"></span>
-                <span id="pages" class="block scroll-mt-24"></span>
-                <span id="custom-audit" class="block scroll-mt-24"></span>
                 <section id="step-4" class="not-prose mt-20 scroll-mt-24">
                     <div class="flex items-baseline gap-4">
                         <span class="font-mono text-sm font-semibold text-slate-400">04</span>
@@ -303,7 +300,7 @@
                     </div>
                     <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Run a page audit</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        Audits combine Core Web Vitals, on-page SEO, and content review in a single pass and finish in under 60 seconds. After you ship a fix, resubmit the URL to Google's Indexing API without leaving the audit view.
+                        Audits combine Core Web Vitals, on-page SEO, and content review in a single pass and finish in under 60 seconds. After you ship a fix, request indexing for the URL without leaving the audit view.
                     </p>
 
                     {{-- Mockup: audit scorecard --}}
@@ -357,7 +354,7 @@
                             </ul>
                         </div>
                         <div class="mt-4 flex flex-wrap gap-2">
-                            <span class="rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">Resubmit to Google</span>
+                            <span class="rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">Request indexing</span>
                             <span class="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700">Re-audit</span>
                             <span class="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700">Download PDF</span>
                         </div>
@@ -384,34 +381,9 @@
                         <p class="mt-1 text-[14px] leading-6 text-slate-700">Always provide a <em>target keyword</em>. Without it the keyword-strategy review and topical-gap analysis are skipped, and you lose half the value of an audit.</p>
                     </div>
 
-                    <span id="audit-report-sections" class="block scroll-mt-24"></span>
-                    <h3 class="mt-8 text-lg font-semibold text-slate-900">Audit report sections explained</h3>
-                    <p class="mt-2 text-[14px] leading-7 text-slate-700">
-                        This is the exact structure used in the page audit detail screen so the "Guide to this report" icon maps one-to-one with what you are reading.
+                    <p class="mt-6 text-[14px] leading-7 text-slate-700">
+                        The <strong>Page audit report layout</strong> section above matches the live audit detail screen—the same panels appear in the same order as the in-app <em>Guide to this report</em> link.
                     </p>
-                    <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <figure class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-                            <div class="flex items-center justify-between">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Visual · Page audit report layout</p>
-                            </div>
-                            <p class="mt-2 text-[12px] text-slate-600">Use this slot for a full-page screenshot from `Page audit` so users can visually match each panel listed below.</p>
-                        </figure>
-                        <div class="mt-4 grid gap-3 sm:grid-cols-2">
-                            @foreach ([
-                                ['Summary score', 'Top-level score, benchmark keyword, and market context for this run.'],
-                                ['Core Web Vitals', 'LCP, CLS, INP, and supporting speed diagnostics with thresholds.'],
-                                ['On-page checks', 'Title, meta, headings, canonical, schema, image alt, and internal links.'],
-                                ['SERP snapshot', 'Current organic competitors and readability averages for the keyword and country.'],
-                                ['Prioritized fixes', 'Action list ordered by impact and implementation effort.'],
-                                ['Re-audit + resubmit', 'Run a fresh audit after deploying and submit URL to indexing from the same flow.'],
-                            ] as [$title, $text])
-                                <div class="rounded-lg border border-slate-200 bg-white p-3">
-                                    <p class="text-[12px] font-semibold text-slate-900">{{ $title }}</p>
-                                    <p class="mt-1 text-[12px] leading-6 text-slate-700">{{ $text }}</p>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
                 </section>
 
                 {{-- ── STEP 5 ─────────────────────────────────── --}}
@@ -495,7 +467,6 @@
 
                 {{-- ── STEP 6 ─────────────────────────────────── --}}
                 <span id="insights" class="block scroll-mt-24"></span>
-                <span id="dashboard" class="block scroll-mt-24"></span>
                 <section id="step-6" class="not-prose mt-20 scroll-mt-24">
                     <div class="flex items-baseline gap-4">
                         <span class="font-mono text-sm font-semibold text-slate-400">06</span>
@@ -503,7 +474,7 @@
                     </div>
                     <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Review the insight boards</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        Six pre-built reports turn raw GSC × GA4 × audit × backlink data into a ranked action list. Each row links straight to the offending page so the next move is one click away.
+                        Six pre-built reports combine synced search and analytics signals with audits and backlinks into a ranked action list. Each row links straight to the offending page so the next move is one click away.
                     </p>
 
                     {{-- Mockup: 6 boards --}}
@@ -546,25 +517,9 @@
                         <p class="mt-1 text-[14px] leading-6 text-slate-700">Most teams ship 1–3 wins from striking-distance in the first week. If you see fewer than 5 candidates total, your keyword set is too narrow — go back to step 3 and broaden.</p>
                     </div>
 
-                    <span id="insight-cards" class="block scroll-mt-24"></span>
-                    <h3 class="mt-8 text-lg font-semibold text-slate-900">Action insights cards (dashboard)</h3>
-                    <p class="mt-2 text-[14px] leading-7 text-slate-700">
-                        The dashboard "Action insights" row is your daily triage queue. Prioritize cards by fastest measurable impact, not by severity color alone.
+                    <p class="mt-6 text-[14px] leading-7 text-slate-700">
+                        For the dashboard insight row and what each card counts, see <strong>Dashboard</strong> and <strong>Action insight cards</strong> in the product reference at the top of this guide.
                     </p>
-                    <div class="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <figure class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-                            <div class="flex items-center justify-between">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Visual · Action insights cards</p>
-                            </div>
-                            <p class="mt-2 text-[12px] text-slate-600">Add a screenshot of the dashboard insights card row with labels visible.</p>
-                        </figure>
-                        <ul class="mt-4 space-y-2 text-[13px] leading-6 text-slate-700">
-                            <li><strong>Striking distance:</strong> execute first. Small edits can move queries from positions 5-20 into top 3.</li>
-                            <li><strong>Cannibalization:</strong> merge overlapping pages or set canonical to consolidate signals.</li>
-                            <li><strong>Indexing issues:</strong> validate canonical and noindex rules, then resubmit.</li>
-                            <li><strong>Audit vs traffic:</strong> fix technical blockers on pages already receiving demand.</li>
-                        </ul>
-                    </div>
                 </section>
 
                 {{-- ── STEP 7 ─────────────────────────────────── --}}
@@ -577,7 +532,7 @@
                     </div>
                     <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Schedule reports + turn on alerts</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        Reports and alerts share one recipient list per website. Reports run on a fixed cadence; alerts fire only when EBQ detects a real anomaly — gated by both relative drop and z-score.
+                        Reports and alerts share one recipient list per website. Reports run on a fixed cadence; alerts fire only when EBQ detects an unusual change against your recent baseline—so normal volatility does not spam your inbox.
                     </p>
 
                     <div class="mt-6 grid gap-5 lg:grid-cols-2">
@@ -619,9 +574,9 @@
                             <div class="px-5 py-5 text-[12px] text-slate-700">
                                 <p>An unusual drop was detected on 2026-04-20.</p>
                                 <ul class="mt-3 space-y-1.5">
-                                    <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Search clicks</span><span class="font-mono text-rose-600">212 vs 844 (z=-3.2)</span></li>
-                                    <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Sessions</span><span class="font-mono text-rose-600">480 vs 1,610 (z=-2.8)</span></li>
-                                    <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Avg position</span><span class="font-mono text-amber-600">14.2 vs 11.6 (z=-1.9)</span></li>
+                                    <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Search clicks</span><span class="font-mono text-rose-600">212 vs typical 820</span></li>
+                                    <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Sessions</span><span class="font-mono text-rose-600">480 vs typical 1,540</span></li>
+                                    <li class="flex items-center justify-between rounded-md bg-slate-50/60 px-3 py-1.5"><span>Avg position</span><span class="font-mono text-amber-600">14.2 vs typical 11.4</span></li>
                                 </ul>
                                 <div class="mt-4 inline-flex rounded-md bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-white">Open EBQ →</div>
                             </div>
@@ -629,42 +584,12 @@
                     </div>
 
                     <h3 class="mt-8 text-lg font-semibold text-slate-900">When alerts fire</h3>
-                    <p class="mt-3 text-[14px] leading-7 text-slate-700">EBQ compares yesterday's value against a rolling 28-day baseline and only sends an alert if both gates trip:</p>
-                    <ul class="mt-3 space-y-2 text-[14px]">
-                        <li class="rounded-xl border border-slate-200 bg-white px-4 py-3"><strong>Relative drop</strong> — the value is at least 30% below the baseline mean.</li>
-                        <li class="rounded-xl border border-slate-200 bg-white px-4 py-3"><strong>Z-score</strong> — the deviation is at least 2 standard deviations from the baseline.</li>
-                        <li class="rounded-xl border border-slate-200 bg-white px-4 py-3"><strong>24-hour deduplication</strong> — one alert per metric per anomaly, never a flood.</li>
-                    </ul>
+                    <p class="mt-3 text-[14px] leading-7 text-slate-700">EBQ compares recent daily totals to your rolling baseline and only notifies you when the drop is both material and unusual for that metric. Alerts are deduplicated so you do not get repeated noise for the same issue.</p>
 
-                    <span id="insights-panel" class="block scroll-mt-24"></span>
-                    <h3 class="mt-8 text-lg font-semibold text-slate-900">Reports insights panel (action list view)</h3>
-                    <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <figure class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-                            <div class="flex items-center justify-between">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Visual · Reports insights tab</p>
-                            </div>
-                            <p class="mt-2 text-[12px] text-slate-600">Capture the `Reports` page with the `Insights` tab selected and at least one actionable row.</p>
-                        </figure>
-                        <p class="mt-4 text-[13px] leading-6 text-slate-700">
-                            Use this panel for prioritization meetings. It is designed for "what to ship this week" and should map directly to tickets or sprint tasks.
-                        </p>
-                    </div>
-
-                    <span id="growth-reports" class="block scroll-mt-24"></span>
-                    <h3 class="mt-8 text-lg font-semibold text-slate-900">Custom growth reports (email tab)</h3>
-                    <div class="mt-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <figure class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4">
-                            <div class="flex items-center justify-between">
-                                <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Visual · Custom report builder</p>
-                            </div>
-                            <p class="mt-2 text-[12px] text-slate-600">Capture the `Custom report` tab showing recipient list, schedule, and content blocks.</p>
-                        </figure>
-                        <ol class="mt-4 space-y-2 text-[13px] leading-6 text-slate-700">
-                            <li><span class="font-mono text-slate-400">1.</span> Select audience and cadence based on decision-making frequency.</li>
-                            <li><span class="font-mono text-slate-400">2.</span> Include only sections teams act on; remove noisy vanity blocks.</li>
-                            <li><span class="font-mono text-slate-400">3.</span> Align schedule timezone with stakeholder working hours.</li>
-                        </ol>
-                    </div>
+                    <h3 class="mt-8 text-lg font-semibold text-slate-900">Reports and scheduled email</h3>
+                    <p class="mt-3 text-[13px] leading-6 text-slate-700">
+                        For the Insights tab (every column per category) and the custom growth report email builder, see <strong>Reports → Insights</strong> and <strong>Custom growth reports (email)</strong> in the product reference at the top of this guide.
+                    </p>
                 </section>
 
                 {{-- ── STEP 8 ─────────────────────────────────── --}}
@@ -730,7 +655,7 @@
                                     <ul class="mt-1.5 space-y-1 text-[11px] text-slate-700">
                                         <li>• Add FAQ schema for "what is saas seo"</li>
                                         <li>• Internal link from /pricing (high authority)</li>
-                                        <li>• Word count below median for top 10 (1,420 vs 2,100)</li>
+                                        <li>• Article shorter than top-ranking pages in the benchmark snapshot</li>
                                     </ul>
                                 </div>
                             </div>
@@ -740,12 +665,12 @@
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Sidebar features</p>
                             <ul class="mt-3 space-y-2.5 text-[13px] leading-6 text-slate-700">
                                 <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>Target keyword field</strong> — set or change the focus query right from the editor; EBQ updates rank tracking and audits to match.</span></li>
-                                <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>30-day search performance</strong> — clicks, impressions, position, CTR pulled from GSC for this exact URL.</span></li>
+                                <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>30-day search performance</strong> — clicks, impressions, position, CTR from your connected search data for this URL.</span></li>
                                 <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>Live rank + delta</strong> — current position for the target query with 7-day movement indicator.</span></li>
                                 <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>Cannibalization detector</strong> — flags other URLs on your site competing for the same query and suggests merge or canonical.</span></li>
                                 <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>Striking-distance hints</strong> — queries this URL ranks 5–20 for with below-curve CTR (the easiest wins).</span></li>
                                 <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>Content opportunities</strong> — FAQ schema gaps, internal-link suggestions, word-count vs top 10 median.</span></li>
-                                <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>One-click resubmit</strong> — after publishing or updating, push the URL to Google's Indexing API without leaving the post.</span></li>
+                                <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>One-click indexing request</strong> — after publishing or updating, queue the URL for indexing without leaving the post.</span></li>
                                 <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>Open in EBQ</strong> — jump to the full page report (audits, backlinks, history) in a new tab.</span></li>
                             </ul>
                         </div>
@@ -922,20 +847,20 @@
                             </thead>
                             <tbody class="divide-y divide-slate-100">
                                 @foreach ([
-                                    ['Clicks', 'GSC', 'Number of times a user clicked your result on Google Search.'],
-                                    ['Impressions', 'GSC', 'Number of times your URL appeared in search results.'],
-                                    ['CTR', 'GSC', 'Clicks ÷ Impressions, expressed as a percentage.'],
-                                    ['Avg position', 'GSC', 'Mean rank of your URL across queries where it appeared.'],
-                                    ['Sessions', 'GA4', 'Distinct user visits in a 30-minute inactivity window.'],
-                                    ['Users', 'GA4', 'Distinct user identifiers (cookie / consent-mode signals).'],
-                                    ['LCP', 'CWV', 'Largest Contentful Paint — when the main content renders.'],
-                                    ['CLS', 'CWV', 'Cumulative Layout Shift — visual stability score.'],
-                                    ['INP', 'CWV', 'Interaction to Next Paint — input responsiveness.'],
-                                    ['TBT', 'CWV', 'Total Blocking Time — JS-blocked main-thread time.'],
-                                    ['FCP', 'CWV', 'First Contentful Paint — first text/image visible.'],
-                                    ['TTFB', 'CWV', 'Time To First Byte — server response latency.'],
-                                    ['Δ clicks (28d)', 'EBQ', 'Backlink target page: clicks 28d after — clicks 28d before first-seen.'],
-                                    ['Z-score', 'EBQ', 'Deviation from the 28-day baseline mean, in standard deviations.'],
+                                    ['Clicks', 'Search sync', 'Times people clicked your listing in search results in the selected scope.'],
+                                    ['Impressions', 'Search sync', 'Times your URL was shown for queries in scope.'],
+                                    ['CTR', 'Search sync', 'Share of impressions that resulted in a click.'],
+                                    ['Avg position', 'Search sync', 'Average rank where your URL appeared for queries in scope.'],
+                                    ['Sessions', 'Analytics sync', 'Visit sessions from your connected analytics property.'],
+                                    ['Users', 'Analytics sync', 'Distinct visitors from your connected analytics property.'],
+                                    ['LCP', 'Lab / field', 'Largest Contentful Paint — when the main content renders.'],
+                                    ['CLS', 'Lab / field', 'Cumulative Layout Shift — visual stability.'],
+                                    ['INP', 'Lab / field', 'Interaction to Next Paint — input responsiveness.'],
+                                    ['TBT', 'Lab', 'Total Blocking Time — main-thread blocking from scripts.'],
+                                    ['FCP', 'Lab / field', 'First Contentful Paint — first paint of text or image.'],
+                                    ['TTFB', 'Lab / field', 'Time To First Byte — server response latency.'],
+                                    ['Δ clicks (28d)', 'EBQ', 'Backlink view: change in target-page clicks around when the link was first seen.'],
+                                    ['Anomaly signal', 'EBQ', 'Indicates how far a daily metric sits from its usual range for your site (used for alerts).'],
                                 ] as [$m, $src, $def])
                                     <tr>
                                         <td class="px-4 py-2.5 font-semibold text-slate-800">{{ $m }}</td>
@@ -958,34 +883,34 @@
                     <div class="mt-6 space-y-4">
                         @foreach ([
                             [
-                                'GSC sync returns zero rows',
-                                'Property mismatch — the URL prefix in GSC must exactly match the canonical URL in EBQ (protocol + host + trailing slash).',
+                                'Search sync returns zero rows',
+                                'Property mismatch — the URL prefix for your connected search property must exactly match the canonical URL in EBQ (protocol, host, trailing slash).',
                                 'Open <strong>Settings → Integrations</strong>, click <em>Reselect property</em>, and pick the correct prefix. Force a sync from the same screen.',
                             ],
                             [
-                                'GA4 dropdown is empty after consent',
-                                'You\'re signed into Google with an account that doesn\'t have GA4 permission for the property.',
-                                'Sign out of Google, sign back in with the right account, then reconnect from <strong>Settings → Integrations</strong>.',
+                                'Analytics property dropdown is empty after consent',
+                                'The signed-in account does not have access to the analytics view you need, or the wrong account was used.',
+                                'Sign out of the provider, sign back in with the account that owns the property, then reconnect from <strong>Settings → Integrations</strong>.',
                             ],
                             [
                                 'Audit fails with "fetch blocked"',
-                                'robots.txt or a WAF rule (e.g., Cloudflare bot fight mode) is blocking the EBQ user-agent.',
+                                'robots.txt or an edge firewall / bot challenge is blocking the EBQ audit fetch.',
                                 'Allow <code>EBQAuditBot</code> in robots.txt and whitelist the EBQ IP range listed in <strong>Settings → Audit access</strong>.',
                             ],
                             [
-                                'Indexing API resubmit returns "permission denied"',
-                                'The Indexing scope wasn\'t granted, or the property isn\'t verified for the connected Google account.',
-                                'Re-run the OAuth flow from <strong>Settings → Integrations</strong> and confirm the indexing checkbox is on. Verify the GSC property if needed.',
+                                'URL resubmit returns "permission denied"',
+                                'Indexing permission was not granted, or the search property is not verified for the connected account.',
+                                'Re-run the connection flow from <strong>Settings → Integrations</strong> and confirm indexing permission is enabled. Verify site ownership for the search property if needed.',
                             ],
                             [
                                 'Backlink shows "removed" but the link is live',
-                                'Source page renders the link via client-side JS, which EBQ\'s default verifier doesn\'t execute.',
-                                'In <strong>Backlinks → Edit</strong>, switch the verifier to <em>Headless</em>. It runs the page through a real browser at the cost of a small per-link credit.',
+                                'The source page renders the link via client-side script, which the default verifier does not execute.',
+                                'In <strong>Backlinks → Edit</strong>, switch the verifier to <em>Headless</em>. It loads the page in a full browser at the cost of a small per-link credit.',
                             ],
                             [
                                 'No anomaly alerts despite a clear drop',
-                                'Either the website has fewer than 14 days of baseline, or the drop didn\'t cross both gates (relative + z-score).',
-                                'Check <strong>Reports → Alerts</strong> for the last evaluation. If baseline is short, alerts will start once 28 days are accumulated.',
+                                'The site may still be building a baseline window, or the change did not meet the anomaly thresholds.',
+                                'Check <strong>Reports → Alerts</strong> for the last evaluation. Alerts strengthen as more history accumulates.',
                             ],
                         ] as [$title, $cause, $fix])
                             <details class="group rounded-xl border border-slate-200 bg-white open:bg-slate-50/40">
@@ -1010,27 +935,27 @@
                         @foreach ([
                             [
                                 'How often does data refresh?',
-                                'GSC and GA4 sync daily. Rank checks run on your plan\'s interval (typically daily on Pro, weekly on Starter). On-demand re-checks are available from any keyword or audit.',
+                                'Connected search and analytics data sync daily. Rank checks follow your plan interval. On-demand re-checks are available from keywords and audits.',
                             ],
                             [
                                 'Can I add multiple websites?',
                                 'Yes. Each plan includes a website allowance; add more in <strong>Settings → Plan</strong>. Each website has its own integrations, recipients, and timezone.',
                             ],
                             [
-                                'Is my Google data shared with third parties?',
-                                'No. Tokens stay on the EBQ server, encrypted at rest. Reports are generated and delivered by EBQ; no analytics or attribution pixels are embedded.',
+                                'Is my account data shared externally?',
+                                'Integration credentials stay on EBQ servers and are encrypted at rest. Delivered reports are generated inside EBQ.',
                             ],
                             [
                                 'How accurate are the ranks?',
-                                'Real SERPs are captured from a residential pool, segmented by country, device, language, and (optional) city. Position is recorded post-feature (i.e., your visible rank, not a synthetic one).',
+                                'Checks use your chosen market (country, device, language, optional location). Position reflects where your URL appears in the live results for that market.',
                             ],
                             [
                                 'Can I export raw data?',
                                 'Yes. Every board offers CSV export. Reports support PDF (white-label on Agency). API access is available on Pro+ — see the API section in <strong>Settings</strong>.',
                             ],
                             [
-                                'What happens if I disconnect Google?',
-                                'Existing data is preserved. New syncs stop until you reconnect. Scheduled reports continue using cached data; alerts pause to avoid false signals.',
+                                'What happens if I disconnect integrations?',
+                                'Existing data is preserved. New syncs pause until you reconnect. Scheduled reports can use cached data; alerts pause to avoid false signals.',
                             ],
                             [
                                 'Do you support team access?',
@@ -1057,7 +982,7 @@
                         @foreach ([
                             ['Mon · 5 min', 'Open the dashboard. Read the action insights panel and yesterday\'s anomaly alerts (if any).'],
                             ['Mon · 10 min', 'Triage striking-distance and cannibalization. Pick 1–3 actions with one-click ticket export.'],
-                            ['Tue–Thu', 'Ship fixes. Re-audit each page and resubmit to Google from the audit view.'],
+                            ['Tue–Thu', 'Ship fixes. Re-audit each page and request indexing from the audit view when you publish.'],
                             ['Thu · 5 min', 'Check new backlinks landed this week — verify and check the 28-day click delta on the target page.'],
                             ['Fri · 10 min', 'Read the scheduled weekly report. Note YoY direction and which actions actually moved the needle.'],
                             ['Fri · 5 min', 'Update the rolling SEO log with what shipped and the result. Builds a reviewable history.'],

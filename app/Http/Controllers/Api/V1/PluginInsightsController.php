@@ -749,6 +749,17 @@ class PluginInsightsController extends Controller
             'title' => 'nullable|string|max:300',
             'target_language' => 'nullable|string|max:50',
             'tone' => 'nullable|string|max:50',
+            // Selection-aware editing (Workstream C). When all three are
+            // present the prompt switches into "edit only the selection"
+            // mode and returns just the replacement slice.
+            'selection_text' => 'nullable|string|max:6000',
+            'selection_prefix' => 'nullable|string|max:1000',
+            'selection_suffix' => 'nullable|string|max:1000',
+            // Multi-block payload (Workstream F). When present, `text`
+            // is ignored and the joined block-text replaces it.
+            'blocks' => 'nullable|array|max:20',
+            'blocks.*.name' => 'string|max:100',
+            'blocks.*.content' => 'string|max:8000',
         ]);
 
         @set_time_limit(120);

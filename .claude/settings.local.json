@@ -131,7 +131,8 @@
       "Bash(composer install *)",
       "Bash(grep -n 'count\\($valid\\)\\\\|count\\($rewrites\\)\\\\|>= 3\\\\|=== 3\\\\|$rewrites\\\\[\\\\] = ' C:/Users/malih/Desktop/ebq/app/Services/AiSnippetRewriterService.php)",
       "Bash(grep -n \"use App\\\\\\\\\\\\\\\\Services\\\\\\\\\\\\\\\\\\\\|LlmClient\\\\|InsightsResolver\\\\|resolver:\" C:/Users/malih/Desktop/ebq/app/Http/Controllers/Api/V1/PluginInsightsController.php)",
-      "Bash(npm install *)"
+      "Bash(npm install *)",
+      "Bash(grep -n \"Object.keys\\( MODES\\\\|Object.entries\\( MODES\\\\|MODES\\\\\\\\[\" C:/Users/malih/Desktop/ebq/ebq-seo-wp/src/block-editor-ai/index.js)"
     ]
   }
 }

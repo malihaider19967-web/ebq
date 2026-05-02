@@ -31,6 +31,19 @@ class AiBlockEditorService
     public const MODE_CONVERT_TO_LIST = 'convert_to_list';
     public const MODE_CONVERT_TO_TABLE = 'convert_to_table';
     public const MODE_TITLE = 'title';
+    // Workstream D: SEO-aware + media-block + multi-block modes.
+    public const MODE_ALT_TEXT = 'alt_text';
+    public const MODE_CTA = 'cta';
+    public const MODE_SIMPLIFY = 'simplify';
+    public const MODE_ADD_FOCUS_KEYWORD = 'add_focus_keyword';
+    public const MODE_SEO_OPTIMIZE = 'seo_optimize';
+    public const MODE_FAQ = 'faq';
+    public const MODE_COUNTER_ARGUMENT = 'counter_argument';
+    // Workstream F: cross-block ops (run from a multi-block selection).
+    public const MODE_SUMMARISE_SECTION = 'summarise_section';
+    public const MODE_GENERATE_HEADING = 'generate_heading';
+    public const MODE_HARMONISE_TONE = 'harmonise_tone';
+    public const MODE_OUTLINE = 'outline';
 
     public const MODES = [
         self::MODE_COMMAND,
@@ -44,6 +57,17 @@ class AiBlockEditorService
         self::MODE_TONE,
         self::MODE_CONVERT_TO_LIST,
         self::MODE_CONVERT_TO_TABLE,
+        self::MODE_ALT_TEXT,
+        self::MODE_CTA,
+        self::MODE_SIMPLIFY,
+        self::MODE_ADD_FOCUS_KEYWORD,
+        self::MODE_SEO_OPTIMIZE,
+        self::MODE_FAQ,
+        self::MODE_COUNTER_ARGUMENT,
+        self::MODE_SUMMARISE_SECTION,
+        self::MODE_GENERATE_HEADING,
+        self::MODE_HARMONISE_TONE,
+        self::MODE_OUTLINE,
         self::MODE_TITLE,
     ];
 
@@ -88,10 +112,24 @@ class AiBlockEditorService
             static fn (string $k): bool => $k !== '',
         ));
 
+        // Selection-aware editing — when the client supplies a selection
+        // slice + before/after context, the model edits ONLY the slice.
+        // The prompt is wrapped to make that boundary explicit.
+        $selectionText = trim((string) ($input['selection_text'] ?? ''));
+        $selectionPrefix = (string) ($input['selection_prefix'] ?? '');
+        $selectionSuffix = (string) ($input['selection_suffix'] ?? '');
+        $isSelectionEdit = $selectionText !== '';
+
         $needsText = in_array($mode, [
             self::MODE_EXTEND, self::MODE_SUMMARISE, self::MODE_GRAMMAR, self::MODE_REWRITE,
             self::MODE_SHORTER, self::MODE_LONGER, self::MODE_TRANSLATE, self::MODE_TONE,
             self::MODE_CONVERT_TO_LIST, self::MODE_CONVERT_TO_TABLE,
+            // Workstream D modes that operate on existing text:
+            self::MODE_SIMPLIFY, self::MODE_ADD_FOCUS_KEYWORD, self::MODE_SEO_OPTIMIZE,
+            self::MODE_FAQ, self::MODE_COUNTER_ARGUMENT,
+            // Workstream F multi-block modes (text is the joined block content):
+            self::MODE_SUMMARISE_SECTION, self::MODE_GENERATE_HEADING,
+            self::MODE_HARMONISE_TONE, self::MODE_OUTLINE,
         ], true);
         // Title mode is a special case: it needs EITHER content text OR
         // the focus keyword to produce useful suggestions.
@@ -120,6 +158,24 @@ class AiBlockEditorService
         $briefContext = $this->extractBriefContext($brief);
 
         [$system, $user] = $this->buildPrompt($mode, $text, $command, $focusKeyword, $title, $additionalKeywords, $briefContext, $targetLanguage, $tone);
+
+        // Selection-aware wrap: replace the user prompt with one that
+        // tells the model to edit only the selected slice and return
+        // only its replacement. The original mode-prompt's intent
+        // (rewrite/grammar/shorter/etc.) is preserved as the operation
+        // descriptor inside the wrapped prompt.
+        if ($isSelectionEdit) {
+            $operationLabel = $this->selectionOperationLabel($mode);
+            $user = "You are editing a slice of a longer paragraph. Edit ONLY the selected text below and return its replacement. The text before and after the selection is read-only context — do NOT echo it.\n\n"
+                ."[before selection — read only]: \"{$selectionPrefix}\"\n"
+                ."[selection to edit]: \"{$selectionText}\"\n"
+                ."[after selection — read only]: \"{$selectionSuffix}\"\n\n"
+                ."Operation: {$operationLabel}\n"
+                ."Constraints:\n"
+                ."- Return ONLY the rewritten selection. No quotes, no labels, no preamble.\n"
+                ."- Result must read as natural English when spliced between [before] and [after] — match grammatical seams, capitalisation, and punctuation flow.\n"
+                ."- Match the input language and approximate length unless the operation explicitly asks otherwise.\n";
+        }
 
         // Title mode benefits from the medium-tier model — better
         // length-constraint adherence is worth the modest cost overhead.
@@ -490,7 +546,136 @@ FEEDBACK;
                     ."Return ONLY the 10 titles, one per line. No numbering, no quotes, no commentary, no preamble.\n\n"
                     .($text !== '' ? "Page content excerpt for context:\n{$text}" : "(No page content yet — base titles on the focus keyword and SEO context only.)"),
             ],
+            // ─── Workstream D: SEO + media-block + structural modes ───
+            self::MODE_ALT_TEXT => [
+                $system,
+                $seoContext."Generate concise, descriptive alt text for an image used in this page. Rules:\n"
+                    ."- 8 to 125 characters\n"
+                    ."- Describe what the image actually shows, in plain language a screen reader would speak\n"
+                    ."- Do NOT start with \"image of\", \"picture of\", \"photo of\" — assistive tech announces image already\n"
+                    ."- Do NOT repeat the caption verbatim if a caption is provided\n"
+                    ."- No emojis, no quotation marks, no trailing punctuation beyond a single period\n"
+                    ."- Match the page language\n\n"
+                    ."Return ONLY the alt text on a single line.\n\n"
+                    .($text !== '' ? "Caption (for context, do NOT repeat): \"{$text}\"" : '(No caption provided — base the alt text on the SEO context above.)'),
+            ],
+            self::MODE_CTA => [
+                $system,
+                $seoContext."Write a single, compelling call-to-action button label. Rules:\n"
+                    ."- 2 to 6 words\n"
+                    ."- Lead with a strong verb (Get, Try, Start, Read, Download, Book, See, Compare, Join, Save)\n"
+                    ."- Match the surrounding page intent (informational vs commercial)\n"
+                    ."- May use ONE power word from this set when natural: free, instant, complete, exclusive, proven, easy, fast, ultimate\n"
+                    ."- No quotation marks, no trailing punctuation\n"
+                    ."- Title Case is fine; ALL CAPS is not\n\n"
+                    ."Return ONLY the button label on a single line.\n\n"
+                    .($text !== '' ? "Current label (improve on it): \"{$text}\"" : '(No current label — generate from the SEO context above.)'),
+            ],
+            self::MODE_SIMPLIFY => [
+                $system,
+                $seoContext."Rewrite the following text to be MUCH easier to read — target a Flesch Reading Ease score of 60 or higher. Specifically:\n"
+                    ."- Split sentences over 20 words into two\n"
+                    ."- Replace 3+ syllable words with 1 to 2 syllable equivalents where the meaning is preserved\n"
+                    ."- Cut redundant clauses and adverb stacks\n"
+                    ."- Keep the focus keyword and any proper nouns / numbers exactly as written\n"
+                    ."- Match the input language; preserve paragraph breaks\n\n"
+                    ."Return ONLY the simplified text.\n\nText:\n{$text}",
+            ],
+            self::MODE_ADD_FOCUS_KEYWORD => [
+                $system,
+                $seoContext."Edit the following text so the EXACT focus keyword appears at least once verbatim, integrated naturally with grammar-clean phrasing. Rules:\n"
+                    ."- Do NOT add the keyword if the text is unrelated to it — return the original unchanged in that case (you cannot lie)\n"
+                    ."- Do NOT echo the keyword more than necessary; one natural mention is the goal\n"
+                    ."- Preserve every other fact, claim, and proper noun\n"
+                    ."- Match the input language and approximate length\n\n"
+                    ."Return ONLY the edited text.\n\nText:\n{$text}",
+            ],
+            self::MODE_SEO_OPTIMIZE => [
+                $system,
+                $seoContext."Lightly SEO-tune the following text. Rules:\n"
+                    ."- Mention the focus keyword once if missing; weave a natural semantic variant somewhere if it fits\n"
+                    ."- Vary the opening word from common heading-starters (avoid 'The' / 'A' / 'Discover' / 'Welcome')\n"
+                    ."- Aim for keyword density around 1 to 1.5 percent (do not stuff)\n"
+                    ."- Tighten filler; preserve meaning, claims, and any proper nouns\n"
+                    ."- Match input language and approximate length\n\n"
+                    ."Return ONLY the SEO-tuned text.\n\nText:\n{$text}",
+            ],
+            self::MODE_FAQ => [
+                $system,
+                $seoContext."Convert the following paragraph into a Frequently Asked Questions section. Rules:\n"
+                    ."- Generate 3 to 6 question + answer pairs that cover the topic of the source paragraph\n"
+                    ."- Each question is a real query a user would type into Google, ending with '?'\n"
+                    ."- Each answer is 1 to 3 sentences, factually grounded in the source\n"
+                    ."- Mention the focus keyword in at least one question or answer when natural\n"
+                    ."- Output as HTML using <h3> for questions and <p> for answers — pairs separated only by the next <h3>\n\n"
+                    ."Return ONLY the HTML, no preamble.\n\nSource paragraph:\n{$text}",
+            ],
+            self::MODE_COUNTER_ARGUMENT => [
+                $system,
+                $seoContext."Read the following text and write ONE additional paragraph that addresses the most likely objection or counter-argument a thoughtful reader would raise. Rules:\n"
+                    ."- DO NOT echo or restate the source paragraph — return ONLY the new counter-argument paragraph\n"
+                    ."- Acknowledge the objection in concrete terms, then resolve it without overclaiming\n"
+                    ."- 2 to 4 sentences\n"
+                    ."- Do NOT begin with 'However' / 'On the other hand' / 'That said' — open in a fresher way\n"
+                    ."- Match the input language and tone\n\n"
+                    ."Source paragraph (read-only context, do NOT output it):\n{$text}",
+            ],
+            // ─── Workstream F: cross-block ops (text bundles 2+ blocks) ───
+            self::MODE_SUMMARISE_SECTION => [
+                $system,
+                $seoContext."Summarise the following section of multiple paragraphs into ONE concise paragraph (3 to 5 sentences). Rules:\n"
+                    ."- Preserve all key claims, named entities, and numbers from the source\n"
+                    ."- Mention the focus keyword once if relevant\n"
+                    ."- Match the input language and tone\n\n"
+                    ."Return ONLY the summary paragraph.\n\nSection:\n{$text}",
+            ],
+            self::MODE_GENERATE_HEADING => [
+                $system,
+                $seoContext."Read the following section of paragraphs and generate ONE H2-level heading that accurately introduces them. Rules:\n"
+                    ."- 30 to 60 characters\n"
+                    ."- Contains the focus keyword OR a close semantic variant when natural\n"
+                    ."- Sentence case, no trailing punctuation\n"
+                    ."- Reads as a real subheading a human would write — not a clickbait title\n\n"
+                    ."Return ONLY the heading text on a single line.\n\nSection:\n{$text}",
+            ],
+            self::MODE_HARMONISE_TONE => [
+                $system,
+                $seoContext."Rewrite the following bundle of paragraphs so they all read in a CONSISTENT tone — pick the tone that best matches the majority of the source, then bring outliers into line. Rules:\n"
+                    ."- Preserve every fact, claim, named entity, and number\n"
+                    ."- Preserve paragraph breaks (separate paragraphs with two newlines so we can split them back into blocks)\n"
+                    ."- Match input language; do not add or drop paragraphs\n\n"
+                    ."Return ONLY the rewritten paragraphs, separated by blank lines.\n\nSource:\n{$text}",
+            ],
+            self::MODE_OUTLINE => [
+                $system,
+                $seoContext."Read the following post content and produce a recommended heading outline (H2 + H3 structure) the page should use. Rules:\n"
+                    ."- Output as a markdown outline using '## H2' and '### H3' prefixes\n"
+                    ."- 5 to 10 H2s; nest H3s under H2s where they belong\n"
+                    ."- Cover the focus keyword and the major semantic clusters in the source\n"
+                    ."- Each heading 30 to 70 characters\n\n"
+                    ."Return ONLY the outline.\n\nPost content:\n{$text}",
+            ],
             default => [$system, $text],
+        };
+    }
+
+    /**
+     * One-line description of the operation for the selection-aware
+     * prompt's "Operation:" line. Maps mode constants to human-readable
+     * verbs so the model knows what to do with the selection slice.
+     */
+    private function selectionOperationLabel(string $mode): string
+    {
+        return match ($mode) {
+            self::MODE_REWRITE => 'Rewrite this slice for clarity and flow without changing meaning.',
+            self::MODE_GRAMMAR => 'Fix every grammar, spelling, and punctuation error in this slice. Preserve voice and word choice.',
+            self::MODE_SHORTER => 'Make this slice shorter (about 30 to 50 percent fewer words). Preserve all key facts.',
+            self::MODE_LONGER => 'Expand this slice with one or two more useful sentences. Preserve every existing fact.',
+            self::MODE_TONE => 'Adjust the tone of this slice as the surrounding context implies. Preserve meaning and length.',
+            self::MODE_SIMPLIFY => 'Rewrite this slice at a Flesch reading-ease score of 60 or higher. Shorter sentences, simpler words.',
+            self::MODE_COMMAND => 'Apply the user instruction to this slice. Preserve all named entities and numbers.',
+            self::MODE_TRANSLATE => 'Translate this slice while preserving names, numbers, and product terms. Match natural target-language style.',
+            default => 'Improve this slice while preserving meaning, named entities, and numbers.',
         };
     }
 
