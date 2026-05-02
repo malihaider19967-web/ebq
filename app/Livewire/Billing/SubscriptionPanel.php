@@ -59,7 +59,10 @@ class SubscriptionPanel extends Component
 
         $currentPlan = $user->effectivePlan();
         $isOnTrial = $subscription && $subscription->onTrial();
-        $isCancelled = $subscription && $subscription->cancelled() && $subscription->onGracePeriod();
+        // Cashier 16 dropped the British `cancelled()` alias — use the
+        // American `canceled()` spelling. Variable name keeps the
+        // British spelling because the rest of the view reads it.
+        $isCancelled = $subscription && $subscription->canceled() && $subscription->onGracePeriod();
         $isPastDue = $subscription && $subscription->stripe_status === 'past_due';
 
         $endsAt = $subscription?->ends_at;          // set when cancelled at period end
