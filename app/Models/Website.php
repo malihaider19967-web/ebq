@@ -45,6 +45,7 @@ class Website extends Model
     protected $fillable = [
         'user_id',
         'domain',
+        'feature_flags',
         'ga_property_id',
         'gsc_site_url',
         'gsc_keyword_lookback_days',
@@ -112,17 +113,30 @@ class Website extends Model
      */
     public function effectiveFeatureFlags(): array
     {
-        // Per-website feature_flags override has been retired (the column
-        // was dropped when billing moved to per-user). The effective map
-        // is just the global kill-switch ANDed against the defaults.
-        // If the website is frozen (over the user's plan limit), every
-        // billed feature is forced off so the WP plugin renders the
-        // frozen-state UI consistently.
+        // Resolution order, evaluated from broadest to most specific:
+        //   1. Defaults (Website::FEATURE_DEFAULTS) — the canonical
+        //      shipped state. chatbot/ai_writer default OFF; rest ON.
+        //   2. Global kill-switch (Setting::globalFeatureFlags()) —
+        //      ANDed against the defaults. If global says false, the
+        //      feature is OFF everywhere regardless of per-site state.
+        //   3. Per-website override (`feature_flags` JSON column) —
+        //      admin-set in /admin/website-features. Replaces the
+        //      effective value when present.
+        //   4. Freeze (over plan limit) — when true, every feature is
+        //      forced OFF so the WP plugin shows the frozen-state UI.
         $effective = self::FEATURE_DEFAULTS;
         $global = self::globalFeatureFlags();
         foreach ($effective as $key => $value) {
             if (($global[$key] ?? true) === false) {
                 $effective[$key] = false;
+            }
+        }
+        $stored = $this->feature_flags;
+        if (is_array($stored)) {
+            foreach ($stored as $key => $value) {
+                if (array_key_exists($key, $effective)) {
+                    $effective[$key] = (bool) $value;
+                }
             }
         }
         if ($this->isFrozen()) {
@@ -218,6 +232,7 @@ class Website extends Model
     {
         return [
             'report_recipients' => 'array',
+            'feature_flags' => 'array',
             'gsc_keyword_lookback_days' => 'integer',
             'last_analytics_sync_at' => 'datetime',
             'last_search_console_sync_at' => 'datetime',
