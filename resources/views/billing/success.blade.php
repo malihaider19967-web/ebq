@@ -1,9 +1,9 @@
 <x-layouts.app>
     @php
-        /** @var \App\Models\Website $website */
-        $isTrialing = method_exists($website, 'onTrial') ? $website->onTrial() : false;
-        $trialEnd = $website->trial_ends_at?->diffForHumans();
-        $portalUrl = route('billing.portal', ['website_id' => $website->id]);
+        /** @var \App\Models\User $user */
+        $subscription = $user->subscription('default');
+        $isTrialing = $subscription ? $subscription->onTrial() : false;
+        $trialEnd = $user->trial_ends_at?->diffForHumans();
     @endphp
 
     <div class="max-w-2xl mx-auto py-16 px-4 text-center">
@@ -16,9 +16,9 @@
         <h1 class="text-3xl font-bold text-slate-900 tracking-tight">Subscription active</h1>
         <p class="text-slate-600 mt-3 text-base leading-relaxed">
             @if ($isTrialing && $trialEnd)
-                Your free trial is running. Your card won't be charged until it ends {{ $trialEnd }}, and you can cancel any time before then from the billing portal.
+                Your free trial is running. Your card won't be charged until it ends {{ $trialEnd }}, and you can cancel any time before then from Billing.
             @else
-                Thanks for subscribing — your account is fully unlocked.
+                Thanks for subscribing. Your account is fully unlocked.
             @endif
         </p>
 
@@ -27,14 +27,14 @@
                class="inline-flex items-center rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">
                 Go to dashboard
             </a>
-            <a href="{{ $portalUrl }}"
+            <a href="{{ route('billing.show') }}"
                class="inline-flex items-center rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
-                Manage billing
+                Manage subscription
             </a>
         </div>
 
         <p class="text-xs text-slate-500 mt-10">
-            Receipt and invoice are emailed automatically. You can change your card or cancel from the billing portal at any time.
+            Receipt and invoice are emailed automatically. You can change your card or cancel from the Billing page at any time.
         </p>
     </div>
 </x-layouts.app>
