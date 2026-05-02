@@ -7,7 +7,14 @@
             $statusTone = 'slate';
             if ($isPastDue) { $statusLabel = 'Past due'; $statusTone = 'red'; }
             elseif ($isCancelled && $endsAt) { $statusLabel = 'Cancels '.$endsAt->toFormattedDateString(); $statusTone = 'amber'; }
-            elseif ($isOnTrial && $trialEndsAt) { $statusLabel = 'Trial — '.$trialEndsAt->diffInDays(now()).' days left'; $statusTone = 'indigo'; }
+            elseif ($isOnTrial && $trialEndsAt) {
+                // Carbon 3 returns signed diffs by default; floor the
+                // positive direction (now → future) so we never see
+                // "29.99 days left" or accidentally negative numbers.
+                $daysLeft = max(0, (int) floor(now()->diffInDays($trialEndsAt)));
+                $statusLabel = 'Trial — '.$daysLeft.' '.\Illuminate\Support\Str::plural('day', $daysLeft).' left';
+                $statusTone = 'indigo';
+            }
             elseif ($subscription && $subscription->active()) { $statusLabel = 'Active'; $statusTone = 'emerald'; }
             $tones = [
                 'emerald' => 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300',

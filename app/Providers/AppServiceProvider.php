@@ -61,11 +61,12 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(20)->by($request->user()?->id ?: $request->ip());
         });
 
-        // Bind Cashier to Website as the billable model. Tier is per-
-        // website (not per-user) so a single user with multiple sites
-        // can run distinct subscriptions per site. Cashier's
-        // `subscriptions.user_id` column then references `websites.id`
-        // — the column name is a Cashier legacy and stays as-is.
-        Cashier::useCustomerModel(Website::class);
+        // Cashier's billable model is App\Models\User — the per-user
+        // billing migration in 2026_05_02 moved the Cashier columns
+        // from `websites` to `users` and rebuilt `subscriptions` with
+        // `user_id`. Cashier's default customer model is User, so no
+        // explicit `useCustomerModel()` call is needed. Calling it
+        // with Website would point relationship lookups at the wrong
+        // table and break $subscription->owner.
     }
 }
