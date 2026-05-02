@@ -235,10 +235,14 @@ class User extends Authenticatable implements MustVerifyEmail
      */
 
     /**
-     * The Plan row the user is currently on, derived from the active
-     * Cashier subscription's stripe_price_id_yearly. Falls back to the
-     * snapshot in `current_plan_slug` if Stripe is unreachable. Returns
-     * null for free-tier users (no active subscription).
+     * The Plan row the user is currently on. Resolution order:
+     *   1. Active Cashier subscription → match by stripe_price_id_yearly
+     *   2. Snapshotted current_plan_slug (set by webhook + on swap)
+     *   3. The `free` plan row, so admin-edited max_websites etc. on
+     *      Free actually take effect for users without a paid sub
+     *
+     * Returns null only if the database has no Plan rows at all (fresh
+     * install, seeder hasn't run).
      */
     public function effectivePlan(): ?Plan
     {
@@ -253,9 +257,16 @@ class User extends Authenticatable implements MustVerifyEmail
             }
         }
         if (! empty($this->current_plan_slug)) {
-            return Plan::where('slug', $this->current_plan_slug)->first();
+            $plan = Plan::where('slug', $this->current_plan_slug)->first();
+            if ($plan) {
+                return $plan;
+            }
         }
-        return null;
+        // Fall back to the Free plan so admin edits to its max_websites
+        // / features apply to free-tier users. Without this, a free
+        // user with no subscription always saw a hard-coded "1 website"
+        // limit regardless of what the admin set on the Free plan row.
+        return Plan::where('slug', 'free')->first();
     }
 
     /**
@@ -278,11 +289,18 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /**
      * Maximum websites the user's current plan allows. Null = unlimited
-     * (the Agency tier). Free-tier users (no plan) always get 1.
+     * (Agency or any plan with `max_websites` cleared in the admin).
+     * Reads straight off the resolved plan, including Free, so admin
+     * edits to the Free plan's max_websites take effect for free-tier
+     * users.
      */
     public function websiteLimit(): ?int
     {
         $plan = $this->effectivePlan();
+        // Only when the entire plans table is missing (fresh install
+        // before the seeder runs) do we fall back to a conservative
+        // single-site default. In normal operation effectivePlan()
+        // always returns the Free row at minimum.
         if ($plan === null) {
             return 1;
         }

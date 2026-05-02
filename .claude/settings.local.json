@@ -134,7 +134,8 @@
       "Bash(npm install *)",
       "Bash(grep -n \"Object.keys\\( MODES\\\\|Object.entries\\( MODES\\\\|MODES\\\\\\\\[\" C:/Users/malih/Desktop/ebq/ebq-seo-wp/src/block-editor-ai/index.js)",
       "Bash(grep -rn \"billing\\\\\\\\.cancel'\\\\|billing\\\\\\\\.cancel\\\\\"\" C:/Users/malih/Desktop/ebq/app C:/Users/malih/Desktop/ebq/resources C:/Users/malih/Desktop/ebq/routes)",
-      "Bash(grep -n \"isConnected\\\\|publicConfig\\\\|cfg\\\\\\\\.tier\\\\|cfg\\\\\\\\.features\" C:/Users/malih/Desktop/ebq/ebq-seo-wp/src/sidebar/hooks/useEditorContext.js C:/Users/malih/Desktop/ebq/ebq-seo-wp/src/sidebar/hooks/gutenberg-context.js)"
+      "Bash(grep -n \"isConnected\\\\|publicConfig\\\\|cfg\\\\\\\\.tier\\\\|cfg\\\\\\\\.features\" C:/Users/malih/Desktop/ebq/ebq-seo-wp/src/sidebar/hooks/useEditorContext.js C:/Users/malih/Desktop/ebq/ebq-seo-wp/src/sidebar/hooks/gutenberg-context.js)",
+      "Bash(grep -n \"notify\\\\\\\\\\(.*error\\\\|notify.*'error'\" C:/Users/malih/Desktop/ebq/ebq-seo-wp/src/block-editor-ai/index.js)"
     ]
   }
 }
