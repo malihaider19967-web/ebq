@@ -54,7 +54,7 @@ return [
     ],
 
     /*
-    | Google reCAPTCHA v2 (checkbox) — email/password registration only.
+    | Google reCAPTCHA v2 (checkbox) — email/password registration and login.
     | Create keys at https://www.google.com/recaptcha/admin — choose v2 "I'm not a robot".
     | Leave both empty to disable (local dev / tests).
     */

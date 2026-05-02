@@ -48,6 +48,16 @@
             <label for="remember" class="ml-2 text-sm text-slate-600">Remember me</label>
         </div>
 
+        @if (\App\Support\Recaptcha::isEnabled())
+            <div>
+                <div class="g-recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}"></div>
+                <script src="https://www.google.com/recaptcha/api.js" async defer></script>
+                @error('g-recaptcha-response')
+                    <p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>
+                @enderror
+            </div>
+        @endif
+
         <button type="submit"
             class="flex w-full justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2">
             Sign in
