@@ -112,6 +112,14 @@ class AiBlockEditorService
             static fn (string $k): bool => $k !== '',
         ));
 
+        // Vision context. Only meaningful for `alt_text`; ignored for all
+        // other modes. Validated at the controller (URL + length caps),
+        // so we just trim here. Empty `image_url` keeps the alt-text path
+        // on the text-only model — useful when the user has selected an
+        // image block whose URL isn't yet resolvable (e.g. just-uploaded).
+        $imageUrl = trim((string) ($input['image_url'] ?? ''));
+        $surroundingText = trim((string) ($input['surrounding_text'] ?? ''));
+
         // Selection-aware editing — when the client supplies a selection
         // slice + before/after context, the model edits ONLY the slice.
         // The prompt is wrapped to make that boundary explicit.
@@ -157,7 +165,7 @@ class AiBlockEditorService
             : null;
         $briefContext = $this->extractBriefContext($brief);
 
-        [$system, $user] = $this->buildPrompt($mode, $text, $command, $focusKeyword, $title, $additionalKeywords, $briefContext, $targetLanguage, $tone);
+        [$system, $user] = $this->buildPrompt($mode, $text, $command, $focusKeyword, $title, $additionalKeywords, $briefContext, $targetLanguage, $tone, $surroundingText);
 
         // Selection-aware wrap: replace the user prompt with one that
         // tells the model to edit only the selected slice and return
@@ -183,9 +191,23 @@ class AiBlockEditorService
         // tier where speed matters more and constraints are looser.
         $modelOverride = $mode === self::MODE_TITLE ? ['model' => 'mistral-medium-latest'] : [];
 
+        // Vision-mode alt text: when an image URL is supplied for the
+        // `alt_text` mode, send a multi-modal user message (text part +
+        // image_url part) and route to Pixtral. Mistral's chat API
+        // accepts the same OpenAI-style content-array shape, so the
+        // underlying LlmClient passes through unchanged.
+        $userContent = $user;
+        if ($mode === self::MODE_ALT_TEXT && $imageUrl !== '' && ! $isSelectionEdit) {
+            $userContent = [
+                ['type' => 'text', 'text' => $user],
+                ['type' => 'image_url', 'image_url' => $imageUrl],
+            ];
+            $modelOverride = ['model' => 'pixtral-12b-latest'];
+        }
+
         $response = $this->llm->complete([
             ['role' => 'system', 'content' => $system],
-            ['role' => 'user', 'content' => $user],
+            ['role' => 'user', 'content' => $userContent],
         ], array_merge([
             'temperature' => $this->temperatureFor($mode),
             'max_tokens' => $this->maxTokensFor($mode),
@@ -405,7 +427,7 @@ FEEDBACK;
      * @param  array{subtopics: list<string>, entities: list<string>, paa: list<string>, recommended_word_count: int, angle: string}|null  $briefContext
      * @return array{0: string, 1: string} [systemPrompt, userPrompt]
      */
-    private function buildPrompt(string $mode, string $text, string $command, string $focusKeyword = '', string $title = '', array $additionalKeywords = [], ?array $briefContext = null, string $targetLanguage = '', string $tone = ''): array
+    private function buildPrompt(string $mode, string $text, string $command, string $focusKeyword = '', string $title = '', array $additionalKeywords = [], ?array $briefContext = null, string $targetLanguage = '', string $tone = '', string $surroundingText = ''): array
     {
         // SEO-first system prompt. Every block is part of a page that needs to
         // rank for a target query — the model should think like a search-led
@@ -551,15 +573,19 @@ FEEDBACK;
             // ─── Workstream D: SEO + media-block + structural modes ───
             self::MODE_ALT_TEXT => [
                 $system,
-                $seoContext."Generate concise, descriptive alt text for an image used in this page. Rules:\n"
+                $seoContext."Generate concise, descriptive alt text for the image attached to this prompt (or, if no image is attached, infer from the editorial context below). Rules:\n"
                     ."- 8 to 125 characters\n"
-                    ."- Describe what the image actually shows, in plain language a screen reader would speak\n"
+                    ."- Describe what the image actually shows in plain language a screen reader would speak\n"
+                    ."- Lead with the visual subject, not generic framing\n"
                     ."- Do NOT start with \"image of\", \"picture of\", \"photo of\" — assistive tech announces image already\n"
                     ."- Do NOT repeat the caption verbatim if a caption is provided\n"
+                    ."- Naturally include the focus keyword or a semantic variant ONLY when the image genuinely depicts it; never force it\n"
+                    ."- Tie the description to the editorial context (what the surrounding paragraphs are explaining) so the alt is relevant, not generic\n"
                     ."- No emojis, no quotation marks, no trailing punctuation beyond a single period\n"
                     ."- Match the page language\n\n"
                     ."Return ONLY the alt text on a single line.\n\n"
-                    .($text !== '' ? "Caption (for context, do NOT repeat): \"{$text}\"" : '(No caption provided — base the alt text on the SEO context above.)'),
+                    .($text !== '' ? "Caption (for context, do NOT repeat): \"{$text}\"\n" : "(No caption provided.)\n")
+                    .($surroundingText !== '' ? "\nSurrounding paragraphs (the prose immediately above/below this image — describes its role on the page):\n{$surroundingText}\n" : ''),
             ],
             self::MODE_CTA => [
                 $system,

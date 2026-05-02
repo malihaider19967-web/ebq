@@ -755,6 +755,15 @@ class PluginInsightsController extends Controller
             'selection_text' => 'nullable|string|max:6000',
             'selection_prefix' => 'nullable|string|max:1000',
             'selection_suffix' => 'nullable|string|max:1000',
+            // Vision context — used by `alt_text` on core/image. When
+            // `image_url` is a public, fetchable URL the service routes
+            // the call to a multi-modal Pixtral model and the prompt
+            // includes the image as a content part. `surrounding_text`
+            // is the prose immediately above/below the image so the model
+            // can ground the alt in editorial context (caption, focus
+            // keyword, neighbouring paragraphs).
+            'image_url' => 'nullable|string|max:2000|url',
+            'surrounding_text' => 'nullable|string|max:4000',
             // Multi-block payload (Workstream F). When present, `text`
             // is ignored and the joined block-text replaces it.
             'blocks' => 'nullable|array|max:20',
