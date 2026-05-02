@@ -477,8 +477,10 @@ FEEDBACK;
             self::MODE_COMMAND => [
                 $system,
                 $text !== ''
-                    ? $seoContext."Apply the user's instruction to the existing block text below. Change tone, structure, length, or style as instructed — but DO NOT invent facts, drop key information, or contradict the source. Preserve any natural mentions of the focus keyword. Return ONLY the resulting block text.\n\nInstruction:\n{$command}\n\nExisting text:\n{$text}"
-                    : $seoContext."Write a single block of text fulfilling the user's instruction. Aim it at the search intent for the focus keyword (if provided). Be concrete and useful. Keep it concise and self-contained.\n\nInstruction:\n{$command}",
+                    ? $seoContext."Apply the user's instruction to the existing text below. Change tone, structure, length, or style as instructed — but DO NOT invent facts, drop key information, or contradict the source. Preserve any natural mentions of the focus keyword.\n\n"
+                        ."If the instruction asks for headings, multiple sections, an outline expanded into content, lists, or tables, follow the OUTPUT FORMAT rules in the system prompt and return clean HTML (`<h2>`/`<h3>` for section titles, `<p>` between, `<ul>`/`<ol>`/`<li>`, `<table>`). Otherwise return plain prose with no wrapper tags. Return ONLY the result.\n\nInstruction:\n{$command}\n\nExisting text:\n{$text}"
+                    : $seoContext."Fulfil the user's instruction. Aim it at the search intent for the focus keyword (if provided). Be concrete and useful.\n\n"
+                        ."If the instruction implies multiple sections, headings, an outline, lists, or a table, follow the OUTPUT FORMAT rules in the system prompt and return clean HTML (`<h2>`/`<h3>`, `<p>`, `<ul>`/`<ol>`/`<li>`, `<table>`). Otherwise keep it as a single concise prose block with no wrapper tags. Return ONLY the result.\n\nInstruction:\n{$command}",
             ],
             self::MODE_EXTEND => [
                 $system,
