@@ -107,9 +107,20 @@ class BillingController extends Controller
             return redirect()->route('dashboard');
         }
 
-        // Optimistic plan-slug snapshot. Idempotent — the webhook
-        // overwrites with the same value moments later.
-        $subscription = $user->subscription('default');
+        // Webhook-race fallback: Stripe redirects the customer back to
+        // `/billing/success` BEFORE the `customer.subscription.created`
+        // webhook arrives at our endpoint. Without this sync, the local
+        // `subscriptions` table is empty, $user->subscription('default')
+        // returns null, the Billing page shows "no plan", AND every
+        // website past index 0 is frozen (because websiteLimit()
+        // falls back to the free-tier 1).
+        //
+        // We pull active subscriptions from Stripe directly and upsert
+        // local rows. Idempotent — the webhook will overwrite with the
+        // same data moments later.
+        $this->syncSubscriptionsFromStripe($user);
+
+        $subscription = $user->fresh()->subscription('default');
         if ($subscription && $subscription->valid()) {
             $plan = Plan::where('stripe_price_id_yearly', $subscription->stripe_price)->first();
             if ($plan && $user->current_plan_slug !== $plan->slug) {
@@ -178,6 +189,18 @@ class BillingController extends Controller
         if (! $user) {
             return redirect()->route('login');
         }
+
+        // Webhook-race safety net: if the user has a Stripe customer
+        // but no active local subscription, the webhook may not have
+        // landed yet (or the queue worker is stopped). Pull from Stripe
+        // directly so the page never lies about subscription state.
+        // Cheap when there's nothing to sync — a single Stripe API call
+        // with `limit=1` per render is acceptable on a low-traffic
+        // billing page.
+        if ($user->hasStripeId() && ! $user->subscribed('default')) {
+            $this->syncSubscriptionsFromStripe($user);
+        }
+
         return view('billing.subscription');
     }
 
@@ -285,6 +308,87 @@ class BillingController extends Controller
 
         return redirect()->route('billing.show')
             ->with('status', 'Subscription resumed.');
+    }
+
+    /**
+     * Pull active subscriptions from Stripe directly and upsert the
+     * matching local rows. Used to bridge the webhook-race gap (Stripe
+     * redirects to /billing/success before the subscription-created
+     * webhook lands). Cashier's Billable trait already has the
+     * relationship + columns; we just need to seed the row from a
+     * stripe.com SDK call.
+     *
+     * Idempotent — the subsequent webhook will overwrite with the same
+     * data. Safe to call multiple times. No-ops when the user has no
+     * Stripe customer yet (fresh free-tier user, never paid).
+     */
+    private function syncSubscriptionsFromStripe(\App\Models\User $user): void
+    {
+        if (! $user->hasStripeId()) {
+            return;
+        }
+
+        try {
+            $stripeSubs = $user->stripe()->subscriptions->all([
+                'customer' => $user->stripe_id,
+                'status' => 'all',
+                'limit' => 5,
+                'expand' => ['data.default_payment_method'],
+            ]);
+        } catch (\Throwable $e) {
+            // Best-effort sync. If Stripe is unreachable, stay silent
+            // — the webhook will fix the gap when it lands. Logging at
+            // info because this isn't a real failure for the user.
+            \Illuminate\Support\Facades\Log::info('Stripe subscription sync failed: '.$e->getMessage());
+            return;
+        }
+
+        foreach ($stripeSubs->data ?? [] as $stripeSub) {
+            $statusActive = in_array(
+                $stripeSub->status,
+                ['active', 'trialing', 'past_due', 'unpaid'],
+                true
+            );
+
+            // Existing row for this Stripe subscription (idempotent
+            // upsert keyed by stripe_id, which is unique on the table).
+            $existing = $user->subscriptions()
+                ->where('stripe_id', $stripeSub->id)
+                ->first();
+
+            $price = $stripeSub->items->data[0] ?? null;
+            $payload = [
+                'type' => 'default',
+                'stripe_id' => $stripeSub->id,
+                'stripe_status' => $stripeSub->status,
+                'stripe_price' => $price?->price?->id,
+                'quantity' => $price?->quantity,
+                'trial_ends_at' => $stripeSub->trial_end
+                    ? \Illuminate\Support\Carbon::createFromTimestamp((int) $stripeSub->trial_end)
+                    : null,
+                'ends_at' => $stripeSub->cancel_at
+                    ? \Illuminate\Support\Carbon::createFromTimestamp((int) $stripeSub->cancel_at)
+                    : ($stripeSub->canceled_at
+                        ? \Illuminate\Support\Carbon::createFromTimestamp((int) $stripeSub->canceled_at)
+                        : null),
+            ];
+
+            if ($existing) {
+                $existing->forceFill($payload)->save();
+            } elseif ($statusActive) {
+                // Only seed brand-new local rows for live subs — old
+                // canceled-and-gone subscriptions would clutter the table
+                // with no upside.
+                $user->subscriptions()->create($payload);
+            }
+        }
+
+        // Mirror the user-side trial_ends_at off the active subscription
+        // so the Billing page can read it directly.
+        $active = $user->fresh()->subscription('default');
+        if ($active && $active->trial_ends_at && $user->trial_ends_at?->ne($active->trial_ends_at)) {
+            $user->forceFill(['trial_ends_at' => $active->trial_ends_at])->save();
+        }
     }
 
     /**

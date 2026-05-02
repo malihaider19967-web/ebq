@@ -81,10 +81,17 @@ class SubscriptionPanel extends Component
 
         // Recent invoices (best-effort). Cashier returns Stripe Invoice
         // objects; we only need date / amount / pdf-url.
+        //
+        // During a trial Stripe creates a $0 "trial-start" invoice that
+        // is noise to the user (no actual charge). Filter it out so the
+        // list only shows real-money invoices. Once the trial converts,
+        // the first real-charge invoice appears here.
         $invoices = [];
         try {
             if ($user->hasStripeId()) {
-                $invoices = collect($user->invoices())->take(3);
+                $invoices = collect($user->invoices())
+                    ->filter(fn ($inv) => (int) ($inv->total ?? 0) > 0)
+                    ->take(3);
             }
         } catch (\Throwable $_) {
             $invoices = [];
