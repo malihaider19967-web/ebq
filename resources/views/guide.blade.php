@@ -39,6 +39,7 @@
                             ['#audit-report-sections', 'Page audit report sections'],
                             ['#insights-panel', 'Reports insights panel'],
                             ['#growth-reports', 'Custom growth reports'],
+                            ['#wordpress-plugin', 'WordPress plugin (ebq-seo-wp)'],
                         ];
                         $tocSetup = [
                             ['#step-1', '01', 'Add your first website'],
@@ -593,8 +594,6 @@
                 </section>
 
                 {{-- ── STEP 8 ─────────────────────────────────── --}}
-                <span id="wordpress" class="block scroll-mt-24"></span>
-                <span id="wordpress-plugin" class="block scroll-mt-24"></span>
                 <section id="step-8" class="not-prose mt-20 scroll-mt-24">
                     <div class="flex items-baseline gap-4">
                         <span class="font-mono text-sm font-semibold text-slate-400">08</span>
@@ -602,169 +601,11 @@
                     </div>
                     <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Install the WordPress plugin</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        If you publish on WordPress, the plugin embeds rank, click, and content opportunities inside Gutenberg, the post list, and the dashboard widget — so editors see EBQ context without ever leaving WordPress. Below is everything the plugin includes, what each feature does, and how to install and operate it safely.
+                        The packaged plugin (<code class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[15px] text-slate-800">ebq-seo-wp</code>) adds HQ, the block-editor panel, the posts-list EBQ column, and the dashboard widget. Full HTML snapshots and column-by-column notes for each surface are in <strong><a href="#wordpress-plugin" class="text-indigo-600 underline decoration-indigo-600/30 underline-offset-2 hover:text-indigo-800">WordPress plugin (ebq-seo-wp)</a></strong> at the top of this guide—aligned with the code under <code class="rounded bg-slate-100 px-1 font-mono text-xs">ebq-seo-wp/</code> in the repo.
                     </p>
 
-                    {{-- ── 8.1 Gutenberg sidebar ─────────────────────── --}}
-                    <h3 class="mt-10 text-lg font-semibold text-slate-900">8.1 Gutenberg sidebar — live SEO context while you write</h3>
-                    <p class="mt-2 text-[14px] leading-7 text-slate-600">A docked panel that appears next to every post and page editor. Editors see the same numbers content marketers see in EBQ, without context-switching.</p>
-
-                    <div class="mt-5 grid gap-5 lg:grid-cols-2">
-                        {{-- Mockup: WP sidebar (extended) --}}
-                        <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                            <div class="flex items-center gap-2 border-b border-slate-200 pb-3">
-                                <span class="h-2 w-2 rounded-full bg-rose-400"></span>
-                                <span class="h-2 w-2 rounded-full bg-amber-400"></span>
-                                <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-                                <span class="ml-2 text-[11px] font-medium text-slate-500">Gutenberg · EBQ SEO</span>
-                            </div>
-                            <div class="mt-4 space-y-3 text-[12px]">
-                                <div class="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Target keyword</p>
-                                    <div class="mt-1.5 rounded bg-white px-2 py-1.5 font-mono text-[11px] text-slate-700 ring-1 ring-slate-200">saas seo guide</div>
-                                </div>
-                                <div class="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Search performance · 30d</p>
-                                    <div class="mt-2 grid grid-cols-4 gap-1.5">
-                                        @foreach ([['Clicks', '1,284'], ['Impr', '21.4k'], ['Pos', '6.4'], ['CTR', '6.0%']] as [$l, $v])
-                                            <div class="rounded bg-white px-2 py-1.5 text-center ring-1 ring-slate-200">
-                                                <span class="block text-[9px] font-medium uppercase text-slate-500">{{ $l }}</span>
-                                                <span class="block font-semibold tabular-nums text-slate-900">{{ $v }}</span>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                                <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Rank tracking</p>
-                                    <div class="mt-1.5 flex items-center gap-2">
-                                        <span class="rounded-md bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-900 ring-1 ring-slate-200">#4</span>
-                                        <span class="text-[10px] font-semibold text-emerald-700">▲ 2</span>
-                                        <span class="text-[10px] text-slate-500">"best seo tools"</span>
-                                    </div>
-                                </div>
-                                <div class="rounded-lg border border-amber-100 bg-amber-50/60 p-3">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Cannibalization</p>
-                                    <p class="mt-1 text-[11px] text-slate-700">Splits with /blog/seo-tools-guide · merge or canonicalize</p>
-                                </div>
-                                <div class="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Striking distance</p>
-                                    <p class="mt-1 text-[11px] text-slate-700">3 queries at pos 5–20 with below-curve CTR</p>
-                                </div>
-                                <div class="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Content opportunities</p>
-                                    <ul class="mt-1.5 space-y-1 text-[11px] text-slate-700">
-                                        <li>• Add FAQ schema for "what is saas seo"</li>
-                                        <li>• Internal link from /pricing (high authority)</li>
-                                        <li>• Article shorter than top-ranking pages in the benchmark snapshot</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Sidebar features</p>
-                            <ul class="mt-3 space-y-2.5 text-[13px] leading-6 text-slate-700">
-                                <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>Target keyword field</strong> — set or change the focus query right from the editor; EBQ updates rank tracking and audits to match.</span></li>
-                                <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>30-day search performance</strong> — clicks, impressions, position, CTR from your connected search data for this URL.</span></li>
-                                <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>Live rank + delta</strong> — current position for the target query with 7-day movement indicator.</span></li>
-                                <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>Cannibalization detector</strong> — flags other URLs on your site competing for the same query and suggests merge or canonical.</span></li>
-                                <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>Striking-distance hints</strong> — queries this URL ranks 5–20 for with below-curve CTR (the easiest wins).</span></li>
-                                <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>Content opportunities</strong> — FAQ schema gaps, internal-link suggestions, word-count vs top 10 median.</span></li>
-                                <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>One-click indexing request</strong> — after publishing or updating, queue the URL for indexing without leaving the post.</span></li>
-                                <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span><span><strong>Open in EBQ</strong> — jump to the full page report (audits, backlinks, history) in a new tab.</span></li>
-                            </ul>
-                        </div>
-                    </div>
-
-                    {{-- ── 8.2 Posts list column ─────────────────── --}}
-                    <h3 class="mt-12 text-lg font-semibold text-slate-900">8.2 Posts list column — performance at a glance</h3>
-                    <p class="mt-2 text-[14px] leading-7 text-slate-600">A new column on <em>Posts → All Posts</em> and <em>Pages → All Pages</em> showing 30-day clicks, position, and a movement arrow. Sortable, filterable, no extra tab.</p>
-
-                    {{-- Mockup: posts list column --}}
-                    <div class="mt-5 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                        <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-5 py-2.5">
-                            <span class="text-[11px] font-medium text-slate-500">WordPress · Posts</span>
-                        </div>
-                        <table class="min-w-full text-[12px]">
-                            <thead class="bg-slate-50/60 text-[10px] uppercase tracking-wider text-slate-500">
-                                <tr>
-                                    <th class="px-4 py-2 text-left font-semibold">Title</th>
-                                    <th class="px-3 py-2 text-left font-semibold">Author</th>
-                                    <th class="px-3 py-2 text-right font-semibold">EBQ · Clicks 30d</th>
-                                    <th class="px-3 py-2 text-right font-semibold">EBQ · Pos</th>
-                                    <th class="px-3 py-2 text-right font-semibold">7d Δ</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                @foreach ([
-                                    ['SaaS SEO playbook', 'Jane', '1,284', '#4', '▲ 2', 'emerald'],
-                                    ['Best SEO tools 2026', 'Mark', '842', '#7', '▼ 1', 'rose'],
-                                    ['Keyword research basics', 'Jane', '218', '#11', '▲ 4', 'emerald'],
-                                    ['What is rank tracking', 'Sam', '12', '#19', '–', 'slate'],
-                                ] as [$t, $a, $c, $p, $d, $tone])
-                                    <tr class="hover:bg-slate-50/60">
-                                        <td class="px-4 py-2.5 font-medium text-slate-800">{{ $t }}</td>
-                                        <td class="px-3 py-2.5 text-slate-600">{{ $a }}</td>
-                                        <td class="px-3 py-2.5 text-right tabular-nums text-slate-700">{{ $c }}</td>
-                                        <td class="px-3 py-2.5 text-right tabular-nums text-slate-900">{{ $p }}</td>
-                                        <td @class([
-                                            'px-3 py-2.5 text-right tabular-nums font-semibold',
-                                            'text-emerald-600' => $tone === 'emerald',
-                                            'text-rose-600' => $tone === 'rose',
-                                            'text-slate-500' => $tone === 'slate',
-                                        ])>{{ $d }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <ul class="mt-5 space-y-2 text-[13px] leading-6 text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Sort by any EBQ column to triage the entire archive in seconds.</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Filter by post type, author, category — the EBQ columns respect every WP filter.</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Hide / show columns from the WP <em>Screen Options</em> menu; settings persist per user.</li>
-                    </ul>
-
-                    {{-- ── 8.3 Dashboard widget ──────────────────── --}}
-                    <h3 class="mt-12 text-lg font-semibold text-slate-900">8.3 Dashboard widget — daily snapshot on WP login</h3>
-                    <p class="mt-2 text-[14px] leading-7 text-slate-600">Lands on the WordPress admin dashboard. The first thing editors see when they log in: the action insights they should ship today.</p>
-
-                    {{-- Mockup: dashboard widget --}}
-                    <div class="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="flex items-center justify-between border-b border-slate-200 pb-3">
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">WordPress dashboard · EBQ at a glance</p>
-                            <span class="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 ring-1 ring-emerald-100">+8% w/w</span>
-                        </div>
-                        <div class="mt-4 grid grid-cols-3 gap-3 text-center">
-                            @foreach ([['Clicks 7d', '4,180'], ['Avg pos', '8.2'], ['New backlinks', '6']] as [$l, $v])
-                                <div class="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ $l }}</p>
-                                    <p class="mt-1 text-base font-semibold tabular-nums text-slate-900">{{ $v }}</p>
-                                </div>
-                            @endforeach
-                        </div>
-                        <div class="mt-4 grid grid-cols-2 gap-3 text-[12px]">
-                            <div class="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
-                                <p class="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Striking distance</p>
-                                <p class="mt-1 text-slate-700">14 quick-win opportunities</p>
-                            </div>
-                            <div class="rounded-lg border border-amber-100 bg-amber-50/60 p-3">
-                                <p class="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Cannibalizations</p>
-                                <p class="mt-1 text-slate-700">3 unresolved conflicts</p>
-                            </div>
-                            <div class="rounded-lg border border-rose-100 bg-rose-50/60 p-3">
-                                <p class="text-[10px] font-semibold uppercase tracking-wider text-rose-700">Indexing fails</p>
-                                <p class="mt-1 text-slate-700">2 URLs stuck</p>
-                            </div>
-                            <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3">
-                                <p class="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Top movers</p>
-                                <p class="mt-1 text-slate-700">/blog/saas-seo +186 clicks</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {{-- ── 8.4 Plugin settings ───────────────────── --}}
-                    <h3 class="mt-12 text-lg font-semibold text-slate-900">8.4 Plugin settings — connection, sync, and updates</h3>
+                    {{-- ── 8.1 Plugin settings ───────────────────── --}}
+                    <h3 class="mt-10 text-lg font-semibold text-slate-900">8.1 Plugin settings — connection, sync, and updates</h3>
                     <div class="mt-3 grid gap-4 sm:grid-cols-2">
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Connection</p>
@@ -800,8 +641,8 @@
                         </div>
                     </div>
 
-                    {{-- ── 8.5 Install in 4 steps ───────────────── --}}
-                    <h3 class="mt-12 text-lg font-semibold text-slate-900">8.5 Install in four steps</h3>
+                    {{-- ── 8.2 Install in 4 steps ───────────────── --}}
+                    <h3 class="mt-12 text-lg font-semibold text-slate-900">8.2 Install in four steps</h3>
                     <ol class="mt-3 space-y-2 text-[14px] leading-7 text-slate-700">
                         <li><span class="font-mono text-slate-400">1.</span> In EBQ, open <strong>Settings → WordPress</strong>. Click <em>Download plugin</em> — you'll get the latest packaged ZIP.</li>
                         <li><span class="font-mono text-slate-400">2.</span> In WordPress, go to <strong>Plugins → Add New → Upload Plugin</strong>. Upload the ZIP, then activate.</li>
@@ -809,8 +650,8 @@
                         <li><span class="font-mono text-slate-400">4.</span> Open any post — the EBQ panel appears in the Gutenberg sidebar. The dashboard widget and posts-list column populate within a sync cycle.</li>
                     </ol>
 
-                    {{-- ── 8.6 Security ──────────────────────────── --}}
-                    <h3 class="mt-12 text-lg font-semibold text-slate-900">8.6 Security model</h3>
+                    {{-- ── 8.3 Security ──────────────────────────── --}}
+                    <h3 class="mt-12 text-lg font-semibold text-slate-900">8.3 Security model</h3>
                     <div class="mt-3 grid gap-4 sm:grid-cols-2">
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Per-site tokens</p>

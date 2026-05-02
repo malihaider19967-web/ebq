@@ -481,4 +481,155 @@
             <p class="mt-4 text-[12px] text-slate-600">Toggle sections so the email only contains blocks your team acts on—KPIs, insights highlights, rank movers, or backlinks, depending on what you configured in the live builder.</p>
         </div>
     </section>
+
+    {{-- ═══ WordPress plugin (ebq-seo-wp) ═══ --}}
+    <span id="wordpress" class="block scroll-mt-24"></span>
+    <span id="wordpress-plugin" class="block scroll-mt-24"></span>
+    <section class="scroll-mt-24 border-t border-slate-200 pt-20">
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">CMS plugin · ebq-seo-wp</p>
+        <h2 class="mt-3 text-3xl font-semibold tracking-tight text-slate-900">WordPress plugin surfaces</h2>
+        <p class="mt-3 text-[16px] leading-7 text-slate-600">
+            The packaged plugin (<code class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[13px] text-slate-800">ebq-seo-wp</code>) mirrors workspace data inside wp-admin. Everything below follows the actual PHP/React structure: admin menu order, REST-backed hydration, and the column markup registered on the posts list.
+        </p>
+
+        <h3 class="mt-10 text-xl font-semibold text-slate-900">EBQ Head Quarter (<span class="font-mono text-lg">ebq-hq</span>)</h3>
+        <p class="mt-2 text-[14px] leading-7 text-slate-600">
+            Top-level admin screen (requires <code class="rounded bg-slate-100 px-1 font-mono text-xs">manage_options</code>). Data is loaded through the site’s authenticated REST proxy—same workspace as the browser app. The nav lists every HQ tab shipped in the React shell:
+        </p>
+        <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                <div class="flex items-center gap-3">
+                    <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-sm font-bold text-white">E</span>
+                    <div>
+                        <p class="text-sm font-bold text-slate-900">EBQ Head Quarter</p>
+                        <p class="text-[11px] text-slate-500"><strong>example.com</strong> · Connected workspace</p>
+                    </div>
+                </div>
+                <span class="rounded-md border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-700">Open workspace ↗</span>
+            </div>
+            <div class="mt-3 flex flex-wrap gap-2 text-[11px] font-semibold">
+                @foreach ([
+                    'Overview',
+                    'SEO Performance',
+                    'Keywords',
+                    'Rank Tracker',
+                    'Pages',
+                    'Index Status',
+                    'Insights',
+                    'Redirects (AI)',
+                    'SERP Features',
+                    'Benchmarks',
+                    'Prospects',
+                    'Topical Authority',
+                ] as $tab)
+                    <span @class([
+                        'rounded-lg border px-2.5 py-1.5',
+                        'border-indigo-400 bg-indigo-50 text-indigo-900' => $tab === 'Overview',
+                        'border-slate-200 bg-slate-50 text-slate-700' => $tab !== 'Overview',
+                    ])>{{ $tab }}</span>
+                @endforeach
+            </div>
+            <p class="mt-4 text-[12px] leading-5 text-slate-600">
+                <strong>Overview</strong> — snapshot KPIs. <strong>SEO Performance</strong> — trend-style charts. <strong>Keywords</strong> — query table from synced search data. <strong>Rank Tracker</strong> — tracked SERP keywords (admin-bar and row-action shortcuts land here with the add-keyword modal). <strong>Pages</strong> / <strong>Index Status</strong> — URL coverage and indexing health. <strong>Insights</strong> — same categories as workspace insights. <strong>Redirects (AI)</strong>, <strong>SERP Features</strong>, <strong>Benchmarks</strong>, <strong>Prospects</strong>, and <strong>Topical Authority</strong> extend planning when enabled for your site.
+            </p>
+        </div>
+
+        <h3 class="mt-10 text-xl font-semibold text-slate-900">AI Writer (<span class="font-mono text-lg">ebq-ai-writer</span>)</h3>
+        <p class="mt-2 text-[14px] leading-7 text-slate-600">
+            Separate top-level menu item when the <strong>AI Writer</strong> feature flag is on for your workspace. It mounts the same bundle as HQ but hosts the long-form draft builder only—keeps heavy writing flows out of the HQ tab strip.
+        </p>
+
+        <h3 class="mt-10 text-xl font-semibold text-slate-900">Settings (submenu under HQ)</h3>
+        <p class="mt-2 text-[14px] leading-7 text-slate-600">
+            Connect / disconnect the site to your EBQ workspace (challenge handshake—no manual API keys), clear the plugin’s response cache, optional title separator for templates, migration helpers from other SEO plugins, and diagnostics. Connecting enables REST proxies that HQ, the dashboard widget, post column, and editor sidebar all consume.
+        </p>
+
+        <h3 class="mt-10 text-xl font-semibold text-slate-900">Block editor · EBQ SEO panel</h3>
+        <p class="mt-2 text-[14px] leading-7 text-slate-600">
+            Registers as <strong>EBQ SEO</strong> in the editor plugins menu and mirrors the same React tree inside the classic metabox container so the UI works whether the pinned sidebar is open or not. Tier and per-feature gates from your workspace (AI inline, live audit, etc.) flow through script localization—surfaces hide individually when an admin turns them off for the site.
+        </p>
+        <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4 text-[12px] shadow-sm">
+            <p class="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Editor · EBQ SEO</p>
+            <p class="mt-2 text-slate-600">Focus keyphrase, on-page analysis scores, schema/social tabs, search-performance snapshot for the URL, and actions consistent with your workspace feature flags—built from the same sidebar bundle as the plugin root.</p>
+        </div>
+
+        <h3 class="mt-10 text-xl font-semibold text-slate-900">Posts / Pages list · <span class="font-mono">EBQ</span> column</h3>
+        <p class="mt-2 text-[14px] leading-7 text-slate-600">
+            When the <strong>post list column</strong> feature is enabled, a sortable <strong>EBQ</strong> column is added for each supported post type (posts and pages by default). It always shows locally computed SEO and readability pills plus enabled schema type chips; when the site is connected, a second block hydrates in one bulk request so the list stays fast even with many rows.
+        </p>
+        <div class="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <table class="w-full text-xs">
+                <thead class="border-b border-slate-200 bg-slate-50 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                    <tr>
+                        <th class="px-4 py-2 text-left">Title</th>
+                        <th class="px-4 py-2 text-left">Author</th>
+                        <th class="px-4 py-2 text-left">EBQ</th>
+                        <th class="px-4 py-2 text-left">Date</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    <tr>
+                        <td class="px-4 py-3 font-medium text-slate-900">Product launch recap</td>
+                        <td class="px-4 py-3 text-slate-600">Alex</td>
+                        <td class="px-4 py-3">
+                            <div class="flex flex-col gap-2">
+                                <div class="flex flex-wrap gap-1.5">
+                                    <span class="inline-flex items-center gap-0.5 rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-800" title="On-page SEO score"><span class="tabular-nums">72</span><span class="text-[9px] opacity-80">SEO</span><span class="text-[9px]">Good</span></span>
+                                    <span class="inline-flex items-center gap-0.5 rounded border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900" title="Readability"><span class="tabular-nums">58</span><span class="text-[9px] opacity-80">Read.</span><span class="text-[9px]">Needs work</span></span>
+                                </div>
+                                <div class="flex flex-wrap gap-1">
+                                    <span class="rounded bg-slate-100 px-1.5 py-px text-[9px] font-medium text-slate-600">Article</span>
+                                    <span class="rounded bg-slate-100 px-1.5 py-px text-[9px] font-medium text-slate-600">FAQPage</span>
+                                </div>
+                                <div class="rounded border border-dashed border-slate-200 bg-slate-50 px-2 py-1.5 text-[10px] text-slate-400">Hydrated rank · clicks · impressions…</div>
+                            </div>
+                        </td>
+                        <td class="px-4 py-3 text-slate-500">Published</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+        <dl class="mt-4 grid gap-3 text-[13px] leading-6 text-slate-700">
+            <div class="rounded-xl border border-slate-200 p-4"><dt class="font-semibold text-slate-900">SEO / Read. pills</dt><dd class="mt-1">Scores from the editor analysis saved as post meta—open the post in the editor once to populate. Labels map to Good / Needs work / Bad bands.</dd></div>
+            <div class="rounded-xl border border-slate-200 p-4"><dt class="font-semibold text-slate-900">Schema chips</dt><dd class="mt-1">Shows which structured-data types are enabled for the URL in the Schema tab.</dd></div>
+            <div class="rounded-xl border border-slate-200 p-4"><dt class="font-semibold text-slate-900">Hydrated strip</dt><dd class="mt-1">After one bulk API response, shows rank and search-performance context for that URL when connected.</dd></div>
+            <div class="rounded-xl border border-slate-200 p-4"><dt class="font-semibold text-slate-900">Row action · Track keyphrase</dt><dd class="mt-1">When a focus keyphrase is saved, an extra action can send it to Rank Tracker without leaving the list (falls back to HQ if scripts are unavailable).</dd></div>
+        </dl>
+
+        <h3 class="mt-10 text-xl font-semibold text-slate-900">Dashboard widget · EBQ SEO insights</h3>
+        <p class="mt-2 text-[14px] leading-7 text-slate-600">
+            When enabled, appears on the main wp-admin dashboard after login. The layout matches the server-rendered cards used by the REST endpoint—four insight counts plus a link to open full reports in your workspace.
+        </p>
+        <div class="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="mb-3 flex flex-wrap items-center gap-2 text-[11px] text-slate-600">
+                <span class="rounded-md bg-slate-900 px-2 py-0.5 text-[10px] font-bold text-white">EBQ</span>
+                <span>example.com</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                @foreach ([
+                    ['Cannibalizations', '14', 'Pages competing for the same query'],
+                    ['Striking distance', '27', 'Queries on positions 5–20'],
+                    ['Index fails + traffic', '3', 'Indexed: false, but still visible'],
+                    ['Content decay', '8', 'Pages losing organic clicks'],
+                ] as [$t, $n, $h])
+                    <div class="rounded-lg border border-slate-200 p-3">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ $t }}</p>
+                        <p class="mt-1 text-xl font-bold tabular-nums text-slate-900">{{ $n }}</p>
+                        <p class="mt-0.5 text-[10px] leading-snug text-slate-500">{{ $h }}</p>
+                    </div>
+                @endforeach
+            </div>
+            <p class="mt-3 text-[11px] font-semibold text-indigo-700">Open full EBQ reports →</p>
+        </div>
+
+        <h3 class="mt-10 text-xl font-semibold text-slate-900">Admin bar shortcut</h3>
+        <p class="mt-2 text-[14px] leading-7 text-slate-600">
+            Logged-in users who can edit posts see <strong>Track keyword</strong> in the admin bar on front and back office—it opens HQ’s Rank Tracker with the add-keyword modal so new terms can be queued from anywhere.
+        </p>
+
+        <h3 class="mt-10 text-xl font-semibold text-slate-900">Feature availability</h3>
+        <p class="mt-2 text-[14px] leading-7 text-slate-600">
+            Workspace administrators can disable individual value-add features (HQ, dashboard widget, post column, chatbot, AI surfaces, live audit, redirects, etc.) without turning off core SEO output—sitemaps, meta tags, schema, and breadcrumbs stay active so discoverability is not silently removed.
+        </p>
+    </section>
 </div>
