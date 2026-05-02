@@ -86,6 +86,17 @@ class InjectFeatureFlags
             $data['tier'] = $website->effectiveTier();
             $touched = true;
         }
+        // Free-for-limited-time promo flag. When env FREE=true, the
+        // marketing /pricing page swaps the plan grid for a "Pro free
+        // for everyone" panel and the in-app /billing page does the
+        // same. Broadcasting it to the plugin lets the WP-side bulk-AI
+        // gate, the editor's tier-required messaging, and any future
+        // Pro-locked UI honour the same promo without a hard-coded
+        // feature flag in every plugin release.
+        if (! array_key_exists('free_promo', $data)) {
+            $data['free_promo'] = (bool) config('app.free', false);
+            $touched = true;
+        }
         if ($touched) {
             $response->setData($data);
         }
