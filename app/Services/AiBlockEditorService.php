@@ -188,8 +188,8 @@ class AiBlockEditorService
             ['role' => 'user', 'content' => $user],
         ], array_merge([
             'temperature' => $this->temperatureFor($mode),
-            'max_tokens' => 1500,
-            'timeout' => 90,
+            'max_tokens' => $this->maxTokensFor($mode),
+            'timeout' => 180,
         ], $modelOverride));
 
         if (! ($response['ok'] ?? false)) {
@@ -689,6 +689,28 @@ FEEDBACK;
             self::MODE_REWRITE, self::MODE_EXTEND, self::MODE_LONGER, self::MODE_TONE => 0.6,
             self::MODE_COMMAND, self::MODE_TITLE => 0.7,
             default => 0.5,
+        };
+    }
+
+    /**
+     * Per-mode output budget. The old global 1500-cap chopped command-mode
+     * outline expansions mid-sentence. Command-mode is the open-ended one
+     * (users expand long outlines, generate full sections, paste lists of
+     * 20+ items) so it gets the largest budget. Short modes stay tight so
+     * the model can't ramble.
+     */
+    private function maxTokensFor(string $mode): int
+    {
+        return match ($mode) {
+            self::MODE_ALT_TEXT, self::MODE_GENERATE_HEADING => 200,
+            self::MODE_SUMMARISE => 500,
+            self::MODE_TITLE => 1500,
+            self::MODE_EXTEND, self::MODE_TONE, self::MODE_GRAMMAR, self::MODE_TRANSLATE => 4000,
+            self::MODE_REWRITE, self::MODE_SHORTER, self::MODE_LONGER => 5000,
+            self::MODE_FAQ, self::MODE_CONVERT_TO_LIST, self::MODE_CONVERT_TO_TABLE,
+            self::MODE_COUNTER_ARGUMENT, self::MODE_CTA => 6000,
+            self::MODE_COMMAND => 12000,
+            default => 5000,
         };
     }
 
