@@ -53,6 +53,16 @@ return [
         ],
     ],
 
+    /*
+    | Google reCAPTCHA v2 (checkbox) — email/password registration only.
+    | Create keys at https://www.google.com/recaptcha/admin — choose v2 "I'm not a robot".
+    | Leave both empty to disable (local dev / tests).
+    */
+    'recaptcha' => [
+        'site_key' => env('RECAPTCHA_SITE_KEY', ''),
+        'secret_key' => env('RECAPTCHA_SECRET_KEY', ''),
+    ],
+
     'google' => [
         'client_id' => env('GOOGLE_CLIENT_ID'),
         'client_secret' => env('GOOGLE_CLIENT_SECRET'),

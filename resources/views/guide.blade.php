@@ -39,7 +39,7 @@
                             ['#audit-report-sections', 'Page audit report sections'],
                             ['#insights-panel', 'Reports insights panel'],
                             ['#growth-reports', 'Custom growth reports'],
-                            ['#wordpress-plugin', 'WordPress plugin (ebq-seo-wp)'],
+                            ['#wordpress-plugin', 'WordPress plugin'],
                         ];
                         $tocSetup = [
                             ['#step-1', '01', 'Add your first website'],
@@ -151,10 +151,10 @@
                     </div>
                     <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Connect search and analytics</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        In one authorization step you grant read access to your connected search and analytics properties, plus permission to request indexing when you use that workflow. Refresh tokens are encrypted at rest and rotated automatically, and you can revoke access from the same screen.
+                        In one authorization step you grant read access to your connected search and analytics properties, plus permission to request indexing when you use that workflow. Credentials are encrypted at rest and rotated automatically, and you can revoke access from the same screen.
                     </p>
 
-                    {{-- Mockup: OAuth consent --}}
+                    {{-- Mockup: authorization consent --}}
                     <div class="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                         <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-5 py-3">
                             <span class="h-2 w-2 rounded-full bg-rose-400"></span>
@@ -196,11 +196,11 @@
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Token safety</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Tokens never leave the server. Refresh tokens are encrypted with the app key; access tokens are short-lived and rotated automatically.</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Integration credentials stay on EBQ servers and are encrypted; short-lived access is rotated automatically.</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-4">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Partial grants</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">If you uncheck a scope, EBQ keeps working with reduced coverage. You can re-grant later from the same screen.</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">If you decline part of the access, EBQ keeps working with reduced coverage. You can approve more later from the same screen.</p>
                         </div>
                     </div>
 
@@ -601,7 +601,7 @@
                     </div>
                     <h2 class="mt-2 text-3xl font-semibold tracking-tight text-slate-900">Install the WordPress plugin</h2>
                     <p class="mt-4 text-[16px] leading-7 text-slate-600">
-                        The packaged plugin (<code class="rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[15px] text-slate-800">ebq-seo-wp</code>) adds HQ, the block-editor panel, the posts-list EBQ column, and the dashboard widget. Full HTML snapshots and column-by-column notes for each surface are in <strong><a href="#wordpress-plugin" class="text-indigo-600 underline decoration-indigo-600/30 underline-offset-2 hover:text-indigo-800">WordPress plugin (ebq-seo-wp)</a></strong> at the top of this guide—aligned with the code under <code class="rounded bg-slate-100 px-1 font-mono text-xs">ebq-seo-wp/</code> in the repo.
+                        The EBQ SEO plugin adds HQ, the block-editor panel, the posts-list EBQ column, and the dashboard widget. Full layouts and column-by-column notes for each surface are in <strong><a href="#wordpress-plugin" class="text-indigo-600 underline decoration-indigo-600/30 underline-offset-2 hover:text-indigo-800">WordPress plugin</a></strong> at the top of this guide.
                     </p>
 
                     {{-- ── 8.1 Plugin settings ───────────────────── --}}
@@ -610,9 +610,9 @@
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Connection</p>
                             <ul class="mt-2 space-y-1.5 text-[13px] leading-6 text-slate-700">
-                                <li>One-click <em>Connect to EBQ</em> via challenge-response handshake.</li>
+                                <li>One-click <em>Connect to EBQ</em> using a short verification step—no secrets to copy.</li>
                                 <li>Live status badge (Connected / Reconnect needed / Revoked).</li>
-                                <li><em>Disconnect</em> immediately revokes the per-site token in EBQ.</li>
+                                <li><em>Disconnect</em> ends the link for this site in EBQ right away.</li>
                             </ul>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
@@ -626,7 +626,7 @@
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Auto-updates</p>
                             <ul class="mt-2 space-y-1.5 text-[13px] leading-6 text-slate-700">
-                                <li>Plugin checks EBQ for new releases on the WP cron schedule.</li>
+                                <li>The plugin checks EBQ for new releases on a routine schedule.</li>
                                 <li>Optional auto-install for security/patch releases.</li>
                                 <li>Manual update from <strong>Plugins</strong> at any time.</li>
                             </ul>
@@ -635,7 +635,7 @@
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Permissions</p>
                             <ul class="mt-2 space-y-1.5 text-[13px] leading-6 text-slate-700">
                                 <li>Sidebar visible to Editors+; widget configurable per role.</li>
-                                <li>Connect/Disconnect requires <code>manage_options</code> (Admin).</li>
+                                <li>Connect and disconnect require administrator access.</li>
                                 <li>Posts column respects post-type capabilities.</li>
                             </ul>
                         </div>
@@ -647,27 +647,27 @@
                         <li><span class="font-mono text-slate-400">1.</span> In EBQ, open <strong>Settings → WordPress</strong>. Click <em>Download plugin</em> — you'll get the latest packaged ZIP.</li>
                         <li><span class="font-mono text-slate-400">2.</span> In WordPress, go to <strong>Plugins → Add New → Upload Plugin</strong>. Upload the ZIP, then activate.</li>
                         <li><span class="font-mono text-slate-400">3.</span> In the WP plugin settings, click <em>Connect to EBQ</em>. You'll be redirected back to EBQ, pick the matching website, and approve.</li>
-                        <li><span class="font-mono text-slate-400">4.</span> Open any post — the EBQ panel appears in the Gutenberg sidebar. The dashboard widget and posts-list column populate within a sync cycle.</li>
+                        <li><span class="font-mono text-slate-400">4.</span> Open any post — the EBQ panel appears in the block editor sidebar. The dashboard widget and posts-list column fill in shortly after.</li>
                     </ol>
 
                     {{-- ── 8.3 Security ──────────────────────────── --}}
                     <h3 class="mt-12 text-lg font-semibold text-slate-900">8.3 Security model</h3>
                     <div class="mt-3 grid gap-4 sm:grid-cols-2">
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Per-site tokens</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Each connection issues a Sanctum token scoped to a single website. Stolen tokens grant read-only access to that site's EBQ data only — never your account or other websites.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Scoped to one site</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Each plugin connection applies to a single website in your EBQ account. A compromised site-specific link could only reach that site’s data—not your other properties or full account.</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Server-side only</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Tokens live in <code>wp_options</code> on the server. They never touch browser JS, never appear in REST responses, and never leave WP except to call EBQ over HTTPS.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Stored on your server</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Connection credentials stay on your server. They are not embedded in public pages or exposed to visitors—only EBQ’s plugin uses them to fetch your workspace data.</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
-                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Challenge-response connect</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">The connect handshake uses a one-time nonce signed by both sides. A copy-pasted URL can't be replayed — and an attacker without WP admin can't initiate a connection.</p>
+                            <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Verified connect flow</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Connecting runs through a short, signed verification step so stray links cannot complete pairing. Someone without access to your site admin cannot bind your install to another workspace.</p>
                         </div>
                         <div class="rounded-xl border border-slate-200 bg-white p-5">
                             <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Instant revoke</p>
-                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Click <em>Disconnect</em> in either WP or EBQ. The token is invalidated server-side immediately and the plugin goes offline on the next request.</p>
+                            <p class="mt-2 text-[13px] leading-6 text-slate-700">Choose <em>Disconnect</em> in either your site admin or EBQ. The link stops working immediately on the next request.</p>
                         </div>
                     </div>
                 </section>
@@ -746,7 +746,7 @@
                             [
                                 'Backlink shows "removed" but the link is live',
                                 'The source page renders the link via client-side script, which the default verifier does not execute.',
-                                'In <strong>Backlinks → Edit</strong>, switch the verifier to <em>Headless</em>. It loads the page in a full browser at the cost of a small per-link credit.',
+                                'In <strong>Backlinks → Edit</strong>, switch the verifier to the <em>enhanced</em> mode that loads the page the way a visitor would. It may use a small per-link credit on your plan.',
                             ],
                             [
                                 'No anomaly alerts despite a clear drop',
@@ -792,7 +792,7 @@
                             ],
                             [
                                 'Can I export raw data?',
-                                'Yes. Every board offers CSV export. Reports support PDF (white-label on Agency). API access is available on Pro+ — see the API section in <strong>Settings</strong>.',
+                                'Yes. Every board offers spreadsheet export. Reports support printable summaries on eligible plans; advanced export options appear in <strong>Settings</strong> where your plan allows.',
                             ],
                             [
                                 'What happens if I disconnect integrations?',

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Plan;
 use App\Models\User;
 use App\Models\WebsiteInvitation;
+use App\Rules\ValidRecaptcha;
+use App\Support\Recaptcha;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -42,12 +44,18 @@ class RegisteredUserController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $validated = $request->validate([
+        $rules = [
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'string', 'lowercase', 'email', 'max:255', 'unique:'.User::class],
             'password' => ['required', 'confirmed', Password::defaults()],
             'invite' => ['nullable', 'string', 'max:128'],
-        ]);
+        ];
+
+        if (Recaptcha::isEnabled()) {
+            $rules['g-recaptcha-response'] = ['required', 'string', new ValidRecaptcha];
+        }
+
+        $validated = $request->validate($rules);
 
         $user = User::create([
             'name' => $validated['name'],
@@ -97,6 +105,7 @@ class RegisteredUserController extends Controller
             return '';
         }
         $request->session()->put('pending_plan', $slug);
+
         return $slug;
     }
 
@@ -111,6 +120,7 @@ class RegisteredUserController extends Controller
             return false;
         }
         $plan = Plan::where('slug', $slug)->where('is_active', true)->first();
+
         return $plan !== null && $plan->isCheckoutReady();
     }
 }
