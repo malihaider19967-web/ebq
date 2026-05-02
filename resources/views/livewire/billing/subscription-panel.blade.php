@@ -58,8 +58,49 @@
         </div>
     @endif
 
+    {{-- Free-for-limited-time promo. When APP_FREE=true on the
+         server, every billing surface (the marketing /pricing page
+         AND this in-app Subscription page) collapses to a single
+         celebratory panel: no plan grid, no upgrade CTA, no cancel,
+         because there's nothing to buy and nothing to cancel during
+         the promo window. Mirrors resources/views/pricing.blade.php's
+         `@if ($free)` branch so customers see consistent messaging
+         no matter which surface they land on. --}}
+    @if ($isFreePromo)
+        <div class="rounded-2xl border border-emerald-200 bg-emerald-50/60 px-6 py-10 text-center dark:border-emerald-500/30 dark:bg-emerald-500/10">
+            <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-emerald-700 dark:text-emerald-300">Limited-time offer</p>
+            <h2 class="mt-3 text-balance text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
+                You currently have full Pro access at no cost.
+            </h2>
+            <p class="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                Every Pro feature is unlocked for your account during this launch period. There's nothing to subscribe to and nothing to cancel right now. We'll notify all active accounts at least 30 days before standard pricing resumes.
+            </p>
+            <ul class="mx-auto mt-6 grid max-w-xl gap-2 text-left sm:grid-cols-2 text-[13px] text-slate-700 dark:text-slate-200">
+                <li class="flex items-start gap-2">
+                    <svg class="mt-0.5 h-4 w-4 flex-none text-emerald-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    <span>AI Writer, Rank Assist chatbot, and inline AI for the editor</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <svg class="mt-0.5 h-4 w-4 flex-none text-emerald-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    <span>Live SEO scoring with GSC and audit signals</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <svg class="mt-0.5 h-4 w-4 flex-none text-emerald-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    <span>Page audits, topical gap, entity coverage</span>
+                </li>
+                <li class="flex items-start gap-2">
+                    <svg class="mt-0.5 h-4 w-4 flex-none text-emerald-600" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" /></svg>
+                    <span>Unlimited connected websites during the promo</span>
+                </li>
+            </ul>
+            <p class="mt-7 text-[11px] text-slate-500 dark:text-slate-400">
+                Standard plans (Free / Starter / Pro / Agency) will be re-enabled with at least 30 days' notice to existing accounts.
+            </p>
+        </div>
+    @endif
+
     {{-- Current plan card --}}
-    @if ($currentPlan && $subscription)
+    @if (! $isFreePromo && $currentPlan && $subscription)
         <div class="rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="flex items-start justify-between gap-3 px-5 py-4">
                 <div class="min-w-0 flex-1">
@@ -118,7 +159,9 @@
         </div>
     @endif
 
-    {{-- Plan grid --}}
+    {{-- Plan grid — hidden during the free-promo window since there
+         is nothing to switch to or buy. --}}
+    @if (! $isFreePromo)
     <div>
         <h3 class="mb-2 text-sm font-semibold text-slate-900 dark:text-slate-100">
             @if ($subscription && $subscription->valid())
@@ -204,6 +247,7 @@
             @endforeach
         </div>
     </div>
+    @endif
 
     {{-- Recent invoices --}}
     @if ($invoices && count($invoices) > 0)
@@ -228,8 +272,9 @@
         </div>
     @endif
 
-    {{-- Danger zone --}}
-    @if ($subscription && $subscription->valid() && ! $isCancelled)
+    {{-- Danger zone — hidden during the free-promo window since
+         there is no Stripe subscription to cancel. --}}
+    @if (! $isFreePromo && $subscription && $subscription->valid() && ! $isCancelled)
         <div class="rounded-xl border border-rose-200 bg-rose-50/50 p-4 dark:border-rose-500/30 dark:bg-rose-500/5">
             <h3 class="text-sm font-semibold text-rose-900 dark:text-rose-200">Cancel subscription</h3>
             <p class="mt-1 text-[12px] text-rose-800 dark:text-rose-300">

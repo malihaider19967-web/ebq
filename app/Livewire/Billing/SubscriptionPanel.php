@@ -107,6 +107,14 @@ class SubscriptionPanel extends Component
             ? collect()
             : $user->websites()->whereIn('id', $frozenIds)->orderBy('created_at')->get(['id','domain']);
 
+        // Free-for-limited-time promo mode. When APP_FREE=true (mirrors
+        // the /pricing marketing page's behaviour), the plan grid +
+        // cancel/danger zone are hidden and replaced with a single
+        // "Pro features unlocked free during the launch period" panel.
+        // Same env flag, same UX pattern, single source of truth via
+        // config('app.free').
+        $isFreePromo = (bool) config('app.free');
+
         return view('livewire.billing.subscription-panel', [
             'user' => $user,
             'subscription' => $subscription,
@@ -115,6 +123,7 @@ class SubscriptionPanel extends Component
             'isOnTrial' => $isOnTrial,
             'isCancelled' => $isCancelled,
             'isPastDue' => $isPastDue,
+            'isFreePromo' => $isFreePromo,
             'endsAt' => $endsAt,
             'trialEndsAt' => $trialEndsAt,
             'nextChargeAt' => $nextChargeAt,
