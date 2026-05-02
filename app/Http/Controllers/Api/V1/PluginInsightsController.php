@@ -947,11 +947,18 @@ class PluginInsightsController extends Controller
         // (everything true) with the website's stored `feature_flags`
         // JSON column — admins toggle individual features OFF in the
         // /admin/website-features grid; everything else stays default-ON.
+        //
+        // Tier is now derived (per-user billing migration removed the
+        // websites.tier column). Use effectiveTier() so freeze state
+        // and the active subscription's plan slug both flow through.
+        // The InjectFeatureFlags middleware also stamps `tier`, but
+        // setting it explicitly here means the websiteFeatures endpoint
+        // is the canonical source of truth for plugin auto-sync.
         return response()->json([
             'ok' => true,
             'features' => $website->effectiveFeatureFlags(),
             'cached_until' => Carbon::now()->addHours(12)->toIso8601String(),
-            'tier' => $website->tier,
+            'tier' => $website->effectiveTier(),
         ]);
     }
 
