@@ -12,11 +12,16 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
+use Laravel\Cashier\Billable;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable;
+    use Billable, HasFactory, Notifiable;
+
+    /** Subscription tier constants — mirrors the legacy Website::TIER_* */
+    public const TIER_FREE = 'free';
+    public const TIER_PRO = 'pro';
 
     /**
      * The attributes that are mass assignable.
@@ -30,6 +35,15 @@ class User extends Authenticatable implements MustVerifyEmail
         'is_admin',
         'is_disabled',
         'password',
+        // Cashier billing columns + plan snapshot. Cashier reads these
+        // off the billable model; current_plan_slug is our snapshot of
+        // the active subscription's plan slug for fast read-path checks
+        // (website limits, frozen-site decisions).
+        'stripe_id',
+        'pm_type',
+        'pm_last_four',
+        'trial_ends_at',
+        'current_plan_slug',
     ];
 
     /**
@@ -55,6 +69,7 @@ class User extends Authenticatable implements MustVerifyEmail
             'is_admin' => 'boolean',
             'is_disabled' => 'boolean',
             'password' => 'hashed',
+            'trial_ends_at' => 'datetime',
         ];
     }
 
@@ -210,5 +225,105 @@ class User extends Authenticatable implements MustVerifyEmail
         $website = Website::find($websiteId);
 
         return $website !== null && $this->can('view', $website);
+    }
+
+    /* ─── Billing & plan helpers ────────────────────────────────────
+     * Per-user billing: one Cashier subscription per user, the active
+     * plan caps how many websites the user can manage. Below are the
+     * read-paths every consumer (controllers, middleware, views, jobs)
+     * uses to ask "what plan? how many sites? which sites are frozen?"
+     */
+
+    /**
+     * The Plan row the user is currently on, derived from the active
+     * Cashier subscription's stripe_price_id_yearly. Falls back to the
+     * snapshot in `current_plan_slug` if Stripe is unreachable. Returns
+     * null for free-tier users (no active subscription).
+     */
+    public function effectivePlan(): ?Plan
+    {
+        $subscription = $this->subscription('default');
+        if ($subscription && $subscription->valid()) {
+            $price = (string) $subscription->stripe_price;
+            if ($price !== '') {
+                $plan = Plan::where('stripe_price_id_yearly', $price)->first();
+                if ($plan) {
+                    return $plan;
+                }
+            }
+        }
+        if (! empty($this->current_plan_slug)) {
+            return Plan::where('slug', $this->current_plan_slug)->first();
+        }
+        return null;
+    }
+
+    /**
+     * Coarse tier flag for feature gating. A user is `pro` whenever
+     * they have an active Cashier subscription (active OR trialing OR
+     * cancelled-but-in-grace), `free` otherwise.
+     */
+    public function effectiveTier(): string
+    {
+        return $this->subscribed('default') ? self::TIER_PRO : self::TIER_FREE;
+    }
+
+    /**
+     * Convenience for the most common gate.
+     */
+    public function isPro(): bool
+    {
+        return $this->effectiveTier() === self::TIER_PRO;
+    }
+
+    /**
+     * Maximum websites the user's current plan allows. Null = unlimited
+     * (the Agency tier). Free-tier users (no plan) always get 1.
+     */
+    public function websiteLimit(): ?int
+    {
+        $plan = $this->effectivePlan();
+        if ($plan === null) {
+            return 1;
+        }
+        return $plan->max_websites;
+    }
+
+    /**
+     * IDs of websites past the user's current limit, ordered by
+     * created_at — i.e. the oldest sites stay active, newer ones are
+     * frozen on a downgrade. Computed live (no stored column) so plan
+     * changes take effect on the next read with no migration drift.
+     *
+     * @return list<int>
+     */
+    public function frozenWebsiteIds(): array
+    {
+        $limit = $this->websiteLimit();
+        if ($limit === null) {
+            return [];
+        }
+        $owned = Website::where('user_id', $this->id)
+            ->orderBy('created_at')
+            ->pluck('id')
+            ->all();
+        if (count($owned) <= $limit) {
+            return [];
+        }
+        return array_slice($owned, $limit);
+    }
+
+    /**
+     * True when the user can add another website without breaking
+     * their plan limit. Onboarding + the admin "add website" flow gate
+     * on this; the UI can also use it to render a disabled CTA.
+     */
+    public function canAddWebsite(): bool
+    {
+        $limit = $this->websiteLimit();
+        if ($limit === null) {
+            return true;
+        }
+        return Website::where('user_id', $this->id)->count() < $limit;
     }
 }

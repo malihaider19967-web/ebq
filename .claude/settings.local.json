@@ -132,7 +132,9 @@
       "Bash(grep -n 'count\\($valid\\)\\\\|count\\($rewrites\\)\\\\|>= 3\\\\|=== 3\\\\|$rewrites\\\\[\\\\] = ' C:/Users/malih/Desktop/ebq/app/Services/AiSnippetRewriterService.php)",
       "Bash(grep -n \"use App\\\\\\\\\\\\\\\\Services\\\\\\\\\\\\\\\\\\\\|LlmClient\\\\|InsightsResolver\\\\|resolver:\" C:/Users/malih/Desktop/ebq/app/Http/Controllers/Api/V1/PluginInsightsController.php)",
       "Bash(npm install *)",
-      "Bash(grep -n \"Object.keys\\( MODES\\\\|Object.entries\\( MODES\\\\|MODES\\\\\\\\[\" C:/Users/malih/Desktop/ebq/ebq-seo-wp/src/block-editor-ai/index.js)"
+      "Bash(grep -n \"Object.keys\\( MODES\\\\|Object.entries\\( MODES\\\\|MODES\\\\\\\\[\" C:/Users/malih/Desktop/ebq/ebq-seo-wp/src/block-editor-ai/index.js)",
+      "Bash(grep -rn \"billing\\\\\\\\.cancel'\\\\|billing\\\\\\\\.cancel\\\\\"\" C:/Users/malih/Desktop/ebq/app C:/Users/malih/Desktop/ebq/resources C:/Users/malih/Desktop/ebq/routes)",
+      "Bash(grep -n \"isConnected\\\\|publicConfig\\\\|cfg\\\\\\\\.tier\\\\|cfg\\\\\\\\.features\" C:/Users/malih/Desktop/ebq/ebq-seo-wp/src/sidebar/hooks/useEditorContext.js C:/Users/malih/Desktop/ebq/ebq-seo-wp/src/sidebar/hooks/gutenberg-context.js)"
     ]
   }
 }

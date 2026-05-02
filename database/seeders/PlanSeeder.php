@@ -30,6 +30,7 @@ class PlanSeeder extends Seeder
                 'price_monthly_usd' => 0,
                 'price_yearly_usd' => 0,
                 'trial_days' => 0,
+                'max_websites' => 1,
                 'display_order' => 1,
                 'is_highlighted' => false,
                 'features' => [
@@ -47,6 +48,7 @@ class PlanSeeder extends Seeder
                 'price_monthly_usd' => 15,
                 'price_yearly_usd' => 180,
                 'trial_days' => 30,
+                'max_websites' => 1,
                 'display_order' => 2,
                 'is_highlighted' => false,
                 'features' => [
@@ -65,6 +67,7 @@ class PlanSeeder extends Seeder
                 'price_monthly_usd' => 39,
                 'price_yearly_usd' => 468,
                 'trial_days' => 30,
+                'max_websites' => 5,
                 'display_order' => 3,
                 'is_highlighted' => true,
                 'features' => [
@@ -85,6 +88,8 @@ class PlanSeeder extends Seeder
                 'price_monthly_usd' => 125,
                 'price_yearly_usd' => 1500,
                 'trial_days' => 30,
+                // Null = unlimited.
+                'max_websites' => null,
                 'display_order' => 4,
                 'is_highlighted' => false,
                 'features' => [

@@ -64,17 +64,20 @@ class ConnectGoogle extends Component
             'gscSiteUrl' => ['required', 'string', 'max:255'],
         ]);
 
-        // Pay-first flow may have already created a placeholder Website
-        // (domain='') with the Stripe subscription attached. We must
-        // UPDATE that row — not create a new one — otherwise the
-        // subscription gets orphaned on a row the user can't see.
-        // updateOrCreate keyed on `domain` would have created a second
-        // row in that case.
         $userId = Auth::id();
+        $user = Auth::user();
         $existing = Website::query()
             ->where('user_id', $userId)
             ->orderByRaw("CASE WHEN domain = '' THEN 0 ELSE 1 END") // placeholder first
             ->first();
+
+        // Plan-limit gate. Only blocks the *create* path — updating an
+        // existing row (the pay-first placeholder, or simply re-saving
+        // an existing site) doesn't add a new website to the account.
+        if ($existing === null && $user !== null && ! $user->canAddWebsite()) {
+            $this->redirectRoute('billing.show', navigate: false);
+            return;
+        }
 
         if ($existing) {
             $existing->fill([

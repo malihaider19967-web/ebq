@@ -2,74 +2,94 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Website;
+use App\Models\Plan;
+use App\Models\User;
 use Laravel\Cashier\Http\Controllers\WebhookController as CashierController;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
  * Stripe webhook handler — extends Cashier's so we keep all the standard
- * subscription bookkeeping (cashier_subscriptions table, subscription
- * items, trial state) and just override the events we care about for
- * tier sync.
+ * subscription bookkeeping (subscriptions / subscription_items, trial
+ * state, etc.) and just override the events we care about for plan-slug
+ * sync.
  *
- * Tier reflects billing reality:
- *   - Subscription `active` or `trialing` (any subscription on the
- *     billable Website) → tier = 'pro'
- *   - Subscription `canceled` / `incomplete_expired` / `unpaid` /
- *     `past_due` (after Stripe's grace period) → tier = 'free'
+ * Source of truth: `User->current_plan_slug`, snapshot of the active
+ * subscription's stripe_price → Plan slug. Read-paths (website limit
+ * checks, frozen-site decisions, dashboard tier badges) all read this
+ * column on the hot path; computing live every time would force a
+ * subscriptions+plans join per request.
  *
- * The plugin reads `tier` from every authenticated API response (auto
- * sync via `EBQ_Api_Client::handle_response`), so a webhook firing here
- * means the customer's WordPress editor flips into / out of Pro within
- * seconds of the Stripe state change — no manual refresh required.
+ * The plugin reads `tier` from every authenticated API response (via
+ * the InjectFeatureFlags middleware), and `tier` is derived from
+ * `User->effectiveTier()` which checks the active subscription. So a
+ * webhook firing here means the customer's WordPress editor flips into
+ * / out of Pro within seconds of the Stripe state change.
  */
 class StripeWebhookController extends CashierController
 {
     /**
      * Handle subscription created / updated. Cashier's parent method
-     * does the table bookkeeping; we run after to sync `tier` on the
-     * affected Website.
+     * does the table bookkeeping; we run after to snapshot the plan
+     * slug on the User.
      */
     public function handleCustomerSubscriptionUpdated(array $payload): Response
     {
         $response = parent::handleCustomerSubscriptionUpdated($payload);
-        $this->syncTierFromStripeCustomer($payload['data']['object']['customer'] ?? null);
+        $this->syncPlanSlugFromStripeCustomer($payload['data']['object']['customer'] ?? null);
         return $response;
     }
 
     public function handleCustomerSubscriptionCreated(array $payload): Response
     {
+        // Use the parent's `updated` handler — Cashier doesn't define a
+        // dedicated `created` override; the same row-upsert logic is fine.
         $response = parent::handleCustomerSubscriptionUpdated($payload);
-        $this->syncTierFromStripeCustomer($payload['data']['object']['customer'] ?? null);
+        $this->syncPlanSlugFromStripeCustomer($payload['data']['object']['customer'] ?? null);
         return $response;
     }
 
     public function handleCustomerSubscriptionDeleted(array $payload): Response
     {
         $response = parent::handleCustomerSubscriptionDeleted($payload);
-        $this->syncTierFromStripeCustomer($payload['data']['object']['customer'] ?? null);
+        $this->syncPlanSlugFromStripeCustomer($payload['data']['object']['customer'] ?? null);
         return $response;
     }
 
     /**
-     * Look up the Website by Stripe customer ID and recompute its tier
-     * by walking its current subscriptions. Cashier's `subscribed()`
-     * helper already considers `active` + `trialing` as "yes", which is
-     * exactly the boundary we want for Pro access.
+     * Look up the User by Stripe customer ID, derive the active plan
+     * slug from the current subscription's price, and snapshot it on
+     * `current_plan_slug`. Free-tier users (cancelled / never paid)
+     * land with `current_plan_slug = null`.
+     *
+     * The lookup goes User->stripe_id (where Cashier wrote it after
+     * the first subscription mint). Frozen-website status is derived
+     * separately from this snapshot via User::frozenWebsiteIds() so no
+     * additional sync work is needed here.
      */
-    private function syncTierFromStripeCustomer(?string $stripeCustomerId): void
+    private function syncPlanSlugFromStripeCustomer(?string $stripeCustomerId): void
     {
         if (! $stripeCustomerId) {
             return;
         }
-        $website = Website::query()->where('stripe_id', $stripeCustomerId)->first();
-        if (! $website) {
+        $user = User::query()->where('stripe_id', $stripeCustomerId)->first();
+        if (! $user) {
             return;
         }
-        $shouldBePro = $website->subscribed('default');
-        $newTier = $shouldBePro ? Website::TIER_PRO : Website::TIER_FREE;
-        if ($website->tier !== $newTier) {
-            $website->forceFill(['tier' => $newTier])->save();
+
+        $newSlug = null;
+        if ($user->subscribed('default')) {
+            $subscription = $user->subscription('default');
+            $price = (string) ($subscription->stripe_price ?? '');
+            if ($price !== '') {
+                $plan = Plan::where('stripe_price_id_yearly', $price)->first();
+                if ($plan) {
+                    $newSlug = $plan->slug;
+                }
+            }
+        }
+
+        if ($user->current_plan_slug !== $newSlug) {
+            $user->forceFill(['current_plan_slug' => $newSlug])->save();
         }
     }
 }

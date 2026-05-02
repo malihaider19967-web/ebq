@@ -12,42 +12,39 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
-use Laravel\Cashier\Billable;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\Setting;
 
 class Website extends Model
 {
-    // Billable mixes in Cashier's Stripe helpers (newSubscription, subscribed,
-    // onTrial, subscription, etc.). Tier is per-website so the model is the
-    // billable target — a single user with multiple sites can run distinct
-    // subscriptions per site. Cashier reads from the stripe_id, pm_type,
-    // pm_last_four, trial_ends_at columns added by the migration.
-    use Billable, HasApiTokens, HasFactory;
+    // Billing has moved to the User model — Cashier's Billable trait
+    // now lives on App\Models\User. Tier and freeze state are derived
+    // from the owning user's plan (see effectiveTier / isFrozen below).
+    use HasApiTokens, HasFactory;
 
     protected static function booted(): void
     {
         static::created(function (Website $website): void {
-            // Any newly created website gets an immediate 365-day backfill
-            // so dashboards are populated without manual sync commands.
+            // Skip the 365-day backfill for websites that boot up
+            // already over the user's plan limit (would happen in
+            // theoretical race conditions during onboarding while the
+            // canAddWebsite gate is being added; in steady-state the
+            // gate prevents this).
+            if ($website->isFrozen()) {
+                return;
+            }
             SyncAnalyticsData::dispatch($website->id, 365);
             SyncSearchConsoleData::dispatch($website->id, 365);
         });
     }
 
-    /** Subscription tier constants — drives gating for AI features. */
+    /** Subscription tier constants — kept for API-response back-compat */
     public const TIER_FREE = 'free';
     public const TIER_PRO  = 'pro';
 
     protected $fillable = [
         'user_id',
         'domain',
-        'tier',
-        'feature_flags',
-        'stripe_id',
-        'pm_type',
-        'pm_last_four',
-        'trial_ends_at',
         'ga_property_id',
         'gsc_site_url',
         'gsc_keyword_lookback_days',
@@ -115,19 +112,21 @@ class Website extends Model
      */
     public function effectiveFeatureFlags(): array
     {
+        // Per-website feature_flags override has been retired (the column
+        // was dropped when billing moved to per-user). The effective map
+        // is just the global kill-switch ANDed against the defaults.
+        // If the website is frozen (over the user's plan limit), every
+        // billed feature is forced off so the WP plugin renders the
+        // frozen-state UI consistently.
         $effective = self::FEATURE_DEFAULTS;
-        $stored = $this->feature_flags;
-        if (is_array($stored)) {
-            foreach ($stored as $key => $value) {
-                if (array_key_exists($key, $effective)) {
-                    $effective[$key] = (bool) $value;
-                }
-            }
-        }
-        // AND with global kill-switch — global FALSE always wins.
         $global = self::globalFeatureFlags();
         foreach ($effective as $key => $value) {
             if (($global[$key] ?? true) === false) {
+                $effective[$key] = false;
+            }
+        }
+        if ($this->isFrozen()) {
+            foreach ($effective as $key => $_) {
                 $effective[$key] = false;
             }
         }
@@ -163,27 +162,67 @@ class Website extends Model
     }
 
     /**
-     * True when this website's tier unlocks paid AI features (snippet
-     * rewrites, content briefs, redirect matching). Single check used
-     * everywhere — controllers gate on this, plugin reads `tier` to
-     * decide whether to render the action button or a Pro CTA.
+     * True when this website's tier unlocks paid AI features. Derived
+     * from the owning user's plan AND a "not frozen" check, since a
+     * website over the user's plan limit drops back to free even if
+     * the user themselves is on Pro.
+     *
+     * Used by every Pro-gating controller. The WP plugin reads `tier`
+     * (string) from API responses; effectiveTier() flows through that
+     * pathway unchanged.
      */
     public function isPro(): bool
     {
-        return (bool) config('app.free', false) || $this->tier === self::TIER_PRO;
+        if ((bool) config('app.free', false)) {
+            return true;
+        }
+        if ($this->isFrozen()) {
+            return false;
+        }
+        $owner = $this->user;
+        return $owner !== null && $owner->isPro();
+    }
+
+    /**
+     * Coarse tier label for API responses (the WP plugin reads this).
+     * Frozen sites always report 'free' so plugin features lock out.
+     */
+    public function effectiveTier(): string
+    {
+        if ($this->isFrozen()) {
+            return self::TIER_FREE;
+        }
+        $owner = $this->user;
+        return $owner !== null ? $owner->effectiveTier() : self::TIER_FREE;
+    }
+
+    /**
+     * True when this website is past the owning user's plan limit.
+     * Computed live (no stored column) so plan changes take effect on
+     * the next read with no migration drift. The user's frozen list
+     * is ordered by created_at so the oldest sites stay active.
+     */
+    public function isFrozen(): bool
+    {
+        if (! $this->user_id) {
+            return false;
+        }
+        $owner = $this->user;
+        if ($owner === null) {
+            return false;
+        }
+        return in_array($this->id, $owner->frozenWebsiteIds(), true);
     }
 
     protected function casts(): array
     {
         return [
             'report_recipients' => 'array',
-            'feature_flags' => 'array',
             'gsc_keyword_lookback_days' => 'integer',
             'last_analytics_sync_at' => 'datetime',
             'last_search_console_sync_at' => 'datetime',
             'last_traffic_drop_alert_at' => 'datetime',
             'last_rank_drop_alert_at' => 'datetime',
-            'trial_ends_at' => 'datetime',
         ];
     }
 

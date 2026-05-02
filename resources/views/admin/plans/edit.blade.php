@@ -109,6 +109,19 @@
                 </div>
             </div>
 
+            <div class="grid gap-4 sm:grid-cols-2">
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Max websites</label>
+                    <input type="number" name="max_websites" value="{{ old('max_websites', $plan->max_websites) }}"
+                           min="0" max="999"
+                           class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
+                           placeholder="leave blank for unlimited" />
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Leave blank for <strong>unlimited</strong>. The user's website count is enforced when they try to add a website; existing sites past the limit are <strong>frozen</strong> (read-only on EBQ and the WP plugin), not deleted, so a downgrade never destroys data.
+                    </p>
+                </div>
+            </div>
+
             <div>
                 <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Stripe price ID (yearly)</label>
                 <input type="text" name="stripe_price_id_yearly" value="{{ old('stripe_price_id_yearly', $plan->stripe_price_id_yearly) }}"

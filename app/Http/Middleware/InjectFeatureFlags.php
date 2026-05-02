@@ -61,8 +61,32 @@ class InjectFeatureFlags
 
         // Don't clobber an explicit features payload from a controller
         // that already builds the map (most notably websiteFeatures).
+        $touched = false;
         if (! array_key_exists('features', $data)) {
             $data['features'] = $website->effectiveFeatureFlags();
+            $touched = true;
+        }
+        // Frozen-state signal — the WP plugin reads this to lock its UI
+        // (banner, AI-disabled notice, sync skip). `frozen` is derived
+        // live from the user's plan limit + ordered websites; freezes
+        // and unfreezes propagate on the next API roundtrip with no
+        // database writes needed. `tier` is overwritten with the
+        // freeze-aware value so the plugin's tier-gated paths see free
+        // when the site is over-limit, even if the user's account is on
+        // Pro elsewhere.
+        if (! array_key_exists('frozen', $data)) {
+            $data['frozen'] = $website->isFrozen();
+            $touched = true;
+        }
+        if (! array_key_exists('frozen_reason', $data)) {
+            $data['frozen_reason'] = $website->isFrozen() ? 'plan_limit_exceeded' : null;
+            $touched = true;
+        }
+        if (! array_key_exists('tier', $data)) {
+            $data['tier'] = $website->effectiveTier();
+            $touched = true;
+        }
+        if ($touched) {
             $response->setData($data);
         }
 

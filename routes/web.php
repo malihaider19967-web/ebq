@@ -47,12 +47,28 @@ Route::post('/stripe/webhook', [\App\Http\Controllers\StripeWebhookController::c
 // billed. The /checkout endpoint mints a Stripe Hosted Checkout session
 // and redirects; /success and /cancel handle the post-checkout return.
 Route::middleware(['web', 'auth'])->group(function (): void {
+    // Subscription management page — current plan, plan grid, cancel,
+    // resume, recent invoices. Lives at /billing under sidebar nav.
+    Route::get('/billing', [\App\Http\Controllers\BillingController::class, 'show'])
+        ->name('billing.show');
+    Route::post('/billing/swap', [\App\Http\Controllers\BillingController::class, 'swap'])
+        ->name('billing.swap');
+    Route::post('/billing/cancel', [\App\Http\Controllers\BillingController::class, 'cancelSubscription'])
+        ->name('billing.cancel-subscription');
+    Route::post('/billing/resume', [\App\Http\Controllers\BillingController::class, 'resume'])
+        ->name('billing.resume');
+
+    // Stripe Hosted Checkout flow — first-time purchase or post-cancel
+    // re-subscribe. swap() is preferred for active subscribers.
     Route::get('/billing/checkout', [\App\Http\Controllers\BillingController::class, 'checkout'])
         ->name('billing.checkout');
     Route::get('/billing/success', [\App\Http\Controllers\BillingController::class, 'success'])
         ->name('billing.success');
-    Route::get('/billing/cancel', [\App\Http\Controllers\BillingController::class, 'cancel'])
-        ->name('billing.cancel');
+    // Renamed from `billing.cancel` to free that name for the
+    // subscription-cancel POST above. This handles "user backed out
+    // of Stripe Checkout" only, not in-app cancellation.
+    Route::get('/billing/cancel-checkout', [\App\Http\Controllers\BillingController::class, 'cancel'])
+        ->name('billing.cancel-checkout');
     Route::get('/billing/portal', [\App\Http\Controllers\BillingController::class, 'portal'])
         ->name('billing.portal');
 });

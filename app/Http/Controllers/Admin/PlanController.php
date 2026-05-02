@@ -97,6 +97,8 @@ class PlanController extends Controller
             'stripe_price_id_monthly' => 'nullable|string|max:128|regex:/^price_/',
             'stripe_price_id_yearly' => 'nullable|string|max:128|regex:/^price_/',
             'trial_days' => 'required|integer|min:0|max:365',
+            // null / empty string = unlimited. Stored as null in DB.
+            'max_websites' => 'nullable|integer|min:0|max:999',
             'features' => 'nullable|string|max:8000',
             'display_order' => 'required|integer|min:0|max:9999',
             'is_active' => 'sometimes|boolean',

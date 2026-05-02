@@ -3,7 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Plan;
-use App\Models\Website;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
@@ -12,38 +12,41 @@ use Laravel\Cashier\Checkout;
 use Laravel\Cashier\Exceptions\IncompletePayment;
 
 /**
- * Billing flow — Stripe Checkout + Customer Portal via Cashier.
+ * Billing flow — Stripe Checkout + Customer Portal + in-app subscription
+ * management via Cashier. Billing is per-USER (a single subscription
+ * caps how many websites the user can manage; over-limit sites freeze
+ * read-only via App\Models\User::frozenWebsiteIds()).
  *
- * The WordPress plugin's setup wizard sends users here when they pick
- * a paid plan: `/billing/checkout?plan=pro&website_id=12&return_to=...`.
- * We resolve the user's authenticated Website context, call Cashier to
- * mint a Stripe Hosted Checkout session, and redirect.
+ * Public surfaces:
  *
- * After the Stripe Hosted Checkout completes, Stripe redirects the user
- * to `/billing/success` (success) or `/billing/cancel` (back arrow).
- * Both endpoints respect a `return_to` query parameter so the WP plugin
- * wizard can resume on its own surface.
+ *   GET  /billing                  show()                Subscription page
+ *   POST /billing/swap             swap()                Switch plan (Cashier swap, prorated)
+ *   POST /billing/cancel           cancelSubscription()  Cancel at period end
+ *   POST /billing/resume           resume()              Undo a pending cancel
+ *   GET  /billing/checkout         checkout()            Stripe Hosted Checkout
+ *   GET  /billing/success          success()             Stripe redirected back, success
+ *   GET  /billing/cancel-checkout  cancel()              Stripe redirected back, user backed out
+ *   GET  /billing/portal           portal()              Stripe Customer Portal (cards / invoices)
  *
- * Tier sync happens in two places:
- *   1. Optimistic — `success()` flips Website.tier='pro' immediately so
- *      the user doesn't see a stale "Free" state during the brief
- *      window between Stripe redirect and webhook landing.
- *   2. Authoritative — Stripe webhooks (handled by WebhookController)
- *      update tier on every subscription state transition (cancellation,
- *      payment failure, trial conversion, plan change).
+ * Tier sync runs in two places:
+ *   1. Optimistic — `success()` writes `User->current_plan_slug` immediately
+ *      so the user doesn't see a stale state during the brief window between
+ *      the Stripe redirect and the webhook landing.
+ *   2. Authoritative — `StripeWebhookController` handles every subscription
+ *      lifecycle event (created / updated / deleted) and is the source of
+ *      truth.
  */
 class BillingController extends Controller
 {
     /**
      * Mint a Stripe Hosted Checkout session for the chosen plan and
      * redirect. Trial days are read from the Plan row so the marketing
-     * page, the WP plugin, and the actual Stripe trial all stay in sync.
+     * page, the WP plugin wizard, and the actual Stripe trial all stay in sync.
      */
     public function checkout(Request $request): RedirectResponse|Response|Checkout
     {
         $request->validate([
             'plan' => 'required|string|max:32',
-            'website_id' => 'nullable|integer',
             'return_to' => 'nullable|string|max:2048',
         ]);
 
@@ -55,30 +58,30 @@ class BillingController extends Controller
                 ->with('error', 'That plan is not available for purchase right now.');
         }
 
-        $website = $this->resolveBillableWebsite($request);
-        if (! $website) {
+        $user = $request->user();
+        if (! $user) {
             return redirect()->route('login', ['redirect_to' => $request->fullUrl()]);
+        }
+
+        // If the user is already actively subscribed, route them through
+        // the in-app swap flow rather than minting a second subscription
+        // (Cashier would happily create one but Stripe would charge twice).
+        if ($user->subscribed('default')) {
+            return redirect()->route('billing.show')
+                ->with('status', 'You already have an active subscription. Use "Switch plan" below to change tiers.');
         }
 
         // Build return URLs so the WP plugin wizard (or any other
         // referrer) gets sent back to the right surface.
         $returnTo = $this->safeReturnUrl($request->input('return_to'));
-        $successUrl = route('billing.success', array_filter([
-            'website_id' => $website->id,
-            'return_to' => $returnTo,
-        ]));
-        $cancelUrl = route('billing.cancel', array_filter([
-            'website_id' => $website->id,
-            'return_to' => $returnTo,
-        ]));
+        $successUrl = route('billing.success', array_filter(['return_to' => $returnTo]));
+        $cancelUrl = route('billing.cancel-checkout', array_filter(['return_to' => $returnTo]));
 
         try {
             // EBQ only sells yearly subscriptions. The monthly price on
             // the Plan row is for "$X/mo, billed yearly" display copy
-            // only — never used to mint a Stripe subscription. Plan::
-            // isCheckoutReady() above already verified the yearly price
-            // ID is set, so this is safe.
-            return $website
+            // only — never used to mint a Stripe subscription.
+            return $user
                 ->newSubscription('default', $plan->stripe_price_id_yearly)
                 ->trialDays($plan->trial_days)
                 ->checkout([
@@ -86,9 +89,6 @@ class BillingController extends Controller
                     'cancel_url' => $cancelUrl,
                 ]);
         } catch (IncompletePayment $exception) {
-            // Card needs SCA confirmation — Cashier provides a payment
-            // confirmation route. For our hosted checkout this is rare
-            // (Stripe handles SCA inline) but kept defensively.
             return redirect()->route(
                 'cashier.payment',
                 [$exception->payment->id, 'redirect' => $cancelUrl]
@@ -97,21 +97,24 @@ class BillingController extends Controller
     }
 
     /**
-     * Stripe redirected back here after successful checkout. We trust
-     * the redirect (Stripe signs nothing on this hop) only enough to
-     * flip the optimistic tier; the authoritative tier change happens
-     * in the webhook handler when Stripe POSTs `customer.subscription.created`.
+     * Stripe redirected back after successful checkout. Optimistically
+     * snapshot the plan slug; webhook will reconfirm.
      */
     public function success(Request $request): View|RedirectResponse
     {
-        $website = $this->resolveBillableWebsite($request);
-        if (! $website) {
+        $user = $request->user();
+        if (! $user) {
             return redirect()->route('dashboard');
         }
 
-        // Optimistic tier flip — webhook will reconfirm. Idempotent.
-        if ($website->tier !== Website::TIER_PRO) {
-            $website->forceFill(['tier' => Website::TIER_PRO])->save();
+        // Optimistic plan-slug snapshot. Idempotent — the webhook
+        // overwrites with the same value moments later.
+        $subscription = $user->subscription('default');
+        if ($subscription && $subscription->valid()) {
+            $plan = Plan::where('stripe_price_id_yearly', $subscription->stripe_price)->first();
+            if ($plan && $user->current_plan_slug !== $plan->slug) {
+                $user->forceFill(['current_plan_slug' => $plan->slug])->save();
+            }
         }
 
         $returnTo = $this->safeReturnUrl($request->input('return_to'));
@@ -119,23 +122,20 @@ class BillingController extends Controller
             return redirect()->away($returnTo.(str_contains($returnTo, '?') ? '&' : '?').'ebq_billing=success');
         }
 
-        // Pay-first flow: when the user paid before doing onboarding, the
-        // Website is still a placeholder with no domain. Send them into
-        // onboarding so they can hook up their site — onboarding updates
-        // this same row, so the subscription stays attached.
-        if (trim((string) $website->domain) === '') {
+        // Pay-first flow: a freshly-registered user paid before doing
+        // onboarding. Bounce to onboarding so they can connect their
+        // site — `current_website_id` is empty / no domain yet.
+        if (! $user->hasAccessibleWebsites()) {
             return redirect()->route('onboarding')->with('status', 'Subscription active — let\'s connect your site.');
         }
 
         return view('billing.success', [
-            'website' => $website,
+            'user' => $user,
         ]);
     }
 
     /**
      * User backed out of the Stripe Hosted Checkout. No state change.
-     * Bounce them back to wherever they came from with a "cancelled"
-     * marker so the WP wizard can offer "try again" UX.
      */
     public function cancel(Request $request): View|RedirectResponse
     {
@@ -144,11 +144,6 @@ class BillingController extends Controller
             return redirect()->away($returnTo.(str_contains($returnTo, '?') ? '&' : '?').'ebq_billing=cancelled');
         }
 
-        // Pay-first flow: a freshly-registered user backed out of Stripe
-        // Checkout. Their placeholder Website has no domain yet, so don't
-        // dump them on a generic "cancelled" page — bring them into
-        // onboarding so they can still use the free tier without going
-        // through register again.
         $user = $request->user();
         if ($user && ! $user->hasAccessibleWebsites()) {
             return redirect()->route('onboarding')->with('status', 'No subscription started — you can still use the free tier or upgrade later from Billing.');
@@ -158,64 +153,143 @@ class BillingController extends Controller
     }
 
     /**
-     * Open the Stripe Customer Portal so the user can change card,
-     * cancel, view invoices, or upgrade/downgrade plan. Cashier signs
-     * a one-time URL keyed to the Stripe customer.
+     * Stripe Customer Portal — change card, view invoices, cancel.
+     * Kept as the secondary action; primary plan-management lives on
+     * the in-app subscription page.
      */
     public function portal(Request $request): RedirectResponse
     {
-        $website = $this->resolveBillableWebsite($request);
-        if (! $website || ! $website->hasStripeId()) {
-            return redirect()->route('pricing');
+        $user = $request->user();
+        if (! $user || ! $user->hasStripeId()) {
+            return redirect()->route('billing.show');
         }
-
-        return $website->redirectToBillingPortal(route('dashboard'));
+        return $user->redirectToBillingPortal(route('billing.show'));
     }
 
+    /* ───── In-app subscription management (Workstream B) ───── */
+
     /**
-     * Resolve which Website is being billed.
-     *
-     * Priority:
-     *   1. `?website_id=N` passed by the WP plugin wizard (must belong to user).
-     *   2. The user's first owned website.
-     *   3. None — auto-create a placeholder so the pay-first flow (where
-     *      a freshly-registered user comes here before onboarding) has
-     *      something to attach a Stripe subscription to. The placeholder
-     *      has `domain=''`; onboarding fills the domain in afterwards by
-     *      updating the same row, keeping the subscription linked.
+     * Render the Subscription page — current plan + plan grid +
+     * cancel / resume + recent invoices + frozen-sites banner.
      */
-    private function resolveBillableWebsite(Request $request): ?Website
+    public function show(Request $request): View|RedirectResponse
     {
         $user = $request->user();
         if (! $user) {
-            return null;
+            return redirect()->route('login');
         }
-
-        $explicit = (int) $request->input('website_id', 0);
-        if ($explicit > 0) {
-            return Website::query()
-                ->where('id', $explicit)
-                ->where('user_id', $user->id)
-                ->first();
-        }
-
-        $existing = Website::query()->where('user_id', $user->id)->first();
-        if ($existing) {
-            return $existing;
-        }
-
-        return Website::create([
-            'user_id' => $user->id,
-            'domain' => '',
-            'tier' => Website::TIER_FREE,
-        ]);
+        return view('billing.subscription');
     }
 
     /**
-     * Sanitise a `return_to` URL — only allow http(s) URLs to prevent
-     * open-redirect to javascript:/data: schemes. Caller is expected
-     * to trust the host (typically a customer's WordPress install) so
-     * we don't restrict the host.
+     * Switch plan via Cashier `swap()` (immediate + Stripe-prorated).
+     * Idempotent: swapping to the current plan is a no-op (Cashier
+     * handles this).
+     */
+    public function swap(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'plan' => 'required|string|max:32',
+        ]);
+
+        $user = $request->user();
+        if (! $user) {
+            return redirect()->route('login');
+        }
+
+        $plan = Plan::where('slug', $request->string('plan'))
+            ->where('is_active', true)
+            ->first();
+        if (! $plan || ! $plan->isCheckoutReady()) {
+            return redirect()->route('billing.show')
+                ->with('error', 'That plan is not available right now.');
+        }
+
+        $subscription = $user->subscription('default');
+        if (! $subscription || ! $subscription->valid()) {
+            // No active subscription — route into the standard checkout
+            // flow instead of trying to swap a non-existent sub.
+            return redirect()->route('billing.checkout', ['plan' => $plan->slug]);
+        }
+
+        try {
+            $subscription->swap($plan->stripe_price_id_yearly);
+        } catch (\Throwable $e) {
+            return redirect()->route('billing.show')
+                ->with('error', 'Could not switch plan: '.$e->getMessage());
+        }
+
+        // Snapshot the new plan slug right away. Webhook reconfirms.
+        $user->forceFill(['current_plan_slug' => $plan->slug])->save();
+
+        return redirect()->route('billing.show')
+            ->with('status', 'Switched to '.$plan->name.'. Stripe applied a prorated charge or credit automatically.');
+    }
+
+    /**
+     * Cancel at period end. Pro access continues until the current
+     * billing window closes; on that date the webhook fires
+     * `customer.subscription.deleted` and tier flips to free.
+     */
+    public function cancelSubscription(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user) {
+            return redirect()->route('login');
+        }
+
+        $subscription = $user->subscription('default');
+        if (! $subscription || ! $subscription->valid()) {
+            return redirect()->route('billing.show')
+                ->with('error', 'No active subscription to cancel.');
+        }
+
+        try {
+            $subscription->cancel();
+        } catch (\Throwable $e) {
+            return redirect()->route('billing.show')
+                ->with('error', 'Could not cancel: '.$e->getMessage());
+        }
+
+        $endsAt = $subscription->fresh()?->ends_at;
+        $endsAtLabel = $endsAt ? $endsAt->toFormattedDayDateString() : 'the end of the current period';
+
+        return redirect()->route('billing.show')
+            ->with('status', 'Subscription cancelled. You\'ll keep Pro access until '.$endsAtLabel.'.');
+    }
+
+    /**
+     * Resume a cancelled-but-still-in-grace subscription. Cashier
+     * `resume()` clears `ends_at` on the local subscription row and
+     * tells Stripe to keep billing.
+     */
+    public function resume(Request $request): RedirectResponse
+    {
+        $user = $request->user();
+        if (! $user) {
+            return redirect()->route('login');
+        }
+
+        $subscription = $user->subscription('default');
+        if (! $subscription || ! $subscription->onGracePeriod()) {
+            return redirect()->route('billing.show')
+                ->with('error', 'No cancelled subscription to resume.');
+        }
+
+        try {
+            $subscription->resume();
+        } catch (\Throwable $e) {
+            return redirect()->route('billing.show')
+                ->with('error', 'Could not resume: '.$e->getMessage());
+        }
+
+        return redirect()->route('billing.show')
+            ->with('status', 'Subscription resumed.');
+    }
+
+    /**
+     * Sanitise a `return_to` URL — only allow http(s) to prevent
+     * open-redirect to javascript:/data: schemes.
      */
     private function safeReturnUrl(?string $url): ?string
     {

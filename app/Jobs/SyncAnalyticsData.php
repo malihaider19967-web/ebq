@@ -25,6 +25,13 @@ class SyncAnalyticsData implements ShouldQueue
     public function handle(GoogleAnalyticsService $service): void
     {
         $website = Website::findOrFail($this->websiteId);
+        // Plan-limit freeze: when the website is past the owning user's
+        // plan limit, skip the GA fetch. Avoids burning Google quota on
+        // sites the user can't actually see in EBQ until they upgrade.
+        if ($website->isFrozen()) {
+            Log::info("SyncAnalyticsData: skipping frozen website {$this->websiteId}");
+            return;
+        }
         $account = $website->user->googleAccounts()->latest()->first();
 
         if (! $account) {

@@ -31,6 +31,7 @@ class Plan extends Model
         'stripe_price_id_monthly',
         'stripe_price_id_yearly',
         'trial_days',
+        'max_websites',
         'features',
         'display_order',
         'is_active',
@@ -44,10 +45,22 @@ class Plan extends Model
             'price_monthly_usd' => 'integer',
             'price_yearly_usd' => 'integer',
             'trial_days' => 'integer',
+            'max_websites' => 'integer',
             'display_order' => 'integer',
             'is_active' => 'boolean',
             'is_highlighted' => 'boolean',
         ];
+    }
+
+    /**
+     * Human-readable display of the website cap. Null = unlimited.
+     */
+    public function maxWebsitesLabel(): string
+    {
+        if ($this->max_websites === null) {
+            return 'Unlimited';
+        }
+        return $this->max_websites === 1 ? '1 website' : ($this->max_websites.' websites');
     }
 
     /**

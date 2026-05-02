@@ -1,0 +1,117 @@
+<?php
+
+namespace App\Livewire\Billing;
+
+use App\Models\Plan;
+use App\Models\User;
+use Illuminate\Support\Facades\Auth;
+use Livewire\Component;
+
+/**
+ * Subscription page Livewire component.
+ *
+ * Read-only by design: every mutation (swap / cancel / resume) is a
+ * standard form POST to BillingController so the public API is the
+ * same whether triggered by this UI, a future CLI tool, or a webhook
+ * replay. The component is a thin presenter — gather everything the
+ * view needs in `render()`, then render.
+ *
+ * Two pieces of state worth tracking client-side:
+ *  - `confirmingCancel` (bool)  — drives the cancel-confirmation modal.
+ *  - `confirmingSwap` (?string) — the slug of the plan being swapped to;
+ *    null when no swap modal is open.
+ */
+class SubscriptionPanel extends Component
+{
+    public bool $confirmingCancel = false;
+
+    public ?string $confirmingSwap = null;
+
+    public function openCancelConfirm(): void
+    {
+        $this->confirmingCancel = true;
+    }
+
+    public function dismissCancelConfirm(): void
+    {
+        $this->confirmingCancel = false;
+    }
+
+    public function openSwapConfirm(string $slug): void
+    {
+        // Only expose modal state — actual swap is the form POST inside
+        // the modal so we don't reach into Cashier from Livewire.
+        $this->confirmingSwap = trim($slug) ?: null;
+    }
+
+    public function dismissSwapConfirm(): void
+    {
+        $this->confirmingSwap = null;
+    }
+
+    public function render()
+    {
+        /** @var User $user */
+        $user = Auth::user();
+        $subscription = $user->subscription('default');
+
+        $plans = Plan::ordered()->get();
+
+        $currentPlan = $user->effectivePlan();
+        $isOnTrial = $subscription && $subscription->onTrial();
+        $isCancelled = $subscription && $subscription->cancelled() && $subscription->onGracePeriod();
+        $isPastDue = $subscription && $subscription->stripe_status === 'past_due';
+
+        $endsAt = $subscription?->ends_at;          // set when cancelled at period end
+        $trialEndsAt = $subscription?->trial_ends_at;
+        // Cashier doesn't expose period-end on the local model; pull
+        // straight from the Stripe object as a one-off when needed.
+        $nextChargeAt = null;
+        try {
+            if ($subscription && $subscription->valid() && ! $isCancelled) {
+                $stripeSub = $subscription->asStripeSubscription();
+                if (isset($stripeSub->current_period_end)) {
+                    $nextChargeAt = \Illuminate\Support\Carbon::createFromTimestamp((int) $stripeSub->current_period_end);
+                }
+            }
+        } catch (\Throwable $_) {
+            // Stripe API unreachable — fall through with null. UI shows
+            // "—" rather than failing the whole page render.
+        }
+
+        // Recent invoices (best-effort). Cashier returns Stripe Invoice
+        // objects; we only need date / amount / pdf-url.
+        $invoices = [];
+        try {
+            if ($user->hasStripeId()) {
+                $invoices = collect($user->invoices())->take(3);
+            }
+        } catch (\Throwable $_) {
+            $invoices = [];
+        }
+
+        $totalWebsites = $user->websites()->count();
+        $websiteLimit = $user->websiteLimit();
+        $frozenIds = $user->frozenWebsiteIds();
+        $frozenSites = empty($frozenIds)
+            ? collect()
+            : $user->websites()->whereIn('id', $frozenIds)->orderBy('created_at')->get(['id','domain']);
+
+        return view('livewire.billing.subscription-panel', [
+            'user' => $user,
+            'subscription' => $subscription,
+            'currentPlan' => $currentPlan,
+            'plans' => $plans,
+            'isOnTrial' => $isOnTrial,
+            'isCancelled' => $isCancelled,
+            'isPastDue' => $isPastDue,
+            'endsAt' => $endsAt,
+            'trialEndsAt' => $trialEndsAt,
+            'nextChargeAt' => $nextChargeAt,
+            'invoices' => $invoices,
+            'totalWebsites' => $totalWebsites,
+            'websiteLimit' => $websiteLimit,
+            'frozenSites' => $frozenSites,
+        ]);
+    }
+}
