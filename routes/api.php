@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\V1\AiToolController;
 use App\Http\Controllers\Api\V1\PluginHqController;
 use App\Http\Controllers\Api\V1\PluginInsightsController;
 use App\Http\Controllers\Api\V1\PluginHeartbeatController;
@@ -147,6 +148,20 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/writer-projects/{externalId}/credits', [WriterProjectController::class, 'credits'])
                 ->where('externalId', '[A-Za-z0-9\-]+')
                 ->name('writer-projects.credits');
+
+            // AI Studio — registry-driven tool catalog. Single execution
+            // path for every AI feature (research, writing, improvement,
+            // marketing, eCommerce, media, utilities).
+            Route::get('/ai/tools', [AiToolController::class, 'indexTools'])->name('ai.tools.index');
+            Route::get('/ai/tools/{toolId}', [AiToolController::class, 'showTool'])
+                ->where('toolId', '[a-z0-9\-]+')
+                ->name('ai.tools.show');
+            Route::post('/ai/tools/{toolId}/run', [AiToolController::class, 'runTool'])
+                ->where('toolId', '[a-z0-9\-]+')
+                ->name('ai.tools.run');
+            Route::get('/ai/brand-voice', [AiToolController::class, 'brandVoiceShow'])->name('ai.brand-voice.show');
+            Route::put('/ai/brand-voice', [AiToolController::class, 'brandVoiceUpdate'])->name('ai.brand-voice.update');
+            Route::delete('/ai/brand-voice', [AiToolController::class, 'brandVoiceDestroy'])->name('ai.brand-voice.destroy');
         });
     });
 });
