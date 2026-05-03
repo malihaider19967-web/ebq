@@ -98,13 +98,21 @@ class WriterProjectService
             }
         }
 
-        // Meta tags bundle (seo_title / seo_description / og_*).
+        // Meta tags bundle.
+        // Two LLM calls in sequence:
+        //   1. seo-meta → seeds meta_title (single best), og_title,
+        //      og_description, AND a baseline meta_description.
+        //   2. seo-description → generates 5 meta-description candidates
+        //      so the user can pick one (mirrors the SEO Titles UX).
+        // The chosen description still ends up in `meta_description`
+        // (single string) which is what gets written to _ebq_description
+        // on Save as draft.
         if ($shouldRun('meta')) {
-            $res = $this->toolRunner->run('seo-meta', $website, $project->user_id, $baseInput + [
+            $bundle = $this->toolRunner->run('seo-meta', $website, $project->user_id, $baseInput + [
                 'summary' => $summary,
             ]);
-            if ($res->ok && is_array($res->value)) {
-                $v = $res->value;
+            if ($bundle->ok && is_array($bundle->value)) {
+                $v = $bundle->value;
                 if (! empty($v['seo_title']) && is_string($v['seo_title'])) {
                     $project->meta_title = mb_substr(trim($v['seo_title']), 0, 200);
                 }
@@ -116,6 +124,25 @@ class WriterProjectService
                 }
                 if (! empty($v['og_description']) && is_string($v['og_description'])) {
                     $project->og_description = mb_substr(trim($v['og_description']), 0, 320);
+                }
+            }
+
+            // Generate 5 meta-description candidates the user can pick from.
+            $candidates = $this->toolRunner->run('seo-description', $website, $project->user_id, $baseInput + [
+                'summary' => $summary,
+                'count' => 5,
+            ]);
+            if ($candidates->ok && is_array($candidates->value)) {
+                $list = array_values(array_filter(array_map(
+                    static fn ($c) => is_string($c) ? mb_substr(trim($c), 0, 320) : '',
+                    $candidates->value,
+                ), static fn ($c) => $c !== ''));
+                $project->meta_descriptions = $list;
+                // If the bundle didn't yield a meta_description but the
+                // candidates list did, use the first candidate as the
+                // initial selection so the user has something workable.
+                if (empty($project->meta_description) && $list !== []) {
+                    $project->meta_description = $list[0];
                 }
             }
         }

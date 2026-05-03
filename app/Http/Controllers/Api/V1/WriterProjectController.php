@@ -139,6 +139,8 @@ class WriterProjectController extends Controller
             'seo_titles.*' => 'string|max:200',
             'meta_title' => 'nullable|string|max:200',
             'meta_description' => 'nullable|string|max:320',
+            'meta_descriptions' => 'nullable|array',
+            'meta_descriptions.*' => 'string|max:320',
             'og_title' => 'nullable|string|max:200',
             'og_description' => 'nullable|string|max:320',
             'faqs' => 'nullable|array',
@@ -169,7 +171,7 @@ class WriterProjectController extends Controller
                 $project->{$metaField} = $data[$metaField];
             }
         }
-        foreach (['seo_titles', 'faqs', 'keyword_suggestions', 'link_suggestions'] as $jsonField) {
+        foreach (['seo_titles', 'meta_descriptions', 'faqs', 'keyword_suggestions', 'link_suggestions'] as $jsonField) {
             if (array_key_exists($jsonField, $data) && $data[$jsonField] !== null) {
                 $project->{$jsonField} = $data[$jsonField];
             }
@@ -397,6 +399,7 @@ class WriterProjectController extends Controller
             'seo_titles' => is_array($p->seo_titles) ? $p->seo_titles : [],
             'meta_title' => (string) ($p->meta_title ?? ''),
             'meta_description' => (string) ($p->meta_description ?? ''),
+            'meta_descriptions' => is_array($p->meta_descriptions) ? $p->meta_descriptions : [],
             'og_title' => (string) ($p->og_title ?? ''),
             'og_description' => (string) ($p->og_description ?? ''),
             'faqs' => is_array($p->faqs) ? $p->faqs : [],
