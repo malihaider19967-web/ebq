@@ -223,6 +223,9 @@ class ContextBuilder
     private function loadRankSnapshot(Website $website, string $focusKw): ?array
     {
         // Look up the most recent snapshot for this kw on this site.
+        // Schema reference: rank_tracking_snapshots has no
+        // `position_change` column — change is derived in
+        // RankTrackingService at read time, not persisted.
         $row = \DB::table('rank_tracking_snapshots as s')
             ->join('rank_tracking_keywords as k', 's.rank_tracking_keyword_id', '=', 'k.id')
             ->where('k.website_id', $website->id)
@@ -230,7 +233,7 @@ class ContextBuilder
             ->orderByDesc('s.checked_at')
             ->limit(1)
             ->select([
-                's.position', 's.position_change', 's.serp_features',
+                's.position', 's.serp_features',
                 's.people_also_ask', 's.related_searches', 's.top_results',
                 's.checked_at',
             ])
@@ -242,7 +245,6 @@ class ContextBuilder
 
         return [
             'position' => $row->position !== null ? (int) $row->position : null,
-            'position_change' => $row->position_change !== null ? (int) $row->position_change : null,
             'serp_features' => $this->jsonOrNull($row->serp_features) ?? [],
             'people_also_ask' => $this->jsonOrNull($row->people_also_ask) ?? [],
             'related_searches' => $this->jsonOrNull($row->related_searches) ?? [],
