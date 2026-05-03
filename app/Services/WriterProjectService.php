@@ -524,11 +524,12 @@ class WriterProjectService
             $imagesByH2[$h2][] = $img;
         }
 
+        // The WordPress post `title` field is the canonical H1 — both
+        // editors render it above the body. We do NOT emit an <h1> here
+        // (would render as a duplicate visible heading inside the post
+        // content), and the writer is in strict mode which already
+        // suppresses <h1> in section output.
         $parts = [];
-        $title = trim($project->title);
-        if ($title !== '') {
-            $parts[] = '<h1>'.$this->esc($title).'</h1>';
-        }
 
         foreach ($sections as $i => $sec) {
             if (! is_array($sec)) continue;
