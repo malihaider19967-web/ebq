@@ -136,15 +136,32 @@ class WriterProjectService
                 'count' => 5,
             ]);
             if ($candidates->ok && is_array($candidates->value)) {
-                $list = array_values(array_filter(array_map(
-                    static fn ($c) => is_string($c) ? mb_substr(trim($c), 0, 320) : '',
-                    $candidates->value,
-                ), static fn ($c) => $c !== ''));
-                // Enforce sweet spot + keyword presence in every
-                // surfaced candidate (with tolerant fallbacks if
-                // strict filtering yields nothing).
-                $list = $this->filterCandidates($list, (string) $project->focus_keyword, 120, 158);
-                $project->meta_descriptions = $list;
+                $list = $this->normaliseDescriptionPool($candidates->value);
+                $filtered = $this->filterCandidates($list, (string) $project->focus_keyword, 120, 158);
+
+                // Count how many survived the strict band filter
+                // (`filterCandidates` may include relaxed fallbacks
+                // beyond that). If fewer than 3 truly land in 120–158,
+                // re-run the tool ONCE with explicit length feedback
+                // to coax the model toward the sweet spot.
+                $strict = array_values(array_filter($filtered, fn (string $s) => mb_strlen($s) >= 120 && mb_strlen($s) <= 158
+                    && $this->stringContainsKeyword($s, (string) $project->focus_keyword)));
+
+                if (count($strict) < 3) {
+                    $retry = $this->toolRunner->run('seo-description', $website, $project->user_id, $baseInput + [
+                        'summary' => $summary . "\n\nPrevious attempt produced these (some out of band): "
+                            . implode(' | ', array_slice($list, 0, 6))
+                            . "\nWrite 6 NEW variants, each EXACTLY 120 to 158 characters. Count carefully.",
+                        'count' => 6,
+                    ]);
+                    if ($retry->ok && is_array($retry->value)) {
+                        $extra = $this->normaliseDescriptionPool($retry->value);
+                        $list = array_values(array_unique(array_merge($list, $extra)));
+                        $filtered = $this->filterCandidates($list, (string) $project->focus_keyword, 120, 158);
+                    }
+                }
+
+                $project->meta_descriptions = $filtered;
                 // If the bundle didn't yield a meta_description but the
                 // candidates list did, use the first candidate as the
                 // initial selection so the user has something workable.
@@ -280,15 +297,21 @@ class WriterProjectService
     }
 
     /**
-     * Filter a list of meta-tag candidates down to ones that hit
-     * BOTH the sweet-spot length band AND contain the focus keyword.
-     * Used by the SEO-title (50–60) and meta-description (120–158)
-     * pickers — the prompt asks for both, but models drift, so we
-     * enforce server-side before surfacing to the user.
+     * Filter meta-tag candidates to ones that hit BOTH the sweet-spot
+     * length band AND contain the focus keyword.
      *
-     * Multi-tier fallback: if the strict pass kills everything, we
-     * relax in steps so the user always sees something rather than
-     * an empty picker. Order: strict → kw-only → length-only → raw.
+     * Strategy:
+     *   1. Trim any over-band candidate at a clean word boundary so it
+     *      fits within maxLen. This salvages the common Mistral pattern
+     *      where the model writes 165–180 char descriptions.
+     *   2. Drop under-band candidates (we can't honestly pad without
+     *      inventing claims).
+     *   3. Filter to keyword-bearing.
+     *   4. If at least 3 candidates survive, return them.
+     *   5. Otherwise, return whatever survived (even if < 3) plus a
+     *      relaxed pool — keyword-bearing at any length — so the
+     *      picker is never empty. The UI shows the in-band hint via
+     *      its colour-coded char counter; the user can still pick.
      *
      * @param  list<string>  $items
      * @return list<string>
@@ -301,27 +324,94 @@ class WriterProjectService
             return [];
         }
 
-        $inBand = static fn (string $s): bool => mb_strlen(trim($s)) >= $minLen && mb_strlen(trim($s)) <= $maxLen;
+        // Step 1: trim over-band entries at word boundary.
+        $trimmed = array_map(fn (string $s) => $this->trimToBand(trim($s), $maxLen), $items);
 
-        // Tier 1: in-band AND contains keyword.
-        $strict = array_values(array_filter($items, fn (string $s) => $inBand($s) && $this->stringContainsKeyword($s, $kw)));
-        if ($strict !== []) {
-            return $strict;
+        // Step 2 + 3: drop under-band, keep kw-bearing.
+        $inBandKw = array_values(array_filter($trimmed, fn (string $s) => mb_strlen($s) >= $minLen
+            && mb_strlen($s) <= $maxLen
+            && $this->stringContainsKeyword($s, $kw)));
+
+        if (count($inBandKw) >= 3) {
+            return $inBandKw;
         }
-        // Tier 2: contains keyword (any length).
-        $kwOnly = $kw !== ''
-            ? array_values(array_filter($items, fn (string $s) => $this->stringContainsKeyword($s, $kw)))
-            : [];
-        if ($kwOnly !== []) {
-            return $kwOnly;
+
+        // Need more candidates. Try kw-bearing at any length, but
+        // prefer the trimmed versions (closer to band) over raw.
+        $kwBearing = $kw !== ''
+            ? array_values(array_filter($trimmed, fn (string $s) => $this->stringContainsKeyword($s, $kw)))
+            : array_values($trimmed);
+
+        // Merge: in-band-kw first (best), then kw-bearing fallbacks
+        // that aren't already included.
+        $merged = $inBandKw;
+        foreach ($kwBearing as $c) {
+            if (! in_array($c, $merged, true)) {
+                $merged[] = $c;
+            }
         }
-        // Tier 3: in-band (kw missing).
-        $bandOnly = array_values(array_filter($items, $inBand));
-        if ($bandOnly !== []) {
-            return $bandOnly;
+        if ($merged !== []) {
+            return $merged;
         }
-        // Tier 4: raw.
-        return $items;
+
+        // Last resort — surface the trimmed pool so the user has
+        // something to work with, even if no candidate met the rules.
+        return $trimmed;
+    }
+
+    /**
+     * Normalise a raw LLM response into a clean list of description
+     * strings — strips empties, leading bullets/numbering, surrounding
+     * quotes, and caps each entry at 320 chars (Google's hard cutoff).
+     *
+     * @param  array<int|string, mixed>  $raw
+     * @return list<string>
+     */
+    private function normaliseDescriptionPool(array $raw): array
+    {
+        return array_values(array_filter(array_map(
+            static function ($c): string {
+                if (! is_string($c)) return '';
+                $s = trim($c);
+                $s = (string) preg_replace('/^\s*(?:[-*•·]|\d+[.)])\s+/u', '', $s);
+                $s = trim($s, " \t\n\r\0\x0B\"'`");
+                return mb_substr($s, 0, 320);
+            },
+            $raw,
+        ), static fn ($c) => $c !== ''));
+    }
+
+    /**
+     * Trim a string to maxLen at the nearest word boundary, ensuring
+     * it ends with sentence-final punctuation. No-op when already
+     * within the cap.
+     */
+    private function trimToBand(string $s, int $maxLen): string
+    {
+        if (mb_strlen($s) <= $maxLen) {
+            return $s;
+        }
+
+        // Cut at the last word boundary inside the cap.
+        $cut = mb_substr($s, 0, $maxLen);
+        $lastSpace = mb_strrpos($cut, ' ');
+        if ($lastSpace !== false && $lastSpace > ($maxLen * 0.7)) {
+            $cut = mb_substr($cut, 0, $lastSpace);
+        }
+        $cut = rtrim($cut, ", \t\n\r;:");
+
+        // Ensure sentence-final punctuation. If trimming truncated
+        // mid-sentence, a period reads more cleanly than nothing.
+        if (! preg_match('/[.!?]$/u', $cut)) {
+            // Account for the period we're about to add.
+            if (mb_strlen($cut) >= $maxLen) {
+                $cut = mb_substr($cut, 0, $maxLen - 1);
+                $cut = rtrim($cut, ", \t\n\r;:");
+            }
+            $cut .= '.';
+        }
+
+        return $cut;
     }
 
     /**
