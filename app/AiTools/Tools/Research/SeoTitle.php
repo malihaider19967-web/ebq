@@ -56,7 +56,12 @@ final class SeoTitle extends AbstractAiTool
 
         return "Focus keyword: {$kw}\n"
             . ($summary !== '' ? "Summary: {$summary}\n" : '')
-            . "Generate exactly 5 SEO title variants. Each ≤60 characters. The focus keyword appears naturally near the front of at least 3. Mix angle: how-to, listicle, definitive, comparison, contrarian. Output one title per line, no numbering."
+            . "Generate exactly 5 SEO title variants.\n"
+            . "HARD RULES (every title must satisfy ALL):\n"
+            . "  * Length 50 to 60 characters (sweet spot for full SERP width — under 50 wastes space, over 60 truncates).\n"
+            . "  * The exact focus keyword '{$kw}' MUST appear verbatim in EVERY title (or, when grammar truly forbids it, an obvious singular/plural variant). No paraphrases.\n"
+            . "  * Place the focus keyword in the first half of the title.\n"
+            . "Mix angle across the 5: how-to, listicle, definitive, comparison, contrarian. Output one title per line, no numbering, no quotes, no trailing period."
             . $gsc . $serp;
     }
 }

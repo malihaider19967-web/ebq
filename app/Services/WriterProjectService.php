@@ -85,16 +85,20 @@ class WriterProjectService
             'language' => (string) ($project->language ?? ''),
         ];
 
-        // SEO titles (5 variants).
+        // SEO titles (5 variants). Filter out any candidate that
+        // doesn't contain the focus keyword — the prompt requires it
+        // and surfacing a kw-less title to the user defeats the
+        // point.
         if ($shouldRun('seo_titles')) {
             $res = $this->toolRunner->run('seo-title', $website, $project->user_id, $baseInput + [
                 'summary' => $summary,
             ]);
             if ($res->ok && is_array($res->value)) {
-                $project->seo_titles = array_values(array_filter(array_map(
+                $titles = array_values(array_filter(array_map(
                     static fn ($t) => is_string($t) ? trim($t) : '',
                     $res->value,
                 ), static fn ($t) => $t !== ''));
+                $project->seo_titles = $this->filterContainsKeyword($titles, $project->focus_keyword);
             }
         }
 
@@ -137,12 +141,30 @@ class WriterProjectService
                     static fn ($c) => is_string($c) ? mb_substr(trim($c), 0, 320) : '',
                     $candidates->value,
                 ), static fn ($c) => $c !== ''));
+                // Drop any candidate that omits the focus keyword.
+                $list = $this->filterContainsKeyword($list, $project->focus_keyword);
                 $project->meta_descriptions = $list;
                 // If the bundle didn't yield a meta_description but the
                 // candidates list did, use the first candidate as the
                 // initial selection so the user has something workable.
                 if (empty($project->meta_description) && $list !== []) {
                     $project->meta_description = $list[0];
+                }
+            }
+
+            // If the seo-meta call's single best landed without the
+            // focus keyword, replace it with the first kw-bearing
+            // candidate from the description list (when available).
+            if ($project->meta_description && ! $this->stringContainsKeyword((string) $project->meta_description, $project->focus_keyword)) {
+                $list = is_array($project->meta_descriptions) ? $project->meta_descriptions : [];
+                if ($list !== []) {
+                    $project->meta_description = $list[0];
+                }
+            }
+            if ($project->meta_title && ! $this->stringContainsKeyword((string) $project->meta_title, $project->focus_keyword)) {
+                $titles = is_array($project->seo_titles) ? $project->seo_titles : [];
+                if ($titles !== []) {
+                    $project->meta_title = $titles[0];
                 }
             }
         }
@@ -254,6 +276,59 @@ class WriterProjectService
             'audience' => $this->normalizeAudience($input['audience'] ?? null),
             'step' => WriterProject::STEP_TOPIC,
         ]);
+    }
+
+    /**
+     * Filter a list of strings down to only those that contain the
+     * focus keyword (verbatim or via a tolerant stem match). Used to
+     * keep the SEO-title and meta-description pickers honest — the
+     * prompt requires the keyword in every candidate, but models
+     * occasionally drop it; surfacing a kw-less candidate would let
+     * the user pick something that won't rank for the target query.
+     *
+     * @param  list<string>  $items
+     * @return list<string>
+     */
+    private function filterContainsKeyword(array $items, string $keyword): array
+    {
+        $kw = trim($keyword);
+        if ($kw === '') {
+            return array_values($items);
+        }
+        $matched = array_values(array_filter($items, fn (string $s) => $this->stringContainsKeyword($s, $kw)));
+        // If filtering kills everything, return the original list — a
+        // partial match is still better than empty UI. The strict
+        // server-side check above will pick a kw-bearing fallback for
+        // the single meta_title / meta_description fields.
+        return $matched !== [] ? $matched : array_values($items);
+    }
+
+    private function stringContainsKeyword(string $haystack, string $keyword): bool
+    {
+        $keyword = trim($keyword);
+        if ($keyword === '') {
+            return true;
+        }
+        // Exact match (case-insensitive).
+        if (mb_stripos($haystack, $keyword) !== false) {
+            return true;
+        }
+        // Stem-tolerant: every keyword token must appear, but not
+        // necessarily contiguous. Catches "vegan protein powder" →
+        // "best vegan protein in powder form" but rejects only one
+        // token landing.
+        $tokens = preg_split('/\s+/', mb_strtolower($keyword)) ?: [];
+        $tokens = array_values(array_filter($tokens, static fn ($t) => mb_strlen($t) > 2));
+        if ($tokens === []) {
+            return false;
+        }
+        $hayLower = mb_strtolower($haystack);
+        foreach ($tokens as $t) {
+            if (mb_strpos($hayLower, $t) === false) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private function normalizeCountry(mixed $v): ?string

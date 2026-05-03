@@ -50,8 +50,16 @@ final class SeoMeta extends AbstractAiTool
 
         return "Focus keyword: {$kw}\nSummary: {$summary}\n\n"
             . "Return ONE JSON object:\n"
-            . "{\n  \"seo_title\": string (≤60 chars),\n  \"seo_description\": string (≤155 chars),\n  \"og_title\": string (≤70 chars, more conversational than seo_title),\n  \"og_description\": string (≤180 chars, social-share-friendly)\n}\n"
-            . "Focus keyword must appear naturally in seo_title and seo_description. og_* should feel like a friend recommending the post."
+            . "{\n"
+            . "  \"seo_title\": string (50 to 60 chars, full SERP width sweet spot),\n"
+            . "  \"seo_description\": string (120 to 158 chars sweet spot, under 120 Google pads the snippet, over 158 it truncates),\n"
+            . "  \"og_title\": string (≤70 chars, more conversational than seo_title),\n"
+            . "  \"og_description\": string (≤180 chars, social-share-friendly)\n"
+            . "}\n"
+            . "HARD RULES:\n"
+            . "  * The exact focus keyword '{$kw}' MUST appear verbatim in BOTH seo_title AND seo_description (or its obvious singular/plural form). No paraphrases.\n"
+            . "  * Place the focus keyword in the first half of seo_title and the first 100 chars of seo_description.\n"
+            . "  * og_* should feel like a friend recommending the post. Focus keyword encouraged there, not required."
             . $gsc;
     }
 }

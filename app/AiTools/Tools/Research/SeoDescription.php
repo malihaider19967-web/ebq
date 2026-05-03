@@ -46,7 +46,13 @@ final class SeoDescription extends AbstractAiTool
         }
 
         return "Focus keyword: {$kw}\nSummary: {$summary}\n\n"
-            . "Write {$count} meta-description variants. Each MUST be ≤155 characters. Each contains the focus keyword naturally. End with a soft action verb (learn, discover, see, compare). Output one per line, no numbering, no quotes."
+            . "Write {$count} meta-description variants.\n"
+            . "HARD RULES (every variant must satisfy ALL):\n"
+            . "  * Length 120 to 158 characters (sweet spot — under 120 Google pads the snippet from page body, over 158 it truncates).\n"
+            . "  * The exact focus keyword '{$kw}' MUST appear verbatim in EVERY variant (or its obvious singular/plural form). No paraphrases.\n"
+            . "  * Place the focus keyword in the first 100 characters so it shows even when truncated on small viewports.\n"
+            . "  * End with a soft action verb (learn, discover, see, compare, find, get).\n"
+            . "Output one variant per line, no numbering, no quotes."
             . $gsc;
     }
 }
