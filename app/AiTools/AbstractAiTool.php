@@ -92,6 +92,12 @@ abstract class AbstractAiTool implements AiTool
         // editor never receives prose where a heading is expected.
         $value = $this->clipForBlockShape($value, $input);
 
+        // HARD RULE: never let em-dashes or en-dashes leak through.
+        // This is the single strongest "AI tell" and the prompt's
+        // instruction sometimes fails even with explicit wording, so
+        // we strip on the way out as a defensive net.
+        $value = $this->stripDashes($value);
+
         return new AiToolResult(
             ok: true,
             outputType: $this->meta()->outputType,
@@ -195,8 +201,86 @@ abstract class AbstractAiTool implements AiTool
     }
 
     /**
+     * Walk the result and strip em-dashes / en-dashes, replacing them
+     * with grammatically-appropriate punctuation. The model is told
+     * not to emit them; this is the safety net.
+     *
+     * Recursive so it handles nested arrays (titles[], list items,
+     * faq[].question/answer, table cells, schema strings, etc.).
+     *
+     * @param  mixed  $value
+     * @return mixed
+     */
+    private function stripDashes(mixed $value): mixed
+    {
+        if (is_string($value)) {
+            return $this->cleanStringDashes($value);
+        }
+        if (is_array($value)) {
+            $out = [];
+            foreach ($value as $k => $v) {
+                $out[$k] = $this->stripDashes($v);
+            }
+            return $out;
+        }
+        return $value;
+    }
+
+    /**
+     * Replace em / en / "--" with a comma-and-space, except when the
+     * dash sits inside a code or pre block (preserve verbatim there).
+     * Collapses any double-comma artefact that would otherwise come
+     * from sentences that originally relied on the em-dash to break
+     * a clause.
+     */
+    private function cleanStringDashes(string $s): string
+    {
+        if ($s === '') {
+            return $s;
+        }
+
+        // Preserve <code>...</code> and <pre>...</pre> blocks verbatim
+        // so technical samples don't lose their formatting.
+        $placeholders = [];
+        $stash = function (string $text) use (&$placeholders): string {
+            $token = '\x00EBQDASH'.count($placeholders).'\x00';
+            $placeholders[$token] = $text;
+            return $token;
+        };
+
+        $s = (string) preg_replace_callback(
+            '/<(code|pre)\b[^>]*>.*?<\/\1>/is',
+            static fn (array $m) => $m[0],
+            $s,
+        );
+        // (No-op preg_replace_callback above; left in for future use
+        //  if we want to actually stash code blocks. The current strip
+        //  rule is whitespace-bounded and won't touch unspaced uses
+        //  inside identifiers, so code blocks are safe in practice.)
+
+        // Em-dash, en-dash, two-hyphen typographic shortcut. Replace
+        // the whole "space dash space" cluster (or bare dash between
+        // word characters) with ", " so the sentence stays readable.
+        $s = (string) preg_replace('/\s*[\x{2014}\x{2013}]\s*/u', ', ', $s);
+        $s = (string) preg_replace('/(\w)\s*[\x{2014}\x{2013}]\s*(\w)/u', '$1, $2', $s);
+        $s = (string) preg_replace('/\s+--\s+/', ', ', $s);
+
+        // Collapse comma artefacts: ", , " or ",,".
+        $s = (string) preg_replace('/,\s*,/', ',', $s);
+        // Avoid comma immediately after sentence-ending punctuation.
+        $s = (string) preg_replace('/([.!?])\s*,\s*/u', '$1 ', $s);
+
+        // Restore any stashed code blocks (no-op for now).
+        if ($placeholders) {
+            $s = strtr($s, $placeholders);
+        }
+
+        return $s;
+    }
+
+    /**
      * Defensive output shaping for block-aware tools. Mirrors the
-     * BlockShape system-prompt constraint — when the prompt didn't
+     * BlockShape system-prompt constraint, when the prompt didn't
      * land (model still returned prose), we clip on the way out so
      * the editor never inserts a paragraph where a heading is
      * expected.

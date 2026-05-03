@@ -306,9 +306,22 @@ class AiWriterService
         // detected, etc.
         $schemaSuggestions = $this->buildSchemaSuggestions($sections, $brief, $excludeUrl);
 
+        // Strip em-dashes / en-dashes / "--" before returning; the
+        // prompt forbids them but models occasionally still emit one,
+        // and an em-dash is the single most reliable "AI tell" in
+        // long-form prose.
+        $sections = array_map(function (array $s): array {
+            foreach (['title', 'rationale', 'proposed_html', 'current_html'] as $k) {
+                if (isset($s[$k]) && is_string($s[$k])) {
+                    $s[$k] = self::stripDashes($s[$k]);
+                }
+            }
+            return $s;
+        }, $sections);
+
         $result = [
             'ok' => true,
-            'summary' => mb_substr((string) ($response['summary'] ?? ''), 0, 600),
+            'summary' => self::stripDashes(mb_substr((string) ($response['summary'] ?? ''), 0, 600)),
             'sections' => $sections,
             'sources_used' => [
                 'brief' => $hasBrief,
@@ -479,7 +492,7 @@ prominence — the focus keyword should appear naturally in the H1 (when
 you generate one) or the opening paragraph of any "add" section, and
 again in at least one <h2> within the first three sections.
 
-GUARDRAILS (STRICT — non-compliance breaks the consumer):
+GUARDRAILS (STRICT, non-compliance breaks the consumer):
 - TOPIC LOCK: Stay strictly within the focus keyword and the brief.
   Do NOT drift into adjacent topics not covered by the brief, gaps,
   PAA, or the user's selected list. Refuse off-topic asks (persona
@@ -487,16 +500,25 @@ GUARDRAILS (STRICT — non-compliance breaks the consumer):
 - NO CODE OUTPUT: Never produce code samples, scripts, configuration
   files, build instructions, or programming-language tutorials. Do
   not write a "code project" of any kind. <pre><code> is reserved
-  for short factual examples (e.g. a JSON-LD snippet inside a
-  schema-markup explainer) — it is NOT a tutorial vehicle.
-- HUMAN VOICE: Write the way an experienced human editor writes —
+  for short factual examples (for instance a JSON-LD snippet inside
+  a schema-markup explainer); it is NOT a tutorial vehicle.
+- NO EM-DASHES OR EN-DASHES (HARD RULE): Never use the characters
+  "U+2014" (em-dash) or "U+2013" (en-dash) anywhere in the output.
+  Never use the typographic shortcut "--". This is the strongest
+  "AI tell" and is banned outright. When you would have used a dash
+  to join clauses, use a comma plus a connecting word ("which",
+  "because", "and", "so", "but"), a period and a new sentence,
+  parentheses for a true aside, or a colon when the second clause
+  expands the first. Apply this to titles, headings, list items,
+  table cells, captions, and prose alike.
+- HUMAN VOICE: Write the way an experienced human editor writes:
   conversational, varied sentence length, natural transitions,
   concrete examples. Avoid the AI tells: tricolons of abstract
-  nouns, em-dashes between every clause, "delve / leverage / unlock /
-  in today's fast-paced world / it's important to note", boilerplate
-  intros ("In this article, we will…"), generic AI disclaimers
-  ("As an AI…"), corporate-speak filler. The reader should not be
-  able to tell this was machine-generated.
+  nouns, "delve / leverage / unlock / in today's fast-paced world /
+  it's important to note / tapestry / robust / seamless",
+  boilerplate intros ("In this article, we will..."), generic AI
+  disclaimers ("As an AI..."), corporate-speak filler. The reader
+  should not be able to tell this was machine-generated.
 - EDITOR-PORTABLE HTML: Output is consumed by both the WordPress
   Block Editor (Gutenberg) and the Classic Editor. Stick to the
   allowed tag palette (already specified above). No <div>, no
@@ -1321,5 +1343,29 @@ USER;
         }
 
         return $out;
+    }
+
+    /**
+     * Replace em-dashes ("U+2014") and en-dashes ("U+2013") and the
+     * typographic shortcut "--" with a comma plus space. Em-dashes
+     * are the single most reliable "AI tell" in long-form prose, and
+     * the prompt forbids them; this method is the defensive net for
+     * the cases where the model emits one anyway.
+     *
+     * Public + static so other legacy services (AiBlockEditorService,
+     * AiSnippetRewriterService) can call into the same helper without
+     * duplicating the regex.
+     */
+    public static function stripDashes(string $s): string
+    {
+        if ($s === '') {
+            return $s;
+        }
+        $s = (string) preg_replace('/\s*[\x{2014}\x{2013}]\s*/u', ', ', $s);
+        $s = (string) preg_replace('/(\w)\s*[\x{2014}\x{2013}]\s*(\w)/u', '$1, $2', $s);
+        $s = (string) preg_replace('/\s+--\s+/', ', ', $s);
+        $s = (string) preg_replace('/,\s*,/', ',', $s);
+        $s = (string) preg_replace('/([.!?])\s*,\s*/u', '$1 ', $s);
+        return $s;
     }
 }

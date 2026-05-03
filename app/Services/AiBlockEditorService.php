@@ -35,6 +35,7 @@ class AiBlockEditorService
     public const MODE_ALT_TEXT = 'alt_text';
     public const MODE_CTA = 'cta';
     public const MODE_SIMPLIFY = 'simplify';
+    public const MODE_BOOST_FLESCH = 'boost_flesch';
     public const MODE_ADD_FOCUS_KEYWORD = 'add_focus_keyword';
     public const MODE_SEO_OPTIMIZE = 'seo_optimize';
     public const MODE_FAQ = 'faq';
@@ -60,6 +61,7 @@ class AiBlockEditorService
         self::MODE_ALT_TEXT,
         self::MODE_CTA,
         self::MODE_SIMPLIFY,
+        self::MODE_BOOST_FLESCH,
         self::MODE_ADD_FOCUS_KEYWORD,
         self::MODE_SEO_OPTIMIZE,
         self::MODE_FAQ,
@@ -133,8 +135,8 @@ class AiBlockEditorService
             self::MODE_SHORTER, self::MODE_LONGER, self::MODE_TRANSLATE, self::MODE_TONE,
             self::MODE_CONVERT_TO_LIST, self::MODE_CONVERT_TO_TABLE,
             // Workstream D modes that operate on existing text:
-            self::MODE_SIMPLIFY, self::MODE_ADD_FOCUS_KEYWORD, self::MODE_SEO_OPTIMIZE,
-            self::MODE_FAQ, self::MODE_COUNTER_ARGUMENT,
+            self::MODE_SIMPLIFY, self::MODE_BOOST_FLESCH, self::MODE_ADD_FOCUS_KEYWORD,
+            self::MODE_SEO_OPTIMIZE, self::MODE_FAQ, self::MODE_COUNTER_ARGUMENT,
             // Workstream F multi-block modes (text is the joined block content):
             self::MODE_SUMMARISE_SECTION, self::MODE_GENERATE_HEADING,
             self::MODE_HARMONISE_TONE, self::MODE_OUTLINE,
@@ -601,13 +603,27 @@ FEEDBACK;
             ],
             self::MODE_SIMPLIFY => [
                 $system,
-                $seoContext."Rewrite the following text to be MUCH easier to read — target a Flesch Reading Ease score of 60 or higher. Specifically:\n"
+                $seoContext."Rewrite the following text to be MUCH easier to read, target a Flesch Reading Ease score of 60 or higher. Specifically:\n"
                     ."- Split sentences over 20 words into two\n"
                     ."- Replace 3+ syllable words with 1 to 2 syllable equivalents where the meaning is preserved\n"
                     ."- Cut redundant clauses and adverb stacks\n"
                     ."- Keep the focus keyword and any proper nouns / numbers exactly as written\n"
                     ."- Match the input language; preserve paragraph breaks\n\n"
                     ."Return ONLY the simplified text.\n\nText:\n{$text}",
+            ],
+            self::MODE_BOOST_FLESCH => [
+                $system,
+                $seoContext."Aggressively boost the Flesch Reading Ease score of the text below. Target Flesch >= 70 (\"fairly easy\", grade-7 level). This is a stronger rewrite than Simplify: keep every claim and named entity, but rebuild sentence-by-sentence for maximum clarity.\n"
+                    ."Hard rules (must hit all of them):\n"
+                    ."- Average sentence length 12 to 16 words. Cap any single sentence at 18 words. Split long sentences.\n"
+                    ."- Use one or two syllable words for everything except proper nouns, brand names, and unavoidable technical terms.\n"
+                    ."- Active voice. No passive constructions ('is being done by'), no nominalisations ('the implementation of').\n"
+                    ."- Drop hedges and filler ('really', 'very', 'quite', 'in order to', 'a number of').\n"
+                    ."- Use concrete subjects (people, things, products) rather than abstract nouns.\n"
+                    ."- Preserve the focus keyword and all numbers / dates / proper nouns exactly as they appear.\n"
+                    ."- Preserve paragraph and list structure if present.\n"
+                    ."- NEVER use em-dashes (U+2014) or en-dashes (U+2013) anywhere in the output. Use a comma plus connecting word, a period, parentheses, or a colon instead.\n\n"
+                    ."Return ONLY the rewritten text.\n\nText:\n{$text}",
             ],
             self::MODE_ADD_FOCUS_KEYWORD => [
                 $system,
@@ -701,6 +717,7 @@ FEEDBACK;
             self::MODE_LONGER => 'Expand this slice with one or two more useful sentences. Preserve every existing fact.',
             self::MODE_TONE => 'Adjust the tone of this slice as the surrounding context implies. Preserve meaning and length.',
             self::MODE_SIMPLIFY => 'Rewrite this slice at a Flesch reading-ease score of 60 or higher. Shorter sentences, simpler words.',
+            self::MODE_BOOST_FLESCH => 'Rewrite this slice for Flesch reading ease 70 or higher. Sentences 12 to 16 words, plain everyday vocabulary, active voice, preserve names and numbers exactly. No em-dashes or en-dashes.',
             self::MODE_COMMAND => 'Apply the user instruction to this slice. Preserve all named entities and numbers.',
             self::MODE_TRANSLATE => 'Translate this slice while preserving names, numbers, and product terms. Match natural target-language style.',
             default => 'Improve this slice while preserving meaning, named entities, and numbers.',
