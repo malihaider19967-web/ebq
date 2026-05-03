@@ -75,6 +75,10 @@ class WriterProjectController extends Controller
             'title' => 'nullable|string|max:300',
             'additional_keywords' => 'nullable|array|max:20',
             'additional_keywords.*' => 'string|max:200',
+            'country' => 'nullable|string|size:2',
+            'language' => 'nullable|string|min:2|max:8',
+            'tone' => 'nullable|string|max:32',
+            'audience' => 'nullable|string|max:32',
         ]);
 
         $project = $this->service->create($website, $request->user()?->id, $data);
@@ -113,6 +117,10 @@ class WriterProjectController extends Controller
             'focus_keyword' => 'nullable|string|min:2|max:200',
             'additional_keywords' => 'nullable|array|max:20',
             'additional_keywords.*' => 'string|max:200',
+            'country' => 'nullable|string|size:2',
+            'language' => 'nullable|string|min:2|max:8',
+            'tone' => 'nullable|string|max:32',
+            'audience' => 'nullable|string|max:32',
             'step' => ['nullable', Rule::in(WriterProject::STEPS)],
             'brief' => 'nullable|array',
             'images' => 'nullable|array|max:20',
@@ -124,6 +132,21 @@ class WriterProjectController extends Controller
             'images.*.assigned_h2' => 'nullable|string|max:200',
             'images.*.width' => 'nullable|integer|min:0|max:20000',
             'images.*.height' => 'nullable|integer|min:0|max:20000',
+            // Strategy outputs — user can override individual fields
+            // (pick a different SEO title from the suggestions, edit
+            // the meta description, etc.) without regenerating the bundle.
+            'seo_titles' => 'nullable|array',
+            'seo_titles.*' => 'string|max:200',
+            'meta_title' => 'nullable|string|max:200',
+            'meta_description' => 'nullable|string|max:320',
+            'og_title' => 'nullable|string|max:200',
+            'og_description' => 'nullable|string|max:320',
+            'faqs' => 'nullable|array',
+            'faqs.*.question' => 'required_with:faqs|string|max:300',
+            'faqs.*.answer' => 'required_with:faqs|string|max:2000',
+            'keyword_suggestions' => 'nullable|array',
+            'keyword_suggestions.*' => 'string|max:200',
+            'link_suggestions' => 'nullable|array',
             'wp_post_id' => 'nullable|integer|min:1',
         ]);
 
@@ -135,6 +158,21 @@ class WriterProjectController extends Controller
         }
         if (array_key_exists('additional_keywords', $data) && $data['additional_keywords'] !== null) {
             $project->additional_keywords = array_values(array_filter(array_map('strval', $data['additional_keywords'])));
+        }
+        foreach (['country', 'language', 'tone', 'audience'] as $localeField) {
+            if (array_key_exists($localeField, $data) && $data[$localeField] !== null) {
+                $project->{$localeField} = $data[$localeField];
+            }
+        }
+        foreach (['meta_title', 'meta_description', 'og_title', 'og_description'] as $metaField) {
+            if (array_key_exists($metaField, $data) && $data[$metaField] !== null) {
+                $project->{$metaField} = $data[$metaField];
+            }
+        }
+        foreach (['seo_titles', 'faqs', 'keyword_suggestions', 'link_suggestions'] as $jsonField) {
+            if (array_key_exists($jsonField, $data) && $data[$jsonField] !== null) {
+                $project->{$jsonField} = $data[$jsonField];
+            }
         }
         if (array_key_exists('step', $data) && $data['step'] !== null) {
             $project->step = $data['step'];
@@ -225,6 +263,32 @@ class WriterProjectController extends Controller
         return response()->json([
             'images' => $images,
             'project' => $this->full($project->refresh()),
+        ]);
+    }
+
+    /**
+     * POST /api/v1/hq/writer-projects/{externalId}/strategy
+     * body: { only?: ["seo_titles", "meta", "faqs", "keyword_suggestions", "link_suggestions"] }
+     *
+     * Run the Strategy step's bundle. Without `only`, every output is
+     * generated (or regenerated). With `only`, just the listed
+     * outputs are refreshed — used by the per-card "Regenerate" buttons.
+     */
+    public function strategy(Request $request, string $externalId): JsonResponse
+    {
+        $project = $this->resolve($request, $externalId);
+        $website = $this->website($request);
+
+        $data = $request->validate([
+            'only' => 'nullable|array',
+            'only.*' => ['string', Rule::in(['seo_titles', 'meta', 'faqs', 'keyword_suggestions', 'link_suggestions'])],
+        ]);
+
+        $only = is_array($data['only'] ?? null) ? $data['only'] : null;
+        $project = $this->service->generateStrategy($project, $website, $only);
+
+        return response()->json([
+            'project' => $this->full($project),
         ]);
     }
 
@@ -322,10 +386,22 @@ class WriterProjectController extends Controller
             'title' => $p->title,
             'focus_keyword' => $p->focus_keyword,
             'additional_keywords' => is_array($p->additional_keywords) ? $p->additional_keywords : [],
+            'country' => $p->country,
+            'language' => $p->language,
+            'tone' => $p->tone,
+            'audience' => $p->audience,
             'step' => $p->step,
             'brief' => is_array($p->brief) ? $p->brief : null,
             'chat_history' => is_array($p->chat_history) ? $p->chat_history : [],
             'images' => is_array($p->images) ? $p->images : [],
+            'seo_titles' => is_array($p->seo_titles) ? $p->seo_titles : [],
+            'meta_title' => (string) ($p->meta_title ?? ''),
+            'meta_description' => (string) ($p->meta_description ?? ''),
+            'og_title' => (string) ($p->og_title ?? ''),
+            'og_description' => (string) ($p->og_description ?? ''),
+            'faqs' => is_array($p->faqs) ? $p->faqs : [],
+            'keyword_suggestions' => is_array($p->keyword_suggestions) ? $p->keyword_suggestions : [],
+            'link_suggestions' => is_array($p->link_suggestions) ? $p->link_suggestions : [],
             'generated_html' => (string) ($p->generated_html ?? ''),
             'wp_post_id' => $p->wp_post_id,
             'credits_used' => (int) $p->credits_used,

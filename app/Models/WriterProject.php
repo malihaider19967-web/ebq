@@ -31,6 +31,7 @@ class WriterProject extends Model
 
     public const STEP_TOPIC     = 'topic';
     public const STEP_BRIEF     = 'brief';
+    public const STEP_STRATEGY  = 'strategy';
     public const STEP_IMAGES    = 'images';
     public const STEP_SUMMARY   = 'summary';
     public const STEP_COMPLETED = 'completed';
@@ -38,6 +39,7 @@ class WriterProject extends Model
     public const STEPS = [
         self::STEP_TOPIC,
         self::STEP_BRIEF,
+        self::STEP_STRATEGY,
         self::STEP_IMAGES,
         self::STEP_SUMMARY,
         self::STEP_COMPLETED,
@@ -50,10 +52,22 @@ class WriterProject extends Model
         'title',
         'focus_keyword',
         'additional_keywords',
+        'country',
+        'language',
+        'tone',
+        'audience',
         'step',
         'brief',
         'chat_history',
         'images',
+        'seo_titles',
+        'meta_title',
+        'meta_description',
+        'og_title',
+        'og_description',
+        'faqs',
+        'keyword_suggestions',
+        'link_suggestions',
         'generated_html',
         'wp_post_id',
         'credits_used',
@@ -66,6 +80,10 @@ class WriterProject extends Model
             'brief' => 'array',
             'chat_history' => 'array',
             'images' => 'array',
+            'seo_titles' => 'array',
+            'faqs' => 'array',
+            'keyword_suggestions' => 'array',
+            'link_suggestions' => 'array',
             'wp_post_id' => 'integer',
             'credits_used' => 'integer',
         ];

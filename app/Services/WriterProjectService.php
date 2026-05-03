@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\ClientActivity;
 use App\Models\Website;
 use App\Models\WriterProject;
+use App\Services\AiToolRunner;
 use App\Services\Llm\LlmClient;
 use App\Support\CreditTypes;
 use Illuminate\Support\Carbon;
@@ -46,7 +47,144 @@ class WriterProjectService
         private readonly SerperSearchClient $serper,
         private readonly LlmClient $llm,
         private readonly ClientActivityLogger $activity,
+        private readonly AiToolRunner $toolRunner,
     ) {
+    }
+
+    /**
+     * Generate the Strategy step's bundle: SEO titles, meta tags
+     * (title/description/OG), FAQs, keyword suggestions, and link
+     * suggestions. Each is produced by the matching registry tool so
+     * the prompt logic stays in one place; results are persisted on
+     * the project so the user can edit / regenerate independently.
+     *
+     * The bundle pulls in the project's locale (country/language),
+     * tone, and audience so every output honours the same voice the
+     * user picked in step 1.
+     *
+     * @param  list<string>|null  $only  optional subset of keys to
+     *   regenerate; `null` regenerates everything. Allowed keys:
+     *   'seo_titles', 'meta', 'faqs', 'keyword_suggestions',
+     *   'link_suggestions'.
+     */
+    public function generateStrategy(WriterProject $project, Website $website, ?array $only = null): WriterProject
+    {
+        @set_time_limit(240);
+
+        $shouldRun = static fn (string $key): bool => $only === null || in_array($key, $only, true);
+
+        $brief = is_array($project->brief) ? $project->brief : [];
+        $sectionsArr = is_array($brief['sections'] ?? null) ? $brief['sections'] : [];
+        $h2List = array_values(array_map(static fn ($s) => is_array($s) ? (string) ($s['h2'] ?? '') : '', $sectionsArr));
+        $summary = $project->title.' (focus: '.$project->focus_keyword.'). Sections: '
+            . implode('; ', array_slice(array_filter($h2List), 0, 8));
+
+        $baseInput = [
+            'focus_keyword' => $project->focus_keyword,
+            'country' => (string) ($project->country ?? ''),
+            'language' => (string) ($project->language ?? ''),
+        ];
+
+        // SEO titles (5 variants).
+        if ($shouldRun('seo_titles')) {
+            $res = $this->toolRunner->run('seo-title', $website, $project->user_id, $baseInput + [
+                'summary' => $summary,
+            ]);
+            if ($res->ok && is_array($res->value)) {
+                $project->seo_titles = array_values(array_filter(array_map(
+                    static fn ($t) => is_string($t) ? trim($t) : '',
+                    $res->value,
+                ), static fn ($t) => $t !== ''));
+            }
+        }
+
+        // Meta tags bundle (seo_title / seo_description / og_*).
+        if ($shouldRun('meta')) {
+            $res = $this->toolRunner->run('seo-meta', $website, $project->user_id, $baseInput + [
+                'summary' => $summary,
+            ]);
+            if ($res->ok && is_array($res->value)) {
+                $v = $res->value;
+                if (! empty($v['seo_title']) && is_string($v['seo_title'])) {
+                    $project->meta_title = mb_substr(trim($v['seo_title']), 0, 200);
+                }
+                if (! empty($v['seo_description']) && is_string($v['seo_description'])) {
+                    $project->meta_description = mb_substr(trim($v['seo_description']), 0, 320);
+                }
+                if (! empty($v['og_title']) && is_string($v['og_title'])) {
+                    $project->og_title = mb_substr(trim($v['og_title']), 0, 200);
+                }
+                if (! empty($v['og_description']) && is_string($v['og_description'])) {
+                    $project->og_description = mb_substr(trim($v['og_description']), 0, 320);
+                }
+            }
+        }
+
+        // FAQs grounded in PAA + the project body so far.
+        if ($shouldRun('faqs')) {
+            $res = $this->toolRunner->run('faq-generator', $website, $project->user_id, $baseInput + [
+                'article_text' => $summary,
+                'count' => 5,
+            ]);
+            if ($res->ok && is_array($res->value)) {
+                $faqs = [];
+                foreach ($res->value as $f) {
+                    if (! is_array($f)) continue;
+                    $q = trim((string) ($f['question'] ?? ''));
+                    $a = trim((string) ($f['answer'] ?? ''));
+                    if ($q !== '' && $a !== '') {
+                        $faqs[] = ['question' => $q, 'answer' => $a];
+                    }
+                }
+                $project->faqs = $faqs;
+            }
+        }
+
+        // Keyword suggestions (semantic / variant kws to expand coverage).
+        if ($shouldRun('keyword_suggestions')) {
+            $res = $this->toolRunner->run('keyword-suggestions', $website, $project->user_id, [
+                'keyword' => $project->focus_keyword,
+                'country' => (string) ($project->country ?? ''),
+                'language' => (string) ($project->language ?? ''),
+            ]);
+            if ($res->ok && is_array($res->value)) {
+                $project->keyword_suggestions = array_values(array_filter(array_map(
+                    static fn ($k) => is_string($k) ? trim($k) : '',
+                    $res->value,
+                ), static fn ($k) => $k !== ''));
+            }
+        }
+
+        // Link suggestions: internal (GSC-driven) + external (authority).
+        if ($shouldRun('link_suggestions')) {
+            $internal = [];
+            $internalRes = $this->toolRunner->run('internal-link-suggestions', $website, $project->user_id, [
+                'focus_keyword' => $project->focus_keyword,
+                'count' => 6,
+            ]);
+            if ($internalRes->ok && is_array($internalRes->value)) {
+                $internal = $internalRes->value;
+            }
+
+            $external = [];
+            $externalRes = $this->toolRunner->run('external-link-suggestions', $website, $project->user_id, [
+                'focus_keyword' => $project->focus_keyword,
+                'article_text' => $summary,
+                'count' => 4,
+            ]);
+            if ($externalRes->ok && is_array($externalRes->value)) {
+                $external = $externalRes->value;
+            }
+
+            $project->link_suggestions = [
+                'internal' => $internal,
+                'external' => $external,
+            ];
+        }
+
+        $project->save();
+
+        return $project->refresh();
     }
 
     /**
@@ -63,7 +201,7 @@ class WriterProjectService
     }
 
     /**
-     * @param  array{title?: string, focus_keyword: string, additional_keywords?: list<string>}  $input
+     * @param  array{title?: string, focus_keyword: string, additional_keywords?: list<string>, country?: string, language?: string, tone?: string, audience?: string}  $input
      */
     public function create(Website $website, ?int $userId, array $input): WriterProject
     {
@@ -83,8 +221,42 @@ class WriterProjectService
             'title' => mb_substr($title, 0, 300),
             'focus_keyword' => mb_substr($kw, 0, 200),
             'additional_keywords' => $additional,
+            'country' => $this->normalizeCountry($input['country'] ?? null),
+            'language' => $this->normalizeLanguage($input['language'] ?? null),
+            'tone' => $this->normalizeTone($input['tone'] ?? null),
+            'audience' => $this->normalizeAudience($input['audience'] ?? null),
             'step' => WriterProject::STEP_TOPIC,
         ]);
+    }
+
+    private function normalizeCountry(mixed $v): ?string
+    {
+        if (! is_string($v)) return null;
+        $v = strtolower(trim($v));
+        return preg_match('/^[a-z]{2}$/', $v) ? $v : null;
+    }
+
+    private function normalizeLanguage(mixed $v): ?string
+    {
+        if (! is_string($v)) return null;
+        $v = strtolower(trim($v));
+        return preg_match('/^[a-z]{2}(-[a-z0-9]{2,5})?$/', $v) ? $v : null;
+    }
+
+    private function normalizeTone(mixed $v): ?string
+    {
+        if (! is_string($v)) return null;
+        $v = strtolower(trim($v));
+        $allowed = ['professional', 'casual', 'persuasive', 'informational', 'friendly', 'authoritative', 'witty', 'empathetic'];
+        return in_array($v, $allowed, true) ? $v : null;
+    }
+
+    private function normalizeAudience(mixed $v): ?string
+    {
+        if (! is_string($v)) return null;
+        $v = strtolower(trim($v));
+        $allowed = ['beginner', 'general', 'intermediate', 'expert'];
+        return in_array($v, $allowed, true) ? $v : null;
     }
 
     /**
@@ -304,6 +476,13 @@ class WriterProjectService
             'selected' => $selected,
             'title' => $project->title,
             'additional_keywords' => is_array($project->additional_keywords) ? $project->additional_keywords : [],
+            // Locale + voice — wired through so the LLM knows the
+            // target country / language / tone / reader level. The
+            // writer service consumes these in its prompt builder.
+            'country' => (string) ($project->country ?? ''),
+            'language' => (string) ($project->language ?? ''),
+            'tone' => (string) ($project->tone ?? ''),
+            'audience' => (string) ($project->audience ?? ''),
         ]);
 
         if (! is_array($payload) || ($payload['ok'] ?? false) !== true) {

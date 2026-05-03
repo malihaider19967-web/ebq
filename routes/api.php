@@ -145,6 +145,9 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/writer-projects/{externalId}/images/search', [WriterProjectController::class, 'searchImages'])
                 ->where('externalId', '[A-Za-z0-9\-]+')
                 ->name('writer-projects.images.search');
+            Route::post('/writer-projects/{externalId}/strategy', [WriterProjectController::class, 'strategy'])
+                ->where('externalId', '[A-Za-z0-9\-]+')
+                ->name('writer-projects.strategy');
             Route::post('/writer-projects/{externalId}/generate', [WriterProjectController::class, 'generate'])
                 ->where('externalId', '[A-Za-z0-9\-]+')
                 ->name('writer-projects.generate');
