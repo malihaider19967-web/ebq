@@ -6,6 +6,7 @@ use App\AiTools\Contracts\AiTool;
 use App\AiTools\Contracts\AiToolMeta;
 use App\AiTools\Contracts\AiToolResult;
 use App\AiTools\Contracts\ToolContext;
+use App\AiTools\Prompts\BlockShape;
 use App\AiTools\Prompts\BrandVoiceBlock;
 use App\AiTools\Prompts\Guardrails;
 use App\AiTools\Prompts\SeoAnalysisBlock;
@@ -49,8 +50,19 @@ abstract class AbstractAiTool implements AiTool
             return AiToolResult::fail('llm_not_configured', 'LLM is not configured.', $this->meta()->outputType);
         }
 
+        $system = $this->buildSystemPrompt($context);
+
+        // When the plugin tells us which Gutenberg block the result
+        // will be inserted into, append a shape constraint so a
+        // "Change Tone" run on a <h2> doesn't return multi-sentence
+        // prose that breaks the heading visually.
+        $shape = BlockShape::from($input);
+        if ($shape !== '') {
+            $system .= "\n\n" . $shape;
+        }
+
         $messages = [
-            ['role' => 'system', 'content' => $this->buildSystemPrompt($context)],
+            ['role' => 'system', 'content' => $system],
             ['role' => 'user', 'content' => $this->buildUserPrompt($input, $context)],
         ];
 
@@ -73,6 +85,12 @@ abstract class AbstractAiTool implements AiTool
         if ($value === null) {
             return AiToolResult::fail('parse_failed', 'The model response could not be parsed.', $this->meta()->outputType);
         }
+
+        // Belt-and-suspenders for block-shape: even with the prompt
+        // constraint, some models return a 200-word reply when they
+        // see a heading they want to "fix". Clip on the way out so the
+        // editor never receives prose where a heading is expected.
+        $value = $this->clipForBlockShape($value, $input);
 
         return new AiToolResult(
             ok: true,
@@ -174,5 +192,66 @@ abstract class AbstractAiTool implements AiTool
     protected function diagnostics(array $input, ToolContext $context): array
     {
         return [];
+    }
+
+    /**
+     * Defensive output shaping for block-aware tools. Mirrors the
+     * BlockShape system-prompt constraint — when the prompt didn't
+     * land (model still returned prose), we clip on the way out so
+     * the editor never inserts a paragraph where a heading is
+     * expected.
+     *
+     * Only acts on string values for `text`/`titles` output types;
+     * structured outputs (lists, tables, faq) pass through.
+     *
+     * @param  array<string, mixed>  $input
+     * @return mixed
+     */
+    private function clipForBlockShape(mixed $value, array $input): mixed
+    {
+        $blockName = (string) ($input['block_name'] ?? '');
+        if ($blockName === '' || ! is_string($value)) {
+            return $value;
+        }
+
+        switch ($blockName) {
+            case 'core/heading':
+                // Strip surrounding quotes the model sometimes adds.
+                $v = trim($value, " \t\n\r\0\x0B\"'`");
+                // First sentence (or first line) only — headings are single line.
+                if (preg_match('/^(.+?)(?:[.!?]\s|\n|$)/u', $v, $m)) {
+                    $v = trim($m[1]);
+                }
+                // Hard cap — Gutenberg won't break on long, but readers will.
+                if (mb_strlen($v) > 100) {
+                    $v = mb_substr($v, 0, 97) . '…';
+                }
+                // Headings don't end with a period.
+                $v = rtrim($v, '.');
+                return $v;
+
+            case 'core/button':
+                $v = trim($value, " \t\n\r\0\x0B\"'`.");
+                // First clause — buttons are short.
+                if (preg_match('/^(.+?)(?:[.!?\n]|$)/u', $v, $m)) {
+                    $v = trim($m[1]);
+                }
+                if (mb_strlen($v) > 40) {
+                    $v = mb_substr($v, 0, 37) . '…';
+                }
+                return $v;
+
+            case 'core/list-item':
+                $v = trim($value);
+                // One line; drop any leading bullet/numbering the model snuck in.
+                $v = (string) preg_replace('/^\s*(?:[-*•·]|\d+[.)])\s+/u', '', $v);
+                if (preg_match('/^(.+?)(?:\n|$)/u', $v, $m)) {
+                    $v = trim($m[1]);
+                }
+                return $v;
+
+            default:
+                return $value;
+        }
     }
 }
