@@ -139,5 +139,9 @@
       "Bash(grep -rn \"config\\('app\\\\\\\\.free'\\)\\\\|APP_FREE\\\\|'free' =>\" C:/Users/malih/Desktop/ebq/config/app.php C:/Users/malih/Desktop/ebq/resources/views/pricing.blade.php)",
       "Bash(grep *)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "code-review-graph"
+  ],
+  "enableAllProjectMcpServers": true
 }
