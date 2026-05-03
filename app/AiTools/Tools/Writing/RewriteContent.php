@@ -25,6 +25,7 @@ final class RewriteContent extends AbstractAiTool
             estCredits: 5,
             surfaces: [AiTool::SURFACE_STUDIO, AiTool::SURFACE_BLOCK_TOOLBAR],
             supportedBlocks: ['core/paragraph', 'core/quote', 'core/list'],
+            contextSignals: [AiTool::SIGNAL_SEO_ANALYSIS],
         );
     }
 

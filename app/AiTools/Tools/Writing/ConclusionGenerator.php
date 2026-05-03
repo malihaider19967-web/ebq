@@ -28,7 +28,7 @@ final class ConclusionGenerator extends AbstractAiTool
             estCredits: 4,
             surfaces: [AiTool::SURFACE_STUDIO, AiTool::SURFACE_BLOCK_TOOLBAR],
             supportedBlocks: ['core/paragraph'],
-            contextSignals: [AiTool::SIGNAL_INTERNAL_LINKS],
+            contextSignals: [AiTool::SIGNAL_INTERNAL_LINKS, AiTool::SIGNAL_SEO_ANALYSIS],
         );
     }
 

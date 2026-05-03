@@ -30,6 +30,7 @@ final class CtaGenerator extends AbstractAiTool
             estCredits: 2,
             surfaces: [AiTool::SURFACE_STUDIO, AiTool::SURFACE_BLOCK_TOOLBAR],
             supportedBlocks: ['core/button'],
+            contextSignals: [AiTool::SIGNAL_SEO_ANALYSIS],
         );
     }
 

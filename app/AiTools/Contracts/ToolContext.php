@@ -26,6 +26,7 @@ final class ToolContext
      * @param  list<array{url:string,anchor:string,topic:string,clicks:int}>|null  $internalLinkCandidates
      * @param  array<string, mixed>|null  $networkInsight
      * @param  array<string, mixed>|null  $pageAudit
+     * @param  array<string, mixed>|null  $seoAnalysis
      */
     public function __construct(
         public readonly Website $website,
@@ -40,6 +41,7 @@ final class ToolContext
         public readonly ?array $internalLinkCandidates = null,
         public readonly ?array $networkInsight = null,
         public readonly ?array $pageAudit = null,
+        public readonly ?array $seoAnalysis = null,
         public readonly string $country = 'us',
         public readonly string $language = 'en',
     ) {

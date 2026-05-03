@@ -26,7 +26,7 @@ final class ExpandContent extends AbstractAiTool
             estCredits: 8,
             surfaces: [AiTool::SURFACE_STUDIO, AiTool::SURFACE_BLOCK_TOOLBAR],
             supportedBlocks: ['core/paragraph'],
-            contextSignals: [AiTool::SIGNAL_BRIEF],
+            contextSignals: [AiTool::SIGNAL_BRIEF, AiTool::SIGNAL_SEO_ANALYSIS],
         );
     }
 

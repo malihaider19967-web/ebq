@@ -27,7 +27,7 @@ final class FaqGenerator extends AbstractAiTool
             estCredits: 6,
             surfaces: [AiTool::SURFACE_STUDIO, AiTool::SURFACE_BLOCK_TOOLBAR],
             supportedBlocks: ['core/group', 'core/list'],
-            contextSignals: [AiTool::SIGNAL_RANK_SNAPSHOT, AiTool::SIGNAL_ENTITIES],
+            contextSignals: [AiTool::SIGNAL_RANK_SNAPSHOT, AiTool::SIGNAL_ENTITIES, AiTool::SIGNAL_SEO_ANALYSIS],
         );
     }
 

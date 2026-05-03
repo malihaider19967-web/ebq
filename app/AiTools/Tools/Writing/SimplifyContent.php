@@ -30,6 +30,7 @@ final class SimplifyContent extends AbstractAiTool
             estCredits: 5,
             surfaces: [AiTool::SURFACE_STUDIO, AiTool::SURFACE_BLOCK_TOOLBAR],
             supportedBlocks: ['core/paragraph'],
+            contextSignals: [AiTool::SIGNAL_SEO_ANALYSIS],
         );
     }
 

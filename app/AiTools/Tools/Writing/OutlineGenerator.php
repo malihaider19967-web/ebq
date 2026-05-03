@@ -25,7 +25,7 @@ final class OutlineGenerator extends AbstractAiTool
             outputType: 'json',
             estCredits: 6,
             surfaces: [AiTool::SURFACE_STUDIO],
-            contextSignals: [AiTool::SIGNAL_BRIEF, AiTool::SIGNAL_RANK_SNAPSHOT, AiTool::SIGNAL_NETWORK_INSIGHT],
+            contextSignals: [AiTool::SIGNAL_BRIEF, AiTool::SIGNAL_RANK_SNAPSHOT, AiTool::SIGNAL_NETWORK_INSIGHT, AiTool::SIGNAL_SEO_ANALYSIS],
             cacheTtlSeconds: 3600,
         );
     }

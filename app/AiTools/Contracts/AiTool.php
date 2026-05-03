@@ -26,6 +26,15 @@ interface AiTool
     public const SIGNAL_NETWORK_INSIGHT = 'network_insight';
     public const SIGNAL_PAGE_AUDIT      = 'page_audit';
 
+    /**
+     * Lightweight, computed-from-input SEO state. Powers the
+     * "writer must honour the SEO analysis" rule: the prompt sees
+     * what's missing (focus kw absence, density gap, weak structure,
+     * missing entities) and produces content that closes those gaps
+     * naturally.
+     */
+    public const SIGNAL_SEO_ANALYSIS    = 'seo_analysis';
+
     public function meta(): AiToolMeta;
 
     /**

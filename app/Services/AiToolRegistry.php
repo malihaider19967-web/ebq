@@ -53,6 +53,7 @@ class AiToolRegistry
         \App\AiTools\Tools\Writing\ExpandContent::class,
         \App\AiTools\Tools\Writing\ShortenContent::class,
         \App\AiTools\Tools\Writing\SimplifyContent::class,
+        \App\AiTools\Tools\Writing\ContinueWriting::class,
 
         // Improvement (7)
         \App\AiTools\Tools\Improvement\FixGrammar::class,

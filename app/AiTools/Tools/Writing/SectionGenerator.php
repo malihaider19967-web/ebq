@@ -26,7 +26,7 @@ final class SectionGenerator extends AbstractAiTool
             outputType: 'html',
             estCredits: 12,
             surfaces: [AiTool::SURFACE_STUDIO],
-            contextSignals: [AiTool::SIGNAL_BRIEF, AiTool::SIGNAL_INTERNAL_LINKS],
+            contextSignals: [AiTool::SIGNAL_BRIEF, AiTool::SIGNAL_INTERNAL_LINKS, AiTool::SIGNAL_SEO_ANALYSIS],
             cacheTtlSeconds: 1800,
         );
     }

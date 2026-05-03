@@ -26,6 +26,7 @@ final class HeadingGenerator extends AbstractAiTool
             estCredits: 3,
             surfaces: [AiTool::SURFACE_STUDIO, AiTool::SURFACE_BLOCK_TOOLBAR],
             supportedBlocks: ['core/heading'],
+            contextSignals: [AiTool::SIGNAL_SEO_ANALYSIS],
         );
     }
 

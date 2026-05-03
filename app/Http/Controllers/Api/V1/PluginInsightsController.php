@@ -1010,6 +1010,143 @@ class PluginInsightsController extends Controller
         ));
     }
 
+    /**
+     * Composite "Research" payload for the Gutenberg sidebar's
+     * Research tab. Single round-trip that bundles SERP top-5, PAA,
+     * related searches, keyword variations, internal-link candidates,
+     * and network insights — saves N×latency on tab open.
+     *
+     * Heavy work (entity coverage = LLM) is opt-in via
+     * `?include_entities=1` so the default tab open stays fast.
+     *
+     *   GET /api/v1/posts/{externalPostId}/research
+     *     ?focus_keyword=...&url=...&country=us&language=en&include_entities=0
+     */
+    public function research(
+        Request $request,
+        string $externalPostId,
+        \App\Services\SerperSearchClient $serper,
+        \App\Services\NetworkInsightService $networkInsight,
+        \App\Services\EntityCoverageService $entityCoverage,
+        \App\Services\Ai\ContextBuilder $contextBuilder,
+    ): JsonResponse {
+        $website = $this->resolveWebsite($request);
+
+        $data = $request->validate([
+            'focus_keyword' => 'required|string|min:2|max:200',
+            'url' => 'nullable|string|max:2048',
+            'country' => 'nullable|string|size:2',
+            'language' => 'nullable|string|min:2|max:10',
+            'include_entities' => 'nullable',
+        ]);
+
+        $kw = trim((string) $data['focus_keyword']);
+        $url = trim((string) ($data['url'] ?? ''));
+        $country = strtolower((string) ($data['country'] ?? 'us')) ?: 'us';
+        $language = strtolower((string) ($data['language'] ?? 'en')) ?: 'en';
+        $includeEntities = filter_var($data['include_entities'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        @set_time_limit(120);
+
+        // Cache the SERP-side bundle 30 min per (website × kw × country).
+        // Entity coverage is excluded from the cache because it can
+        // grow expensive and the user opts in to refreshing it.
+        $cacheKey = sprintf(
+            'editor_research:v1:%d:%s:%s',
+            $website->id,
+            hash('xxh3', mb_strtolower($kw)),
+            $country,
+        );
+
+        $bundle = \Cache::remember($cacheKey, 1800, function () use ($website, $kw, $url, $country, $language, $serper, $networkInsight, $contextBuilder) {
+            $serpRes = $serper->query([
+                'q' => $kw,
+                'type' => 'organic',
+                'num' => 10,
+                'gl' => $country,
+                'hl' => $language,
+                '__website_id' => $website->id,
+                '__owner_user_id' => $website->user_id,
+            ]);
+
+            $organic = is_array($serpRes['organic'] ?? null) ? $serpRes['organic'] : [];
+            $serpTop = [];
+            foreach (array_slice($organic, 0, 5) as $i => $row) {
+                if (! is_array($row)) continue;
+                $serpTop[] = [
+                    'position' => (int) ($row['position'] ?? ($i + 1)),
+                    'title' => (string) ($row['title'] ?? ''),
+                    'snippet' => (string) ($row['snippet'] ?? ''),
+                    'url' => (string) ($row['link'] ?? ''),
+                    'displayed_link' => (string) ($row['displayedLink'] ?? ''),
+                ];
+            }
+
+            $paa = [];
+            foreach ((array) ($serpRes['peopleAlsoAsk'] ?? []) as $item) {
+                if (is_string($item)) {
+                    $paa[] = $item;
+                } elseif (is_array($item) && is_string($item['question'] ?? null)) {
+                    $paa[] = (string) $item['question'];
+                }
+            }
+
+            $related = [];
+            foreach ((array) ($serpRes['relatedSearches'] ?? []) as $item) {
+                if (is_string($item)) {
+                    $related[] = $item;
+                } elseif (is_array($item) && is_string($item['query'] ?? null)) {
+                    $related[] = (string) $item['query'];
+                }
+            }
+
+            // Keyword suggestions are derived directly from the SERP
+            // response when Serper returns a "peopleAlsoSearchFor" or
+            // "queries" cluster. We don't fire a separate paid call.
+            $kwSuggestions = $related; // alias by default; the UI can dedupe
+
+            // Internal-link candidates — reuse the ContextBuilder logic
+            // via a public proxy method (added below).
+            $internalLinks = $contextBuilder->loadInternalLinkCandidatesPublic($website, $kw, $url);
+
+            $network = $networkInsight->forKeyword($kw, $country);
+
+            return [
+                'focus_keyword' => $kw,
+                'country' => $country,
+                'language' => $language,
+                'serp_top' => $serpTop,
+                'people_also_ask' => array_values(array_unique($paa)),
+                'related_searches' => array_values(array_unique($related)),
+                'keyword_suggestions' => array_slice($kwSuggestions, 0, 12),
+                'internal_link_candidates' => is_array($internalLinks) ? $internalLinks : [],
+                'network_insight' => $network,
+                'cached_at' => Carbon::now()->toIso8601String(),
+            ];
+        });
+
+        // Entity gaps live OUTSIDE the cache because the LLM call is
+        // expensive and the user opts in. preflight() is cheap and
+        // never triggers an LLM run.
+        $entityPayload = null;
+        if ($url !== '') {
+            try {
+                if ($includeEntities) {
+                    $entityPayload = $entityCoverage->analyze($website, $url);
+                } else {
+                    $entityPayload = $entityCoverage->preflight($website, $url);
+                }
+            } catch (\Throwable) {
+                $entityPayload = null;
+            }
+        }
+
+        return response()->json($bundle + [
+            'entity_coverage' => $entityPayload,
+            'cached' => true,
+        ]);
+    }
+
     private function resolveWebsite(Request $request): Website
     {
         $website = $request->attributes->get('api_website');

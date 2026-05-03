@@ -34,6 +34,7 @@ final class ChangeTone extends AbstractAiTool
             estCredits: 4,
             surfaces: [AiTool::SURFACE_STUDIO, AiTool::SURFACE_BLOCK_TOOLBAR],
             supportedBlocks: ['core/paragraph', 'core/heading'],
+            contextSignals: [AiTool::SIGNAL_SEO_ANALYSIS],
         );
     }
 

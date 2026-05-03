@@ -8,6 +8,7 @@ use App\AiTools\Contracts\AiToolResult;
 use App\AiTools\Contracts\ToolContext;
 use App\AiTools\Prompts\BrandVoiceBlock;
 use App\AiTools\Prompts\Guardrails;
+use App\AiTools\Prompts\SeoAnalysisBlock;
 use App\Services\Ai\OutputNormalizer;
 use App\Services\Llm\LlmClient;
 use Illuminate\Support\Carbon;
@@ -86,8 +87,9 @@ abstract class AbstractAiTool implements AiTool
     }
 
     /**
-     * Default system prompt = guardrails + brand voice + tool addendum.
-     * Override for fully custom prompts (rare).
+     * Default system prompt = guardrails + brand voice + live SEO
+     * analysis (when the tool opted into SIGNAL_SEO_ANALYSIS) + tool
+     * addendum. Override for fully custom prompts (rare).
      */
     protected function buildSystemPrompt(ToolContext $context): string
     {
@@ -96,6 +98,15 @@ abstract class AbstractAiTool implements AiTool
         $voice = BrandVoiceBlock::from($context->brandVoice);
         if ($voice !== '') {
             $parts[] = $voice;
+        }
+
+        // SEO analysis is injected only when the tool requested it
+        // (so utility tools like Definition / Sentence don't pay the
+        // prompt-tokens cost). When it's set, we honour it: the writer
+        // sees concrete gaps to close as it produces content.
+        $seo = SeoAnalysisBlock::from($context->seoAnalysis);
+        if ($seo !== '') {
+            $parts[] = $seo;
         }
 
         $addendum = $this->systemAddendum($context);
