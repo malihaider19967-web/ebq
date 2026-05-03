@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\V1\PluginHqController;
 use App\Http\Controllers\Api\V1\PluginInsightsController;
 use App\Http\Controllers\Api\V1\PluginHeartbeatController;
+use App\Http\Controllers\Api\V1\WriterProjectController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -115,6 +116,37 @@ Route::prefix('v1')->group(function (): void {
                 ->name('outreach-prospects.update');
             Route::get('/benchmarks', [PluginHqController::class, 'crossSiteBenchmarks'])->name('benchmarks');
             Route::get('/topical-authority', [PluginHqController::class, 'topicalAuthority'])->name('topical-authority');
+
+            // AI Writer wizard — multi-step project lifecycle. Replaces
+            // the stateless /posts/{id}/ai-writer flow for HQ-side drafts.
+            // Persistence + Serper image search + chat-driven brief edits
+            // + EBQ Content Credit accounting all live behind these routes.
+            Route::get('/writer-projects', [WriterProjectController::class, 'index'])->name('writer-projects.index');
+            Route::post('/writer-projects', [WriterProjectController::class, 'store'])->name('writer-projects.store');
+            Route::get('/writer-projects/{externalId}', [WriterProjectController::class, 'show'])
+                ->where('externalId', '[A-Za-z0-9\-]+')
+                ->name('writer-projects.show');
+            Route::patch('/writer-projects/{externalId}', [WriterProjectController::class, 'update'])
+                ->where('externalId', '[A-Za-z0-9\-]+')
+                ->name('writer-projects.update');
+            Route::delete('/writer-projects/{externalId}', [WriterProjectController::class, 'destroy'])
+                ->where('externalId', '[A-Za-z0-9\-]+')
+                ->name('writer-projects.destroy');
+            Route::post('/writer-projects/{externalId}/brief', [WriterProjectController::class, 'generateBrief'])
+                ->where('externalId', '[A-Za-z0-9\-]+')
+                ->name('writer-projects.brief');
+            Route::post('/writer-projects/{externalId}/brief/chat', [WriterProjectController::class, 'briefChat'])
+                ->where('externalId', '[A-Za-z0-9\-]+')
+                ->name('writer-projects.brief.chat');
+            Route::post('/writer-projects/{externalId}/images/search', [WriterProjectController::class, 'searchImages'])
+                ->where('externalId', '[A-Za-z0-9\-]+')
+                ->name('writer-projects.images.search');
+            Route::post('/writer-projects/{externalId}/generate', [WriterProjectController::class, 'generate'])
+                ->where('externalId', '[A-Za-z0-9\-]+')
+                ->name('writer-projects.generate');
+            Route::get('/writer-projects/{externalId}/credits', [WriterProjectController::class, 'credits'])
+                ->where('externalId', '[A-Za-z0-9\-]+')
+                ->name('writer-projects.credits');
         });
     });
 });

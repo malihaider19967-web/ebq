@@ -1,0 +1,709 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\ClientActivity;
+use App\Models\Website;
+use App\Models\WriterProject;
+use App\Services\Llm\LlmClient;
+use App\Support\CreditTypes;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
+
+/**
+ * Orchestration for the AI Writer wizard (topic → brief → images →
+ * summary → completed). Owns project state transitions and the credit
+ * accounting layer.
+ *
+ * Brief / generate are delegated to the existing AiContentBriefService /
+ * AiWriterService — this class is the wizard's persistence + chat +
+ * image-placement glue, not a duplicate of those services.
+ *
+ * Credits
+ * ───────
+ * EBQ Content Credits are a single user-facing metric, computed from
+ * the size of the work product (output HTML + brief JSON + chat
+ * messages). The ratio lives in config('services.ebq_credits.*') so
+ * finance can tune without code changes. Every charge writes one row
+ * into `client_activities` (provider='ebq_content_credits',
+ * meta.writer_project_id=<uuid>) and increments
+ * `writer_projects.credits_used`.
+ */
+class WriterProjectService
+{
+    /** Default ratio: 1 credit per 400 chars of work product. */
+    private const DEFAULT_CHARS_PER_CREDIT = 400;
+
+    /** Image search costs a flat 1 credit per request (Serper page). */
+    private const IMAGE_SEARCH_FLAT_CREDITS = 1;
+
+    public function __construct(
+        private readonly AiContentBriefService $briefService,
+        private readonly AiWriterService $writerService,
+        private readonly TopicalGapService $gapService,
+        private readonly SerperSearchClient $serper,
+        private readonly LlmClient $llm,
+        private readonly ClientActivityLogger $activity,
+    ) {
+    }
+
+    /**
+     * Title fallback when the user hasn't named the project yet.
+     * "vegan protein powder" → "Vegan Protein Powder — draft".
+     */
+    public function suggestTitle(string $focusKeyword): string
+    {
+        $kw = trim($focusKeyword);
+        if ($kw === '') {
+            return 'Untitled draft';
+        }
+        return Str::title($kw).' — draft';
+    }
+
+    /**
+     * @param  array{title?: string, focus_keyword: string, additional_keywords?: list<string>}  $input
+     */
+    public function create(Website $website, ?int $userId, array $input): WriterProject
+    {
+        $kw = trim((string) $input['focus_keyword']);
+        $title = trim((string) ($input['title'] ?? ''));
+        if ($title === '') {
+            $title = $this->suggestTitle($kw);
+        }
+        $additional = array_values(array_filter(array_map(
+            static fn ($v) => is_string($v) ? trim($v) : '',
+            (array) ($input['additional_keywords'] ?? []),
+        ), static fn ($v) => $v !== ''));
+
+        return WriterProject::create([
+            'website_id' => $website->id,
+            'user_id' => $userId,
+            'title' => mb_substr($title, 0, 300),
+            'focus_keyword' => mb_substr($kw, 0, 200),
+            'additional_keywords' => $additional,
+            'step' => WriterProject::STEP_TOPIC,
+        ]);
+    }
+
+    /**
+     * Generate (or regenerate) the topic brief for step 2. The brief is
+     * persisted on the project and the step advances to 'brief'.
+     */
+    public function generateBrief(WriterProject $project, Website $website): WriterProject
+    {
+        @set_time_limit(180);
+
+        $briefRes = $this->briefService->brief($website, 0, [
+            'focus_keyword' => $project->focus_keyword,
+            'country' => null,
+            'language' => null,
+        ]);
+
+        $brief = (is_array($briefRes) && ($briefRes['ok'] ?? false) === true && is_array($briefRes['brief'] ?? null))
+            ? $briefRes['brief']
+            : null;
+
+        $shaped = $this->shapeBrief($brief);
+        $project->brief = $shaped;
+        if ($project->step === WriterProject::STEP_TOPIC) {
+            $project->step = WriterProject::STEP_BRIEF;
+        }
+        $project->save();
+
+        $this->recordCredits(
+            $project,
+            CreditTypes::AI_WRITER_BRIEF,
+            $this->charsToCredits(strlen((string) json_encode($shaped))),
+            ['cached' => (bool) ($briefRes['cached'] ?? false)],
+        );
+
+        return $project->refresh();
+    }
+
+    /**
+     * User chat amendment to the brief. Sends the current brief + chat
+     * history + new user message to the LLM and asks it to return an
+     * updated brief JSON (same shape as `shapeBrief()`).
+     */
+    public function applyBriefChat(WriterProject $project, string $userMessage): WriterProject
+    {
+        $userMessage = trim($userMessage);
+        if ($userMessage === '') {
+            return $project;
+        }
+
+        $chat = is_array($project->chat_history) ? $project->chat_history : [];
+        $chat[] = [
+            'role' => 'user',
+            'content' => mb_substr($userMessage, 0, 2000),
+            'ts' => Carbon::now()->toIso8601String(),
+        ];
+
+        $currentBrief = is_array($project->brief) ? $project->brief : [];
+        $messages = $this->buildBriefChatMessages($project, $currentBrief, $chat);
+
+        $resp = $this->llm->isAvailable()
+            ? $this->llm->complete($messages, [
+                'temperature' => 0.3,
+                'max_tokens' => 3000,
+                'json_object' => true,
+                'timeout' => 90,
+            ])
+            : ['ok' => false, 'content' => '', 'usage' => ['prompt' => 0, 'completion' => 0, 'total' => 0]];
+
+        $assistantText = (string) ($resp['content'] ?? '');
+        $decoded = $this->safeJsonDecode($assistantText);
+        $updatedBrief = is_array($decoded) ? $this->shapeBrief($decoded) : $currentBrief;
+
+        $assistantSummary = $this->summarizeBriefChange($currentBrief, $updatedBrief);
+
+        $chat[] = [
+            'role' => 'assistant',
+            'content' => $assistantSummary,
+            'ts' => Carbon::now()->toIso8601String(),
+        ];
+
+        $project->brief = $updatedBrief;
+        $project->chat_history = $chat;
+        $project->save();
+
+        $usage = is_array($resp['usage'] ?? null) ? $resp['usage'] : [];
+        $totalTokens = (int) ($usage['total'] ?? 0);
+        $credits = $totalTokens > 0
+            ? max(1, (int) ceil($totalTokens / 100))
+            : $this->charsToCredits(strlen($userMessage) + strlen($assistantText));
+
+        $this->recordCredits($project, CreditTypes::AI_WRITER_BRIEF_CHAT, $credits, [
+            'tokens' => $totalTokens,
+        ]);
+
+        return $project->refresh();
+    }
+
+    /**
+     * Serper image search for the project's focus keyword (or a custom
+     * query). Results are not persisted — the client picks which to add
+     * via `updateImages()`.
+     *
+     * @return list<array{url: string, thumbnail_url: string, title: string, width: int, height: int, source: string}>
+     */
+    public function searchImages(WriterProject $project, ?string $query = null, int $num = 16): array
+    {
+        $q = trim((string) ($query ?? $project->focus_keyword));
+        if ($q === '') {
+            return [];
+        }
+
+        $resp = $this->serper->query([
+            'q' => $q,
+            'type' => 'images',
+            'num' => max(1, min(40, $num)),
+            '__website_id' => $project->website_id,
+            '__owner_user_id' => $project->user_id,
+        ]);
+
+        $results = [];
+        if (is_array($resp) && is_array($resp['images'] ?? null)) {
+            foreach ($resp['images'] as $img) {
+                if (! is_array($img)) {
+                    continue;
+                }
+                $url = (string) ($img['imageUrl'] ?? $img['url'] ?? '');
+                if ($url === '') {
+                    continue;
+                }
+                $results[] = [
+                    'url' => $url,
+                    'thumbnail_url' => (string) ($img['thumbnailUrl'] ?? $img['thumbnail'] ?? $url),
+                    'title' => (string) ($img['title'] ?? ''),
+                    'width' => (int) ($img['imageWidth'] ?? $img['width'] ?? 0),
+                    'height' => (int) ($img['imageHeight'] ?? $img['height'] ?? 0),
+                    'source' => (string) ($img['source'] ?? ''),
+                ];
+            }
+        }
+
+        $this->recordCredits($project, CreditTypes::AI_WRITER_IMAGE_SEARCH, self::IMAGE_SEARCH_FLAT_CREDITS, [
+            'query' => $q,
+            'returned' => count($results),
+        ]);
+
+        return $results;
+    }
+
+    /**
+     * Replace the project's image selection. Image entries are validated
+     * and normalized; any entry without a `url` is dropped.
+     *
+     * @param  list<array<string, mixed>>  $images
+     */
+    public function updateImages(WriterProject $project, array $images): WriterProject
+    {
+        $normalized = [];
+        foreach ($images as $img) {
+            if (! is_array($img)) {
+                continue;
+            }
+            $url = trim((string) ($img['url'] ?? ''));
+            if ($url === '') {
+                continue;
+            }
+            $normalized[] = [
+                'source' => in_array(($img['source'] ?? ''), ['serper', 'upload'], true) ? $img['source'] : 'serper',
+                'url' => $url,
+                'thumbnail_url' => (string) ($img['thumbnail_url'] ?? $url),
+                'alt' => mb_substr((string) ($img['alt'] ?? ''), 0, 200),
+                'caption' => mb_substr((string) ($img['caption'] ?? ''), 0, 280),
+                'assigned_h2' => isset($img['assigned_h2']) && is_string($img['assigned_h2'])
+                    ? mb_substr($img['assigned_h2'], 0, 200)
+                    : null,
+                'width' => (int) ($img['width'] ?? 0),
+                'height' => (int) ($img['height'] ?? 0),
+            ];
+        }
+        $project->images = $normalized;
+        $project->save();
+
+        return $project->refresh();
+    }
+
+    /**
+     * Final generation step. Calls the existing AiWriterService in
+     * strict-selection mode with the curated brief, then post-processes
+     * to inject <figure> blocks for each selected image immediately
+     * after its assigned (or auto-matched) <h2>.
+     */
+    public function generate(WriterProject $project, Website $website): WriterProject
+    {
+        @set_time_limit(360);
+
+        $brief = is_array($project->brief) ? $project->brief : [];
+        $h2List = array_values(array_filter(
+            (array) ($brief['sections'] ?? []),
+            static fn ($s) => is_array($s) && is_string($s['h2'] ?? null) && trim($s['h2']) !== '',
+        ));
+
+        $selected = [
+            'h1' => '',
+            'h2_outline' => array_map(static fn (array $s) => (string) $s['h2'], $h2List),
+            'subtopics' => $this->flattenSubtopics($h2List),
+            'paa' => array_values(array_filter((array) ($brief['paa'] ?? []), 'is_string')),
+            'gap_topics' => array_values(array_filter((array) ($brief['gaps'] ?? []), 'is_string')),
+            'competitor_subtopics' => [],
+        ];
+
+        $payload = $this->writerService->draft($website, 0, [
+            'focus_keyword' => $project->focus_keyword,
+            'current_html' => '',
+            'exclude_url' => '',
+            'brief' => $this->briefForWriter($brief),
+            'gaps' => null,
+            'wp_pages' => [],
+            'selected' => $selected,
+            'title' => $project->title,
+            'additional_keywords' => is_array($project->additional_keywords) ? $project->additional_keywords : [],
+        ]);
+
+        if (! is_array($payload) || ($payload['ok'] ?? false) !== true) {
+            return tap($project, function (WriterProject $p) use ($payload): void {
+                Log::warning('WriterProjectService: writer.draft failed', [
+                    'project' => $p->id,
+                    'error' => is_array($payload) ? ($payload['error'] ?? 'unknown') : 'invalid',
+                ]);
+            });
+        }
+
+        $sections = is_array($payload['sections'] ?? null) ? $payload['sections'] : [];
+        $html = $this->assembleHtml($project, $sections);
+
+        $project->generated_html = $html;
+        $project->step = WriterProject::STEP_SUMMARY; // user reviews on step 5 (review), but project stays at 'summary' until they Save-as-draft
+        $project->save();
+
+        $this->recordCredits(
+            $project,
+            CreditTypes::AI_WRITER_GENERATE,
+            $this->charsToCredits(strlen($html)),
+            [
+                'sections' => count($sections),
+                'images' => count(is_array($project->images) ? $project->images : []),
+                'cached' => (bool) ($payload['cached'] ?? false),
+            ],
+        );
+
+        return $project->refresh();
+    }
+
+    /**
+     * Sum of credits charged against a specific project. Mirrors the
+     * `writer_projects.credits_used` column but pulled live from
+     * `client_activities` so the UI always shows authoritative numbers.
+     */
+    public function totalCreditsForProject(WriterProject $project): int
+    {
+        $sum = (int) ClientActivity::query()
+            ->where('provider', CreditTypes::PROVIDER)
+            ->whereIn('type', CreditTypes::TYPES)
+            ->whereJsonContains('meta->writer_project_id', $project->external_id)
+            ->sum('units_consumed');
+
+        return $sum;
+    }
+
+    /* ─────────────────── helpers ─────────────────── */
+
+    /**
+     * Internal: write one credit charge and bump the cached column.
+     *
+     * @param  array<string, mixed>  $extraMeta
+     */
+    private function recordCredits(WriterProject $project, string $type, int $credits, array $extraMeta = []): void
+    {
+        if ($credits <= 0) {
+            return;
+        }
+
+        $meta = array_merge([
+            'writer_project_id' => $project->external_id,
+            'project_pk' => $project->id,
+            'step' => $project->step,
+            'focus_keyword' => $project->focus_keyword,
+        ], $extraMeta);
+
+        $this->activity->log(
+            type: $type,
+            userId: $project->user_id,
+            websiteId: $project->website_id,
+            provider: CreditTypes::PROVIDER,
+            meta: $meta,
+            unitsConsumed: $credits,
+        );
+
+        DB::table('writer_projects')
+            ->where('id', $project->id)
+            ->increment('credits_used', $credits);
+
+        $project->credits_used = (int) $project->credits_used + $credits;
+    }
+
+    private function charsToCredits(int $chars): int
+    {
+        $perCredit = (int) config('services.ebq_credits.chars_per_credit', self::DEFAULT_CHARS_PER_CREDIT);
+        if ($perCredit < 50) {
+            $perCredit = self::DEFAULT_CHARS_PER_CREDIT;
+        }
+        return max(1, (int) ceil($chars / $perCredit));
+    }
+
+    /**
+     * Reshape an AiContentBriefService brief (or a chat-edited brief)
+     * into the wizard's canonical structure:
+     *   { h1, sections: [{ h2, subtopics: [string] }], paa: [string], gaps: [string] }
+     *
+     * Accepts both shapes (raw brief from AiContentBriefService and the
+     * already-shaped dict from a previous save / chat round).
+     *
+     * @param  array<string, mixed>|null  $brief
+     * @return array{h1: string, sections: list<array{h2: string, subtopics: list<string>}>, paa: list<string>, gaps: list<string>}
+     */
+    private function shapeBrief(?array $brief): array
+    {
+        $brief = is_array($brief) ? $brief : [];
+
+        $h1 = (string) ($brief['h1'] ?? $brief['suggested_h1'] ?? '');
+
+        $sections = [];
+        if (isset($brief['sections']) && is_array($brief['sections'])) {
+            foreach ($brief['sections'] as $s) {
+                if (! is_array($s)) continue;
+                $h2 = trim((string) ($s['h2'] ?? ''));
+                if ($h2 === '') continue;
+                $subs = array_values(array_filter(array_map(
+                    static fn ($x) => is_string($x) ? trim($x) : '',
+                    (array) ($s['subtopics'] ?? []),
+                ), static fn ($x) => $x !== ''));
+                $sections[] = ['h2' => $h2, 'subtopics' => $subs];
+            }
+        } else {
+            // Build sections from suggested_outline + subtopics.
+            $outline = array_values(array_filter((array) ($brief['suggested_outline'] ?? $brief['suggested_h2_outline'] ?? []), 'is_string'));
+            $subtopics = array_values(array_filter((array) ($brief['subtopics'] ?? []), 'is_string'));
+            $merged = $outline ?: $subtopics;
+            foreach ($merged as $h2) {
+                $h2 = trim($h2);
+                if ($h2 === '') continue;
+                $sections[] = ['h2' => $h2, 'subtopics' => []];
+            }
+        }
+
+        $paa = array_values(array_filter((array) ($brief['paa'] ?? $brief['people_also_ask'] ?? []), 'is_string'));
+        $gaps = array_values(array_filter((array) ($brief['gaps'] ?? $brief['missing_subtopics'] ?? []), 'is_string'));
+
+        return [
+            'h1' => $h1,
+            'sections' => $sections,
+            'paa' => $paa,
+            'gaps' => $gaps,
+        ];
+    }
+
+    /**
+     * Hand-back into the AiWriterService brief shape (it expects
+     * `suggested_outline`, `subtopics`, `people_also_ask` etc.).
+     *
+     * @param  array<string, mixed>  $brief
+     * @return array<string, mixed>
+     */
+    private function briefForWriter(array $brief): array
+    {
+        $sections = is_array($brief['sections'] ?? null) ? $brief['sections'] : [];
+        $outline = array_map(static fn (array $s) => (string) $s['h2'], array_filter($sections, 'is_array'));
+        $subtopics = $this->flattenSubtopics($sections);
+
+        return [
+            'suggested_h1' => (string) ($brief['h1'] ?? ''),
+            'suggested_outline' => array_values($outline),
+            'subtopics' => $subtopics,
+            'people_also_ask' => array_values(array_filter((array) ($brief['paa'] ?? []), 'is_string')),
+        ];
+    }
+
+    /**
+     * @param  list<array<string, mixed>>  $sections
+     * @return list<string>
+     */
+    private function flattenSubtopics(array $sections): array
+    {
+        $out = [];
+        foreach ($sections as $s) {
+            if (! is_array($s)) continue;
+            foreach ((array) ($s['subtopics'] ?? []) as $sub) {
+                if (is_string($sub) && trim($sub) !== '') {
+                    $out[] = trim($sub);
+                }
+            }
+        }
+        return array_values(array_unique($out));
+    }
+
+    /**
+     * Concatenate generated section HTML in order, prepend an <h1>
+     * (using the project's title, since the writer is in strict mode and
+     * never emits <h1>), and inject <figure> blocks under each H2 that
+     * has an assigned image. Images without an explicit assignment are
+     * placed under the closest-matching H2 by token overlap.
+     *
+     * @param  list<array<string, mixed>>  $sections
+     */
+    private function assembleHtml(WriterProject $project, array $sections): string
+    {
+        $images = is_array($project->images) ? $project->images : [];
+
+        // Auto-assign images that have no `assigned_h2` set.
+        $h2Index = [];
+        foreach ($sections as $i => $sec) {
+            if (! is_array($sec)) continue;
+            $title = trim((string) ($sec['title'] ?? ''));
+            if ($title === '') {
+                $title = $this->extractFirstHeading((string) ($sec['proposed_html'] ?? ''));
+            }
+            $h2Index[$i] = $title;
+        }
+        foreach ($images as &$img) {
+            if (! empty($img['assigned_h2'])) continue;
+            $img['assigned_h2'] = $this->bestH2For((string) ($img['alt'] ?? '').' '.(string) ($img['caption'] ?? ''), $h2Index);
+        }
+        unset($img);
+
+        $imagesByH2 = [];
+        foreach ($images as $img) {
+            $h2 = (string) ($img['assigned_h2'] ?? '');
+            if ($h2 === '') continue;
+            $imagesByH2[$h2][] = $img;
+        }
+
+        $parts = [];
+        $title = trim($project->title);
+        if ($title !== '') {
+            $parts[] = '<h1>'.$this->esc($title).'</h1>';
+        }
+
+        foreach ($sections as $i => $sec) {
+            if (! is_array($sec)) continue;
+            $html = (string) ($sec['proposed_html'] ?? '');
+            if ($html === '') continue;
+            $parts[] = $html;
+
+            $h2 = $h2Index[$i] ?? '';
+            if ($h2 !== '' && ! empty($imagesByH2[$h2])) {
+                foreach ($imagesByH2[$h2] as $img) {
+                    $parts[] = $this->renderFigure($img);
+                }
+                // Each image renders only once even if multiple sections share an H2.
+                unset($imagesByH2[$h2]);
+            }
+        }
+
+        // Trailing images that didn't match any H2 — append at the end.
+        foreach ($imagesByH2 as $list) {
+            foreach ($list as $img) {
+                $parts[] = $this->renderFigure($img);
+            }
+        }
+
+        return implode("\n\n", $parts);
+    }
+
+    /** @param array<string, mixed> $img */
+    private function renderFigure(array $img): string
+    {
+        $url = $this->esc((string) ($img['url'] ?? ''));
+        $alt = $this->esc((string) ($img['alt'] ?? ''));
+        $caption = trim((string) ($img['caption'] ?? ''));
+
+        $figcaption = $caption !== ''
+            ? '<figcaption>'.$this->esc($caption).'</figcaption>'
+            : '';
+
+        return '<figure><img src="'.$url.'" alt="'.$alt.'" />'.$figcaption.'</figure>';
+    }
+
+    /**
+     * @param  array<int, string>  $h2Index
+     */
+    private function bestH2For(string $needle, array $h2Index): ?string
+    {
+        $needleTokens = $this->tokens($needle);
+        if ($needleTokens === [] || $h2Index === []) {
+            return $h2Index[0] ?? null;
+        }
+
+        $bestScore = 0;
+        $best = null;
+        foreach ($h2Index as $h2) {
+            $score = count(array_intersect($needleTokens, $this->tokens($h2)));
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $best = $h2;
+            }
+        }
+
+        return $best ?? ($h2Index[0] ?? null);
+    }
+
+    /** @return list<string> */
+    private function tokens(string $s): array
+    {
+        $s = mb_strtolower($s);
+        $s = preg_replace('/[^a-z0-9]+/i', ' ', $s) ?? '';
+        $parts = preg_split('/\s+/', trim($s)) ?: [];
+        return array_values(array_filter($parts, static fn ($w) => mb_strlen($w) > 2));
+    }
+
+    private function extractFirstHeading(string $html): string
+    {
+        if (preg_match('/<h2\b[^>]*>(.*?)<\/h2>/is', $html, $m)) {
+            return trim(strip_tags($m[1]));
+        }
+        return '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $currentBrief
+     * @param  list<array{role: string, content: string}>  $chat
+     * @return list<array{role: string, content: string}>
+     */
+    private function buildBriefChatMessages(WriterProject $project, array $currentBrief, array $chat): array
+    {
+        $system = "You are a content-strategy assistant editing a content brief for an SEO article.\n"
+            ."Focus keyword: ".$project->focus_keyword."\n"
+            ."Title: ".$project->title."\n"
+            ."Stay strictly within the topic of an SEO content article on this focus keyword. Refuse off-topic edits (coding, unrelated subjects, persona changes) by returning the brief unchanged.\n"
+            ."The user will ask for changes (add a heading, drop one, rename, reorder). Apply them and return the FULL UPDATED BRIEF as one JSON object only — no prose, no markdown fences.\n"
+            ."JSON shape (strict):\n"
+            ."{\n"
+            ."  \"h1\": string,\n"
+            ."  \"sections\": [ { \"h2\": string, \"subtopics\": [string] } ],\n"
+            ."  \"paa\": [string],\n"
+            ."  \"gaps\": [string]\n"
+            ."}\n"
+            ."Keep changes minimal. Don't rewrite headings the user didn't mention.";
+
+        $messages = [['role' => 'system', 'content' => $system]];
+
+        $messages[] = [
+            'role' => 'user',
+            'content' => "Current brief:\n".json_encode($currentBrief, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT),
+        ];
+
+        // Replay previous chat (cap to last 10 turns to keep prompt small).
+        $tail = array_slice($chat, -10);
+        foreach ($tail as $turn) {
+            $role = ($turn['role'] ?? '') === 'assistant' ? 'assistant' : 'user';
+            $content = (string) ($turn['content'] ?? '');
+            if ($content === '') continue;
+            $messages[] = ['role' => $role, 'content' => $content];
+        }
+
+        return $messages;
+    }
+
+    private function safeJsonDecode(string $text): ?array
+    {
+        $text = trim($text);
+        if ($text === '') return null;
+
+        // Strip ```json fences if the model emitted them despite json_object mode.
+        $text = preg_replace('/^```(?:json)?\s*|\s*```$/m', '', $text) ?? $text;
+
+        $decoded = json_decode($text, true);
+        if (is_array($decoded)) {
+            return $decoded;
+        }
+
+        // Try extracting the first {...} block.
+        if (preg_match('/\{.*\}/s', $text, $m)) {
+            $decoded = json_decode($m[0], true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * @param  array<string, mixed>  $before
+     * @param  array<string, mixed>  $after
+     */
+    private function summarizeBriefChange(array $before, array $after): string
+    {
+        $beforeH2 = array_map(static fn (array $s) => (string) ($s['h2'] ?? ''), array_filter((array) ($before['sections'] ?? []), 'is_array'));
+        $afterH2 = array_map(static fn (array $s) => (string) ($s['h2'] ?? ''), array_filter((array) ($after['sections'] ?? []), 'is_array'));
+
+        $added = array_values(array_diff($afterH2, $beforeH2));
+        $removed = array_values(array_diff($beforeH2, $afterH2));
+
+        if ($added === [] && $removed === [] && $beforeH2 === $afterH2) {
+            return 'I kept the brief unchanged. If you wanted a specific edit, try naming the heading directly (e.g. "rename section 3 to …").';
+        }
+
+        $bits = [];
+        if ($added !== []) {
+            $bits[] = 'Added: '.implode(', ', array_slice($added, 0, 4)).(count($added) > 4 ? '…' : '');
+        }
+        if ($removed !== []) {
+            $bits[] = 'Removed: '.implode(', ', array_slice($removed, 0, 4)).(count($removed) > 4 ? '…' : '');
+        }
+        if ($bits === []) {
+            $bits[] = 'Reordered or renamed headings to match your request.';
+        }
+        return implode(' · ', $bits);
+    }
+
+    private function esc(string $s): string
+    {
+        return htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
+    }
+}
