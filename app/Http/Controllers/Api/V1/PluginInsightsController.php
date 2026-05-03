@@ -1058,7 +1058,8 @@ class PluginInsightsController extends Controller
             $country,
         );
 
-        $bundle = \Cache::remember($cacheKey, 1800, function () use ($website, $kw, $url, $country, $language, $serper, $networkInsight, $contextBuilder) {
+        try {
+            $bundle = \Cache::remember($cacheKey, 1800, function () use ($website, $kw, $url, $country, $language, $serper, $networkInsight, $contextBuilder) {
             $serpRes = $serper->query([
                 'q' => $kw,
                 'type' => 'organic',
@@ -1123,7 +1124,19 @@ class PluginInsightsController extends Controller
                 'network_insight' => $network,
                 'cached_at' => Carbon::now()->toIso8601String(),
             ];
-        });
+            });
+        } catch (\Throwable $e) {
+            \Log::warning('PluginInsightsController::research bundle failed', [
+                'website_id' => $website->id,
+                'kw' => $kw,
+                'msg' => $e->getMessage(),
+            ]);
+            return response()->json([
+                'ok' => false,
+                'error' => 'research_failed',
+                'message' => 'Research data could not be loaded — please try again. If it persists, check that Serper / GSC are configured for this website.',
+            ], 500);
+        }
 
         // Entity gaps live OUTSIDE the cache because the LLM call is
         // expensive and the user opts in. preflight() is cheap and
@@ -1141,7 +1154,10 @@ class PluginInsightsController extends Controller
             }
         }
 
+        // Stamp `ok: true` so the plugin's "if (res?.ok === false)"
+        // check distinguishes legit success from caught failures.
         return response()->json($bundle + [
+            'ok' => true,
             'entity_coverage' => $entityPayload,
             'cached' => true,
         ]);
