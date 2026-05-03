@@ -85,10 +85,9 @@ class WriterProjectService
             'language' => (string) ($project->language ?? ''),
         ];
 
-        // SEO titles (5 variants). Filter out any candidate that
-        // doesn't contain the focus keyword — the prompt requires it
-        // and surfacing a kw-less title to the user defeats the
-        // point.
+        // SEO titles. Each surfaced candidate must hit the 50-60 char
+        // sweet spot AND contain the focus keyword. The prompt asks
+        // for both; this is the post-process net.
         if ($shouldRun('seo_titles')) {
             $res = $this->toolRunner->run('seo-title', $website, $project->user_id, $baseInput + [
                 'summary' => $summary,
@@ -98,7 +97,7 @@ class WriterProjectService
                     static fn ($t) => is_string($t) ? trim($t) : '',
                     $res->value,
                 ), static fn ($t) => $t !== ''));
-                $project->seo_titles = $this->filterContainsKeyword($titles, $project->focus_keyword);
+                $project->seo_titles = $this->filterCandidates($titles, (string) $project->focus_keyword, 50, 60);
             }
         }
 
@@ -141,8 +140,10 @@ class WriterProjectService
                     static fn ($c) => is_string($c) ? mb_substr(trim($c), 0, 320) : '',
                     $candidates->value,
                 ), static fn ($c) => $c !== ''));
-                // Drop any candidate that omits the focus keyword.
-                $list = $this->filterContainsKeyword($list, $project->focus_keyword);
+                // Enforce sweet spot + keyword presence in every
+                // surfaced candidate (with tolerant fallbacks if
+                // strict filtering yields nothing).
+                $list = $this->filterCandidates($list, (string) $project->focus_keyword, 120, 158);
                 $project->meta_descriptions = $list;
                 // If the bundle didn't yield a meta_description but the
                 // candidates list did, use the first candidate as the
@@ -279,12 +280,53 @@ class WriterProjectService
     }
 
     /**
-     * Filter a list of strings down to only those that contain the
-     * focus keyword (verbatim or via a tolerant stem match). Used to
-     * keep the SEO-title and meta-description pickers honest — the
-     * prompt requires the keyword in every candidate, but models
-     * occasionally drop it; surfacing a kw-less candidate would let
-     * the user pick something that won't rank for the target query.
+     * Filter a list of meta-tag candidates down to ones that hit
+     * BOTH the sweet-spot length band AND contain the focus keyword.
+     * Used by the SEO-title (50–60) and meta-description (120–158)
+     * pickers — the prompt asks for both, but models drift, so we
+     * enforce server-side before surfacing to the user.
+     *
+     * Multi-tier fallback: if the strict pass kills everything, we
+     * relax in steps so the user always sees something rather than
+     * an empty picker. Order: strict → kw-only → length-only → raw.
+     *
+     * @param  list<string>  $items
+     * @return list<string>
+     */
+    private function filterCandidates(array $items, string $keyword, int $minLen, int $maxLen): array
+    {
+        $kw = trim($keyword);
+        $items = array_values(array_filter($items, static fn ($s) => is_string($s) && trim($s) !== ''));
+        if ($items === []) {
+            return [];
+        }
+
+        $inBand = static fn (string $s): bool => mb_strlen(trim($s)) >= $minLen && mb_strlen(trim($s)) <= $maxLen;
+
+        // Tier 1: in-band AND contains keyword.
+        $strict = array_values(array_filter($items, fn (string $s) => $inBand($s) && $this->stringContainsKeyword($s, $kw)));
+        if ($strict !== []) {
+            return $strict;
+        }
+        // Tier 2: contains keyword (any length).
+        $kwOnly = $kw !== ''
+            ? array_values(array_filter($items, fn (string $s) => $this->stringContainsKeyword($s, $kw)))
+            : [];
+        if ($kwOnly !== []) {
+            return $kwOnly;
+        }
+        // Tier 3: in-band (kw missing).
+        $bandOnly = array_values(array_filter($items, $inBand));
+        if ($bandOnly !== []) {
+            return $bandOnly;
+        }
+        // Tier 4: raw.
+        return $items;
+    }
+
+    /**
+     * Backwards-compatible kw-only filter — used wherever sweet-spot
+     * length isn't relevant (keyword suggestions, link anchors, etc.).
      *
      * @param  list<string>  $items
      * @return list<string>
@@ -296,10 +338,6 @@ class WriterProjectService
             return array_values($items);
         }
         $matched = array_values(array_filter($items, fn (string $s) => $this->stringContainsKeyword($s, $kw)));
-        // If filtering kills everything, return the original list — a
-        // partial match is still better than empty UI. The strict
-        // server-side check above will pick a kw-bearing fallback for
-        // the single meta_title / meta_description fields.
         return $matched !== [] ? $matched : array_values($items);
     }
 

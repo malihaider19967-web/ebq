@@ -35,7 +35,10 @@ final class SeoDescription extends AbstractAiTool
     {
         $kw = (string) ($input['focus_keyword'] ?? '');
         $summary = (string) ($input['summary'] ?? '');
-        $count = max(1, min(5, (int) ($input['count'] ?? 3)));
+        // Over-generate: server-side filter trims to in-band + kw,
+        // so a few extras keep the picker from going empty when one
+        // or two candidates miss the band.
+        $count = max(5, min(8, (int) ($input['count'] ?? 6)));
 
         $gsc = '';
         if (is_array($context->gscTopQueries) && $context->gscTopQueries !== []) {
@@ -46,10 +49,10 @@ final class SeoDescription extends AbstractAiTool
         }
 
         return "Focus keyword: {$kw}\nSummary: {$summary}\n\n"
-            . "Write {$count} meta-description variants.\n"
+            . "Write {$count} meta-description variants (over-generate so the picker has plenty after server-side filtering).\n"
             . "HARD RULES (every variant must satisfy ALL):\n"
-            . "  * Length 120 to 158 characters (sweet spot — under 120 Google pads the snippet from page body, over 158 it truncates).\n"
-            . "  * The exact focus keyword '{$kw}' MUST appear verbatim in EVERY variant (or its obvious singular/plural form). No paraphrases.\n"
+            . "  * Length 120 to 158 characters strictly (sweet spot). Count characters before writing each one. Under 120 Google pads the snippet from page body, over 158 it truncates.\n"
+            . "  * The exact focus keyword '{$kw}' MUST appear verbatim in EVERY variant (or its obvious singular/plural form). No paraphrases, no synonyms.\n"
             . "  * Place the focus keyword in the first 100 characters so it shows even when truncated on small viewports.\n"
             . "  * End with a soft action verb (learn, discover, see, compare, find, get).\n"
             . "Output one variant per line, no numbering, no quotes."
