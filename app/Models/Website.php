@@ -200,9 +200,20 @@ class Website extends Model
     /**
      * Coarse tier label for API responses (the WP plugin reads this).
      * Frozen sites always report 'free' so plugin features lock out.
+     *
+     * Honour the global "free for everyone" promo flag (FREE=true in
+     * env) — when set, the platform is in promo mode and every site
+     * effectively reports `pro` so the plugin's tier-gated UI unlocks.
+     * This mirrors `isPro()` which already short-circuits on the same
+     * config; without the parallel mirror, the server lets a request
+     * through (because `isPro()` is true) but the plugin still shows
+     * the "upgrade to Pro" banner because it reads `tier` directly.
      */
     public function effectiveTier(): string
     {
+        if ((bool) config('app.free', false)) {
+            return self::TIER_PRO;
+        }
         if ($this->isFrozen()) {
             return self::TIER_FREE;
         }
