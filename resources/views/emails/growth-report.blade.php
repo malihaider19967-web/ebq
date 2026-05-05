@@ -9,7 +9,8 @@
         .card { background: #ffffff; border-radius: 12px; padding: 32px; margin-bottom: 16px; }
         h1 { font-size: 22px; margin: 0 0 4px; font-weight: 700; }
         .meta { color: #64748b; margin: 0 0 4px; font-size: 14px; }
-        .compare-line { color: #94a3b8; margin: 0 0 24px; font-size: 13px; font-style: italic; }
+        .compare-line { color: #94a3b8; margin: 0 0 8px; font-size: 13px; font-style: italic; }
+        .freshness { color: #64748b; margin: 0 0 24px; font-size: 12px; padding: 8px 12px; background: #f8fafc; border-left: 3px solid #cbd5e1; border-radius: 4px; }
         .greeting { color: #475569; margin: 0 0 28px; font-size: 14px; }
 
         .section-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #fff; margin-bottom: 14px; }
@@ -77,6 +78,14 @@
         <p class="compare-line">
             Compared to {{ $report['period']['previous_label'] }}
             ({{ format_user_date($report['period']['prev_start'], 'M j', $user) }} &ndash; {{ format_user_date($report['period']['prev_end'], 'M j, Y', $user) }})
+        </p>
+        <p class="freshness">
+            <strong>Data through {{ format_user_date($endDate, 'M j, Y', $user) }}.</strong>
+            @if ($startDate === $endDate)
+                Google Search Console finalises numbers 1&ndash;3 days after the day ends, so this is the most recent fully&#8209;synced day for a fair comparison.
+            @else
+                Google Search Console finalises numbers 1&ndash;3 days after each day ends, so the period ends on the most recent fully&#8209;synced day for a fair comparison.
+            @endif
         </p>
         <p class="greeting">Hello {{ $user->name }}, here is the performance summary for your website.</p>
 

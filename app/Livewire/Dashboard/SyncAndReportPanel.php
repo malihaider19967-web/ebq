@@ -4,7 +4,7 @@ namespace App\Livewire\Dashboard;
 
 use App\Mail\GrowthReportMail;
 use App\Models\Website;
-use Illuminate\Support\Carbon;
+use App\Services\ReportDataService;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -64,20 +64,38 @@ class SyncAndReportPanel extends Component
             return;
         }
 
+        // Snap to the most recent fully-synced GSC day. When no
+        // safe day exists yet (sync still catching up, or a brand
+        // new site), surface a clear toast instead of mailing a
+        // misleading report.
+        $safe = app(ReportDataService::class)->lastSafeReportDate($website->id);
+        if (! $safe) {
+            $this->sendError = 'Search Console data is still syncing for this site. Try again tomorrow once Google has finalised the latest day.';
+
+            return;
+        }
+
         try {
-            $yesterday = Carbon::yesterday(config('app.timezone'))->toDateString();
+            $date = $safe->toDateString();
             $recipients = $website->getReportRecipientUsers();
+
+            if ($recipients->isEmpty()) {
+                $this->sendError = 'No report recipients are configured for this website. Add team members or set a report email first.';
+
+                return;
+            }
+
             $emails = [];
 
             foreach ($recipients as $recipient) {
                 Mail::to($recipient->email)->send(
-                    new GrowthReportMail($recipient, $website, $yesterday, $yesterday, 'daily')
+                    new GrowthReportMail($recipient, $website, $date, $date, 'daily')
                 );
                 $emails[] = $recipient->email;
             }
 
             RateLimiter::hit($key, 3600);
-            $this->sendSuccess = 'Report for '.$website->domain.' sent to '.implode(', ', $emails).'.';
+            $this->sendSuccess = 'Report for '.$website->domain.' (data through '.$date.') sent to '.implode(', ', $emails).'.';
         } catch (Throwable $e) {
             $this->sendError = 'Could not send the report. Check your mail configuration.';
             report($e);

@@ -11,6 +11,42 @@ use Illuminate\Support\Carbon;
 
 class ReportDataService
 {
+    /**
+     * Most recent date for which it's safe to report on this website.
+     *
+     * "Safe" means BOTH:
+     *   1. Old enough to be GSC-final — at least `gsc_lag_days` ago
+     *      (default 3, floored at 1 because today itself is always
+     *      partial). Google takes 24–72h to finalise daily numbers,
+     *      so anything fresher than the floor risks comparing two
+     *      partial days, which reads as a regression even on up-days.
+     *   2. Actually present in `search_console_data` for this site.
+     *      A site whose sync is stalled at D-7 still gets a usable
+     *      report (D-7 vs D-8); a site caught up to D-3 reports on
+     *      D-3 vs D-4. A brand-new site with zero rows returns null
+     *      and the caller skips the send.
+     *
+     * The optional $timezone argument lets callers anchor "today" to
+     * a specific user's tz when that matters; the cron path passes
+     * nothing and gets app-tz, which is fine since the multi-day lag
+     * floor swallows any sub-24h tz delta.
+     *
+     * Returns null when no usable date exists.
+     */
+    public function lastSafeReportDate(int $websiteId, ?int $minLagDays = null, ?string $timezone = null): ?Carbon
+    {
+        $lag = $minLagDays ?? (int) config('reports.gsc_lag_days', 3);
+        $tz = $timezone ?? config('app.timezone');
+        $ceiling = Carbon::today($tz)->subDays(max(1, $lag));
+
+        $lastSynced = SearchConsoleData::query()
+            ->where('website_id', $websiteId)
+            ->where('date', '<=', $ceiling->toDateString())
+            ->max('date');
+
+        return $lastSynced ? Carbon::parse($lastSynced, $tz)->startOfDay() : null;
+    }
+
     public function generate(int $websiteId, string $startDate, string $endDate, ?string $country = null): array
     {
         $start = Carbon::parse($startDate)->startOfDay();

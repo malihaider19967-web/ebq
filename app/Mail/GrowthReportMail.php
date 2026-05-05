@@ -30,15 +30,19 @@ class GrowthReportMail extends Mailable
     public function __construct(
         public User $user,
         public Website $website,
-        ?string $startDate = null,
-        ?string $endDate = null,
-        ?string $reportType = null,
+        string $startDate,
+        string $endDate,
+        string $reportType = 'daily',
     ) {
-        $tz = $user->timezoneForDisplay();
-
-        $this->endDate = $endDate ?? Carbon::yesterday($tz)->toDateString();
-        $this->startDate = $startDate ?? $this->endDate;
-        $this->reportType = $reportType ?? 'daily';
+        // Callers must pre-resolve the report window via
+        // ReportDataService::lastSafeReportDate(). The Mailable
+        // does not retry that lookup here: throwing from a queued
+        // mailable's constructor aborts the surrounding chunkById
+        // batch on the dispatcher, and silently substituting a
+        // fallback date would mask sync failures.
+        $this->startDate = $startDate;
+        $this->endDate = $endDate;
+        $this->reportType = $reportType;
 
         $service = app(ReportDataService::class);
         $this->report = $service->generate(

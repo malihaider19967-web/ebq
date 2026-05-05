@@ -20,8 +20,13 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Drop the index before the column. SQLite's ALTER TABLE DROP
+        // COLUMN does not cascade to indexes that reference the column,
+        // and Laravel's :memory: test database surfaces this as a
+        // hard "no such column" failure during migration.
         Schema::table('websites', function (Blueprint $table) {
             if (Schema::hasColumn('websites', 'stripe_id')) {
+                $table->dropIndex(['stripe_id']);
                 $table->dropColumn('stripe_id');
             }
         });
