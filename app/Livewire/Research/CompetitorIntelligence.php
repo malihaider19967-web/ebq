@@ -35,7 +35,7 @@ class CompetitorIntelligence extends Component
                 ->all();
 
             $keywords = Keyword::query()
-                ->whereIn('id', $keywordIds)
+                ->whereIn('keywords.id', $keywordIds)
                 ->leftJoin('keyword_intelligence', 'keyword_intelligence.keyword_id', '=', 'keywords.id')
                 ->orderByDesc('keyword_intelligence.search_volume')
                 ->select(['keywords.*', 'keyword_intelligence.search_volume', 'keyword_intelligence.difficulty_score'])
