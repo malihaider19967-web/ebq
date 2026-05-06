@@ -44,6 +44,19 @@ class AppServiceProvider extends ServiceProvider
                 (string) config('services.mistral.model', 'mistral-small-latest'),
             );
         });
+
+        // Research embeddings — bind only when the env flag is on AND the
+        // Mistral API key is present. KeywordToNicheMapper / ClusteringService
+        // take ?EmbeddingProvider so leaving this unbound makes the rule-based
+        // path the default.
+        if (config('research.embeddings.enabled') && trim((string) config('services.mistral.key', '')) !== '') {
+            $this->app->bind(\App\Services\Research\Niche\EmbeddingProvider::class, function () {
+                return new \App\Services\Research\Niche\MistralEmbeddingProvider(
+                    (string) config('services.mistral.key'),
+                    (string) config('services.mistral.embedding_model', 'mistral-embed'),
+                );
+            });
+        }
     }
 
     /**

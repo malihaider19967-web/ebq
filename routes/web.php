@@ -106,6 +106,25 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/team', 'team.index')->middleware('feature:team')->name('team.index');
     Route::view('/reports', 'reports.index')->middleware('feature:reports')->name('reports.index');
     Route::view('/settings', 'settings.index')->middleware('feature:settings')->name('settings.index');
+
+    Route::middleware(['feature:research', 'research.rollout'])->prefix('research')->name('research.')->group(function () {
+        Route::view('/', 'research.index')->name('index');
+        Route::view('/keywords', 'research.keywords')->name('keywords');
+        Route::view('/topics', 'research.topics')->name('topics');
+        Route::view('/serp', 'research.serp')->name('serp');
+        Route::view('/competitors', 'research.competitors')->name('competitors');
+        Route::view('/content-gap', 'research.content-gap')->name('gap');
+        Route::view('/briefs', 'research.briefs')->name('briefs');
+        Route::get('/briefs/{brief}', fn (int $brief) => view('research.brief-show', ['briefId' => $brief]))
+            ->whereNumber('brief')
+            ->name('briefs.show');
+        Route::view('/topical-authority', 'research.topical-authority')->name('authority');
+        Route::view('/coverage', 'research.coverage')->name('coverage');
+        Route::view('/internal-links', 'research.internal-links')->name('internal-links');
+        Route::view('/opportunities', 'research.opportunities')->name('opportunities');
+        Route::view('/alerts', 'research.alerts')->name('alerts');
+        Route::view('/reverse', 'research.reverse')->name('reverse');
+    });
 });
 
 Route::middleware(['auth', 'verified', 'throttle:oauth'])->group(function () {

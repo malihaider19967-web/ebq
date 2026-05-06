@@ -1025,10 +1025,8 @@ class PluginInsightsController extends Controller
     public function research(
         Request $request,
         string $externalPostId,
-        \App\Services\SerperSearchClient $serper,
-        \App\Services\NetworkInsightService $networkInsight,
+        \App\Services\Research\ResearchAggregateService $aggregate,
         \App\Services\EntityCoverageService $entityCoverage,
-        \App\Services\Ai\ContextBuilder $contextBuilder,
     ): JsonResponse {
         $website = $this->resolveWebsite($request);
 
@@ -1048,83 +1046,8 @@ class PluginInsightsController extends Controller
 
         @set_time_limit(120);
 
-        // Cache the SERP-side bundle 30 min per (website × kw × country).
-        // Entity coverage is excluded from the cache because it can
-        // grow expensive and the user opts in to refreshing it.
-        $cacheKey = sprintf(
-            'editor_research:v1:%d:%s:%s',
-            $website->id,
-            hash('xxh3', mb_strtolower($kw)),
-            $country,
-        );
-
         try {
-            $bundle = \Cache::remember($cacheKey, 1800, function () use ($website, $kw, $url, $country, $language, $serper, $networkInsight, $contextBuilder) {
-            $serpRes = $serper->query([
-                'q' => $kw,
-                'type' => 'organic',
-                'num' => 10,
-                'gl' => $country,
-                'hl' => $language,
-                '__website_id' => $website->id,
-                '__owner_user_id' => $website->user_id,
-            ]);
-
-            $organic = is_array($serpRes['organic'] ?? null) ? $serpRes['organic'] : [];
-            $serpTop = [];
-            foreach (array_slice($organic, 0, 5) as $i => $row) {
-                if (! is_array($row)) continue;
-                $serpTop[] = [
-                    'position' => (int) ($row['position'] ?? ($i + 1)),
-                    'title' => (string) ($row['title'] ?? ''),
-                    'snippet' => (string) ($row['snippet'] ?? ''),
-                    'url' => (string) ($row['link'] ?? ''),
-                    'displayed_link' => (string) ($row['displayedLink'] ?? ''),
-                ];
-            }
-
-            $paa = [];
-            foreach ((array) ($serpRes['peopleAlsoAsk'] ?? []) as $item) {
-                if (is_string($item)) {
-                    $paa[] = $item;
-                } elseif (is_array($item) && is_string($item['question'] ?? null)) {
-                    $paa[] = (string) $item['question'];
-                }
-            }
-
-            $related = [];
-            foreach ((array) ($serpRes['relatedSearches'] ?? []) as $item) {
-                if (is_string($item)) {
-                    $related[] = $item;
-                } elseif (is_array($item) && is_string($item['query'] ?? null)) {
-                    $related[] = (string) $item['query'];
-                }
-            }
-
-            // Keyword suggestions are derived directly from the SERP
-            // response when Serper returns a "peopleAlsoSearchFor" or
-            // "queries" cluster. We don't fire a separate paid call.
-            $kwSuggestions = $related; // alias by default; the UI can dedupe
-
-            // Internal-link candidates — reuse the ContextBuilder logic
-            // via a public proxy method (added below).
-            $internalLinks = $contextBuilder->loadInternalLinkCandidatesPublic($website, $kw, $url);
-
-            $network = $networkInsight->forKeyword($kw, $country);
-
-            return [
-                'focus_keyword' => $kw,
-                'country' => $country,
-                'language' => $language,
-                'serp_top' => $serpTop,
-                'people_also_ask' => array_values(array_unique($paa)),
-                'related_searches' => array_values(array_unique($related)),
-                'keyword_suggestions' => array_slice($kwSuggestions, 0, 12),
-                'internal_link_candidates' => is_array($internalLinks) ? $internalLinks : [],
-                'network_insight' => $network,
-                'cached_at' => Carbon::now()->toIso8601String(),
-            ];
-            });
+            $bundle = $aggregate->bundle($website, $kw, $country, $language, $url);
         } catch (\Throwable $e) {
             \Log::warning('PluginInsightsController::research bundle failed', [
                 'website_id' => $website->id,

@@ -19,6 +19,7 @@ class SearchConsoleData extends Model
         'country',
         'device',
         'ctr',
+        'keyword_id',
     ];
 
     protected function casts(): array

@@ -347,6 +347,18 @@ class Website extends Model
         return $this->hasOne(WebsitePluginInstall::class);
     }
 
+    public function niches(): BelongsToMany
+    {
+        return $this->belongsToMany(\App\Models\Research\Niche::class, 'website_niche_map', 'website_id', 'niche_id')
+            ->withPivot(['weight', 'is_primary', 'source', 'confidence', 'last_classified_at'])
+            ->withTimestamps();
+    }
+
+    public function researchPages(): HasMany
+    {
+        return $this->hasMany(\App\Models\Research\WebsitePage::class);
+    }
+
     /**
      * Whether a page URL is on this website's domain or a subdomain of it (www normalized).
      */
