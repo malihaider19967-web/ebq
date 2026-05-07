@@ -1,0 +1,22 @@
+# Per-machine venv
+.venv/
+venv/
+env/
+
+# Local scraper config (caps + user-agent)
+.env
+
+# Build / packaging artefacts
+*.egg-info/
+build/
+dist/
+
+# Crawl scratch DBs
+out/
+scratch-*.db
+
+# Python caches
+__pycache__/
+*.pyc
+.pytest_cache/
+.coverage

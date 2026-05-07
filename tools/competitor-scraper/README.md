@@ -4,12 +4,22 @@ EBQ competitor crawler. Admin triggers a scan from `/admin/research/competitor-s
 
 ## Install
 
-```powershell
+Modern Ubuntu / Debian (Python 3.11+) refuses system-wide `pip install` (PEP 668). Use a venv:
+
+```bash
 cd tools/competitor-scraper
-uv pip install -e ".[dev]"
-# or:
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
 ```
+
+Then point Laravel at the venv's interpreter so the queue worker can find it without activating the venv. In the project's `.env`:
+
+```
+RESEARCH_SCRAPER_PYTHON=/var/www/ebq/tools/competitor-scraper/.venv/bin/python
+```
+
+(On dev machines where `python` is already a venv, the default `RESEARCH_SCRAPER_PYTHON=python` is fine and you can skip the env var.)
 
 The DB connection is read from the **Laravel** `.env` two directories up (no separate Python `.env` for credentials). Override the location via `EBQ_LARAVEL_ROOT` if running from outside the repo.
 
