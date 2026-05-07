@@ -16,9 +16,8 @@
     <div class="flex min-h-full">
         {{-- Brand panel --}}
         <div class="hidden w-1/2 flex-col justify-between border-r border-slate-200 bg-slate-50 p-12 lg:flex">
-            <a href="{{ route('landing') }}" class="inline-flex items-center gap-2.5">
-                <img src="{{ asset('ebq-logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 object-contain rounded-lg ring-1 ring-slate-200">
-                <span class="text-[15px] font-semibold tracking-tight text-slate-900">EBQ</span>
+            <a href="{{ route('landing') }}" class="inline-flex items-center">
+                <img src="{{ asset('ebq-logo.png') }}" alt="EBQ" width="48" height="48" class="h-12 w-12 object-contain rounded-xl ring-1 ring-slate-200">
             </a>
 
             <div class="max-w-md">
@@ -52,9 +51,8 @@
         {{-- Form panel --}}
         <div class="flex w-full flex-col items-center justify-center bg-white p-6 lg:w-1/2 lg:p-12">
             <div class="mb-8 lg:hidden">
-                <a href="{{ route('landing') }}" class="inline-flex items-center gap-2.5">
-                    <img src="{{ asset('ebq-logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 object-contain rounded-lg ring-1 ring-slate-200">
-                    <span class="text-[15px] font-semibold tracking-tight text-slate-900">EBQ</span>
+                <a href="{{ route('landing') }}" class="inline-flex items-center">
+                    <img src="{{ asset('ebq-logo.png') }}" alt="EBQ" width="44" height="44" class="h-11 w-11 object-contain rounded-xl ring-1 ring-slate-200">
                 </a>
             </div>
             <div class="w-full max-w-md">
