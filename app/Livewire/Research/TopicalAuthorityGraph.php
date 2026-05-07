@@ -112,13 +112,31 @@ class TopicalAuthorityGraph extends Component
                         'coverage' => $total > 0 ? $covered / $total : 0.0,
                     ];
                 });
+
+                // Fallback / supplement: even when no topic centroids
+                // into the niche, competitor_scan_keywords often has
+                // direct page-level data for the niche's keywords —
+                // i.e., competitors whose pages mention this keyword.
+                // Surface those rows so a thin niche (1 seed keyword,
+                // no clustered topics) still has actionable info.
+                $rankings = \App\Models\Research\CompetitorScanKeyword::query()
+                    ->with(['keyword:id,query', 'scan:id,seed_domain,finished_at'])
+                    ->whereIn('keyword_id', $keywordIdsInNiche)
+                    ->orderByDesc('total_occurrences')
+                    ->limit(30)
+                    ->get();
+            } else {
+                $rankings = collect();
             }
+        } else {
+            $rankings = collect();
         }
 
         return view('livewire.research.topical-authority-graph', [
             'niches' => $niches,
             'rows' => $rows,
             'keywordCount' => $keywordCount,
+            'rankings' => $rankings ?? collect(),
         ]);
     }
 }
