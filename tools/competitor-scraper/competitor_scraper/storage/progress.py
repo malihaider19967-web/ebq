@@ -21,19 +21,32 @@ class HeartbeatWriter:
         self.scan_id = int(scan_id)
 
     def mark_running(self) -> None:
+        """Transition the scan into the running state. Accepts retries:
+        failed → running is a valid manual rerun. Raises when the row is
+        currently in 'done' or 'cancelling' (those are intentional
+        terminal / mid-cancel states the runner must NOT clobber). Also
+        raises on rowcount==0 so a silent no-op cannot strand the row's
+        status out of sync with the work that actually happened."""
         scans = table("competitor_scans")
         with get_engine().begin() as conn:
-            conn.execute(
+            result = conn.execute(
                 update(scans)
                 .where(scans.c.id == self.scan_id)
-                .where(scans.c.status.in_(["queued", "running"]))
+                .where(scans.c.status.in_(["queued", "running", "failed"]))
                 .values(
                     status="running",
                     started_at=_now(),
                     last_heartbeat_at=_now(),
+                    error=None,
                     updated_at=_now(),
                 )
             )
+            if result.rowcount == 0:
+                raise RuntimeError(
+                    f"Scan #{self.scan_id} cannot be transitioned to running "
+                    f"(current status is not queued/running/failed; "
+                    f"likely already done or cancelling)."
+                )
 
     def flush_progress(self, *, current_url: Optional[str], force: bool = False) -> None:
         scans = table("competitor_scans")
@@ -61,6 +74,9 @@ class HeartbeatWriter:
         return bool(row and row[0] == "cancelling")
 
     def mark_done(self) -> None:
+        """Transition running/cancelling → done. Clears any prior error
+        text so a successful retry doesn't leave stale failure messages
+        on the row."""
         scans = table("competitor_scans")
         with get_engine().begin() as conn:
             conn.execute(
@@ -70,6 +86,7 @@ class HeartbeatWriter:
                 .values(
                     status="done",
                     finished_at=_now(),
+                    error=None,
                     updated_at=_now(),
                 )
             )
