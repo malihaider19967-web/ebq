@@ -184,6 +184,8 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::put('/plans/{plan}', [AdminPlanController::class, 'update'])->name('plans.update');
 
     Route::prefix('research')->name('research.')->group(function (): void {
+        Route::view('/', 'admin.research.dashboard')->name('dashboard');
+
         Route::get('/niche-candidates', [\App\Http\Controllers\Admin\NicheCandidateController::class, 'index'])
             ->name('niche-candidates.index');
         Route::post('/niche-candidates/{niche}/approve', [\App\Http\Controllers\Admin\NicheCandidateController::class, 'approve'])

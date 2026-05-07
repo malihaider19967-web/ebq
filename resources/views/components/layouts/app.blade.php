@@ -81,14 +81,9 @@
                         'match_routes' => ['admin.plans.'],
                     ],
                     [
-                        'route' => 'admin.research.competitor-scans.index',
-                        'label' => 'Competitor scans',
-                        'match_routes' => ['admin.research.competitor-scans.', 'admin.research.niche-candidates.'],
-                    ],
-                    [
-                        'route' => 'admin.research.settings.show',
-                        'label' => 'Research settings',
-                        'match_routes' => ['admin.research.settings.'],
+                        'route' => 'admin.research.dashboard',
+                        'label' => 'Research engine',
+                        'match_routes' => ['admin.research.'],
                     ],
                 ];
             @endphp
