@@ -6,7 +6,75 @@
             Results appear here once the scan finishes. Status: <span class="font-mono">{{ $scan->status }}</span>.
         </div>
     @elseif ($scan->page_count === 0)
-        <p class="text-xs text-slate-400">Scan finished without any pages.</p>
+        @php
+            $stats = $scan->progress['scrapy_stats'] ?? [];
+            $robotsBlocked = (int) ($stats['robotstxt/forbidden'] ?? 0);
+            $responseCount = (int) ($stats['downloader/response_count'] ?? 0);
+            $retries = (int) ($stats['retry/count'] ?? 0);
+            $finishReason = (string) ($stats['finish_reason'] ?? $scan->progress['finish_reason'] ?? '—');
+            $statusBreakdown = collect($stats)
+                ->filter(fn ($v, $k) => str_starts_with($k, 'downloader/response_status_count/'))
+                ->mapWithKeys(fn ($v, $k) => [str_replace('downloader/response_status_count/', '', $k) => (int) $v])
+                ->sortKeys();
+            $hint = match (true) {
+                $robotsBlocked > 0 && $responseCount === 0 => 'robots.txt blocked every request — the site disallows our crawler entirely.',
+                $robotsBlocked > 0 => 'robots.txt blocked some paths. Consider seeding a different starting URL on this domain.',
+                $statusBreakdown->has(403) => 'Site returned 403 Forbidden. Likely WAF / anti-bot. Try the marketing root URL or a different user-agent.',
+                $statusBreakdown->has(503) || $statusBreakdown->has(429) => 'Site rate-limited or blocked our requests. Re-run after a delay or lower request rate.',
+                $responseCount > 0 && ! $statusBreakdown->has(200) => 'Site responded but never with HTTP 200. Likely all redirects off-domain or all errors.',
+                $responseCount === 0 => 'No HTTP response received. DNS / firewall / robots-txt block at network level.',
+                default => 'Pages were fetched but extraction yielded no items — likely JS-rendered content (Playwright comes in v2).',
+            };
+        @endphp
+        <div class="space-y-3">
+            <div class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-900/30 dark:text-amber-200">
+                <p><strong>Scan finished without any pages.</strong> {{ $hint }}</p>
+                <p class="mt-1 text-[11px]">Finish reason: <span class="font-mono">{{ $finishReason }}</span></p>
+            </div>
+
+            <div class="rounded-lg border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
+                <div class="text-xs font-semibold uppercase text-slate-500">Crawl diagnostics</div>
+                <dl class="mt-3 grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+                    <div>
+                        <dt class="text-slate-500">Responses received</dt>
+                        <dd class="font-semibold tabular-nums">{{ number_format($responseCount) }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">robots.txt forbidden</dt>
+                        <dd class="font-semibold tabular-nums">{{ number_format($robotsBlocked) }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">Retries</dt>
+                        <dd class="font-semibold tabular-nums">{{ number_format($retries) }}</dd>
+                    </div>
+                    <div>
+                        <dt class="text-slate-500">Elapsed</dt>
+                        <dd class="font-semibold tabular-nums">{{ number_format((float) ($stats['elapsed_time_seconds'] ?? 0), 1) }}s</dd>
+                    </div>
+                </dl>
+
+                @if ($statusBreakdown->isNotEmpty())
+                    <div class="mt-3">
+                        <div class="text-[11px] font-semibold uppercase text-slate-500">HTTP status breakdown</div>
+                        <ul class="mt-1 flex flex-wrap gap-1.5 text-xs">
+                            @foreach ($statusBreakdown as $code => $count)
+                                @php
+                                    $tone = match (true) {
+                                        $code === 200 || $code === '200' => 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-200',
+                                        in_array((int) $code, [301, 302], true) => 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
+                                        (int) $code >= 400 => 'bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-200',
+                                        default => 'bg-slate-100 text-slate-700',
+                                    };
+                                @endphp
+                                <li class="rounded-full px-2.5 py-1 {{ $tone }}">
+                                    {{ $code }} <span class="text-[10px] opacity-70">×{{ $count }}</span>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+            </div>
+        </div>
     @else
         <div class="space-y-6">
 

@@ -95,6 +95,7 @@ class RunCompetitorScanJob implements ShouldQueue
         // for future scans (Ahrefs-style backlink/discovery moat).
         if ($scan->status === \App\Models\Research\CompetitorScan::STATUS_DONE) {
             \App\Jobs\Research\AutoEnqueueOutlinksJob::dispatch($scan->id);
+            \App\Jobs\Research\MapScanKeywordsToNichesJob::dispatch($scan->id);
 
             // Bump the originating research_target row to status='done'
             // so the scheduler doesn't pick it again immediately. Also

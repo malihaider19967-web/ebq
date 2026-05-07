@@ -65,6 +65,62 @@ class HeartbeatWriter:
                 )
             )
 
+    def write_final_stats(self, stats: dict, reason: str) -> None:
+        """Persist a curated subset of Scrapy's stats dict into the
+        scan's `progress` JSON column. The fields chosen are the ones an
+        operator actually wants to see when diagnosing a 0-page scan:
+        HTTP status counts, robots blocks, retries, exceptions."""
+        keep_keys = (
+            "downloader/response_count",
+            "downloader/response_status_count/200",
+            "downloader/response_status_count/301",
+            "downloader/response_status_count/302",
+            "downloader/response_status_count/403",
+            "downloader/response_status_count/404",
+            "downloader/response_status_count/429",
+            "downloader/response_status_count/500",
+            "downloader/response_status_count/502",
+            "downloader/response_status_count/503",
+            "downloader/exception_count",
+            "downloader/exception_type_count/scrapy.exceptions.IgnoreRequest",
+            "robotstxt/forbidden",
+            "robotstxt/request_count",
+            "retry/count",
+            "item_scraped_count",
+            "elapsed_time_seconds",
+        )
+        curated: dict = {"finish_reason": reason}
+        for k in keep_keys:
+            if k in stats:
+                curated[k] = stats[k]
+
+        scans = table("competitor_scans")
+        with get_engine().connect() as conn:
+            row = conn.execute(
+                scans.select().with_only_columns(scans.c.progress).where(scans.c.id == self.scan_id)
+            ).first()
+
+        existing: dict = {}
+        if row and row[0]:
+            raw = row[0]
+            try:
+                if isinstance(raw, (str, bytes, bytearray)):
+                    existing = json.loads(raw if isinstance(raw, str) else raw.decode("utf-8", "replace"))
+                elif isinstance(raw, dict):
+                    existing = raw
+            except Exception:
+                existing = {}
+
+        existing["scrapy_stats"] = curated
+        existing["finish_reason"] = reason
+
+        with get_engine().begin() as conn:
+            conn.execute(
+                update(scans)
+                .where(scans.c.id == self.scan_id)
+                .values(progress=json.dumps(existing), updated_at=_now())
+            )
+
     def is_cancelling(self) -> bool:
         scans = table("competitor_scans")
         with get_engine().connect() as conn:

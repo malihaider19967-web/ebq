@@ -11,23 +11,25 @@
 
     @if ($nicheId === null)
         <p class="text-xs text-slate-400">Pick a niche to see its topic-cluster tree and your coverage.</p>
+    @elseif ($keywordCount === 0)
+        <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+            No keywords are mapped to this niche yet. Niche linkage happens automatically after each successful competitor scan. Run a scrape against a competitor that targets this niche, or wait for an in-progress scan to finish — the chart populates as soon as competitor topics centroid into the niche.
+        </div>
+    @elseif ($rows->isEmpty())
+        <div class="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-300">
+            {{ number_format($keywordCount) }} keyword(s) are in this niche, but no competitor topic centroids into it yet. Run more scrapes against sites in this niche.
+        </div>
     @else
         @php
-            $selectedNiche = $niches->firstWhere('id', $nicheId);
             $treeData = [
-                'name' => $selectedNiche?->name ?? 'Niche',
-                'children' => $rows->map(function ($row) use ($coveredKeywordIds) {
-                    $clusterKeywordIds = $row->cluster?->keywords->pluck('id') ?? collect();
-                    $covered = $clusterKeywordIds->intersect($coveredKeywordIds)->count();
-                    $total = $clusterKeywordIds->count();
-                    return [
-                        'name' => $row->topic_name,
-                        'priority' => (float) ($row->priority_score ?? 0),
-                        'covered' => $covered,
-                        'total' => $total,
-                        'coverage' => $total > 0 ? $covered / $total : 0,
-                    ];
-                })->values()->all(),
+                'name' => $niches->firstWhere('id', $nicheId)?->name ?? 'Niche',
+                'children' => $rows->map(fn ($row) => [
+                    'name' => $row->name,
+                    'priority' => (int) $row->page_count,
+                    'covered' => $row->covered,
+                    'total' => $row->total,
+                    'coverage' => $row->coverage,
+                ])->values()->all(),
             ];
         @endphp
 
@@ -36,10 +38,24 @@
                  class="min-h-[420px] w-full"
                  data-tree="{{ json_encode($treeData, JSON_HEX_QUOT | JSON_HEX_APOS | JSON_HEX_AMP | JSON_HEX_TAG) }}">
             </div>
+        </div>
 
-            @if ($rows->isEmpty())
-                <p class="mt-3 text-xs text-slate-400">No topic clusters yet for this niche. Run <code>ebq:research-cluster-refresh</code> + <code>ebq:niche-aggregates-recompute</code>.</p>
-            @endif
+        <div class="mt-4 space-y-2">
+            @foreach ($rows as $row)
+                @php
+                    $coverage = $row->coverage;
+                    $bg = $coverage >= 0.66 ? 'bg-emerald-500' : ($coverage >= 0.33 ? 'bg-amber-500' : 'bg-rose-500');
+                @endphp
+                <div class="rounded-md border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-950">
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm font-medium">{{ $row->name }}</div>
+                        <div class="text-xs text-slate-500">{{ $row->covered }} / {{ $row->total }} keywords covered · {{ number_format($row->page_count) }} competitor page(s)</div>
+                    </div>
+                    <div class="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                        <div class="h-full {{ $bg }}" style="width: {{ (int) ($coverage * 100) }}%"></div>
+                    </div>
+                </div>
+            @endforeach
         </div>
 
         @if (! app()->environment('testing'))

@@ -78,12 +78,47 @@ class CompetitorSpider(scrapy.Spider):
         self.custom_settings["USER_AGENT"] = user_agent
 
     def start_requests(self) -> Iterable[scrapy.Request]:
-        yield scrapy.Request(
-            self.seed_url,
-            callback=self.parse,
-            cb_kwargs={"depth": 0},
-            dont_filter=False,
-        )
+        # Always seed the domain root in addition to the user-supplied
+        # URL. If the operator pasted a deep product / article URL,
+        # starting only there often dead-ends — robots.txt may forbid
+        # it, the page may be JS-rendered with empty static HTML, or it
+        # may simply have few internal links. The root usually has nav
+        # / sitemap-style links that fan out across the site.
+        parsed = urlparse(self.seed_url)
+        root = f"{parsed.scheme or 'https'}://{parsed.netloc}/"
+        seen: set[str] = set()
+
+        if root and root not in seen:
+            seen.add(root)
+            yield scrapy.Request(
+                root,
+                callback=self.parse,
+                cb_kwargs={"depth": 0},
+                priority=110,
+                dont_filter=False,
+            )
+
+        if self.seed_url not in seen:
+            yield scrapy.Request(
+                self.seed_url,
+                callback=self.parse,
+                cb_kwargs={"depth": 0},
+                priority=100,
+                dont_filter=False,
+            )
+
+    def closed(self, reason: str) -> None:
+        """Final crawl stats — captured here and pushed to MySQL so the
+        admin UI can diagnose 0-page scans (robots blocks, HTTP errors,
+        retry storms) without reading worker logs."""
+        if self.scan_id is None:
+            return
+        try:
+            stats = self.crawler.stats.get_stats() if hasattr(self, "crawler") else {}
+            from ..storage.progress import HeartbeatWriter
+            HeartbeatWriter(self.scan_id).write_final_stats(stats, reason)
+        except Exception:
+            pass
 
     def parse(self, response: scrapy.http.Response, depth: int = 0):
         body = response.text or ""
