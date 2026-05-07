@@ -80,6 +80,11 @@
                         'label' => 'Plans',
                         'match_routes' => ['admin.plans.'],
                     ],
+                    [
+                        'route' => 'admin.research.competitor-scans.index',
+                        'label' => 'Competitor scans',
+                        'match_routes' => ['admin.research.'],
+                    ],
                 ];
             @endphp
             <nav class="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">

@@ -190,6 +190,18 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
             ->whereNumber('niche')->name('niche-candidates.approve');
         Route::delete('/niche-candidates/{niche}', [\App\Http\Controllers\Admin\NicheCandidateController::class, 'destroy'])
             ->whereNumber('niche')->name('niche-candidates.destroy');
+
+        Route::prefix('competitor-scans')->name('competitor-scans.')->group(function (): void {
+            Route::get('/', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'index'])->name('index');
+            Route::get('/create', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'create'])->name('create');
+            Route::post('/', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'store'])->name('store');
+            Route::get('/{competitorScan}', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'show'])
+                ->whereNumber('competitorScan')->name('show');
+            Route::post('/{competitorScan}/cancel', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'cancel'])
+                ->whereNumber('competitorScan')->name('cancel');
+            Route::post('/{competitorScan}/mark-failed', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'markFailed'])
+                ->whereNumber('competitorScan')->name('mark-failed');
+        });
     });
 });
 

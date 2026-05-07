@@ -1,0 +1,15 @@
+# Pin the same set declared in pyproject.toml so `pip install -r requirements.txt`
+# works without -e in CI / containers. Operator installs themselves.
+scrapy>=2.11,<3
+lxml>=5
+readability-lxml>=0.8.1
+yake>=0.4.8
+scikit-learn>=1.4
+numpy>=1.26
+sqlalchemy>=2.0
+pymysql>=1.1
+python-dotenv>=1
+pydantic>=2.5
+pydantic-settings>=2
+typer>=0.12
+tldextract>=5
