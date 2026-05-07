@@ -21,7 +21,14 @@ class MistralEmbeddingProvider implements EmbeddingProvider
 
     public function isAvailable(): bool
     {
-        return trim($this->apiKey) !== '';
+        if (trim($this->apiKey) === '') {
+            return false;
+        }
+
+        // Admin-flippable kill-switch. /admin/research/settings can flip
+        // this off without a redeploy; no API calls happen until it's
+        // back on.
+        return \App\Support\ResearchEngineSettings::embeddingsEnabled();
     }
 
     /**

@@ -43,11 +43,7 @@ class CompetitorScanController extends Controller
                 'max_pages_per_external_domain' => 5,
                 'max_depth' => 4,
             ],
-            'ceilings' => [
-                'max_total_pages' => (int) config('research.scraper.ceiling_total_pages', 5000),
-                'max_pages_per_external_domain' => (int) config('research.scraper.ceiling_external_per_domain', 25),
-                'max_depth' => (int) config('research.scraper.ceiling_depth', 6),
-            ],
+            'ceilings' => $this->ceilings(),
         ]);
     }
 
@@ -149,10 +145,11 @@ class CompetitorScanController extends Controller
 
     private function ceilings(): array
     {
+        $scraper = \App\Support\ResearchEngineSettings::scraper();
         return [
-            'max_total_pages' => (int) config('research.scraper.ceiling_total_pages', 5000),
-            'max_pages_per_external_domain' => (int) config('research.scraper.ceiling_external_per_domain', 25),
-            'max_depth' => (int) config('research.scraper.ceiling_depth', 6),
+            'max_total_pages' => (int) $scraper['ceiling_total_pages'],
+            'max_pages_per_external_domain' => (int) $scraper['ceiling_external_per_domain'],
+            'max_depth' => (int) $scraper['ceiling_depth'],
         ];
     }
 

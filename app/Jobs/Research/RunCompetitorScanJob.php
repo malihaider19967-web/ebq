@@ -29,7 +29,8 @@ class RunCompetitorScanJob implements ShouldQueue
 
     public function __construct(public int $scanId)
     {
-        $this->timeout = (int) (config('research.scraper.timeout_seconds') ?: 3600);
+        $scraper = \App\Support\ResearchEngineSettings::scraper();
+        $this->timeout = (int) ($scraper['timeout_seconds'] ?: 3600);
     }
 
     public function handle(): void
@@ -88,6 +89,30 @@ class RunCompetitorScanJob implements ShouldQueue
         // we don't overwrite it here. Just refresh the row in case the
         // queue worker is logging.
         $scan->refresh();
+
+        // Continuous research loop: every successful scan feeds the
+        // next round. External outlinks become low-priority targets
+        // for future scans (Ahrefs-style backlink/discovery moat).
+        if ($scan->status === \App\Models\Research\CompetitorScan::STATUS_DONE) {
+            \App\Jobs\Research\AutoEnqueueOutlinksJob::dispatch($scan->id);
+
+            // Bump the originating research_target row to status='done'
+            // so the scheduler doesn't pick it again immediately. Also
+            // stamp last_scanned_at + last_scan_id for re-scan policy.
+            $target = \App\Models\Research\ResearchTarget::query()
+                ->where('domain', $scan->seed_domain)
+                ->first();
+            if ($target !== null) {
+                $target->forceFill([
+                    'status' => \App\Models\Research\ResearchTarget::STATUS_DONE,
+                    'last_scan_id' => $scan->id,
+                    'last_scanned_at' => now(),
+                    'next_scan_at' => now()->addDays(14),
+                    'total_scans' => (int) $target->total_scans + 1,
+                ])->save();
+            }
+        }
+
         Log::info('RunCompetitorScanJob: completed', [
             'id' => $this->scanId,
             'status' => $scan->status,

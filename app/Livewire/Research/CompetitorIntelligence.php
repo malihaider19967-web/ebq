@@ -31,7 +31,7 @@ class CompetitorIntelligence extends Component
     #[Url(as: 'domain')]
     public string $domain = '';
 
-    public function render()
+    public function render(\App\Services\Research\BacklinksLookupService $backlinksLookup)
     {
         $payload = [
             'mode' => 'empty',
@@ -40,6 +40,7 @@ class CompetitorIntelligence extends Component
             'topics' => collect(),
             'topExternalDomains' => collect(),
             'serpKeywords' => collect(),
+            'backlinksSummary' => null,
         ];
 
         if ($this->domain === '') {
@@ -47,6 +48,13 @@ class CompetitorIntelligence extends Component
         }
 
         $domain = mb_strtolower(preg_replace('/^www\./', '', $this->domain) ?? $this->domain);
+
+        // Backlinks live independent of whether we've scraped THIS
+        // domain — they come from outlinks recorded in OTHER scans, so
+        // even a never-scraped domain may already have rich backlink
+        // data once we've crawled enough sites that link to it. This is
+        // the SEMrush/Ahrefs effect that compounds as the corpus grows.
+        $payload['backlinksSummary'] = $backlinksLookup->summary($domain, linkLimit: 30, anchorLimit: 12);
 
         $scan = CompetitorScan::query()
             ->where('seed_domain', $domain)

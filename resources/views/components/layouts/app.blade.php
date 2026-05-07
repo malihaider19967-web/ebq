@@ -83,7 +83,12 @@
                     [
                         'route' => 'admin.research.competitor-scans.index',
                         'label' => 'Competitor scans',
-                        'match_routes' => ['admin.research.'],
+                        'match_routes' => ['admin.research.competitor-scans.', 'admin.research.niche-candidates.'],
+                    ],
+                    [
+                        'route' => 'admin.research.settings.show',
+                        'label' => 'Research settings',
+                        'match_routes' => ['admin.research.settings.'],
                     ],
                 ];
             @endphp

@@ -27,22 +27,9 @@ class ResearchQuotaService
     /** @return array<string, int> */
     public function defaults(): array
     {
-        $cfg = config('services.research.limits');
-        if (is_array($cfg)) {
-            return [
-                'keyword_lookup' => (int) ($cfg['keyword_lookup'] ?? 1000),
-                'serp_fetch' => (int) ($cfg['serp_fetch'] ?? 500),
-                'llm_call' => (int) ($cfg['llm_call'] ?? 2000),
-                'brief' => (int) ($cfg['brief'] ?? 30),
-            ];
-        }
-
-        return [
-            'keyword_lookup' => 1000,
-            'serp_fetch' => 500,
-            'llm_call' => 2000,
-            'brief' => 30,
-        ];
+        // Reads from /admin/research/settings via the helper (which
+        // falls back to config/env if no admin override is set).
+        return \App\Support\ResearchEngineSettings::quotas();
     }
 
     public function limit(?Website $website, string $resource): int

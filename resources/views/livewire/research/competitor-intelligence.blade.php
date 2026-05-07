@@ -103,4 +103,58 @@
             </table>
         </div>
     @endif
+
+    {{-- Backlinks: shown for any non-empty domain, regardless of mode --}}
+    @if ($mode !== 'empty' && $backlinksSummary && $backlinksSummary['total_links'] > 0)
+        <div class="mt-6 rounded-lg border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950">
+            <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-2 dark:border-slate-800">
+                <span class="text-xs font-semibold uppercase text-slate-500">Backlinks (across our scan corpus)</span>
+                <span class="text-[11px] text-slate-500">
+                    {{ number_format($backlinksSummary['total_links']) }} link(s) ·
+                    {{ number_format($backlinksSummary['referring_domains']) }} referring domain(s)
+                </span>
+            </div>
+
+            @if ($backlinksSummary['anchors']->isNotEmpty())
+                <div class="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+                    <div class="text-[11px] font-semibold uppercase text-slate-500">Anchor text distribution</div>
+                    <ul class="mt-2 flex flex-wrap gap-1.5 text-xs">
+                        @foreach ($backlinksSummary['anchors'] as $row)
+                            <li class="rounded-full bg-slate-100 px-2.5 py-1 dark:bg-slate-800">
+                                {{ $row->anchor_text }}
+                                <span class="ml-1 text-[10px] text-slate-500">×{{ $row->link_count }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </div>
+            @endif
+
+            <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-800">
+                <thead class="bg-slate-50 dark:bg-slate-900">
+                    <tr>
+                        <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase text-slate-500">Linking page</th>
+                        <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase text-slate-500">Anchor</th>
+                        <th class="px-3 py-2 text-left text-[11px] font-semibold uppercase text-slate-500">Source scan</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100 text-sm dark:divide-slate-800">
+                    @foreach ($backlinksSummary['linking_pages'] as $row)
+                        <tr>
+                            <td class="px-3 py-2">
+                                <a href="{{ $row->from_url }}" target="_blank" rel="noopener" class="block truncate text-indigo-600 hover:underline dark:text-indigo-400">{{ $row->from_title ?: $row->from_url }}</a>
+                                <p class="text-[11px] text-slate-500">{{ $row->from_domain }}</p>
+                            </td>
+                            <td class="px-3 py-2 text-xs text-slate-600">{{ $row->anchor_text ?: '—' }}</td>
+                            <td class="px-3 py-2 text-xs text-slate-500">
+                                {{ $row->scan_seed }}
+                                @if ($row->scanned_at)
+                                    · {{ \Illuminate\Support\Carbon::parse($row->scanned_at)->diffForHumans() }}
+                                @endif
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
 </div>

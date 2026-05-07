@@ -46,6 +46,16 @@ class KeywordEnrichmentService
 
     private function maybeFetchVolume(Keyword $keyword, KeywordIntelligence $intel, ?Website $website): void
     {
+        // Operator gate. KE bills 1 credit per keyword per request; the
+        // pipeline enrichment path can blow through credits fast on a
+        // freshly-scraped corpus. Read live from the admin settings so
+        // the operator can flip without redeploying. Manual
+        // /research/keywords lookups still go through their own path
+        // and aren't gated by this flag.
+        if (! \App\Support\ResearchEngineSettings::autoFetchVolume()) {
+            return;
+        }
+
         if ($intel->last_metrics_at !== null && $intel->last_metrics_at->gt(Carbon::now()->subDays(30))) {
             return;
         }

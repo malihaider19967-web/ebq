@@ -25,3 +25,7 @@ Schedule::command('ebq:reclassify-niches')->monthlyOn(1, '04:00');
 Schedule::command('ebq:discover-emerging-niches')->weeklyOn(1, '05:00');
 Schedule::command('ebq:research-volatility-scan')->dailyAt('06:00');
 Schedule::command('ebq:detect-research-signals')->dailyAt('07:45');
+
+// Continuous research engine: scheduler tick + daily bootstrap.
+Schedule::command('ebq:research-scan-next')->everyFifteenMinutes();
+Schedule::command('ebq:research-bootstrap-websites')->dailyAt('05:30');

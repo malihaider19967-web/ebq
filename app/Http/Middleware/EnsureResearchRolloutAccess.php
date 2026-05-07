@@ -27,15 +27,15 @@ class EnsureResearchRolloutAccess
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $mode = (string) config('research.rollout.mode', 'ga');
+        $mode = \App\Support\ResearchEngineSettings::rolloutMode();
         if ($mode === 'ga') {
             return $next($request);
         }
 
         $websiteId = (int) session('current_website_id', 0);
-        $allowlist = (array) config('research.rollout.allowlist', []);
+        $allowlist = \App\Support\ResearchEngineSettings::rolloutAllowlist();
 
-        if ($websiteId > 0 && in_array($websiteId, array_map('intval', $allowlist), true)) {
+        if ($websiteId > 0 && in_array($websiteId, $allowlist, true)) {
             return $next($request);
         }
 

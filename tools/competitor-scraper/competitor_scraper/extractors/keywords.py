@@ -12,10 +12,11 @@ from typing import Iterable
 import yake
 
 
-SHORT_TAIL_MAX_N = 2
-LONG_TAIL_MIN_N = 3
+SHORT_TAIL_MIN_N = 2
+SHORT_TAIL_MAX_N = 3
+LONG_TAIL_MIN_N = 4
 LONG_TAIL_MAX_N = 7
-TOP_PER_BUCKET = 20
+TOP_PER_BUCKET = 25
 
 
 @dataclass(frozen=True)
@@ -34,35 +35,36 @@ class KeywordResult:
 
 
 def extract_keywords(text: str, *, language: str = "en") -> KeywordResult:
-    """Run YAKE twice — once for short n-grams, once for long. YAKE's
-    de-duplication threshold is set so near-duplicate phrases don't crowd
-    out the top-N (e.g. "running shoes" + "best running shoes" both stay)."""
+    """Single YAKE pass at n=LONG_TAIL_MAX_N, then partition the results
+    by phrase length. Single-word phrases are dropped — they're too
+    generic to be useful for SEO research and crowd out genuine
+    multi-word terms.
+
+    YAKE's de-duplication threshold is loose so near-duplicate phrases
+    survive (e.g. both "running shoes" and "best running shoes" stay) —
+    they convey different intent."""
     if not text or len(text.split()) < 5:
         return KeywordResult(short_tail=[], long_tail=[])
 
-    short = yake.KeywordExtractor(
-        lan=language,
-        n=SHORT_TAIL_MAX_N,
-        dedupLim=0.7,
-        top=TOP_PER_BUCKET,
-    ).extract_keywords(text)
-
-    long = yake.KeywordExtractor(
+    raw = yake.KeywordExtractor(
         lan=language,
         n=LONG_TAIL_MAX_N,
         dedupLim=0.7,
-        top=TOP_PER_BUCKET,
+        top=TOP_PER_BUCKET * 4,  # over-fetch then partition
     ).extract_keywords(text)
 
-    short_phrases = [
-        ScoredPhrase(phrase=phrase, score=float(score))
-        for phrase, score in short
-        if 1 <= len(phrase.split()) <= SHORT_TAIL_MAX_N
-    ]
-    long_phrases = [
-        ScoredPhrase(phrase=phrase, score=float(score))
-        for phrase, score in long
-        if LONG_TAIL_MIN_N <= len(phrase.split()) <= LONG_TAIL_MAX_N
-    ]
+    short: list[ScoredPhrase] = []
+    long: list[ScoredPhrase] = []
 
-    return KeywordResult(short_tail=short_phrases[:TOP_PER_BUCKET], long_tail=long_phrases[:TOP_PER_BUCKET])
+    for phrase, score in raw:
+        words = len(phrase.split())
+        if SHORT_TAIL_MIN_N <= words <= SHORT_TAIL_MAX_N:
+            short.append(ScoredPhrase(phrase=phrase, score=float(score)))
+        elif LONG_TAIL_MIN_N <= words <= LONG_TAIL_MAX_N:
+            long.append(ScoredPhrase(phrase=phrase, score=float(score)))
+        # 1-word phrases and >7-word phrases discarded.
+
+    return KeywordResult(
+        short_tail=short[:TOP_PER_BUCKET],
+        long_tail=long[:TOP_PER_BUCKET],
+    )

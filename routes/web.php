@@ -191,6 +191,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         Route::delete('/niche-candidates/{niche}', [\App\Http\Controllers\Admin\NicheCandidateController::class, 'destroy'])
             ->whereNumber('niche')->name('niche-candidates.destroy');
 
+        Route::get('/settings', [\App\Http\Controllers\Admin\ResearchSettingsController::class, 'show'])
+            ->name('settings.show');
+        Route::put('/settings', [\App\Http\Controllers\Admin\ResearchSettingsController::class, 'update'])
+            ->name('settings.update');
+
         Route::prefix('competitor-scans')->name('competitor-scans.')->group(function (): void {
             Route::get('/', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'index'])->name('index');
             Route::get('/create', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'create'])->name('create');

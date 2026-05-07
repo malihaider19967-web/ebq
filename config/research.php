@@ -24,6 +24,13 @@ return [
         'enabled' => filter_var(env('RESEARCH_EMBEDDINGS_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
     ],
 
+    // Auto-fetch search volume / CPC / competition from KeywordsEverywhere
+    // during pipeline enrichment. Off by default — KE charges 1 credit
+    // per keyword per request, so flip it on only when the operator wants
+    // to spend budget on broad enrichment. Manual one-off lookups (e.g.
+    // from /research/keywords) still hit KE regardless.
+    'auto_fetch_volume' => filter_var(env('RESEARCH_AUTO_FETCH_VOLUME', false), FILTER_VALIDATE_BOOLEAN),
+
     // Competitor scraper subprocess. The Python tool is invoked by
     // RunCompetitorScanJob; it reads MySQL credentials from this same
     // Laravel .env, so no credential duplication.

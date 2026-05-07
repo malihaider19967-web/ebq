@@ -26,7 +26,7 @@ class CompetitorScanResults extends Component
         $this->scanId = $scanId;
     }
 
-    public function render()
+    public function render(\App\Services\Research\BacklinksLookupService $backlinks)
     {
         $scan = CompetitorScan::query()->find($this->scanId);
         if ($scan === null) {
@@ -37,6 +37,7 @@ class CompetitorScanResults extends Component
                 'seedRankings' => collect(),
                 'topExternalDomains' => collect(),
                 'pages' => collect(),
+                'backlinks' => null,
             ]);
         }
 
@@ -131,6 +132,12 @@ class CompetitorScanResults extends Component
             ->limit(50)
             ->get(['id', 'url', 'title', 'meta_description', 'word_count', 'depth', 'is_external']);
 
+        // Backlinks: cross-scan inverted view. Anything any other scan
+        // saw linking to THIS scan's seed_domain. Grows in value as the
+        // research engine accumulates more crawls — that's the
+        // SEMrush/Ahrefs moat.
+        $backlinksSummary = $backlinks->summary($scan->seed_domain, linkLimit: 50, anchorLimit: 15);
+
         return view('livewire.admin.competitor-scan-results', compact(
             'scan',
             'topics',
@@ -139,6 +146,7 @@ class CompetitorScanResults extends Component
             'seedRankings',
             'topExternalDomains',
             'pages',
+            'backlinksSummary',
         ));
     }
 }
