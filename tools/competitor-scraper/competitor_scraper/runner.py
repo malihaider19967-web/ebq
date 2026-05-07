@@ -46,7 +46,14 @@ def run_scan(scan_id: int) -> int:
     writer = HeartbeatWriter(scan_id)
     writer.mark_running()
 
-    output_dir = Path("./out")
+    # Output dir resolution:
+    #   1. COMPETITOR_SCRAPER_OUT_DIR env var (set by Laravel's RunCompetitorScanJob)
+    #   2. ./out relative to cwd (default for manual / dev runs)
+    # Laravel points us at storage/app/research-scraper/ so the queue
+    # worker (www-data) can always write there regardless of who first
+    # ran the scraper manually.
+    import os
+    output_dir = Path(os.environ.get("COMPETITOR_SCRAPER_OUT_DIR") or "./out")
     output_dir.mkdir(parents=True, exist_ok=True)
     scratch_db = output_dir / f"scratch-{scan_id}-{int(time.time())}.db"
 

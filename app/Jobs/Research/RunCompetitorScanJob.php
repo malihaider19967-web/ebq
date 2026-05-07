@@ -50,10 +50,20 @@ class RunCompetitorScanJob implements ShouldQueue
         $python = (string) config('research.scraper.python_path', 'python');
         $cwd = (string) config('research.scraper.cwd', base_path('tools/competitor-scraper'));
 
+        // Force the scratch SQLite into a location every queue-worker
+        // user can write to. storage/app is conventionally owned by
+        // www-data with group sticky bits set; using ./out from the
+        // tool dir runs into permission-mismatch headaches when an
+        // operator first runs the scraper manually as root.
+        $outDir = storage_path('app/research-scraper');
+        if (! is_dir($outDir)) {
+            @mkdir($outDir, 0775, true);
+        }
+
         $process = new Process(
             [$python, '-m', 'competitor_scraper', 'run', '--scan-id', (string) $this->scanId],
             $cwd,
-            null,
+            ['COMPETITOR_SCRAPER_OUT_DIR' => $outDir],
             null,
             $this->timeout,
         );

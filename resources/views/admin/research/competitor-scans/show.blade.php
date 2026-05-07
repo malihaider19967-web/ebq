@@ -11,5 +11,7 @@
         @endif
 
         <livewire:admin.competitor-scan-monitor :scan-id="$scan->id" />
+
+        <livewire:admin.competitor-scan-results :scan-id="$scan->id" />
     </div>
 </x-layouts.app>
