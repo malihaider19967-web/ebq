@@ -36,7 +36,7 @@
     <header class="sticky top-0 z-40 border-b border-slate-200/80 bg-white/80 backdrop-blur-xl">
         <div class="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-4 lg:px-8">
             <a href="{{ route('landing') }}" class="inline-flex items-center gap-2.5" aria-label="EBQ home">
-                <img src="{{ asset('logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 rounded-lg ring-1 ring-slate-200">
+                <img src="{{ asset('ebq-logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 object-contain rounded-lg ring-1 ring-slate-200">
                 <span class="text-[15px] font-semibold tracking-tight text-slate-900">EBQ</span>
             </a>
 
@@ -65,7 +65,7 @@
         <div class="mx-auto grid max-w-6xl gap-10 px-6 py-14 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-5 lg:px-8">
             <div class="lg:col-span-2">
                 <a href="{{ route('landing') }}" class="inline-flex items-center gap-2.5" aria-label="EBQ home">
-                    <img src="{{ asset('logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 rounded-lg ring-1 ring-slate-200">
+                    <img src="{{ asset('ebq-logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 object-contain rounded-lg ring-1 ring-slate-200">
                     <span class="text-[15px] font-semibold tracking-tight text-slate-900">EBQ</span>
                 </a>
                 <p class="mt-4 max-w-xs text-slate-500">The SEO command center for teams that ship every week. Discover, prioritize, execute, measure.</p>

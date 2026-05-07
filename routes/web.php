@@ -124,6 +124,7 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
         Route::view('/opportunities', 'research.opportunities')->name('opportunities');
         Route::view('/alerts', 'research.alerts')->name('alerts');
         Route::view('/reverse', 'research.reverse')->name('reverse');
+        Route::view('/performance', 'research.performance')->name('performance');
     });
 });
 
@@ -181,6 +182,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/plans', [AdminPlanController::class, 'store'])->name('plans.store');
     Route::get('/plans/{plan}/edit', [AdminPlanController::class, 'edit'])->name('plans.edit');
     Route::put('/plans/{plan}', [AdminPlanController::class, 'update'])->name('plans.update');
+
+    Route::prefix('research')->name('research.')->group(function (): void {
+        Route::get('/niche-candidates', [\App\Http\Controllers\Admin\NicheCandidateController::class, 'index'])
+            ->name('niche-candidates.index');
+        Route::post('/niche-candidates/{niche}/approve', [\App\Http\Controllers\Admin\NicheCandidateController::class, 'approve'])
+            ->whereNumber('niche')->name('niche-candidates.approve');
+        Route::delete('/niche-candidates/{niche}', [\App\Http\Controllers\Admin\NicheCandidateController::class, 'destroy'])
+            ->whereNumber('niche')->name('niche-candidates.destroy');
+    });
 });
 
 Route::middleware('auth')->post('/admin/impersonation/stop', [ClientImpersonationController::class, 'stop'])->name('admin.impersonation.stop');

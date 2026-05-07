@@ -6,6 +6,8 @@ use App\Models\Research\Keyword;
 use App\Models\Research\KeywordCluster;
 use App\Models\Research\SerpResult;
 use App\Models\Research\SerpSnapshot;
+use App\Services\Research\Niche\EmbeddingCache;
+use App\Services\Research\Niche\EmbeddingProvider;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -24,6 +26,8 @@ class ClusteringService
 {
     public function __construct(
         private readonly float $similarityThreshold = 0.4,
+        private readonly ?EmbeddingProvider $embedding = null,
+        private readonly float $embeddingThreshold = 0.6,
     ) {}
 
     /**
@@ -32,20 +36,30 @@ class ClusteringService
      */
     public function cluster(iterable $keywords): Collection
     {
-        $domainSets = [];   // keyword_id => set<domain>
+        $useEmbeddings = $this->embedding !== null && $this->embedding->isAvailable();
+
+        $signatures = [];   // keyword_id => domain-set OR embedding vector
         $keywordById = [];  // keyword_id => Keyword
+        $cache = $useEmbeddings ? new EmbeddingCache($this->embedding) : null;
 
         foreach ($keywords as $keyword) {
             $keywordById[$keyword->id] = $keyword;
-            $domainSets[$keyword->id] = $this->topDomainsFor($keyword);
+            if ($useEmbeddings) {
+                $vec = $cache?->forKeyword($keyword);
+                if ($vec !== null) {
+                    $signatures[$keyword->id] = $vec;
+                }
+            } else {
+                $signatures[$keyword->id] = $this->topDomainsFor($keyword);
+            }
         }
 
-        if ($domainSets === []) {
+        if ($signatures === []) {
             return collect();
         }
 
         $parent = [];
-        foreach (array_keys($domainSets) as $id) {
+        foreach (array_keys($signatures) as $id) {
             $parent[$id] = $id;
         }
 
@@ -58,12 +72,21 @@ class ClusteringService
             return $x;
         };
 
-        $ids = array_keys($domainSets);
+        $ids = array_keys($signatures);
         for ($i = 0; $i < count($ids); $i++) {
             for ($j = $i + 1; $j < count($ids); $j++) {
                 $a = $ids[$i];
                 $b = $ids[$j];
-                if ($this->jaccard($domainSets[$a], $domainSets[$b]) >= $this->similarityThreshold) {
+
+                if ($useEmbeddings) {
+                    $sim = EmbeddingCache::cosine($signatures[$a], $signatures[$b]);
+                    $hit = $sim >= $this->embeddingThreshold;
+                } else {
+                    $sim = $this->jaccard($signatures[$a], $signatures[$b]);
+                    $hit = $sim >= $this->similarityThreshold;
+                }
+
+                if ($hit) {
                     $ra = $find($a);
                     $rb = $find($b);
                     if ($ra !== $rb) {
@@ -85,7 +108,7 @@ class ClusteringService
                 ['centroid_keyword_id' => $centroid->id],
                 [
                     'cluster_name' => $centroid->normalized_query,
-                    'signal' => 'serp_overlap',
+                    'signal' => $useEmbeddings ? 'embedding' : 'serp_overlap',
                     'last_recomputed_at' => Carbon::now(),
                 ]
             );

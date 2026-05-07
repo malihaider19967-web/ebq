@@ -20,7 +20,7 @@
         {{-- Sidebar --}}
         <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-200 md:static md:translate-x-0 dark:border-slate-800 dark:bg-slate-950">
             <div class="flex h-16 items-center gap-2.5 border-b border-slate-200 px-5 dark:border-slate-800">
-                <img src="{{ asset('logo.png') }}" alt="EBQ" width="28" height="28" class="h-7 w-7 rounded-md ring-1 ring-slate-200 dark:ring-slate-700">
+                <img src="{{ asset('ebq-logo.png') }}" alt="EBQ" width="28" height="28" class="h-7 w-7 object-contain rounded-md ring-1 ring-slate-200 dark:ring-slate-700">
                 <span class="text-[14px] font-semibold tracking-tight text-slate-900 dark:text-slate-100">EBQ</span>
             </div>
 

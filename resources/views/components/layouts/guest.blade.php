@@ -17,7 +17,7 @@
         {{-- Brand panel --}}
         <div class="hidden w-1/2 flex-col justify-between border-r border-slate-200 bg-slate-50 p-12 lg:flex">
             <a href="{{ route('landing') }}" class="inline-flex items-center gap-2.5">
-                <img src="{{ asset('logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 rounded-lg ring-1 ring-slate-200">
+                <img src="{{ asset('ebq-logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 object-contain rounded-lg ring-1 ring-slate-200">
                 <span class="text-[15px] font-semibold tracking-tight text-slate-900">EBQ</span>
             </a>
 
@@ -53,7 +53,7 @@
         <div class="flex w-full flex-col items-center justify-center bg-white p-6 lg:w-1/2 lg:p-12">
             <div class="mb-8 lg:hidden">
                 <a href="{{ route('landing') }}" class="inline-flex items-center gap-2.5">
-                    <img src="{{ asset('logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 rounded-lg ring-1 ring-slate-200">
+                    <img src="{{ asset('ebq-logo.png') }}" alt="EBQ" width="32" height="32" class="h-8 w-8 object-contain rounded-lg ring-1 ring-slate-200">
                     <span class="text-[15px] font-semibold tracking-tight text-slate-900">EBQ</span>
                 </a>
             </div>

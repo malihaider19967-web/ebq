@@ -13,6 +13,7 @@
             ['route' => 'research.coverage', 'label' => 'Coverage Score', 'desc' => 'Per-page subtopic coverage benchmarked against the niche.'],
             ['route' => 'research.internal-links', 'label' => 'Internal Links', 'desc' => 'Suggested source pages for any target page\'s primary keywords.'],
             ['route' => 'research.alerts', 'label' => 'Alerts', 'desc' => 'Ranking drops, new opportunities, SERP changes, volatility spikes.'],
+            ['route' => 'research.performance', 'label' => 'Performance vs niche', 'desc' => 'Page-keyword CTR benchmarked against the anonymised niche aggregate.'],
         ];
     @endphp
     <div class="space-y-6">

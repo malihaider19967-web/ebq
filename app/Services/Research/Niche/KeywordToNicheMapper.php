@@ -53,12 +53,57 @@ class KeywordToNicheMapper
             return $tokenMatches;
         }
 
+        if ($this->embedding !== null && $this->embedding->isAvailable()) {
+            $embeddingMatches = $this->classifyWithEmbeddings($query);
+            if ($embeddingMatches->isNotEmpty()) {
+                if ($keywordId !== null) {
+                    $this->cache($keywordId, $embeddingMatches);
+                }
+
+                return $embeddingMatches;
+            }
+        }
+
         $llmMatches = $this->classifyWithLlm($query);
         if ($llmMatches->isNotEmpty() && $keywordId !== null) {
             $this->cache($keywordId, $llmMatches);
         }
 
         return $llmMatches;
+    }
+
+    /**
+     * @return Collection<int, array{niche_id:int, relevance_score:float}>
+     */
+    private function classifyWithEmbeddings(string $query): Collection
+    {
+        $cache = new EmbeddingCache($this->embedding);
+        $queryVec = $cache->forText($query);
+        if ($queryVec === null) {
+            return collect();
+        }
+
+        $scored = [];
+
+        Niche::query()
+            ->where('is_approved', true)
+            ->whereNotNull('parent_id')
+            ->chunkById(200, function ($niches) use ($cache, $queryVec, &$scored): void {
+                foreach ($niches as $niche) {
+                    $vec = $cache->forNiche($niche);
+                    if ($vec === null) {
+                        continue;
+                    }
+                    $sim = EmbeddingCache::cosine($queryVec, $vec);
+                    if ($sim >= 0.3) {
+                        $scored[] = ['niche_id' => $niche->id, 'relevance_score' => round($sim, 4)];
+                    }
+                }
+            });
+
+        usort($scored, fn ($a, $b) => $b['relevance_score'] <=> $a['relevance_score']);
+
+        return collect(array_slice($scored, 0, 3));
     }
 
     /** @return Collection<int, array{niche_id:int, relevance_score:float}> */
