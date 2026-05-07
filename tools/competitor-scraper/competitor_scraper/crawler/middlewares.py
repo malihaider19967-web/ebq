@@ -1,15 +1,23 @@
 """
 Scrapy downloader middlewares.
 
-  PerDomainCapMiddleware           Drops outgoing requests for
-                                   non-seed-domain URLs once the per-
-                                   domain cap is reached. Also enforces
-                                   the global max_total_pages.
+  SeedDomainOnlyMiddleware         Drops every request that escapes the
+                                   seed domain. Defense-in-depth — the
+                                   spider already filters externals
+                                   upstream, but a redirect can land us
+                                   off-domain. Also enforces the global
+                                   max_total_pages.
 
   SeedKeywordPriorityMiddleware    Bumps the priority of requests whose
                                    anchor text contains a seed token, so
                                    the crawl reaches seed-relevant pages
                                    first. Doesn't gate; just biases.
+
+Note: cross-domain follow used to live here (per-domain cap, global cap).
+Removed in favour of `AutoEnqueueOutlinksJob` queueing every external
+to_domain as a separate research_target after the scan completes — each
+domain becomes its own focused scan instead of grabbing a few random
+pages mid-crawl.
 """
 
 from __future__ import annotations
@@ -27,15 +35,14 @@ from scrapy.exceptions import IgnoreRequest
 logger = logging.getLogger(__name__)
 
 
-class PerDomainCapMiddleware:
-    """Cap requests per registered domain (other than the seed domain)
-    and enforce the global max_total_pages."""
+class SeedDomainOnlyMiddleware:
+    """Stops the crawl from straying off the seed domain (e.g., via a
+    redirect that lands on a different host). Also enforces the global
+    max_total_pages cap."""
 
     def __init__(self) -> None:
         self.seed_domain: Optional[str] = None
-        self.max_external_per_domain: int = 5
         self.max_total_pages: int = 1000
-        self._counts: dict[str, int] = defaultdict(int)
         self._total: int = 0
 
     @classmethod
@@ -46,7 +53,6 @@ class PerDomainCapMiddleware:
 
     def spider_opened(self, spider):
         self.seed_domain = getattr(spider, "seed_domain", None)
-        self.max_external_per_domain = int(getattr(spider, "max_pages_per_external_domain", 5))
         self.max_total_pages = int(getattr(spider, "max_total_pages", 1000))
 
     def process_request(self, request, spider):
@@ -55,9 +61,10 @@ class PerDomainCapMiddleware:
 
         domain = self._registered_domain(request.url)
         if self.seed_domain and domain != self.seed_domain:
-            if self._counts[domain] >= self.max_external_per_domain:
-                raise IgnoreRequest(f"per-domain cap reached for {domain}")
-            self._counts[domain] += 1
+            raise IgnoreRequest(
+                f"off-domain request to {domain} (only {self.seed_domain} crawled; "
+                f"external domains queued as research_targets after scan)"
+            )
 
         self._total += 1
         return None
@@ -67,6 +74,11 @@ class PerDomainCapMiddleware:
         if not ext.suffix:
             return ext.domain.lower()
         return f"{ext.domain}.{ext.suffix}".lower()
+
+
+# Backwards-compatible alias so existing pipelines / settings strings
+# pointing at the old name keep working until callers are updated.
+PerDomainCapMiddleware = SeedDomainOnlyMiddleware
 
 
 class SeedKeywordPriorityMiddleware:

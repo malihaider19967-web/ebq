@@ -19,7 +19,6 @@ class CompetitorScrape extends Command
                             {--keywords= : Comma-separated seed keywords}
                             {--max-pages=250 : max_total_pages cap}
                             {--max-depth=4 : max_depth cap}
-                            {--max-external=5 : max_pages_per_external_domain cap}
                             {--sync : Run synchronously instead of dispatching}';
 
     protected $description = 'Queue a competitor scrape (canonical path is the admin UI).';
@@ -55,7 +54,6 @@ class CompetitorScrape extends Command
             'seed_keywords' => $seeds,
             'caps' => [
                 'max_total_pages' => max(10, (int) $this->option('max-pages')),
-                'max_pages_per_external_domain' => max(0, (int) $this->option('max-external')),
                 'max_depth' => max(1, (int) $this->option('max-depth')),
             ],
             'status' => CompetitorScan::STATUS_QUEUED,

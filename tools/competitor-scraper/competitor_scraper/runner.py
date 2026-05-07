@@ -65,9 +65,9 @@ def run_scan(scan_id: int) -> int:
         process.crawl(
             CompetitorSpider,
             seed_url=scan["seed_url"],
-            max_total_pages=scan["caps"]["max_total_pages"],
-            max_pages_per_external_domain=scan["caps"]["max_pages_per_external_domain"],
-            max_depth=scan["caps"]["max_depth"],
+            max_total_pages=scan["caps"].get("max_total_pages", 1000),
+            max_pages_per_external_domain=scan["caps"].get("max_pages_per_external_domain", 5),
+            max_depth=scan["caps"].get("max_depth", 4),
             seed_keywords=scan["seed_keywords"],
             scan_id=scan_id,
             scratch_db=str(scratch_db),
@@ -125,7 +125,7 @@ def _scrapy_settings(scan: dict, scratch_db: Path) -> dict:
             "competitor_scraper.crawler.pipelines.HeartbeatPipeline": 400,
         },
         "DOWNLOADER_MIDDLEWARES": {
-            "competitor_scraper.crawler.middlewares.PerDomainCapMiddleware": 543,
+            "competitor_scraper.crawler.middlewares.SeedDomainOnlyMiddleware": 543,
             "competitor_scraper.crawler.middlewares.SeedKeywordPriorityMiddleware": 544,
         },
         "LOG_LEVEL": "INFO",

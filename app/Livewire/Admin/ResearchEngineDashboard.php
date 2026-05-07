@@ -59,7 +59,6 @@ class ResearchEngineDashboard extends Component
             'seed_keywords' => $target->seed_keywords ?? [],
             'caps' => [
                 'max_total_pages' => 250,
-                'max_pages_per_external_domain' => 5,
                 'max_depth' => 4,
             ],
             'status' => CompetitorScan::STATUS_QUEUED,

@@ -173,13 +173,22 @@ class CompetitorSpider(scrapy.Spider):
             return
 
         for to_url, _hash, _to_domain, anchor, target_external in outlinks:
+            if target_external:
+                # Outlink is already recorded on the page item above and
+                # will land in `competitor_outlinks`. We don't fetch
+                # external pages mid-crawl — AutoEnqueueOutlinksJob
+                # promotes every external `to_domain` into a separate
+                # research_target after the scan completes, so each
+                # external domain becomes its own focused scrape.
+                continue
+
             request = scrapy.Request(
                 to_url,
                 callback=self.parse,
                 cb_kwargs={"depth": depth + 1},
                 meta={
                     "anchor_text": anchor,
-                    "is_external_target": target_external,
+                    "is_external_target": False,
                     "seed_keywords": self.seed_keywords,
                 },
             )

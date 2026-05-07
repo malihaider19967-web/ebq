@@ -40,7 +40,6 @@ class CompetitorScanController extends Controller
             'websites' => Website::query()->orderBy('domain')->get(['id', 'domain']),
             'defaults' => [
                 'max_total_pages' => 250,
-                'max_pages_per_external_domain' => 5,
                 'max_depth' => 4,
             ],
             'ceilings' => $this->ceilings(),
@@ -56,7 +55,6 @@ class CompetitorScanController extends Controller
             'website_id' => 'nullable|integer|exists:websites,id',
             'seed_keywords' => 'nullable|string|max:8000',
             'max_total_pages' => 'required|integer|min:10|max:'.$cfg['max_total_pages'],
-            'max_pages_per_external_domain' => 'required|integer|min:0|max:'.$cfg['max_pages_per_external_domain'],
             'max_depth' => 'required|integer|min:1|max:'.$cfg['max_depth'],
         ]);
 
@@ -91,7 +89,6 @@ class CompetitorScanController extends Controller
             'seed_keywords' => $seeds,
             'caps' => [
                 'max_total_pages' => (int) $data['max_total_pages'],
-                'max_pages_per_external_domain' => (int) $data['max_pages_per_external_domain'],
                 'max_depth' => (int) $data['max_depth'],
             ],
             'status' => CompetitorScan::STATUS_QUEUED,
@@ -148,7 +145,6 @@ class CompetitorScanController extends Controller
         $scraper = \App\Support\ResearchEngineSettings::scraper();
         return [
             'max_total_pages' => (int) $scraper['ceiling_total_pages'],
-            'max_pages_per_external_domain' => (int) $scraper['ceiling_external_per_domain'],
             'max_depth' => (int) $scraper['ceiling_depth'],
         ];
     }

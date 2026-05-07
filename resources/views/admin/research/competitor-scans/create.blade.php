@@ -42,7 +42,7 @@
                 <p class="mt-1 text-[11px] text-slate-500">Used three ways: bias the crawl frontier toward seed-relevant pages, count occurrences per page, rank the competitor's best pages per keyword.</p>
             </div>
 
-            <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                     <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Max total pages</label>
                     <input type="number" name="max_total_pages" value="{{ old('max_total_pages', $defaults['max_total_pages']) }}" min="10" max="{{ $ceilings['max_total_pages'] }}" required
@@ -50,17 +50,12 @@
                     <p class="mt-1 text-[11px] text-slate-500">Server ceiling: {{ number_format($ceilings['max_total_pages']) }}</p>
                 </div>
                 <div>
-                    <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Max external pages per domain</label>
-                    <input type="number" name="max_pages_per_external_domain" value="{{ old('max_pages_per_external_domain', $defaults['max_pages_per_external_domain']) }}" min="0" max="{{ $ceilings['max_pages_per_external_domain'] }}" required
-                        class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
-                    <p class="mt-1 text-[11px] text-slate-500">0 disables external follow.</p>
-                </div>
-                <div>
                     <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-300">Max depth</label>
                     <input type="number" name="max_depth" value="{{ old('max_depth', $defaults['max_depth']) }}" min="1" max="{{ $ceilings['max_depth'] }}" required
                         class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-sm shadow-sm dark:border-slate-700 dark:bg-slate-800" />
                 </div>
             </div>
+            <p class="text-[11px] text-slate-500">Crawl is bounded to the seed domain only. External links are recorded as outlinks; their domains become future research_targets after this scan completes.</p>
 
             <div class="pt-2">
                 <button type="submit" class="inline-flex h-9 items-center justify-center rounded-md bg-indigo-600 px-4 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700">Queue scan</button>
