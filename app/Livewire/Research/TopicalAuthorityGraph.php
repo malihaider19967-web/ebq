@@ -54,7 +54,8 @@ class TopicalAuthorityGraph extends Component
         if ($this->nicheId !== null) {
             $keywordIdsInNiche = NicheKeywordMap::query()
                 ->where('niche_id', $this->nicheId)
-                ->pluck('keyword_id');
+                ->pluck('keyword_id')
+                ->map(fn ($v) => (int) $v);
             $keywordCount = $keywordIdsInNiche->count();
 
             $coveredKeywordIds = $this->websiteId === 0
@@ -67,11 +68,35 @@ class TopicalAuthorityGraph extends Component
                     ->unique();
 
             if ($keywordIdsInNiche->isNotEmpty()) {
+                // Match on EITHER centroid OR any top_keyword_id —
+                // see TopicExplorer for the rationale.
+                $nicheKeywordSet = $keywordIdsInNiche->flip();
                 $topics = CompetitorTopic::query()
-                    ->whereIn('centroid_keyword_id', $keywordIdsInNiche)
+                    ->where(function ($q) use ($keywordIdsInNiche) {
+                        $q->whereIn('centroid_keyword_id', $keywordIdsInNiche);
+                        foreach ($keywordIdsInNiche as $kid) {
+                            $q->orWhere('top_keyword_ids', 'like', '%'.$kid.'%');
+                        }
+                    })
                     ->orderByDesc('page_count')
-                    ->limit(40)
-                    ->get();
+                    ->limit(400)
+                    ->get()
+                    ->filter(function ($topic) use ($nicheKeywordSet) {
+                        if ($topic->centroid_keyword_id !== null && $nicheKeywordSet->has((int) $topic->centroid_keyword_id)) {
+                            return true;
+                        }
+                        foreach ((array) $topic->top_keyword_ids as $kid) {
+                            if (! is_int($kid) && ! ctype_digit((string) $kid)) {
+                                continue;
+                            }
+                            if ($nicheKeywordSet->has((int) $kid)) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    })
+                    ->take(40)
+                    ->values();
 
                 $rows = $topics->map(function (CompetitorTopic $topic) use ($coveredKeywordIds) {
                     $topicKeywordIds = collect((array) $topic->top_keyword_ids)

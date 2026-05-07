@@ -42,7 +42,8 @@ class TopicExplorer extends Component
 
         $keywordIds = NicheKeywordMap::query()
             ->where('niche_id', $this->nicheId)
-            ->pluck('keyword_id');
+            ->pluck('keyword_id')
+            ->map(fn ($v) => (int) $v);
 
         $payload['keywordCount'] = $keywordIds->count();
 
@@ -50,12 +51,42 @@ class TopicExplorer extends Component
             return view('livewire.research.topic-explorer', $payload);
         }
 
+        // Match on EITHER centroid_keyword_id OR any id in
+        // top_keyword_ids JSON. The centroid is YAKE's top-1 phrase
+        // per cluster and often isn't what the niche-mapper hooked
+        // onto. Broadening surfaces topics whose top phrases include
+        // niche keywords even when the centroid wasn't classifiable.
+        $keywordIdSet = $keywordIds->flip();
         $topics = CompetitorTopic::query()
             ->with(['scan:id,seed_domain,finished_at', 'centroid:id,query'])
-            ->whereIn('centroid_keyword_id', $keywordIds)
+            ->where(function ($q) use ($keywordIds) {
+                $q->whereIn('centroid_keyword_id', $keywordIds);
+                foreach ($keywordIds as $kid) {
+                    // LIKE-based prefilter against the JSON column is
+                    // intentionally permissive — the in-PHP filter
+                    // below tightens it to actual array membership.
+                    $q->orWhere('top_keyword_ids', 'like', '%'.$kid.'%');
+                }
+            })
             ->orderByDesc('page_count')
-            ->limit(50)
-            ->get();
+            ->limit(500)
+            ->get()
+            ->filter(function ($topic) use ($keywordIdSet) {
+                if ($topic->centroid_keyword_id !== null && $keywordIdSet->has((int) $topic->centroid_keyword_id)) {
+                    return true;
+                }
+                foreach ((array) $topic->top_keyword_ids as $kid) {
+                    if (! is_int($kid) && ! ctype_digit((string) $kid)) {
+                        continue;
+                    }
+                    if ($keywordIdSet->has((int) $kid)) {
+                        return true;
+                    }
+                }
+                return false;
+            })
+            ->take(50)
+            ->values();
 
         $allKeywordIds = $topics->flatMap(fn ($t) => (array) $t->top_keyword_ids)
             ->filter(fn ($v) => is_int($v) || ctype_digit((string) $v))
