@@ -107,7 +107,7 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/reports', 'reports.index')->middleware('feature:reports')->name('reports.index');
     Route::view('/settings', 'settings.index')->middleware('feature:settings')->name('settings.index');
 
-    Route::middleware(['feature:research', 'research.rollout'])->prefix('research')->name('research.')->group(function () {
+    Route::middleware(['admin', 'feature:research', 'research.rollout'])->prefix('research')->name('research.')->group(function () {
         Route::view('/', 'research.index')->name('index');
         Route::view('/keywords', 'research.keywords')->name('keywords');
         Route::view('/topics', 'research.topics')->name('topics');
