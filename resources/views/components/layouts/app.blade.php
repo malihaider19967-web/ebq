@@ -18,7 +18,7 @@
 
     <div class="min-h-screen md:flex">
         {{-- Sidebar --}}
-        <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-200 md:static md:translate-x-0 dark:border-slate-800 dark:bg-slate-950">
+        <aside :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full'" class="fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-slate-200 bg-white transition-transform duration-200 md:sticky md:top-0 md:h-screen md:translate-x-0 dark:border-slate-800 dark:bg-slate-950">
             <div class="flex h-16 items-center justify-center border-b border-slate-200 px-5 dark:border-slate-800">
                 <img src="{{ asset('ebq-logo.png') }}" alt="EBQ" width="48" height="48" class="h-12 w-12 object-contain">
             </div>
