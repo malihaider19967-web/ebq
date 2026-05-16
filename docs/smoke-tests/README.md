@@ -40,6 +40,22 @@ EBQ host (`/var/www/ebq/`) and the WP-CLI installed on a connected site.
 - [12 — Topical authority map](12-topical-authority-map.md)
 - [13 — Entity coverage](13-entity-coverage.md)
 
+### Phase 4 — Rank-Math-parity push (2026-05)
+
+- [14 — Link Genius (orphan/broken/anchor bulk)](14-link-genius.md)
+- [15 — News sitemap + NewsArticle schema](15-news-sitemap.md)
+- [16 — WooCommerce Pro (GTIN/MPN/ISBN, auto-noindex)](16-woo-pro.md)
+- [17 — Multi-location Local SEO (CPT, KML, finder)](17-multi-location.md)
+- [18 — Bulk Image SEO (find-replace + AI alt)](18-image-bulk.md)
+- [19 — Analytics Pro (AI traffic, winners/losers, drilldown)](19-analytics-pro.md)
+- [20 — White-label client reports](20-white-label-reports.md)
+- [21 — Sitewide SEO Analyzer](21-site-audit.md)
+- [22 — Role Manager](22-role-manager.md)
+- [23 — Schema Spy (import-from-URL)](23-schema-spy.md)
+- [24 — AI Related Posts block](24-related-posts.md)
+- [25 — LLMs.txt endpoint](25-llms-txt.md)
+- [26 — Instant Indexing admin page](26-instant-indexing.md)
+
 ## Conventions used in every doc
 
 - `<WEBSITE_ID>` — the `websites.id` of the test site

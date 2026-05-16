@@ -23,10 +23,30 @@ delegates to the owning user (clamped to `free` when the site is
 frozen).
 
 Feature gating is now plan-driven. Each plan row carries a
-`plan_features` JSON map keyed by the 8 plugin feature flags
-(`chatbot`, `ai_writer`, `ai_inline`, `live_audit`, `hq`, `redirects`,
-`dashboard_widget`, `post_column`). The map is edited live from
-`/admin/plans/<id>/edit` and consumed by:
+`plan_features` JSON map keyed by the plugin feature flags. As of the
+2026-05-18 Rank-Math-parity push the canonical key list is:
+
+```
+# core (8)
+chatbot, ai_writer, ai_inline, live_audit, hq, redirects,
+dashboard_widget, post_column
+
+# Rank-Math-parity (15)
+internal_links, link_genius, news_sitemap, local_multi, image_bulk,
+woo_pro, analytics_pro, white_label, sitewide_audit, role_manager,
+instant_indexing, llms_txt, speakable, schema_spy, schema_extras
+```
+
+Default tier mapping (see `database/seeders/PlanSeeder.php`):
+
+| Tier | New flags ON by default |
+|---|---|
+| free | `llms_txt`, `speakable`, `schema_extras` |
+| pro | + `internal_links`, `link_genius`, `woo_pro`, `role_manager`, `instant_indexing` |
+| startup | + `news_sitemap`, `image_bulk`, `analytics_pro`, `schema_spy` |
+| agency | + `local_multi`, `white_label`, `sitewide_audit` |
+
+The map is edited live from `/admin/plans/<id>/edit` and consumed by:
 
 - `Website::effectiveFeatureFlags()` — plan defines the ceiling; per-site
   overrides can narrow but cannot widen.
@@ -41,7 +61,8 @@ Feature gating is now plan-driven. Each plan row carries a
 |---|---|
 | Plan migration | `database/migrations/2026_05_17_000000_add_plan_features_to_plans_table.php` |
 | Slug rename | `database/migrations/2026_05_17_000100_rename_plan_slugs.php` |
-| Plan model | `app/Models/Plan.php` (`FEATURE_KEYS`, `featureMap()`, `requiredPlanFor()`) |
+| New-flag backfill | `database/migrations/2026_05_18_000000_seed_new_plan_features.php` |
+| Plan model | `app/Models/Plan.php` (`FEATURE_KEYS` — 23 keys, `featureMap()`, `requiredPlanFor()`) |
 | User model | `app/Models/User.php` (`effectivePlan()`, `effectiveTier()`, `effectivePlanFeatures()`, `isAtLeast()`) |
 | Website model | `app/Models/Website.php` (`effectiveFeatureFlags()` — plan ceiling, `featureRequiresUpgrade()`) |
 | Admin plan editor | `app/Http/Controllers/Admin/PlanController.php` + `resources/views/admin/plans/edit.blade.php` |

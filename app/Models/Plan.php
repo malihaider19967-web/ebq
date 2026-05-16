@@ -29,6 +29,7 @@ class Plan extends Model
      * features" checkbox grid and the `featureMap()` reader.
      */
     public const FEATURE_KEYS = [
+        // Original 8 flags (pre-Rank-Math-parity push).
         'chatbot',
         'ai_writer',
         'ai_inline',
@@ -37,6 +38,23 @@ class Plan extends Model
         'redirects',
         'dashboard_widget',
         'post_column',
+        // Rank-Math-parity additions (2026-05-18). Order grouped by
+        // domain so the admin grid renders coherent rows.
+        'internal_links',     // Phase 3 — orphan suggestions, link health.
+        'link_genius',        // Phase 3/4 — Link Genius admin + bulk replace.
+        'news_sitemap',       // Phase 5 — Google News XML sitemap module.
+        'local_multi',        // Phase 7 — multi-location LocalBusiness + KML.
+        'image_bulk',         // Phase 8 — bulk image find/replace + AI alt.
+        'woo_pro',            // Phase 6 — WooCommerce GTIN/MPN/ISBN, auto-noindex.
+        'analytics_pro',      // Phase 9 — AI traffic split, algorithm overlay.
+        'white_label',        // Phase 10 — PDF/email client reports.
+        'sitewide_audit',     // Phase 11 — full-site SEO Analyzer.
+        'role_manager',       // Phase 1 — capability matrix UI.
+        'instant_indexing',   // Phase 1 — dedicated IndexNow admin page.
+        'llms_txt',           // Phase 1 — /llms.txt route.
+        'speakable',          // Phase 1 — SpeakableSpecification in Article schema.
+        'schema_spy',         // Phase 2 — Import schema from competitor URL.
+        'schema_extras',      // Phase 2 — Dataset / FactCheck / Podcast templates.
     ];
 
     protected $fillable = [

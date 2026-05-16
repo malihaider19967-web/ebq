@@ -38,6 +38,7 @@
     // "Includes:" list is auto-generated from `featureMap()` — every
     // checked flag emits its label here. Keys match Plan::FEATURE_KEYS.
     $featureCopy = [
+        // Original 8 — core editor / admin enhancements.
         'live_audit'       => 'Live SEO score & audit',
         'hq'               => 'EBQ HQ rank tracker + performance',
         'redirects'        => '404-monitor + redirects manager',
@@ -46,6 +47,22 @@
         'ai_inline'        => 'AI inline edits (// slash commands)',
         'chatbot'          => 'EBQ Assistant chatbot',
         'ai_writer'        => 'AI Writer (full-draft generation)',
+        // Rank-Math-parity additions (2026-05-18).
+        'internal_links'   => 'AI internal link suggestions',
+        'link_genius'      => 'Link Genius — orphan + broken-link admin',
+        'speakable'        => 'Speakable schema (voice search)',
+        'schema_extras'    => 'Schema extras: Dataset, FactCheck, Podcast',
+        'schema_spy'       => 'Schema Spy: import schema from competitor URL',
+        'role_manager'     => 'Per-role capability manager',
+        'instant_indexing' => 'Instant Indexing dashboard',
+        'llms_txt'         => '/llms.txt for AI crawlers',
+        'woo_pro'          => 'WooCommerce Pro: GTIN/MPN/ISBN, auto-noindex',
+        'news_sitemap'     => 'Google News XML sitemap',
+        'image_bulk'       => 'Bulk image SEO + AI alt generation',
+        'analytics_pro'    => 'Analytics Pro: AI-traffic split, winners/losers',
+        'local_multi'      => 'Multi-location LocalBusiness + KML sitemap',
+        'white_label'      => 'White-label PDF + scheduled email reports',
+        'sitewide_audit'   => 'Sitewide SEO Analyzer (PSI + schema + audit)',
     ];
 
     // Pretty-format the per-plan API caps into 1-line strings for the
