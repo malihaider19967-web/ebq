@@ -85,6 +85,11 @@
                         'label' => 'Research engine',
                         'match_routes' => ['admin.research.'],
                     ],
+                    [
+                        'route' => 'admin.commands.index',
+                        'label' => 'Commands',
+                        'match_routes' => ['admin.commands.'],
+                    ],
                 ];
             @endphp
             <nav class="flex-1 space-y-0.5 overflow-y-auto px-3 py-4">

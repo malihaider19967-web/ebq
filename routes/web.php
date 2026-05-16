@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\UsageController as AdminUsageController;
 use App\Http\Controllers\Admin\WebsiteFeatureController as AdminWebsiteFeatureController;
 use App\Http\Controllers\Admin\BillingController as AdminBillingController;
 use App\Http\Controllers\Admin\PlanController as AdminPlanController;
+use App\Http\Controllers\Admin\ArtisanCommandsController as AdminArtisanCommandsController;
 use App\Http\Controllers\WordPressConnectController;
 use App\Http\Controllers\WordPressPluginDownloadController;
 use App\Http\Controllers\WordPressPluginVersionController;
@@ -182,6 +183,12 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/plans', [AdminPlanController::class, 'store'])->name('plans.store');
     Route::get('/plans/{plan}/edit', [AdminPlanController::class, 'edit'])->name('plans.edit');
     Route::put('/plans/{plan}', [AdminPlanController::class, 'update'])->name('plans.update');
+
+    // Artisan commands reference — operator-facing docs for every
+    // `ebq:*` console command. Read-only; documentation lives in
+    // ArtisanCommandsController::CATALOG, signatures come live from
+    // Artisan::all() so the page can't drift from `php artisan list`.
+    Route::get('/commands', [AdminArtisanCommandsController::class, 'index'])->name('commands.index');
 
     Route::prefix('research')->name('research.')->group(function (): void {
         Route::view('/', 'admin.research.dashboard')->name('dashboard');
