@@ -33,7 +33,6 @@ class Plan extends Model
         'trial_days',
         'max_websites',
         'features',
-        'research_limits',
         'api_limits',
         'display_order',
         'is_active',
@@ -44,7 +43,6 @@ class Plan extends Model
     {
         return [
             'features' => 'array',
-            'research_limits' => 'array',
             'api_limits' => 'array',
             'price_monthly_usd' => 'integer',
             'price_yearly_usd' => 'integer',
@@ -54,16 +52,6 @@ class Plan extends Model
             'is_active' => 'boolean',
             'is_highlighted' => 'boolean',
         ];
-    }
-
-    public function researchLimit(string $resource, int $default): int
-    {
-        $limits = $this->research_limits;
-        if (is_array($limits) && isset($limits[$resource]) && is_numeric($limits[$resource])) {
-            return (int) $limits[$resource];
-        }
-
-        return $default;
     }
 
     /**

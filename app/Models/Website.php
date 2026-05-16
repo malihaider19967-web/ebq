@@ -35,37 +35,6 @@ class Website extends Model
             }
             SyncAnalyticsData::dispatch($website->id, 365);
             SyncSearchConsoleData::dispatch($website->id, 365);
-
-            // Continuous-research bootstrap. Register the website itself
-            // as a research_target (highest priority) and queue
-            // competitor discovery once GSC has had time to populate
-            // top queries. The discovery job is idempotent and the
-            // daily ebq:research-bootstrap-websites command will retry
-            // any websites still without competitors.
-            $domain = preg_replace('/^www\./', '', mb_strtolower((string) $website->domain)) ?: '';
-            if ($domain !== '') {
-                \App\Models\Research\ResearchTarget::query()->updateOrCreate(
-                    ['domain' => $domain],
-                    [
-                        'root_url' => 'https://'.$domain.'/',
-                        'source' => \App\Models\Research\ResearchTarget::SOURCE_WEBSITE_ONBOARDING,
-                        'priority' => \App\Models\Research\ResearchTarget::PRIORITY_OWN_SITE,
-                        'status' => \App\Models\Research\ResearchTarget::STATUS_QUEUED,
-                        'attached_website_id' => $website->id,
-                    ]
-                );
-            }
-
-            // Auto-discovery dispatch respects the admin settings.
-            // engine_paused and auto_discovery_disabled both skip the
-            // dispatch; the research_target row above still exists so
-            // when the engine resumes / discovery is re-enabled, the
-            // website is already in the queue.
-            if (! \App\Support\ResearchEngineSettings::enginePaused()
-                && ! \App\Support\ResearchEngineSettings::autoDiscoveryDisabled()) {
-                \App\Jobs\Research\DiscoverCompetitorsForWebsiteJob::dispatch($website->id)
-                    ->delay(now()->addHours(6));
-            }
         });
     }
 
@@ -376,18 +345,6 @@ class Website extends Model
     public function pluginInstall(): HasOne
     {
         return $this->hasOne(WebsitePluginInstall::class);
-    }
-
-    public function niches(): BelongsToMany
-    {
-        return $this->belongsToMany(\App\Models\Research\Niche::class, 'website_niche_map', 'website_id', 'niche_id')
-            ->withPivot(['weight', 'is_primary', 'source', 'confidence', 'last_classified_at'])
-            ->withTimestamps();
-    }
-
-    public function researchPages(): HasMany
-    {
-        return $this->hasMany(\App\Models\Research\WebsitePage::class);
     }
 
     /**

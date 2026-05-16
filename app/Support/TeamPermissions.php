@@ -61,11 +61,6 @@ class TeamPermissions
             'description' => 'Invite, remove, and manage teammates.',
             'route' => 'team.index',
         ],
-        'research' => [
-            'label' => 'Research',
-            'description' => 'Keyword, topic, SERP, and competitor research.',
-            'route' => 'research.index',
-        ],
     ];
 
     /** @return list<string> */

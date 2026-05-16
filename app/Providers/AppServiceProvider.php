@@ -44,10 +44,6 @@ class AppServiceProvider extends ServiceProvider
                 (string) config('services.mistral.model', 'mistral-small-latest'),
             );
         });
-
-        // Research embeddings — actual bind moved to boot() because
-        // ResearchEngineSettings::embeddingsEnabled() reads through
-        // Cache + DB and neither is bound during register().
     }
 
     /**
@@ -64,20 +60,6 @@ class AppServiceProvider extends ServiceProvider
         RateLimiter::for('oauth', function (Request $request) {
             return Limit::perMinute(20)->by($request->user()?->id ?: $request->ip());
         });
-
-        // Research embeddings — bind whenever the Mistral API key is
-        // configured (config-only check; no DB read during boot, so
-        // it's safe in the testing bootstrap before migrations run).
-        // The actual on/off toggle is checked inside the provider's
-        // isAvailable() at call time, reading from the admin setting.
-        if (trim((string) config('services.mistral.key', '')) !== '') {
-            $this->app->bind(\App\Services\Research\Niche\EmbeddingProvider::class, function () {
-                return new \App\Services\Research\Niche\MistralEmbeddingProvider(
-                    (string) config('services.mistral.key'),
-                    (string) config('services.mistral.embedding_model', 'mistral-embed'),
-                );
-            });
-        }
 
         // Cashier's billable model is App\Models\User — the per-user
         // billing migration in 2026_05_02 moved the Cashier columns

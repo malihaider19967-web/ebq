@@ -107,26 +107,6 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/team', 'team.index')->middleware('feature:team')->name('team.index');
     Route::view('/reports', 'reports.index')->middleware('feature:reports')->name('reports.index');
     Route::view('/settings', 'settings.index')->middleware('feature:settings')->name('settings.index');
-
-    Route::middleware(['admin', 'feature:research', 'research.rollout'])->prefix('research')->name('research.')->group(function () {
-        Route::view('/', 'research.index')->name('index');
-        Route::view('/keywords', 'research.keywords')->name('keywords');
-        Route::view('/topics', 'research.topics')->name('topics');
-        Route::view('/serp', 'research.serp')->name('serp');
-        Route::view('/competitors', 'research.competitors')->name('competitors');
-        Route::view('/content-gap', 'research.content-gap')->name('gap');
-        Route::view('/briefs', 'research.briefs')->name('briefs');
-        Route::get('/briefs/{brief}', fn (int $brief) => view('research.brief-show', ['briefId' => $brief]))
-            ->whereNumber('brief')
-            ->name('briefs.show');
-        Route::view('/topical-authority', 'research.topical-authority')->name('authority');
-        Route::view('/coverage', 'research.coverage')->name('coverage');
-        Route::view('/internal-links', 'research.internal-links')->name('internal-links');
-        Route::view('/opportunities', 'research.opportunities')->name('opportunities');
-        Route::view('/alerts', 'research.alerts')->name('alerts');
-        Route::view('/reverse', 'research.reverse')->name('reverse');
-        Route::view('/performance', 'research.performance')->name('performance');
-    });
 });
 
 Route::middleware(['auth', 'verified', 'throttle:oauth'])->group(function () {
@@ -189,34 +169,6 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // ArtisanCommandsController::CATALOG, signatures come live from
     // Artisan::all() so the page can't drift from `php artisan list`.
     Route::get('/commands', [AdminArtisanCommandsController::class, 'index'])->name('commands.index');
-
-    Route::prefix('research')->name('research.')->group(function (): void {
-        Route::view('/', 'admin.research.dashboard')->name('dashboard');
-
-        Route::get('/niche-candidates', [\App\Http\Controllers\Admin\NicheCandidateController::class, 'index'])
-            ->name('niche-candidates.index');
-        Route::post('/niche-candidates/{niche}/approve', [\App\Http\Controllers\Admin\NicheCandidateController::class, 'approve'])
-            ->whereNumber('niche')->name('niche-candidates.approve');
-        Route::delete('/niche-candidates/{niche}', [\App\Http\Controllers\Admin\NicheCandidateController::class, 'destroy'])
-            ->whereNumber('niche')->name('niche-candidates.destroy');
-
-        Route::get('/settings', [\App\Http\Controllers\Admin\ResearchSettingsController::class, 'show'])
-            ->name('settings.show');
-        Route::put('/settings', [\App\Http\Controllers\Admin\ResearchSettingsController::class, 'update'])
-            ->name('settings.update');
-
-        Route::prefix('competitor-scans')->name('competitor-scans.')->group(function (): void {
-            Route::get('/', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'index'])->name('index');
-            Route::get('/create', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'create'])->name('create');
-            Route::post('/', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'store'])->name('store');
-            Route::get('/{competitorScan}', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'show'])
-                ->whereNumber('competitorScan')->name('show');
-            Route::post('/{competitorScan}/cancel', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'cancel'])
-                ->whereNumber('competitorScan')->name('cancel');
-            Route::post('/{competitorScan}/mark-failed', [\App\Http\Controllers\Admin\CompetitorScanController::class, 'markFailed'])
-                ->whereNumber('competitorScan')->name('mark-failed');
-        });
-    });
 });
 
 Route::middleware('auth')->post('/admin/impersonation/stop', [ClientImpersonationController::class, 'stop'])->name('admin.impersonation.stop');

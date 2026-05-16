@@ -170,14 +170,5 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/ai/brand-voice', [AiToolController::class, 'brandVoiceUpdate'])->name('ai.brand-voice.update');
             Route::delete('/ai/brand-voice', [AiToolController::class, 'brandVoiceDestroy'])->name('ai.brand-voice.destroy');
         });
-
-        // Research section — same auth chain as the plugin endpoints so
-        // the WP plugin and the portal share one controller.
-        Route::prefix('research')->name('api.v1.research.')->group(function (): void {
-            Route::post('/keywords/expand', [ResearchApiController::class, 'expandKeywords'])->name('keywords.expand');
-            Route::get('/serp', [ResearchApiController::class, 'serp'])->name('serp');
-            Route::get('/briefs', [ResearchApiController::class, 'briefs'])->name('briefs');
-            Route::get('/opportunities', [ResearchApiController::class, 'opportunities'])->name('opportunities');
-        });
     });
 });
