@@ -22,6 +22,23 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Plan extends Model
 {
+    /**
+     * Canonical list of plugin feature keys. Mirrors
+     * `App\Models\Website::FEATURE_KEYS` and the WordPress plugin's
+     * `EBQ_Feature_Flags::KNOWN_FEATURES`. Drives the admin "Plugin
+     * features" checkbox grid and the `featureMap()` reader.
+     */
+    public const FEATURE_KEYS = [
+        'chatbot',
+        'ai_writer',
+        'ai_inline',
+        'live_audit',
+        'hq',
+        'redirects',
+        'dashboard_widget',
+        'post_column',
+    ];
+
     protected $fillable = [
         'slug',
         'name',
@@ -34,6 +51,14 @@ class Plan extends Model
         'max_websites',
         'features',
         'api_limits',
+        // Plugin entitlement matrix — the authoritative "which of the 8
+        // feature flags is this plan allowed to enable" boolean map. The
+        // `features` column above stays as marketing-bullet copy.
+        'plan_features',
+        // Per-plan research-engine caps (keyword_lookup, serp_fetch,
+        // llm_call, brief). Column exists since 2026_05_06; was missing
+        // from $fillable until the plan_features rollout.
+        'research_limits',
         'display_order',
         'is_active',
         'is_highlighted',
@@ -44,6 +69,8 @@ class Plan extends Model
         return [
             'features' => 'array',
             'api_limits' => 'array',
+            'plan_features' => 'array',
+            'research_limits' => 'array',
             'price_monthly_usd' => 'integer',
             'price_yearly_usd' => 'integer',
             'trial_days' => 'integer',
@@ -114,5 +141,58 @@ class Plan extends Model
     {
         return $this->price_yearly_usd > 0
             && ! empty($this->stripe_price_id_yearly);
+    }
+
+    /**
+     * Canonical 8-key boolean entitlement map for this plan. Merges the
+     * stored `plan_features` JSON over a defaults-all-false skeleton so
+     * the caller always gets a complete map regardless of how partial
+     * the DB row is (and zero-fills new flag keys added later).
+     *
+     * Consumed by:
+     *   - Website::effectiveFeatureFlags()   — ceiling for per-site overrides
+     *   - InjectFeatureFlags middleware      — plugin payload
+     *   - Admin\PlanController edit form     — checkbox state
+     *   - Plan::requiredPlanFor()            — upgrade-path resolution
+     *
+     * @return array<string, bool>
+     */
+    public function featureMap(): array
+    {
+        $defaults = array_fill_keys(self::FEATURE_KEYS, false);
+        $stored = $this->plan_features;
+        if (! is_array($stored)) {
+            return $defaults;
+        }
+        foreach ($stored as $key => $value) {
+            if (array_key_exists($key, $defaults)) {
+                $defaults[$key] = (bool) $value;
+            }
+        }
+        return $defaults;
+    }
+
+    /**
+     * The slug of the lowest-priced active plan that enables the given
+     * feature key. Used to populate the `required_tier` field on
+     * `tier_required` API responses so the plugin can render copy like
+     * "AI Writer is on Startup or above" without hardcoding tier names.
+     *
+     * Walks plans in `display_order` ASC so the cheapest tier that
+     * unlocks the feature wins. Returns null when no plan enables the
+     * feature (i.e. it's globally disabled or misconfigured).
+     */
+    public static function requiredPlanFor(string $featureKey): ?string
+    {
+        if (! in_array($featureKey, self::FEATURE_KEYS, true)) {
+            return null;
+        }
+        $plans = self::ordered()->get(['slug', 'plan_features']);
+        foreach ($plans as $plan) {
+            if (($plan->featureMap()[$featureKey] ?? false) === true) {
+                return (string) $plan->slug;
+            }
+        }
+        return null;
     }
 }

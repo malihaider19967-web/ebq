@@ -47,6 +47,7 @@ class PlanController extends Controller
                 'trial_days' => 0,
                 'display_order' => Plan::max('display_order') + 1,
                 'features' => [],
+                'plan_features' => array_fill_keys(Plan::FEATURE_KEYS, false),
             ]),
             'isNew' => true,
         ]);
@@ -110,6 +111,11 @@ class PlanController extends Controller
             'api_limits.serper.monthly_calls' => 'nullable|integer|min:0|max:10000000',
             'api_limits.mistral.monthly_tokens' => 'nullable|integer|min:0|max:1000000000',
             'api_limits.rank_tracker.max_active_keywords' => 'nullable|integer|min:0|max:100000',
+            // Plugin entitlement matrix. Submitted as a bag of
+            // `plan_features[<key>]=on` checkbox fields; unchecked
+            // boxes don't POST, so we default-fill below.
+            'plan_features' => 'sometimes|array',
+            'plan_features.*' => 'nullable|in:on,1,true',
         ];
         if ($isNew) {
             $rules['slug'] = 'required|string|max:32|alpha_dash|unique:plans,slug';
@@ -147,6 +153,18 @@ class PlanController extends Controller
             }
         }
         $data['api_limits'] = $cleanLimits !== [] ? $cleanLimits : null;
+
+        // Plugin entitlement matrix — checkbox payload normalisation.
+        // Checkboxes only POST when ticked, so we explicitly fill the
+        // full 8-key map with false for any flag the operator left off.
+        // This is what makes "untick + save" actually remove the flag,
+        // instead of silently leaving the previous DB value in place.
+        $rawFlags = $request->input('plan_features', []);
+        $planFeatures = [];
+        foreach (Plan::FEATURE_KEYS as $key) {
+            $planFeatures[$key] = (bool) ($rawFlags[$key] ?? false);
+        }
+        $data['plan_features'] = $planFeatures;
 
         return $data;
     }

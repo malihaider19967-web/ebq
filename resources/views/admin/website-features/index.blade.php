@@ -120,6 +120,26 @@
                             $stored = is_array($website->feature_flags) ? $website->feature_flags : [];
                             $effectiveTier = $website->effectiveTier();
                             $isFrozen = $website->isFrozen();
+
+                            // Per-plan ceiling: the owning user's plan
+                            // boolean map decides which flags this row is
+                            // *allowed* to enable. Plan defaults render as
+                            // "Locked by plan" badges on disallowed cells.
+                            // The form still POSTs whatever the admin
+                            // ticked — effectiveFeatureFlags() clamps at
+                            // read time so this never accidentally widens
+                            // the entitlement.
+                            $owner = $website->owner;
+                            $planFeatures = $owner !== null
+                                ? $owner->effectivePlanFeatures()
+                                : array_fill_keys(\App\Models\Website::FEATURE_KEYS, true);
+                            $tierTone = match ($effectiveTier) {
+                                'free'    => 'bg-gray-100 text-gray-700',
+                                'pro'     => 'bg-violet-100 text-violet-800',
+                                'startup' => 'bg-indigo-100 text-indigo-800',
+                                'agency'  => 'bg-emerald-100 text-emerald-800',
+                                default   => 'bg-gray-100 text-gray-700',
+                            };
                         @endphp
                         <tr>
                             <form method="POST" action="{{ route('admin.website-features.update', $website) }}">
@@ -139,20 +159,38 @@
                                     </div>
                                 </td>
                                 <td class="px-2 py-3 text-xs">
-                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium
-                                                 {{ $effectiveTier === 'pro' ? 'bg-violet-100 text-violet-800' : 'bg-gray-100 text-gray-700' }}">
+                                    <span class="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium {{ $tierTone }}">
                                         {{ $effectiveTier }}
                                     </span>
                                 </td>
                                 @foreach ($feature_keys as $key)
+                                    @php
+                                        $planAllows = (bool) ($planFeatures[$key] ?? false);
+                                        $required = $planAllows ? null : \App\Models\Plan::requiredPlanFor($key);
+                                    @endphp
                                     <td class="px-2 py-3 text-center">
-                                        <label class="inline-flex items-center justify-center cursor-pointer">
-                                            <input type="checkbox"
-                                                   name="feature_flags[{{ $key }}]"
-                                                   value="1"
-                                                   @checked(array_key_exists($key, $stored) ? (bool) $stored[$key] : (bool) (\App\Models\Website::FEATURE_DEFAULTS[$key] ?? true))
-                                                   class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
-                                        </label>
+                                        @if ($planAllows)
+                                            <label class="inline-flex items-center justify-center cursor-pointer">
+                                                <input type="checkbox"
+                                                       name="feature_flags[{{ $key }}]"
+                                                       value="1"
+                                                       @checked(array_key_exists($key, $stored) ? (bool) $stored[$key] : true)
+                                                       class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                                            </label>
+                                        @else
+                                            <span class="inline-flex flex-col items-center gap-0.5"
+                                                  title="{{ $feature_labels[$key] ?? $key }} is not available on the owner's current plan ({{ $effectiveTier }})">
+                                                <input type="checkbox" disabled
+                                                       class="h-4 w-4 rounded border-gray-300 text-gray-400 cursor-not-allowed">
+                                                <span class="text-[9px] uppercase tracking-wide text-amber-700 font-semibold">
+                                                    @if ($required)
+                                                        Needs {{ $required }}
+                                                    @else
+                                                        Locked
+                                                    @endif
+                                                </span>
+                                            </span>
+                                        @endif
                                     </td>
                                 @endforeach
                                 <td class="px-3 py-3 text-right">
@@ -191,6 +229,14 @@
             field), or at the latest within 12 hours when the local transient expires.
             Toggling a feature OFF retracts every UI surface, REST route, and enqueued
             asset for that feature on the customer's site without a plugin update.
+        </p>
+        <p class="mt-3 text-xs text-gray-500">
+            <strong>Plan ceiling:</strong> cells marked "Needs &lt;plan&gt;" are disabled because
+            the owner's <a href="{{ route('admin.plans.index') }}" class="underline">subscription plan</a>
+            does not include that feature. Per-site overrides above can <em>narrow</em> the plan
+            entitlement (turn a flag off) but cannot <em>widen</em> it (turn a plan-disallowed
+            flag on) — the server enforces this at read time, so even a ticked checkbox here is
+            ignored if the plan disallows it.
         </p>
     </div>
 </x-layouts.app>

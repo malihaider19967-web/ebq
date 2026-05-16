@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Plan;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Carbon;
 
 /**
  * Public anonymous pricing endpoint.
@@ -18,9 +17,15 @@ use Illuminate\Support\Carbon;
  * Response shape:
  *   {
  *     plans: [
- *       { slug, name, tagline, price_monthly_usd, trial_days, features:[],
- *         checkout_url, is_highlighted },
- *       ...
+ *       {
+ *         slug, name, tagline,
+ *         price_monthly_usd, price_yearly_usd, trial_days,
+ *         features: [],                  // marketing bullet copy
+ *         plan_features: {<key>:bool},   // authoritative entitlement
+ *         api_limits: {...} | null,      // per-plan API caps
+ *         max_websites: int | null,      // null = unlimited
+ *         is_highlighted, requires_subscription, checkout_url
+ *       }, ...
  *     ],
  *     promo: { headline, expires_at } | null
  *   }
@@ -48,9 +53,19 @@ class PricingController extends Controller
             $isReady = $plan instanceof Plan
                 ? $plan->isCheckoutReady()
                 : (bool) ($plan['_checkout_ready'] ?? false);
+            $slug = (string) ($plan['slug'] ?? '');
+            $planFeatures = $plan instanceof Plan
+                ? $plan->featureMap()
+                : (is_array($plan['plan_features'] ?? null) ? $plan['plan_features'] : array_fill_keys(Plan::FEATURE_KEYS, false));
+            $apiLimits = $plan instanceof Plan
+                ? $plan->api_limits
+                : ($plan['api_limits'] ?? null);
+            $maxWebsites = $plan instanceof Plan
+                ? $plan->max_websites
+                : ($plan['max_websites'] ?? null);
 
             return [
-                'slug' => $plan['slug'],
+                'slug' => $slug,
                 'name' => $plan['name'],
                 'tagline' => $plan['tagline'] ?? null,
                 'price_monthly_usd' => (int) ($plan['price_monthly_usd'] ?? 0),
@@ -59,9 +74,17 @@ class PricingController extends Controller
                 'features' => is_array($plan['features'] ?? null)
                     ? array_values($plan['features'])
                     : [],
+                // Authoritative entitlement matrix — the WP plugin's
+                // setup wizard reads this to render checkmark grids and
+                // the public pricing page derives its "Includes:" list
+                // from the same map.
+                'plan_features' => is_array($planFeatures) ? $planFeatures : array_fill_keys(Plan::FEATURE_KEYS, false),
+                'api_limits' => is_array($apiLimits) ? $apiLimits : null,
+                'max_websites' => $maxWebsites !== null ? (int) $maxWebsites : null,
+                'requires_subscription' => $slug !== 'free',
                 'is_highlighted' => (bool) ($plan['is_highlighted'] ?? false),
                 'checkout_url' => $isReady
-                    ? route('billing.checkout', ['plan' => $plan['slug']])
+                    ? route('billing.checkout', ['plan' => $slug])
                     : null,
             ];
         })->values()->all();
@@ -97,6 +120,8 @@ class PricingController extends Controller
      * non-empty so downstream consumers (the WP plugin wizard) don't
      * crash on a fresh install.
      *
+     * Slugs match the post-2026-05-17 rename: free < pro < startup < agency.
+     *
      * @return list<array<string, mixed>>
      */
     private function fallbackPlans(): array
@@ -109,6 +134,7 @@ class PricingController extends Controller
                 'price_monthly_usd' => 0,
                 'price_yearly_usd' => 0,
                 'trial_days' => 0,
+                'max_websites' => 1,
                 'features' => [
                     '1 connected website',
                     'WordPress plugin (full)',
@@ -116,36 +142,60 @@ class PricingController extends Controller
                     '5 tracked keywords',
                     '10 page audits / month',
                 ],
-                'is_highlighted' => false,
-                '_checkout_ready' => false,
-            ],
-            [
-                'slug' => 'starter',
-                'name' => 'Starter',
-                'tagline' => 'For one site you actively grow.',
-                'price_monthly_usd' => 15,
-                'price_yearly_usd' => 180,
-                'trial_days' => 30,
-                'features' => [
-                    'Everything in Free',
-                    '50 tracked keywords',
-                    '100 page audits / month',
-                    'Topical-gap analysis (top-5 SERP)',
-                    'AI snippet rewrites + content brief',
-                    'Backlink monitoring (own domain)',
+                'plan_features' => [
+                    'chatbot'          => false,
+                    'ai_writer'        => false,
+                    'ai_inline'        => false,
+                    'live_audit'       => true,
+                    'hq'               => true,
+                    'redirects'        => true,
+                    'dashboard_widget' => true,
+                    'post_column'      => true,
                 ],
+                'api_limits' => null,
                 'is_highlighted' => false,
                 '_checkout_ready' => false,
             ],
             [
                 'slug' => 'pro',
                 'name' => 'Pro',
+                'tagline' => 'For one site you actively grow.',
+                'price_monthly_usd' => 15,
+                'price_yearly_usd' => 180,
+                'trial_days' => 30,
+                'max_websites' => 1,
+                'features' => [
+                    'Everything in Free',
+                    '50 tracked keywords',
+                    '100 page audits / month',
+                    'Topical-gap analysis (top-5 SERP)',
+                    'AI inline edits + content brief',
+                    'Backlink monitoring (own domain)',
+                ],
+                'plan_features' => [
+                    'chatbot'          => true,
+                    'ai_writer'        => false,
+                    'ai_inline'        => true,
+                    'live_audit'       => true,
+                    'hq'               => true,
+                    'redirects'        => true,
+                    'dashboard_widget' => true,
+                    'post_column'      => true,
+                ],
+                'api_limits' => null,
+                'is_highlighted' => true,
+                '_checkout_ready' => false,
+            ],
+            [
+                'slug' => 'startup',
+                'name' => 'Startup',
                 'tagline' => 'For agencies and growth teams.',
                 'price_monthly_usd' => 39,
                 'price_yearly_usd' => 468,
                 'trial_days' => 30,
+                'max_websites' => 5,
                 'features' => [
-                    'Everything in Starter',
+                    'Everything in Pro',
                     '5 websites, 250 tracked keywords',
                     '500 page audits / month',
                     'AI Writer (full draft)',
@@ -154,7 +204,18 @@ class PricingController extends Controller
                     'Quick-submit (Google Indexing API)',
                     'Priority email + chat support',
                 ],
-                'is_highlighted' => true,
+                'plan_features' => [
+                    'chatbot'          => true,
+                    'ai_writer'        => true,
+                    'ai_inline'        => true,
+                    'live_audit'       => true,
+                    'hq'               => true,
+                    'redirects'        => true,
+                    'dashboard_widget' => true,
+                    'post_column'      => true,
+                ],
+                'api_limits' => null,
+                'is_highlighted' => false,
                 '_checkout_ready' => false,
             ],
             [
@@ -164,15 +225,27 @@ class PricingController extends Controller
                 'price_monthly_usd' => 125,
                 'price_yearly_usd' => 1500,
                 'trial_days' => 30,
+                'max_websites' => null,
                 'features' => [
-                    'Everything in Pro',
-                    '25 websites, 1,500 tracked keywords',
+                    'Everything in Startup',
+                    '25+ websites, 1,500 tracked keywords',
                     '2,500 page audits / month',
                     'White-label client reports (PDF)',
                     'Bulk operations + batch URL submit',
                     'SSO + role-based access',
                     'Dedicated success manager',
                 ],
+                'plan_features' => [
+                    'chatbot'          => true,
+                    'ai_writer'        => true,
+                    'ai_inline'        => true,
+                    'live_audit'       => true,
+                    'hq'               => true,
+                    'redirects'        => true,
+                    'dashboard_widget' => true,
+                    'post_column'      => true,
+                ],
+                'api_limits' => null,
                 'is_highlighted' => false,
                 '_checkout_ready' => false,
             ],

@@ -88,7 +88,7 @@ class WordPressConnectController extends Controller
             // returning the current tier in their response — this carry on
             // connect just primes the local option so the editor doesn't
             // flash a wrong button before the first request resolves.
-            'ebq_tier' => $website->tier ?: Website::TIER_FREE,
+            'ebq_tier' => $website->effectiveTier(),
         ]);
 
         return redirect()->away($callback);

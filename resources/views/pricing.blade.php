@@ -28,105 +28,125 @@
         ? 'Free Pro access for a limited time'
         : '1-month free trial · Cancel during trial, no charge';
 
-    $plans = [
-        [
-            'name'      => 'Free',
-            'price'     => '$0',
-            'suffix'    => 'forever',
-            'caption'   => 'No card required.',
-            'tagline'   => 'For personal sites and trial runs.',
-            'features'  => [
-                '1 connected website',
-                'WordPress plugin (full)',
-                'Search Console performance + indexing',
-                '5 tracked keywords',
-                '10 page audits / month',
-            ],
-            'excluded'  => ['AI Writer (preview only)', 'Topical-gap analysis'],
-            'cta_label' => 'Start free',
-            'cta_url'   => $registerUrl,
-            'cta_style' => 'ghost',
-            'highlight' => false,
-        ],
-        [
-            'name'      => 'Starter',
-            'price'     => '$15',
-            'suffix'    => '/mo',
-            'caption'   => '$180 billed yearly',
-            'tagline'   => 'For one site you actively grow.',
-            'features'  => [
-                'Everything in Free',
-                '50 tracked keywords',
-                '100 page audits / month',
-                'Topical-gap analysis (top-5 SERP)',
-                'AI snippet rewrites + content brief',
-                'Backlink monitoring (own domain)',
-            ],
-            'excluded'  => [],
-            'cta_label' => 'Start 1-month trial',
-            'cta_url'   => $ctaForPlan('starter'),
-            'cta_style' => 'ghost',
-            'highlight' => false,
-        ],
-        [
-            'name'      => 'Pro',
-            'price'     => '$39',
-            'suffix'    => '/mo',
-            'caption'   => '$468 billed yearly',
-            'tagline'   => 'For agencies and growth teams.',
-            'features'  => [
-                'Everything in Starter',
-                '5 websites, 250 tracked keywords',
-                '500 page audits / month',
-                'AI Writer (full draft)',
-                'Competitor backlink prospecting',
-                'Cross-site benchmarks',
-                'Quick-submit (Google Indexing API)',
-                'Priority email + chat support',
-            ],
-            'excluded'  => [],
-            'cta_label' => 'Start 1-month trial',
-            'cta_url'   => $ctaForPlan('pro'),
-            'cta_style' => 'primary',
-            'highlight' => true,
-        ],
-        [
-            'name'      => 'Agency',
-            'price'     => '$125',
-            'suffix'    => '/mo',
-            'caption'   => '$1,500 billed yearly',
-            'tagline'   => 'For agencies managing many clients.',
-            'features'  => [
-                'Everything in Pro',
-                '25 websites, 1,500 tracked keywords',
-                '2,500 page audits / month',
-                'White-label client reports (PDF)',
-                'Bulk operations + batch URL submit',
-                'SSO + role-based access',
-                'Dedicated success manager',
-            ],
-            'excluded'  => [],
-            'cta_label' => 'Talk to sales',
-            'cta_url'   => $salesMailto,
-            'cta_style' => 'ghost',
-            'highlight' => false,
-        ],
+    // Pull plans straight from the DB — `Admin\PlanController` keeps
+    // pricing, feature toggles, and quotas in sync without a deploy.
+    // The Plan model + seeder ship the canonical 4-tier set; the
+    // `Plan::ordered()` scope filters to active plans in display_order.
+    $planRows = \App\Models\Plan::ordered()->get();
+
+    // Display copy for the 8 plugin features. The pricing card's
+    // "Includes:" list is auto-generated from `featureMap()` — every
+    // checked flag emits its label here. Keys match Plan::FEATURE_KEYS.
+    $featureCopy = [
+        'live_audit'       => 'Live SEO score & audit',
+        'hq'               => 'EBQ HQ rank tracker + performance',
+        'redirects'        => '404-monitor + redirects manager',
+        'dashboard_widget' => 'WordPress dashboard widget',
+        'post_column'      => 'Posts-list EBQ score column',
+        'ai_inline'        => 'AI inline edits (// slash commands)',
+        'chatbot'          => 'EBQ Assistant chatbot',
+        'ai_writer'        => 'AI Writer (full-draft generation)',
     ];
 
-    $compareRows = [
-        ['Connected websites',              '1',    '1',    '5',    '25'],
-        ['Tracked keywords',                '5',    '50',   '250',  '1,500'],
-        ['Page audits / month',             '10',   '100',  '500',  '2,500'],
-        ['Cross-signal insights (6 boards)', true,  true,   true,   true],
-        ['WordPress plugin',                true,   true,   true,   true],
-        ['AI snippet rewrites',             false,  true,   true,   true],
-        ['AI Writer (full draft)',          false,  false,  true,   true],
-        ['Competitor backlink prospecting', false,  false,  true,   true],
-        ['White-label PDF reports',         false,  false,  false,  true],
-        ['SSO + RBAC',                      false,  false,  false,  true],
-        ['Priority support',                false,  false,  true,   true],
-        ['Dedicated success manager',       false,  false,  false,  true],
-    ];
+    // Pretty-format the per-plan API caps into 1-line strings for the
+    // "Includes:" list. Null leaf = unlimited, but on the marketing
+    // page we just omit unlimited rows (paid plans should never be
+    // unlimited on every limit anyway).
+    $apiLimitCopy = function (?array $limits): array {
+        if (! is_array($limits)) {
+            return [];
+        }
+        $out = [];
+        $rt  = $limits['rank_tracker']['max_active_keywords'] ?? null;
+        if ($rt !== null) {
+            $out[] = number_format((int) $rt) . ' tracked keywords';
+        }
+        $ke  = $limits['keywords_everywhere']['monthly_credits'] ?? null;
+        if ($ke !== null) {
+            $out[] = number_format((int) $ke) . ' keyword research credits / month';
+        }
+        $ser = $limits['serper']['monthly_calls'] ?? null;
+        if ($ser !== null) {
+            $out[] = number_format((int) $ser) . ' SERP fetches / month';
+        }
+        $mis = $limits['mistral']['monthly_tokens'] ?? null;
+        if ($mis !== null) {
+            $out[] = number_format((int) $mis) . ' AI tokens / month';
+        }
+        return $out;
+    };
+
+    $planStyleFor = function (string $slug): array {
+        return match ($slug) {
+            'free'    => ['cta_label' => 'Start free',           'cta_style' => 'ghost'],
+            'agency'  => ['cta_label' => 'Talk to sales',        'cta_style' => 'ghost'],
+            default   => ['cta_label' => 'Start 1-month trial',  'cta_style' => 'primary'],
+        };
+    };
+
+    $plans = $planRows->map(function (\App\Models\Plan $p) use ($ctaForPlan, $salesMailto, $registerUrl, $featureCopy, $apiLimitCopy, $planStyleFor) {
+        $slug    = (string) $p->slug;
+        $monthly = (int) $p->price_monthly_usd;
+        $yearly  = (int) $p->price_yearly_usd;
+        $style   = $planStyleFor($slug);
+
+        $featureMap = $p->featureMap();
+        $autoBullets = [];
+        if ($p->max_websites === null) {
+            $autoBullets[] = 'Unlimited connected websites';
+        } else {
+            $autoBullets[] = $p->max_websites === 1
+                ? '1 connected website'
+                : (int) $p->max_websites . ' connected websites';
+        }
+        $autoBullets = array_merge($autoBullets, $apiLimitCopy($p->api_limits));
+        foreach ($featureCopy as $key => $label) {
+            if (($featureMap[$key] ?? false) === true) {
+                $autoBullets[] = $label;
+            }
+        }
+
+        $excluded = [];
+        foreach ($featureCopy as $key => $label) {
+            if (($featureMap[$key] ?? false) === false) {
+                $excluded[] = $label;
+            }
+        }
+
+        return [
+            'slug'      => $slug,
+            'name'      => (string) $p->name,
+            'price'     => $monthly > 0 ? '$' . number_format($monthly) : '$0',
+            'suffix'    => $monthly > 0 ? '/mo' : 'forever',
+            'caption'   => $yearly > 0
+                ? '$' . number_format($yearly) . ' billed yearly'
+                : 'No card required.',
+            'tagline'   => (string) ($p->tagline ?? ''),
+            'features'  => is_array($p->features) ? array_values($p->features) : [],
+            // Auto-generated entitlement bullets driven by plan_features
+            // + api_limits + max_websites. Always shown above the
+            // hand-written marketing bullets.
+            'includes'  => $autoBullets,
+            'excluded'  => $excluded,
+            'cta_label' => $style['cta_label'],
+            'cta_url'   => $slug === 'free'
+                ? $registerUrl
+                : ($slug === 'agency' ? $salesMailto : $ctaForPlan($slug)),
+            'cta_style' => $style['cta_style'],
+            'highlight' => (bool) $p->is_highlighted,
+        ];
+    })->all();
+
+    // Auto-build the comparison matrix from the same DB rows so a new
+    // tier added in /admin/plans appears here without a deploy.
+    $compareRows = [];
+    $compareRows[] = array_merge(['Connected websites'], $planRows->map(fn ($p) => $p->max_websites === null ? '∞' : (string) (int) $p->max_websites)->all());
+    $compareRows[] = array_merge(['Tracked keywords'], $planRows->map(fn ($p) => isset($p->api_limits['rank_tracker']['max_active_keywords']) ? number_format((int) $p->api_limits['rank_tracker']['max_active_keywords']) : '—')->all());
+    $compareRows[] = array_merge(['SERP fetches / month'], $planRows->map(fn ($p) => isset($p->api_limits['serper']['monthly_calls']) ? number_format((int) $p->api_limits['serper']['monthly_calls']) : '—')->all());
+    foreach ($featureCopy as $key => $label) {
+        $compareRows[] = array_merge([$label], $planRows->map(fn ($p) => (bool) ($p->featureMap()[$key] ?? false))->all());
+    }
+    $compareColHeaders = $planRows->pluck('name')->all();
 
     $addOns = [
         ['Extra website',          '$96 / site / year'],
@@ -160,8 +180,8 @@
         'offers'        => [
             '@type'         => 'AggregateOffer',
             'priceCurrency' => 'USD',
-            'lowPrice'      => '0',
-            'highPrice'     => '125',
+            'lowPrice'      => (string) ($planRows->min('price_monthly_usd') ?? 0),
+            'highPrice'     => (string) ($planRows->max('price_monthly_usd') ?? 0),
             'offerCount'    => count($plans),
             'availability'  => 'https://schema.org/InStock',
             'url'           => url()->current(),
@@ -245,6 +265,17 @@
                             <p class="mt-4 text-sm text-slate-600">{{ $plan['tagline'] }}</p>
 
                             <ul class="mt-6 space-y-2.5 text-[13px] text-slate-700">
+                                {{-- Auto-generated "Includes:" list driven by
+                                     plan_features + api_limits + max_websites
+                                     in /admin/plans. Always rendered before
+                                     the marketing bullets so the entitlement
+                                     truth is front-and-centre. --}}
+                                @foreach ($plan['includes'] as $feature)
+                                    <li class="flex gap-2.5">
+                                        <svg class="mt-0.5 h-4 w-4 flex-none text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                                        <span>{{ $feature }}</span>
+                                    </li>
+                                @endforeach
                                 @foreach ($plan['features'] as $feature)
                                     <li class="flex gap-2.5">
                                         <svg class="mt-0.5 h-4 w-4 flex-none text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -314,7 +345,7 @@
                             <thead>
                                 <tr class="border-b border-slate-200 bg-slate-50/60 text-left">
                                     <th scope="col" class="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Feature</th>
-                                    @foreach (['Free', 'Starter', 'Pro', 'Agency'] as $col)
+                                    @foreach ($compareColHeaders as $col)
                                         <th scope="col" class="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ $col }}</th>
                                     @endforeach
                                 </tr>

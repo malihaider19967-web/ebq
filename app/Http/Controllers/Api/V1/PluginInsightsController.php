@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Jobs\MatchRedirectFor404Job;
 use App\Models\RedirectSuggestion;
+use App\Models\Plan;
 use App\Models\Website;
 use App\Services\AiBlockEditorService;
 use App\Services\AiChatService;
@@ -311,7 +312,7 @@ class PluginInsightsController extends Controller
             // Tier is echoed on every response so the WP plugin's local
             // option stays in sync with EBQ-side billing changes — without
             // requiring the user to reconnect the site after upgrading.
-            'tier' => $website->tier,
+            'tier' => $website->effectiveTier(),
             'live' => $payload,
         ]);
     }
@@ -365,8 +366,9 @@ class PluginInsightsController extends Controller
             return response()->json([
                 'ok' => false,
                 'error' => 'tier_required',
-                'tier' => $website->tier,
-                'required_tier' => Website::TIER_PRO,
+                'tier' => $website->effectiveTier(),
+                'required_tier' => Plan::requiredPlanFor('ai_inline') ?? Website::TIER_PRO,
+                'feature' => 'ai_inline',
                 'message' => 'AI snippet rewrites are available on Pro. Upgrade to unlock.',
             ], 402);
         }
@@ -403,7 +405,7 @@ class PluginInsightsController extends Controller
 
         return response()->json([
             'external_post_id' => $externalPostId,
-            'tier' => $website->tier,
+            'tier' => $website->effectiveTier(),
             'rewrite' => $payload,
         ]);
     }
@@ -444,8 +446,9 @@ class PluginInsightsController extends Controller
             return response()->json([
                 'ok' => false,
                 'error' => 'tier_required',
-                'tier' => $website->tier,
-                'required_tier' => Website::TIER_PRO,
+                'tier' => $website->effectiveTier(),
+                'required_tier' => Plan::requiredPlanFor('ai_inline') ?? Website::TIER_PRO,
+                'feature' => 'ai_inline',
                 'message' => 'AI content briefs are available on Pro. Upgrade to unlock.',
             ], 402);
         }
@@ -465,7 +468,7 @@ class PluginInsightsController extends Controller
         return response()->json([
             'external_post_id' => $externalPostId,
             'focus_keyword' => $data['focus_keyword'],
-            'tier' => $website->tier,
+            'tier' => $website->effectiveTier(),
             'brief' => $payload,
         ]);
     }
@@ -494,8 +497,9 @@ class PluginInsightsController extends Controller
             return response()->json([
                 'ok' => false,
                 'error' => 'tier_required',
-                'tier' => $website->tier,
-                'required_tier' => Website::TIER_PRO,
+                'tier' => $website->effectiveTier(),
+                'required_tier' => Plan::requiredPlanFor('ai_writer') ?? Website::TIER_PRO,
+                'feature' => 'ai_writer',
                 'message' => 'AI Writer is available on Pro. Upgrade to unlock.',
             ], 402);
         }
@@ -549,7 +553,7 @@ class PluginInsightsController extends Controller
         // Reshape into a flat plan the UI can render with checkboxes.
         return response()->json([
             'external_post_id' => $externalPostId,
-            'tier' => $website->tier,
+            'tier' => $website->effectiveTier(),
             'plan' => [
                 'brief' => $brief ? [
                     'available' => true,
@@ -611,8 +615,9 @@ class PluginInsightsController extends Controller
             return response()->json([
                 'ok' => false,
                 'error' => 'tier_required',
-                'tier' => $website->tier,
-                'required_tier' => Website::TIER_PRO,
+                'tier' => $website->effectiveTier(),
+                'required_tier' => Plan::requiredPlanFor('ai_writer') ?? Website::TIER_PRO,
+                'feature' => 'ai_writer',
                 'message' => 'AI Writer is available on Pro. Upgrade to unlock.',
             ], 402);
         }
@@ -710,7 +715,7 @@ class PluginInsightsController extends Controller
 
         return response()->json([
             'external_post_id' => $externalPostId,
-            'tier' => $website->tier,
+            'tier' => $website->effectiveTier(),
             'writer' => $payload,
         ]);
     }
@@ -733,8 +738,9 @@ class PluginInsightsController extends Controller
             return response()->json([
                 'ok' => false,
                 'error' => 'tier_required',
-                'tier' => $website->tier,
-                'required_tier' => Website::TIER_PRO,
+                'tier' => $website->effectiveTier(),
+                'required_tier' => Plan::requiredPlanFor('ai_inline') ?? Website::TIER_PRO,
+                'feature' => 'ai_inline',
                 'message' => 'AI block actions are available on Pro. Upgrade to unlock.',
             ], 402);
         }
@@ -802,7 +808,7 @@ class PluginInsightsController extends Controller
         return response()->json([
             'external_post_id' => $externalPostId,
             'url' => $url,
-            'tier' => $website->tier,
+            'tier' => $website->effectiveTier(),
             'entities' => $payload,
         ]);
     }
@@ -988,8 +994,9 @@ class PluginInsightsController extends Controller
             return response()->json([
                 'ok' => false,
                 'error' => 'tier_required',
-                'tier' => $website->tier,
-                'required_tier' => Website::TIER_PRO,
+                'tier' => $website->effectiveTier(),
+                'required_tier' => Plan::requiredPlanFor('chatbot') ?? Website::TIER_PRO,
+                'feature' => 'chatbot',
                 'message' => 'The EBQ Assistant chat is available on Pro. Upgrade to unlock.',
             ], 402);
         }

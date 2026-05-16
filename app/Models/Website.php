@@ -100,51 +100,84 @@ class Website extends Model
     /**
      * Resolve the effective feature-flag map for this website.
      *
-     * Composition (kill-switch precedence):
-     *   defaults → per-site overrides → AND'd against global flags
+     * Composition (highest-priority "off" wins):
      *
-     * If a feature is globally disabled (e.g., emergency kill-switch
-     * flipped in `/admin/website-features` global panel), it's hidden
-     * regardless of per-site state. A per-site `true` cannot override
-     * a global `false`. A per-site `false` always wins (admin can
-     * disable features per customer even when global allows them).
+     *   freeze            → all-off, short-circuit
+     *   plan ceiling      → if the owning user's plan doesn't allow a
+     *                       feature, it's OFF regardless of overrides
+     *   global kill       → emergency platform-wide kill-switch (AND'd)
+     *   per-site override → admin-set per-customer (can only narrow,
+     *                       never widen — capped by the plan)
+     *   plan defaults     → starting point when no override is set
+     *
+     * The previous behaviour blended FEATURE_DEFAULTS with overrides;
+     * the canonical starting state is now the user's plan entitlement
+     * matrix (`User::effectivePlanFeatures()`), with FEATURE_DEFAULTS
+     * kept only as a fallback for orphan / userless websites (tests,
+     * fixture data, transient onboarding rows before user_id is set).
      *
      * @return array<string, bool>
      */
     public function effectiveFeatureFlags(): array
     {
-        // Resolution order, evaluated from broadest to most specific:
-        //   1. Defaults (Website::FEATURE_DEFAULTS) — the canonical
-        //      shipped state. chatbot/ai_writer default OFF; rest ON.
-        //   2. Global kill-switch (Setting::globalFeatureFlags()) —
-        //      ANDed against the defaults. If global says false, the
-        //      feature is OFF everywhere regardless of per-site state.
-        //   3. Per-website override (`feature_flags` JSON column) —
-        //      admin-set in /admin/website-features. Replaces the
-        //      effective value when present.
-        //   4. Freeze (over plan limit) — when true, every feature is
-        //      forced OFF so the WP plugin shows the frozen-state UI.
-        $effective = self::FEATURE_DEFAULTS;
+        // 1. Freeze short-circuits everything — over-plan-limit sites
+        //    behave like locked free trials regardless of upstream state.
+        if ($this->isFrozen()) {
+            return array_fill_keys(self::FEATURE_KEYS, false);
+        }
+
+        // 2. Start from the owning user's plan map. Orphan rows fall
+        //    back to FEATURE_DEFAULTS so test fixtures / transient
+        //    onboarding sites don't 500 just because no plan resolved.
+        $owner = $this->user;
+        $effective = $owner !== null
+            ? $owner->effectivePlanFeatures()
+            : self::FEATURE_DEFAULTS;
+
+        // 3. Per-site override — can NARROW (turn off a plan-allowed
+        //    flag) but cannot WIDEN (a per-site true on a plan-disallowed
+        //    flag is ignored; the plan is the ceiling).
+        $stored = $this->feature_flags;
+        if (is_array($stored)) {
+            foreach ($stored as $key => $value) {
+                if (! array_key_exists($key, $effective)) {
+                    continue;
+                }
+                if ((bool) $value === false) {
+                    $effective[$key] = false;
+                }
+                // (bool) $value === true: noop — plan already permits or
+                // forbids this; per-site can't override the plan ceiling.
+            }
+        }
+
+        // 4. Global kill-switch — AND'd last so an emergency disable
+        //    propagates regardless of per-plan or per-site state.
         $global = self::globalFeatureFlags();
         foreach ($effective as $key => $value) {
             if (($global[$key] ?? true) === false) {
                 $effective[$key] = false;
             }
         }
-        $stored = $this->feature_flags;
-        if (is_array($stored)) {
-            foreach ($stored as $key => $value) {
-                if (array_key_exists($key, $effective)) {
-                    $effective[$key] = (bool) $value;
-                }
-            }
-        }
-        if ($this->isFrozen()) {
-            foreach ($effective as $key => $_) {
-                $effective[$key] = false;
-            }
-        }
+
         return $effective;
+    }
+
+    /**
+     * Returns the slug of the cheapest plan that would unlock the given
+     * feature key for this website's owner. Null when the feature is on
+     * already, when no plan enables it, or when the website has no
+     * owner. Used by API gating to populate `required_tier` on
+     * `tier_required` responses so the plugin can render contextual
+     * upgrade copy ("AI Writer is on Startup or above").
+     */
+    public function featureRequiresUpgrade(string $key): ?string
+    {
+        $effective = $this->effectiveFeatureFlags();
+        if (($effective[$key] ?? false) === true) {
+            return null;
+        }
+        return Plan::requiredPlanFor($key);
     }
 
     /**
@@ -183,13 +216,12 @@ class Website extends Model
      *
      * Used by every Pro-gating controller. The WP plugin reads `tier`
      * (string) from API responses; effectiveTier() flows through that
-     * pathway unchanged.
+     * pathway unchanged. After the slug rename, "Pro" is the entry-
+     * level paid tier; `isPro()` returns true for any paid tier
+     * (pro/startup/agency).
      */
     public function isPro(): bool
     {
-        if ((bool) config('app.free', false)) {
-            return true;
-        }
         if ($this->isFrozen()) {
             return false;
         }
@@ -198,27 +230,36 @@ class Website extends Model
     }
 
     /**
-     * Coarse tier label for API responses (the WP plugin reads this).
+     * Exact tier slug for API responses (the WP plugin reads this).
      * Frozen sites always report 'free' so plugin features lock out.
      *
-     * Honour the global "free for everyone" promo flag (FREE=true in
-     * env) — when set, the platform is in promo mode and every site
-     * effectively reports `pro` so the plugin's tier-gated UI unlocks.
-     * This mirrors `isPro()` which already short-circuits on the same
-     * config; without the parallel mirror, the server lets a request
-     * through (because `isPro()` is true) but the plugin still shows
-     * the "upgrade to Pro" banner because it reads `tier` directly.
+     * After the 2026-05-17 rename returns one of: `free`, `pro`,
+     * `startup`, `agency`. The free-promo (FREE=true) short-circuit
+     * lives in `User::effectivePlan()` — when set, the platform
+     * resolves every user to the Pro plan row, and this method then
+     * returns `pro` naturally without a parallel check here.
      */
     public function effectiveTier(): string
     {
-        if ((bool) config('app.free', false)) {
-            return self::TIER_PRO;
-        }
         if ($this->isFrozen()) {
             return self::TIER_FREE;
         }
         $owner = $this->user;
         return $owner !== null ? $owner->effectiveTier() : self::TIER_FREE;
+    }
+
+    /**
+     * Ordinal-comparison helper for tier gates: "is this website on at
+     * least the Startup tier?". Delegates to the owning user when one
+     * is set; orphan websites always return false.
+     */
+    public function isAtLeast(string $slug): bool
+    {
+        if ($this->isFrozen()) {
+            return $slug === self::TIER_FREE;
+        }
+        $owner = $this->user;
+        return $owner !== null && $owner->isAtLeast($slug);
     }
 
     /**

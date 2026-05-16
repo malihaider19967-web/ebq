@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Plan;
 use App\Models\Website;
 use App\Models\WriterProject;
 use App\Services\WriterProjectService;
@@ -340,8 +341,9 @@ class WriterProjectController extends Controller
             abort(response()->json([
                 'ok' => false,
                 'error' => 'tier_required',
-                'tier' => $website->tier,
-                'required_tier' => Website::TIER_PRO,
+                'tier' => $website->effectiveTier(),
+                'required_tier' => Plan::requiredPlanFor('ai_writer') ?? Website::TIER_PRO,
+                'feature' => 'ai_writer',
                 'message' => 'AI Writer is available on Pro. Upgrade to unlock.',
             ], 402));
         }

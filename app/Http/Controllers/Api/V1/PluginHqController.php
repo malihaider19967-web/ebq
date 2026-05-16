@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Jobs\TrackKeywordRankJob;
 use App\Models\PageIndexingStatus;
+use App\Models\Plan;
 use App\Models\RankTrackingKeyword;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
@@ -899,8 +900,9 @@ class PluginHqController extends Controller
             return response()->json([
                 'ok' => false,
                 'error' => 'tier_required',
-                'tier' => $website->tier,
-                'required_tier' => Website::TIER_PRO,
+                'tier' => $website->effectiveTier(),
+                'required_tier' => Plan::requiredPlanFor('ai_writer') ?? Website::TIER_PRO,
+                'feature' => 'ai_writer',
                 'message' => 'AI outreach drafting is on Pro.',
             ], 402);
         }

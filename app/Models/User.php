@@ -19,9 +19,34 @@ class User extends Authenticatable implements MustVerifyEmail
     /** @use HasFactory<UserFactory> */
     use Billable, HasFactory, Notifiable;
 
-    /** Subscription tier constants — mirrors the legacy Website::TIER_* */
+    /**
+     * Subscription tier constants. After the 2026-05-17 rename:
+     *
+     *   free    — unpaid, default
+     *   pro     — entry-level paid (was 'starter')
+     *   startup — growth tier      (was 'pro')
+     *   agency  — top tier         (unchanged)
+     *
+     * `effectiveTier()` returns one of these exact slugs. The constants
+     * also drive the WP plugin's tier comparator (`isAtLeast`) — keep
+     * them ordered the same way in the TIER_ORDER map below.
+     */
     public const TIER_FREE = 'free';
     public const TIER_PRO = 'pro';
+    public const TIER_STARTUP = 'startup';
+    public const TIER_AGENCY = 'agency';
+
+    /**
+     * Tier ordinal — higher = more capable. Used by the `isAtLeast()`
+     * helper so callers can ask "is this user on at least Pro?" without
+     * hardcoding the full slug list.
+     */
+    public const TIER_ORDER = [
+        self::TIER_FREE    => 0,
+        self::TIER_PRO     => 1,
+        self::TIER_STARTUP => 2,
+        self::TIER_AGENCY  => 3,
+    ];
 
     /**
      * The attributes that are mass assignable.
@@ -236,9 +261,12 @@ class User extends Authenticatable implements MustVerifyEmail
 
     /**
      * The Plan row the user is currently on. Resolution order:
-     *   1. Active Cashier subscription → match by stripe_price_id_yearly
-     *   2. Snapshotted current_plan_slug (set by webhook + on swap)
-     *   3. The `free` plan row, so admin-edited max_websites etc. on
+     *   1. `config('app.free')` (FREE=true env) — every user clones into
+     *      the Pro tier regardless of subscription state. Falls back to
+     *      the next resolution step if the Pro row doesn't exist.
+     *   2. Active Cashier subscription → match by stripe_price_id_yearly
+     *   3. Snapshotted current_plan_slug (set by webhook + on swap)
+     *   4. The `free` plan row, so admin-edited max_websites etc. on
      *      Free actually take effect for users without a paid sub
      *
      * Returns null only if the database has no Plan rows at all (fresh
@@ -246,6 +274,18 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function effectivePlan(): ?Plan
     {
+        // Free-promo override: when the platform is in "all Pro free"
+        // mode (env FREE=true) every user resolves to the Pro plan row
+        // regardless of subscription state. Flipping FREE=false snaps
+        // them back to their real subscription on the very next request.
+        // Falls through to the normal resolution chain when the Pro row
+        // is missing (deleted from admin) so we never 500 on a misconfig.
+        if ((bool) config('app.free', false)) {
+            $pro = Plan::where('slug', self::TIER_PRO)->first();
+            if ($pro) {
+                return $pro;
+            }
+        }
         $subscription = $this->subscription('default');
         if ($subscription && $subscription->valid()) {
             $price = (string) $subscription->stripe_price;
@@ -266,25 +306,73 @@ class User extends Authenticatable implements MustVerifyEmail
         // / features apply to free-tier users. Without this, a free
         // user with no subscription always saw a hard-coded "1 website"
         // limit regardless of what the admin set on the Free plan row.
-        return Plan::where('slug', 'free')->first();
+        return Plan::where('slug', self::TIER_FREE)->first();
     }
 
     /**
-     * Coarse tier flag for feature gating. A user is `pro` whenever
-     * they have an active Cashier subscription (active OR trialing OR
-     * cancelled-but-in-grace), `free` otherwise.
+     * Exact slug of the user's effective plan. Post-rename, one of:
+     * `free`, `pro`, `startup`, `agency`. The WP plugin reads this as
+     * the `tier` field on every authenticated JSON response (injected
+     * by `InjectFeatureFlags`).
+     *
+     * Honours the free-promo short-circuit transparently: when
+     * `effectivePlan()` resolves to the Pro row because of FREE=true,
+     * this returns `'pro'` and the plugin treats it identically to a
+     * paid Pro user.
      */
     public function effectiveTier(): string
     {
-        return $this->subscribed('default') ? self::TIER_PRO : self::TIER_FREE;
+        $plan = $this->effectivePlan();
+        if ($plan === null) {
+            return self::TIER_FREE;
+        }
+        return (string) $plan->slug;
     }
 
     /**
-     * Convenience for the most common gate.
+     * Convenience for "is the user on any paid tier". Kept as a
+     * backward-compat shim for the dozens of `$user->isPro()` /
+     * `$website->isPro()` call sites; new code should prefer
+     * `isAtLeast()` to express specific tier requirements.
      */
     public function isPro(): bool
     {
-        return $this->effectiveTier() === self::TIER_PRO;
+        return $this->effectiveTier() !== self::TIER_FREE;
+    }
+
+    /**
+     * Ordinal-comparison helper. Returns true iff the user's effective
+     * tier ranks at or above the requested slug.
+     *
+     *   $user->isAtLeast(User::TIER_STARTUP)
+     *
+     * Unknown slugs return false (defensive — a typo never accidentally
+     * grants access).
+     */
+    public function isAtLeast(string $slug): bool
+    {
+        $required = self::TIER_ORDER[$slug] ?? null;
+        if ($required === null) {
+            return false;
+        }
+        $current = self::TIER_ORDER[$this->effectiveTier()] ?? 0;
+        return $current >= $required;
+    }
+
+    /**
+     * The 8-key plugin entitlement map for this user's current plan.
+     * Thin wrapper around `effectivePlan()->featureMap()` with a safe
+     * all-false fallback when no Plan rows exist at all.
+     *
+     * @return array<string, bool>
+     */
+    public function effectivePlanFeatures(): array
+    {
+        $plan = $this->effectivePlan();
+        if ($plan === null) {
+            return array_fill_keys(Plan::FEATURE_KEYS, false);
+        }
+        return $plan->featureMap();
     }
 
     /**

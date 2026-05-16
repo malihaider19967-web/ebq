@@ -10,6 +10,16 @@ use Illuminate\Database\Seeder;
  * `pricing.blade.php` so the public API endpoint, the WordPress plugin
  * wizard, and the marketing page all show identical plan content.
  *
+ * Slug taxonomy (renamed 2026-05-17):
+ *   free    — anonymous / free tier
+ *   pro     — entry-level paid (was "starter")
+ *   startup — growth tier      (was "pro")
+ *   agency  — top tier         (unchanged)
+ *
+ * `plan_features` is the authoritative entitlement matrix the WP plugin
+ * honours. Treat the seeded values as a sensible starting point —
+ * operators tune them live from /admin/plans/<id>/edit without a deploy.
+ *
  * Stripe price IDs are intentionally NULL here — operator must add them
  * via Stripe Dashboard + a follow-up `php artisan tinker` (or migration)
  * once the products exist. `isCheckoutReady()` on the Plan model
@@ -33,6 +43,7 @@ class PlanSeeder extends Seeder
                 'max_websites' => 1,
                 'display_order' => 1,
                 'is_highlighted' => false,
+                'is_active' => true,
                 'features' => [
                     '1 connected website',
                     'WordPress plugin (full)',
@@ -40,38 +51,78 @@ class PlanSeeder extends Seeder
                     '5 tracked keywords',
                     '10 page audits / month',
                 ],
+                'plan_features' => [
+                    'chatbot'          => false,
+                    'ai_writer'        => false,
+                    'ai_inline'        => false,
+                    'live_audit'       => true,
+                    'hq'               => true,
+                    'redirects'        => true,
+                    'dashboard_widget' => true,
+                    'post_column'      => true,
+                ],
+                'api_limits' => [
+                    'keywords_everywhere' => ['monthly_credits' => 100],
+                    'serper'              => ['monthly_calls'   => 50],
+                    'mistral'             => ['monthly_tokens'  => 50_000],
+                    'rank_tracker'        => ['max_active_keywords' => 5],
+                ],
             ],
             [
-                'slug' => 'starter',
-                'name' => 'Starter',
+                // Renamed: starter → pro. This is the new entry-level
+                // paid tier (formerly known as "Starter").
+                'slug' => 'pro',
+                'name' => 'Pro',
                 'tagline' => 'For one site you actively grow.',
                 'price_monthly_usd' => 15,
                 'price_yearly_usd' => 180,
                 'trial_days' => 30,
                 'max_websites' => 1,
                 'display_order' => 2,
-                'is_highlighted' => false,
+                'is_highlighted' => true,
+                'is_active' => true,
                 'features' => [
                     'Everything in Free',
                     '50 tracked keywords',
                     '100 page audits / month',
                     'Topical-gap analysis (top-5 SERP)',
                     'AI snippet rewrites + content brief',
+                    'AI inline editor (// slash commands)',
                     'Backlink monitoring (own domain)',
+                ],
+                'plan_features' => [
+                    'chatbot'          => true,
+                    'ai_writer'        => false,
+                    'ai_inline'        => true,
+                    'live_audit'       => true,
+                    'hq'               => true,
+                    'redirects'        => true,
+                    'dashboard_widget' => true,
+                    'post_column'      => true,
+                ],
+                'api_limits' => [
+                    'keywords_everywhere' => ['monthly_credits' => 2_500],
+                    'serper'              => ['monthly_calls'   => 500],
+                    'mistral'             => ['monthly_tokens'  => 1_000_000],
+                    'rank_tracker'        => ['max_active_keywords' => 50],
                 ],
             ],
             [
-                'slug' => 'pro',
-                'name' => 'Pro',
+                // Renamed: pro → startup. Same SKU + price as the
+                // previously-shipped Pro tier; just relabelled to make
+                // room for the cheaper entry-level "Pro" above.
+                'slug' => 'startup',
+                'name' => 'Startup',
                 'tagline' => 'For agencies and growth teams.',
                 'price_monthly_usd' => 39,
                 'price_yearly_usd' => 468,
                 'trial_days' => 30,
                 'max_websites' => 5,
                 'display_order' => 3,
-                'is_highlighted' => true,
+                'is_highlighted' => false,
+                'is_active' => true,
                 'features' => [
-                    'Everything in Starter',
+                    'Everything in Pro',
                     '5 websites, 250 tracked keywords',
                     '500 page audits / month',
                     'AI Writer (full draft)',
@@ -79,6 +130,22 @@ class PlanSeeder extends Seeder
                     'Cross-site benchmarks',
                     'Quick-submit (Google Indexing API)',
                     'Priority email + chat support',
+                ],
+                'plan_features' => [
+                    'chatbot'          => true,
+                    'ai_writer'        => true,
+                    'ai_inline'        => true,
+                    'live_audit'       => true,
+                    'hq'               => true,
+                    'redirects'        => true,
+                    'dashboard_widget' => true,
+                    'post_column'      => true,
+                ],
+                'api_limits' => [
+                    'keywords_everywhere' => ['monthly_credits' => 15_000],
+                    'serper'              => ['monthly_calls'   => 2_500],
+                    'mistral'             => ['monthly_tokens'  => 5_000_000],
+                    'rank_tracker'        => ['max_active_keywords' => 250],
                 ],
             ],
             [
@@ -92,14 +159,31 @@ class PlanSeeder extends Seeder
                 'max_websites' => null,
                 'display_order' => 4,
                 'is_highlighted' => false,
+                'is_active' => true,
                 'features' => [
-                    'Everything in Pro',
-                    '25 websites, 1,500 tracked keywords',
+                    'Everything in Startup',
+                    '25+ websites, 1,500 tracked keywords',
                     '2,500 page audits / month',
                     'White-label client reports (PDF)',
                     'Bulk operations + batch URL submit',
                     'SSO + role-based access',
                     'Dedicated success manager',
+                ],
+                'plan_features' => [
+                    'chatbot'          => true,
+                    'ai_writer'        => true,
+                    'ai_inline'        => true,
+                    'live_audit'       => true,
+                    'hq'               => true,
+                    'redirects'        => true,
+                    'dashboard_widget' => true,
+                    'post_column'      => true,
+                ],
+                'api_limits' => [
+                    'keywords_everywhere' => ['monthly_credits' => 100_000],
+                    'serper'              => ['monthly_calls'   => 15_000],
+                    'mistral'             => ['monthly_tokens'  => 25_000_000],
+                    'rank_tracker'        => ['max_active_keywords' => 1_500],
                 ],
             ],
         ];

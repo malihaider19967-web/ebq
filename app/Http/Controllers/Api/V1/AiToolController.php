@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Models\Plan;
 use App\Models\Website;
 use App\Services\AiToolRegistry;
 use App\Services\AiToolRunner;
@@ -81,7 +82,19 @@ class AiToolController extends Controller
 
         $result = $this->runner->run($toolId, $website, $request->user()?->id, $input);
 
-        return response()->json($result->toArray(), $result->ok ? 200 : ($result->error === 'tier_required' ? 402 : 422));
+        $payload = $result->toArray();
+        if (! $result->ok && $result->error === 'tier_required') {
+            // Decorate AI Studio tier-required failures with the same
+            // tier/required_tier/feature triple every other gating
+            // controller emits, so the WP plugin's friendlyError can
+            // surface a contextual "Upgrade to <plan>" CTA. AI Studio
+            // tools all live under the ai_writer feature flag.
+            $payload['tier'] = $website->effectiveTier();
+            $payload['required_tier'] = Plan::requiredPlanFor('ai_writer') ?? Website::TIER_PRO;
+            $payload['feature'] = 'ai_writer';
+        }
+
+        return response()->json($payload, $result->ok ? 200 : ($result->error === 'tier_required' ? 402 : 422));
     }
 
     public function brandVoiceShow(Request $request): JsonResponse
@@ -98,6 +111,9 @@ class AiToolController extends Controller
             return response()->json([
                 'ok' => false,
                 'error' => 'tier_required',
+                'tier' => $website->effectiveTier(),
+                'required_tier' => Plan::requiredPlanFor('ai_writer') ?? Website::TIER_PRO,
+                'feature' => 'ai_writer',
                 'message' => 'Brand voice is available on Pro.',
             ], 402);
         }

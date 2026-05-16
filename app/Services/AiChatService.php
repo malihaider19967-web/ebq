@@ -584,7 +584,7 @@ class AiChatService
 
         $site = trim((string) ($website->domain ?? ''));
         if ($site !== '') {
-            $lines[] = "- Site: {$site} (tier: ".(string) ($website->tier ?? 'free').')';
+            $lines[] = "- Site: {$site} (tier: ".$website->effectiveTier().')';
         }
 
         $title = trim((string) ($context['title'] ?? ''));

@@ -140,11 +140,59 @@
             <input type="hidden" name="stripe_price_id_monthly" value="{{ old('stripe_price_id_monthly', $plan->stripe_price_id_monthly) }}" />
 
             <div>
-                <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Features (one per line)</label>
+                <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Marketing bullets (one per line)</label>
                 <textarea name="features" rows="8"
                           class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
-                          placeholder="Everything in Free&#10;5 websites, 250 tracked keywords&#10;500 page audits / month">{{ old('features', $featuresText) }}</textarea>
-                <p class="text-[11px] text-slate-500 mt-1">Bullet points shown on /pricing and inside the WP plugin's setup wizard pricing step.</p>
+                          placeholder="Everything in Pro&#10;5 websites, 250 tracked keywords&#10;500 page audits / month">{{ old('features', $featuresText) }}</textarea>
+                <p class="text-[11px] text-slate-500 mt-1">
+                    Free-text bullet points shown on /pricing and inside the WP plugin's setup wizard pricing step.
+                    Display copy only — the <strong>Plugin features</strong> grid below is the authoritative entitlement matrix.
+                </p>
+            </div>
+
+            {{-- Plugin entitlement matrix. Authoritative source of "which
+                 of the 8 plugin feature flags does this plan unlock?".
+                 The WP plugin reads this map through InjectFeatureFlags
+                 middleware; per-website overrides can only narrow it,
+                 never widen it. --}}
+            @php
+                $planFeatures = $plan->featureMap();
+                $featureLabels = [
+                    'chatbot'          => ['Chatbot', 'Floating "EBQ Assistant" panel inside the WordPress editor.'],
+                    'ai_writer'        => ['AI Writer', 'Multi-step "Generate full draft from focus keyword" tool.'],
+                    'ai_inline'        => ['AI inline edits', 'Block toolbar "EBQ AI" menu + // slash commands.'],
+                    'live_audit'       => ['Live audit', 'Real-time SEO + readability scoring with GSC signals.'],
+                    'hq'               => ['EBQ HQ admin page', 'Top-level "EBQ HQ" admin page with rank tracker, performance, pages, AI Studio.'],
+                    'redirects'        => ['Redirects manager', '"EBQ Redirects" admin page with CSV import/export.'],
+                    'dashboard_widget' => ['Dashboard widget', 'WP Dashboard "EBQ summary" widget on the home screen.'],
+                    'post_column'      => ['Post list column', '"EBQ score" column in the wp-admin posts list.'],
+                ];
+            @endphp
+            <div class="border-t border-slate-200 pt-4 space-y-3">
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wide">Plugin features</h3>
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Tick every feature this plan unlocks. <strong>Off here = off everywhere</strong>: per-site overrides
+                        in <a href="{{ route('admin.website-features.index') }}" class="underline">Website features</a>
+                        can still disable a flag this plan allows, but cannot enable a flag this plan disallows.
+                    </p>
+                </div>
+                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    @foreach ($featureLabels as $key => [$label, $help])
+                        @php
+                            $checked = (bool) old('plan_features.'.$key, $planFeatures[$key] ?? false);
+                        @endphp
+                        <label class="flex items-start gap-2 rounded border border-slate-200 px-3 py-2 hover:border-slate-300">
+                            <input type="checkbox" name="plan_features[{{ $key }}]" value="on" @checked($checked)
+                                   class="mt-1 h-4 w-4 rounded border-slate-300 text-indigo-600">
+                            <span class="text-sm leading-tight">
+                                <span class="font-medium text-slate-800">{{ $label }}</span>
+                                <span class="block text-[11px] text-slate-500 mt-0.5">{{ $help }}</span>
+                                <code class="mt-1 inline-block text-[10px] text-slate-400">{{ $key }}</code>
+                            </span>
+                        </label>
+                    @endforeach
+                </div>
             </div>
 
             {{-- Per-plan API caps. Leave a field blank for unlimited.
