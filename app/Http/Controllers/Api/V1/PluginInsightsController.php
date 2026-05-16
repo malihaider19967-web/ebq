@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Jobs\MatchRedirectFor404Job;
 use App\Models\RedirectSuggestion;
-use App\Models\Plan;
 use App\Models\Website;
 use App\Services\AiBlockEditorService;
 use App\Services\AiChatService;
@@ -362,13 +361,8 @@ class PluginInsightsController extends Controller
     public function rewriteSnippet(Request $request, string $externalPostId, AiSnippetRewriterService $service): JsonResponse
     {
         $website = $this->resolveWebsite($request);
-        if (! $website->isPro()) {
-            return response()->json([
-                'ok' => false,
-                'error' => 'tier_required',
-                'tier' => $website->effectiveTier(),
-                'required_tier' => Plan::requiredPlanFor('ai_inline') ?? Website::TIER_PRO,
-                'feature' => 'ai_inline',
+        if ($gate = $website->featureGateInfo('ai_inline')) {
+            return response()->json($gate + [
                 'message' => 'AI snippet rewrites are available on Pro. Upgrade to unlock.',
             ], 402);
         }
@@ -442,13 +436,8 @@ class PluginInsightsController extends Controller
     public function contentBrief(Request $request, string $externalPostId, AiContentBriefService $service): JsonResponse
     {
         $website = $this->resolveWebsite($request);
-        if (! $website->isPro()) {
-            return response()->json([
-                'ok' => false,
-                'error' => 'tier_required',
-                'tier' => $website->effectiveTier(),
-                'required_tier' => Plan::requiredPlanFor('ai_inline') ?? Website::TIER_PRO,
-                'feature' => 'ai_inline',
+        if ($gate = $website->featureGateInfo('ai_inline')) {
+            return response()->json($gate + [
                 'message' => 'AI content briefs are available on Pro. Upgrade to unlock.',
             ], 402);
         }
@@ -493,13 +482,8 @@ class PluginInsightsController extends Controller
         TopicalGapService $gapService,
     ): JsonResponse {
         $website = $this->resolveWebsite($request);
-        if (! $website->isPro()) {
-            return response()->json([
-                'ok' => false,
-                'error' => 'tier_required',
-                'tier' => $website->effectiveTier(),
-                'required_tier' => Plan::requiredPlanFor('ai_writer') ?? Website::TIER_PRO,
-                'feature' => 'ai_writer',
+        if ($gate = $website->featureGateInfo('ai_writer')) {
+            return response()->json($gate + [
                 'message' => 'AI Writer is available on Pro. Upgrade to unlock.',
             ], 402);
         }
@@ -611,13 +595,8 @@ class PluginInsightsController extends Controller
         TopicalGapService $gapService,
     ): JsonResponse {
         $website = $this->resolveWebsite($request);
-        if (! $website->isPro()) {
-            return response()->json([
-                'ok' => false,
-                'error' => 'tier_required',
-                'tier' => $website->effectiveTier(),
-                'required_tier' => Plan::requiredPlanFor('ai_writer') ?? Website::TIER_PRO,
-                'feature' => 'ai_writer',
+        if ($gate = $website->featureGateInfo('ai_writer')) {
+            return response()->json($gate + [
                 'message' => 'AI Writer is available on Pro. Upgrade to unlock.',
             ], 402);
         }
@@ -734,13 +713,8 @@ class PluginInsightsController extends Controller
     ): JsonResponse 
     {
         $website = $this->resolveWebsite($request);
-        if (! $website->isPro()) {
-            return response()->json([
-                'ok' => false,
-                'error' => 'tier_required',
-                'tier' => $website->effectiveTier(),
-                'required_tier' => Plan::requiredPlanFor('ai_inline') ?? Website::TIER_PRO,
-                'feature' => 'ai_inline',
+        if ($gate = $website->featureGateInfo('ai_inline')) {
+            return response()->json($gate + [
                 'message' => 'AI block actions are available on Pro. Upgrade to unlock.',
             ], 402);
         }
@@ -990,13 +964,8 @@ class PluginInsightsController extends Controller
         AiChatService $service,
     ): JsonResponse {
         $website = $this->resolveWebsite($request);
-        if (! $website->isPro()) {
-            return response()->json([
-                'ok' => false,
-                'error' => 'tier_required',
-                'tier' => $website->effectiveTier(),
-                'required_tier' => Plan::requiredPlanFor('chatbot') ?? Website::TIER_PRO,
-                'feature' => 'chatbot',
+        if ($gate = $website->featureGateInfo('chatbot')) {
+            return response()->json($gate + [
                 'message' => 'The EBQ Assistant chat is available on Pro. Upgrade to unlock.',
             ], 402);
         }

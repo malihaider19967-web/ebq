@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Jobs\TrackKeywordRankJob;
 use App\Models\PageIndexingStatus;
-use App\Models\Plan;
 use App\Models\RankTrackingKeyword;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
@@ -896,13 +895,8 @@ class PluginHqController extends Controller
     public function backlinkOutreachDraft(Request $request, BacklinkProspectingService $service): JsonResponse
     {
         $website = $this->website($request);
-        if (! $website->isPro()) {
-            return response()->json([
-                'ok' => false,
-                'error' => 'tier_required',
-                'tier' => $website->effectiveTier(),
-                'required_tier' => Plan::requiredPlanFor('ai_writer') ?? Website::TIER_PRO,
-                'feature' => 'ai_writer',
+        if ($gate = $website->featureGateInfo('ai_writer')) {
+            return response()->json($gate + [
                 'message' => 'AI outreach drafting is on Pro.',
             ], 402);
         }

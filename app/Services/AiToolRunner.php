@@ -58,12 +58,20 @@ class AiToolRunner
 
         $meta = $tool->meta();
 
-        if ($meta->requiresPro && ! $website->isPro()) {
-            return AiToolResult::fail(
-                error: 'tier_required',
-                message: 'AI Studio is available on Pro. Upgrade to unlock.',
-                outputType: $meta->outputType,
-            );
+        // Pro-only tools are gated through the plan-driven feature
+        // matrix: AI Studio entries are part of the `ai_writer` flag.
+        // The controller decorates the failure response with the
+        // tier/required_tier/feature triple so the WP plugin can render
+        // a contextual "Upgrade to <plan>" CTA.
+        if ($meta->requiresPro) {
+            $effective = $website->effectiveFeatureFlags();
+            if (($effective['ai_writer'] ?? false) !== true) {
+                return AiToolResult::fail(
+                    error: 'tier_required',
+                    message: 'AI Studio is available on Pro. Upgrade to unlock.',
+                    outputType: $meta->outputType,
+                );
+            }
         }
 
         $validated = $this->validate($meta, $input);

@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\Plan;
 use App\Models\Website;
 use App\Services\AiToolRegistry;
 use App\Services\AiToolRunner;
@@ -84,17 +83,22 @@ class AiToolController extends Controller
 
         $payload = $result->toArray();
         if (! $result->ok && $result->error === 'tier_required') {
-            // Decorate AI Studio tier-required failures with the same
-            // tier/required_tier/feature triple every other gating
-            // controller emits, so the WP plugin's friendlyError can
-            // surface a contextual "Upgrade to <plan>" CTA. AI Studio
-            // tools all live under the ai_writer feature flag.
-            $payload['tier'] = $website->effectiveTier();
-            $payload['required_tier'] = Plan::requiredPlanFor('ai_writer') ?? Website::TIER_PRO;
-            $payload['feature'] = 'ai_writer';
+            // Decorate AI Studio tier-required failures with the
+            // tier/required_tier/feature triple the WP plugin reads
+            // through friendlyError. AI Studio tools all live under
+            // the ai_writer feature flag; featureGateInfo() picks the
+            // right error code (tier_required vs feature_disabled) and
+            // the right required slug given the site's current state.
+            $gate = $website->featureGateInfo('ai_writer');
+            if ($gate !== null) {
+                $payload['error'] = $gate['error'];
+                $payload['tier'] = $gate['tier'];
+                $payload['required_tier'] = $gate['required_tier'];
+                $payload['feature'] = $gate['feature'];
+            }
         }
 
-        return response()->json($payload, $result->ok ? 200 : ($result->error === 'tier_required' ? 402 : 422));
+        return response()->json($payload, $result->ok ? 200 : (in_array($result->error, ['tier_required', 'feature_disabled'], true) ? 402 : 422));
     }
 
     public function brandVoiceShow(Request $request): JsonResponse
@@ -107,13 +111,8 @@ class AiToolController extends Controller
     public function brandVoiceUpdate(Request $request): JsonResponse
     {
         $website = $this->website($request);
-        if (! $website->isPro()) {
-            return response()->json([
-                'ok' => false,
-                'error' => 'tier_required',
-                'tier' => $website->effectiveTier(),
-                'required_tier' => Plan::requiredPlanFor('ai_writer') ?? Website::TIER_PRO,
-                'feature' => 'ai_writer',
+        if ($gate = $website->featureGateInfo('ai_writer')) {
+            return response()->json($gate + [
                 'message' => 'Brand voice is available on Pro.',
             ], 402);
         }

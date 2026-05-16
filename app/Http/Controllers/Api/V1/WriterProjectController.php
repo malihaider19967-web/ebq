@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\Plan;
 use App\Models\Website;
 use App\Models\WriterProject;
 use App\Services\WriterProjectService;
@@ -337,13 +336,9 @@ class WriterProjectController extends Controller
 
     private function requirePro(Website $website): void
     {
-        if (! $website->isPro()) {
-            abort(response()->json([
-                'ok' => false,
-                'error' => 'tier_required',
-                'tier' => $website->effectiveTier(),
-                'required_tier' => Plan::requiredPlanFor('ai_writer') ?? Website::TIER_PRO,
-                'feature' => 'ai_writer',
+        $gate = $website->featureGateInfo('ai_writer');
+        if ($gate !== null) {
+            abort(response()->json($gate + [
                 'message' => 'AI Writer is available on Pro. Upgrade to unlock.',
             ], 402));
         }

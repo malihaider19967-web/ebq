@@ -181,6 +181,65 @@ class Website extends Model
     }
 
     /**
+     * Single-call feature gate for the API surface. Returns null when
+     * the feature is currently allowed for this website (plan + global
+     * + per-site overrides + freeze all permit it), or a structured
+     * payload the controller can splat into its 402 JsonResponse.
+     *
+     * The error code distinguishes two failure modes:
+     *
+     *   tier_required     — the owner's plan doesn't include the
+     *                       feature; the plugin should show an
+     *                       "Upgrade to <slug>" CTA. `required_tier`
+     *                       points at the cheapest qualifying plan.
+     *   feature_disabled  — the plan allows the feature, but either
+     *                       the global kill-switch or a per-site
+     *                       override turned it off. No amount of
+     *                       upgrading fixes this — the workspace admin
+     *                       has to flip the switch back.
+     *
+     * Frozen sites get tier_required too: the user CAN unfreeze by
+     * upgrading or removing other sites, so the upgrade CTA is the
+     * correct affordance.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function featureGateInfo(string $key): ?array
+    {
+        $effective = $this->effectiveFeatureFlags();
+        if (($effective[$key] ?? false) === true) {
+            return null;
+        }
+
+        $currentTier = $this->effectiveTier();
+        $required = Plan::requiredPlanFor($key);
+        $order = User::TIER_ORDER;
+
+        // Distinguish "you need a bigger plan" from "your plan supports
+        // this but it's been disabled". A required slug that exists AND
+        // ranks strictly above the current tier is an upgrade path; the
+        // owner's plan already allowing it but the flag still being off
+        // means a kill-switch / per-site override is suppressing it.
+        $isUpgradePath = $required !== null
+            && ($order[$required] ?? 0) > ($order[$currentTier] ?? 0);
+
+        // Frozen sites are coded as tier_required so the plugin renders
+        // an Upgrade CTA — unfreezing requires either removing sites or
+        // upgrading to a larger plan.
+        if ($this->isFrozen()) {
+            $isUpgradePath = true;
+        }
+
+        return [
+            'ok' => false,
+            'error' => $isUpgradePath ? 'tier_required' : 'feature_disabled',
+            'tier' => $currentTier,
+            'required_tier' => $required ?? self::TIER_PRO,
+            'feature' => $key,
+        ];
+    }
+
+    /**
      * Global per-feature kill-switch map, the same shape as
      * FEATURE_DEFAULTS. Persisted in the `settings` table under the
      * `global_feature_flags` key; cached forever in Laravel's cache,
