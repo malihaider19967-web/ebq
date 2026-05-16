@@ -50,18 +50,19 @@ return new class extends Migration {
             }
 
             // 3) Settings rows that happen to embed a plan slug. The
-            //    settings table stores arbitrary JSON keyed by a `key`
-            //    column; we rewrite any value that's a bare slug string.
-            //    Nested JSON references aren't auto-rewritten — operators
-            //    must edit those manually if they exist.
+            //    `settings` table uses `key` as its primary key (no
+            //    surrogate `id` column) with a JSON `value`. We rewrite
+            //    any value that's a bare slug string. Nested JSON
+            //    references aren't auto-rewritten — operators must edit
+            //    those manually if they exist.
             if (Schema::hasTable('settings')) {
-                $rows = DB::table('settings')->get(['id', 'key', 'value']);
+                $rows = DB::table('settings')->get(['key', 'value']);
                 foreach ($rows as $row) {
                     $decoded = is_string($row->value) ? json_decode($row->value, true) : null;
                     if ($decoded === 'pro') {
-                        DB::table('settings')->where('id', $row->id)->update(['value' => json_encode('startup')]);
+                        DB::table('settings')->where('key', $row->key)->update(['value' => json_encode('startup')]);
                     } elseif ($decoded === 'starter') {
-                        DB::table('settings')->where('id', $row->id)->update(['value' => json_encode('pro')]);
+                        DB::table('settings')->where('key', $row->key)->update(['value' => json_encode('pro')]);
                     }
                 }
             }
