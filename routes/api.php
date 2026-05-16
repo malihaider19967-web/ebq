@@ -6,15 +6,6 @@ use App\Http\Controllers\Api\V1\PluginInsightsController;
 use App\Http\Controllers\Api\V1\PluginHeartbeatController;
 use App\Http\Controllers\Api\V1\ResearchApiController;
 use App\Http\Controllers\Api\V1\WriterProjectController;
-// Rank-Math-parity controllers (Phase 2+).
-use App\Http\Controllers\Api\V1\SchemaSpyController;
-use App\Http\Controllers\Api\V1\LinkGeniusController;
-use App\Http\Controllers\Api\V1\RelatedPostsController;
-use App\Http\Controllers\Api\V1\InstantIndexingController;
-use App\Http\Controllers\Api\V1\AnalyticsProController;
-use App\Http\Controllers\Api\V1\SiteAuditController;
-use App\Http\Controllers\Api\V1\ClientReportsController;
-use App\Http\Controllers\Api\V1\ImageBulkController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -178,68 +169,6 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/ai/brand-voice', [AiToolController::class, 'brandVoiceShow'])->name('ai.brand-voice.show');
             Route::put('/ai/brand-voice', [AiToolController::class, 'brandVoiceUpdate'])->name('ai.brand-voice.update');
             Route::delete('/ai/brand-voice', [AiToolController::class, 'brandVoiceDestroy'])->name('ai.brand-voice.destroy');
-
-            // Phase 1 — Instant Indexing dedicated route (alongside the
-            // existing /index-status routes the bulk action uses).
-            Route::post('/indexing/submit', [InstantIndexingController::class, 'submit'])
-                ->name('indexing.submit');
-        });
-
-        // Phase 2 — Schema Spy. Top-level (not /hq) because it's used
-        // from the editor sidebar, not the admin dashboard.
-        Route::post('/schema-spy', [SchemaSpyController::class, 'spy'])
-            ->name('api.v1.schema-spy');
-
-        // Phase 3/4 — Link Genius (orphan finder, link health, anchor
-        // rules, auto-link on publish). Pattern matches the WP REST
-        // proxy `/link-genius/(?P<action>...)`.
-        Route::prefix('link-genius')->name('api.v1.link-genius.')->group(function (): void {
-            Route::get('/overview',     [LinkGeniusController::class, 'overview'])->name('overview');
-            Route::get('/orphans',      [LinkGeniusController::class, 'orphans'])->name('orphans');
-            Route::get('/links',        [LinkGeniusController::class, 'links'])->name('links');
-            Route::post('/links/recheck', [LinkGeniusController::class, 'recheck'])->name('links.recheck');
-            Route::get('/anchor-rules', [LinkGeniusController::class, 'rulesIndex'])->name('rules.index');
-            Route::post('/anchor-rules', [LinkGeniusController::class, 'rulesStore'])->name('rules.store');
-            Route::post('/anchor-rules/{id}/apply', [LinkGeniusController::class, 'rulesApply'])
-                ->whereNumber('id')->name('rules.apply');
-            Route::delete('/anchor-rules/{id}', [LinkGeniusController::class, 'rulesDestroy'])
-                ->whereNumber('id')->name('rules.destroy');
-            Route::post('/apply-auto-rules', [LinkGeniusController::class, 'applyAutoRules'])->name('apply-auto-rules');
-        });
-
-        // Phase 4 — AI Related Posts (called by the server-rendered block).
-        Route::get('/related-posts/{postId}', [RelatedPostsController::class, 'show'])
-            ->whereNumber('postId')->name('api.v1.related-posts');
-
-        // Phase 9 — Analytics Pro tabs.
-        Route::prefix('analytics')->name('api.v1.analytics.')->group(function (): void {
-            Route::get('/ai-traffic-split', [AnalyticsProController::class, 'aiTrafficSplit'])->name('ai-traffic');
-            Route::get('/algorithm-updates', [AnalyticsProController::class, 'algorithmUpdates'])->name('algorithm-updates');
-            Route::get('/winners-losers',   [AnalyticsProController::class, 'winnersLosers'])->name('winners-losers');
-            Route::get('/page/{postId}',    [AnalyticsProController::class, 'pageDrilldown'])
-                ->whereNumber('postId')->name('page');
-        });
-
-        // Phase 10 — White-label client reports.
-        Route::prefix('reports')->name('api.v1.reports.')->group(function (): void {
-            Route::get('/branding',  [ClientReportsController::class, 'brandingShow'])->name('branding.show');
-            Route::post('/branding', [ClientReportsController::class, 'brandingUpdate'])->name('branding.update');
-            Route::get('/history',   [ClientReportsController::class, 'history'])->name('history');
-            Route::post('/test',     [ClientReportsController::class, 'sendTest'])->name('send-test');
-        });
-
-        // Phase 11 — Sitewide SEO Analyzer.
-        Route::prefix('audit')->name('api.v1.audit.')->group(function (): void {
-            Route::post('/run',    [SiteAuditController::class, 'run'])->name('run');
-            Route::get('/latest',  [SiteAuditController::class, 'latest'])->name('latest');
-            Route::get('/runs/{id}', [SiteAuditController::class, 'show'])->whereNumber('id')->name('show');
-        });
-
-        // Phase 8 — Bulk Image SEO (preview + AI alt queue).
-        Route::prefix('image-bulk')->name('api.v1.image-bulk.')->group(function (): void {
-            Route::post('/preview',       [ImageBulkController::class, 'preview'])->name('preview');
-            Route::post('/apply',         [ImageBulkController::class, 'apply'])->name('apply');
-            Route::post('/queue-ai-alt',  [ImageBulkController::class, 'queueAiAlt'])->name('queue-ai-alt');
         });
     });
 });

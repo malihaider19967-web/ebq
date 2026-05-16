@@ -139,22 +139,6 @@ class WebsiteFeatureController extends Controller
             'redirects'        => 'Redirects + 404 tracker',
             'dashboard_widget' => 'Dashboard widget',
             'post_column'      => 'Posts-list EBQ column',
-            // Rank-Math-parity additions.
-            'internal_links'   => 'Internal link suggestions',
-            'link_genius'      => 'Link Genius admin',
-            'news_sitemap'     => 'News sitemap',
-            'local_multi'      => 'Multi-location Local SEO',
-            'image_bulk'       => 'Bulk image SEO',
-            'woo_pro'          => 'WooCommerce Pro',
-            'analytics_pro'    => 'Analytics Pro tabs',
-            'white_label'      => 'White-label reports',
-            'sitewide_audit'   => 'SEO Analyzer',
-            'role_manager'     => 'Role Manager',
-            'instant_indexing' => 'Instant Indexing page',
-            'llms_txt'         => 'LLMs.txt route',
-            'speakable'        => 'Speakable schema',
-            'schema_spy'       => 'Schema Spy import',
-            'schema_extras'    => 'Schema extras (Dataset/FactCheck/Podcast)',
         ];
     }
 }

@@ -63,7 +63,6 @@ class Website extends Model
      * merges stored overrides on top of these defaults.
      */
     public const FEATURE_KEYS = [
-        // Original 8 flags.
         'chatbot',
         'ai_writer',
         'ai_inline',
@@ -72,22 +71,6 @@ class Website extends Model
         'redirects',
         'dashboard_widget',
         'post_column',
-        // Rank-Math-parity additions (2026-05-18). Mirror Plan::FEATURE_KEYS.
-        'internal_links',
-        'link_genius',
-        'news_sitemap',
-        'local_multi',
-        'image_bulk',
-        'woo_pro',
-        'analytics_pro',
-        'white_label',
-        'sitewide_audit',
-        'role_manager',
-        'instant_indexing',
-        'llms_txt',
-        'speakable',
-        'schema_spy',
-        'schema_extras',
     ];
 
     /**
@@ -112,26 +95,6 @@ class Website extends Model
         'redirects'        => true,
         'dashboard_widget' => true,
         'post_column'      => true,
-        // Rank-Math-parity flags default to OFF for orphan/userless
-        // websites: every new feature is opt-in until a real plan is
-        // resolved. The owning user's plan_features is the authoritative
-        // ceiling — these defaults only apply to test fixtures / transient
-        // onboarding rows.
-        'internal_links'   => false,
-        'link_genius'      => false,
-        'news_sitemap'     => false,
-        'local_multi'      => false,
-        'image_bulk'       => false,
-        'woo_pro'          => false,
-        'analytics_pro'    => false,
-        'white_label'      => false,
-        'sitewide_audit'   => false,
-        'role_manager'     => false,
-        'instant_indexing' => false,
-        'llms_txt'         => false,
-        'speakable'        => true,  // Pure schema enrichment, low risk.
-        'schema_spy'       => false,
-        'schema_extras'    => true,  // Just enables more schema types.
     ];
 
     /**

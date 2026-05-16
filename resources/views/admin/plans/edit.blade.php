@@ -158,7 +158,6 @@
             @php
                 $planFeatures = $plan->featureMap();
                 $featureLabels = [
-                    // Original 8 — core editor / admin surfaces.
                     'chatbot'          => ['Chatbot', 'Floating "EBQ Assistant" panel inside the WordPress editor.'],
                     'ai_writer'        => ['AI Writer', 'Multi-step "Generate full draft from focus keyword" tool.'],
                     'ai_inline'        => ['AI inline edits', 'Block toolbar "EBQ AI" menu + // slash commands.'],
@@ -167,22 +166,6 @@
                     'redirects'        => ['Redirects manager', '"EBQ Redirects" admin page with CSV import/export.'],
                     'dashboard_widget' => ['Dashboard widget', 'WP Dashboard "EBQ summary" widget on the home screen.'],
                     'post_column'      => ['Post list column', '"EBQ score" column in the wp-admin posts list.'],
-                    // Rank-Math-parity additions (2026-05-18).
-                    'internal_links'   => ['Internal link suggestions', 'AI-powered internal link recommendations in the editor sidebar.'],
-                    'link_genius'      => ['Link Genius admin', 'Orphan-post finder, broken-link checker, link health overview, anchor bulk replace.'],
-                    'news_sitemap'     => ['News sitemap', 'Dedicated Google News XML sitemap module with publication name + last-48h filter.'],
-                    'local_multi'      => ['Multi-location Local SEO', 'Location CPT, store-finder block + shortcode, KML sitemap for hyper-local ranking.'],
-                    'image_bulk'       => ['Bulk image SEO', 'Find & replace alt/title/caption across content + media, plus bulk AI alt generation.'],
-                    'woo_pro'          => ['WooCommerce Pro', 'GTIN/MPN/ISBN identifier fields, auto-noindex hidden products, product-tailored SEO scoring.'],
-                    'analytics_pro'    => ['Analytics Pro', 'AI traffic split, algorithm-update overlay, top winners/losers, page-level keyword drilldown.'],
-                    'white_label'      => ['White-label reports', 'PDF + scheduled email client reports with custom logo, colours, and sender branding.'],
-                    'sitewide_audit'   => ['SEO Analyzer', 'Full-site audit: robots.txt, sitemap reachability, schema validity, broken links, Core Web Vitals.'],
-                    'role_manager'     => ['Role Manager', 'Per-role capability matrix for SEO / Redirects / HQ / AI Writer / Link Genius access.'],
-                    'instant_indexing' => ['Instant Indexing page', 'Dedicated IndexNow admin page with submission log + manual URL submit.'],
-                    'llms_txt'         => ['LLMs.txt route', 'Public /llms.txt published with the configured post types/taxonomies for AI crawlers.'],
-                    'speakable'        => ['Speakable schema', 'SpeakableSpecification CSS-selector list injected into Article JSON-LD for voice search.'],
-                    'schema_spy'       => ['Schema Spy', 'Import competitor schema markup by pasting a URL into the editor.'],
-                    'schema_extras'    => ['Schema extras', 'Adds Dataset / FactCheck / PodcastEpisode / SoftwareReview templates to the schema picker.'],
                 ];
             @endphp
             <div class="border-t border-slate-200 pt-4 space-y-3">
