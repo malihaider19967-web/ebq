@@ -189,6 +189,7 @@
                         </form>
                     </div>
                 @endif
+                @include('partials.quota-banner')
                 {{ $slot }}
             </main>
         </div>

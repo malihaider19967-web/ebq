@@ -147,6 +147,56 @@
                 <p class="text-[11px] text-slate-500 mt-1">Bullet points shown on /pricing and inside the WP plugin's setup wizard pricing step.</p>
             </div>
 
+            {{-- Per-plan API caps. Leave a field blank for unlimited.
+                 Each input maps to a leaf in `plans.api_limits` JSON. --}}
+            @php
+                $apiLimits = is_array($plan->api_limits ?? null) ? $plan->api_limits : [];
+                $ke  = (int) ($apiLimits['keywords_everywhere']['monthly_credits'] ?? 0) ?: '';
+                $ser = (int) ($apiLimits['serper']['monthly_calls']                ?? 0) ?: '';
+                $mis = (int) ($apiLimits['mistral']['monthly_tokens']              ?? 0) ?: '';
+                $rt  = (int) ($apiLimits['rank_tracker']['max_active_keywords']    ?? 0) ?: '';
+            @endphp
+            <div class="border-t border-slate-200 pt-4 space-y-3">
+                <div>
+                    <h3 class="text-xs font-semibold text-slate-700 uppercase tracking-wide">API limits</h3>
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Per-user monthly caps. Leave blank for unlimited. Monthly windows reset on each user's
+                        subscription anchor day. Rank tracker is a hard ceiling on active tracked keywords; users
+                        must pause or remove keywords to free slots.
+                    </p>
+                </div>
+                <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <label class="block">
+                        <span class="block text-xs font-medium text-slate-700">Keywords Everywhere — credits / month</span>
+                        <input type="number" min="0" name="api_limits[keywords_everywhere][monthly_credits]"
+                               value="{{ old('api_limits.keywords_everywhere.monthly_credits', $ke) }}"
+                               placeholder="Unlimited"
+                               class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="block text-xs font-medium text-slate-700">Serper — calls / month</span>
+                        <input type="number" min="0" name="api_limits[serper][monthly_calls]"
+                               value="{{ old('api_limits.serper.monthly_calls', $ser) }}"
+                               placeholder="Unlimited"
+                               class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="block text-xs font-medium text-slate-700">Mistral — tokens / month (input + output)</span>
+                        <input type="number" min="0" name="api_limits[mistral][monthly_tokens]"
+                               value="{{ old('api_limits.mistral.monthly_tokens', $mis) }}"
+                               placeholder="Unlimited"
+                               class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="block">
+                        <span class="block text-xs font-medium text-slate-700">Rank tracker — max active keywords</span>
+                        <input type="number" min="0" name="api_limits[rank_tracker][max_active_keywords]"
+                               value="{{ old('api_limits.rank_tracker.max_active_keywords', $rt) }}"
+                               placeholder="Unlimited"
+                               class="mt-1 w-full rounded border border-slate-300 px-3 py-2 text-sm">
+                    </label>
+                </div>
+            </div>
+
             <div class="flex flex-wrap items-center gap-6 border-t border-slate-200 pt-4">
                 <label class="inline-flex items-center gap-2 text-sm text-slate-700 cursor-pointer">
                     <input type="checkbox" name="is_active" value="1" @checked(old('is_active', (bool) $plan->is_active))

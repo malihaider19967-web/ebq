@@ -406,6 +406,7 @@ class PageAuditService
                 $effectiveHl,
                 websiteId: $websiteId,
                 ownerUserId: $ownerUserId,
+                source: 'audit',
             );
             if ($payload === null) {
                 return [

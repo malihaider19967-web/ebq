@@ -57,6 +57,7 @@ class CompetitorDiscoveryService
                 'gl' => $country,
                 '__website_id' => $attachedWebsite?->id,
                 '__owner_user_id' => $attachedWebsite?->user_id,
+                '__source' => 'research',
             ]);
 
             if (! is_array($payload)) {

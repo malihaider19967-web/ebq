@@ -2,6 +2,10 @@
 
 namespace App\Services\Llm;
 
+use App\Models\User;
+use App\Services\ClientActivityLogger;
+use App\Services\Usage\UsageMeter;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -70,6 +74,17 @@ final class MistralClient implements LlmClient
             $body['tool_choice'] = $options['tool_choice'] ?? 'auto';
         }
 
+        // Per-user monthly token cap. Caller may pass __user_id /
+        // __website_id explicitly (queue jobs, webhook handlers); during
+        // a request the Auth user is the implicit fallback. Estimate the
+        // pre-flight ceiling as prompt-chars / 4 + max_tokens (Mistral
+        // tokenises ~4 chars per token for English).
+        $billedUser = $this->resolveBilledUser($options);
+        if ($billedUser !== null) {
+            $estimated = $this->estimateTokens($messages, (int) ($body['max_tokens'] ?? 2048));
+            app(UsageMeter::class)->assertCanSpend($billedUser, 'mistral', $estimated);
+        }
+
         try {
             $response = Http::withToken($this->apiKey)
                 ->acceptJson()
@@ -107,6 +122,31 @@ final class MistralClient implements LlmClient
         $choice = $message['content'] ?? '';
         $toolCalls = is_array($message['tool_calls'] ?? null) ? $message['tool_calls'] : [];
         $usage = (array) ($json['usage'] ?? []);
+        $totalTokens = (int) ($usage['total_tokens'] ?? 0);
+
+        // Log actual token spend so admin Usage page and UsageMeter both
+        // see real billed usage (the pre-flight estimate above is just a
+        // ceiling check — this is the truth).
+        if ($billedUser !== null && $totalTokens > 0) {
+            $meta = [
+                'operation'         => 'chat_completion',
+                'model'             => (string) ($json['model'] ?? $model),
+                'prompt_tokens'     => (int) ($usage['prompt_tokens'] ?? 0),
+                'completion_tokens' => (int) ($usage['completion_tokens'] ?? 0),
+            ];
+            $source = isset($options['__source']) ? (string) $options['__source'] : null;
+            if ($source !== null && $source !== '') {
+                $meta['source'] = $source;
+            }
+            app(ClientActivityLogger::class)->log(
+                'api_usage.mistral',
+                userId: $billedUser->id,
+                websiteId: isset($options['__website_id']) ? (int) $options['__website_id'] : null,
+                provider: 'mistral',
+                meta: $meta,
+                unitsConsumed: $totalTokens,
+            );
+        }
 
         return [
             'ok' => true,
@@ -316,5 +356,40 @@ final class MistralClient implements LlmClient
 
         $decoded = json_decode($candidate, true);
         return is_array($decoded) ? $decoded : null;
+    }
+
+    /**
+     * Resolve the billed user for usage gating. Caller may pass
+     * `__user_id` (and optionally `__website_id`) in options; otherwise
+     * we fall back to the authenticated user. Returns null for unauth'd
+     * background contexts where there's no one to bill (e.g. internal
+     * housekeeping jobs).
+     */
+    private function resolveBilledUser(array $options): ?User
+    {
+        $userId = isset($options['__user_id']) ? (int) $options['__user_id'] : (int) (Auth::id() ?? 0);
+        if ($userId <= 0) {
+            return null;
+        }
+        return User::find($userId);
+    }
+
+    /**
+     * Conservative pre-flight token estimate. Sums message content
+     * length (chars/4 ≈ tokens for English) and adds the requested
+     * max_tokens ceiling.
+     *
+     * @param  array<int, array<string, mixed>>  $messages
+     */
+    private function estimateTokens(array $messages, int $maxOutputTokens): int
+    {
+        $promptChars = 0;
+        foreach ($messages as $m) {
+            $content = $m['content'] ?? '';
+            if (is_string($content)) {
+                $promptChars += strlen($content);
+            }
+        }
+        return (int) ceil($promptChars / 4) + max(0, $maxOutputTokens);
     }
 }

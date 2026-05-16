@@ -102,7 +102,7 @@ class KeywordMetricsService
      *
      * @param  list<string>  $keywords
      */
-    public function refresh(array $keywords, string $country = 'global', ?int $websiteId = null, ?int $ownerUserId = null): int
+    public function refresh(array $keywords, string $country = 'global', ?int $websiteId = null, ?int $ownerUserId = null, ?string $source = null): int
     {
         $country = $this->normalizeCountry($country);
         $cleaned = $this->uniqueCleaned($keywords);
@@ -123,6 +123,7 @@ class KeywordMetricsService
             $country,
             websiteId: $websiteId,
             ownerUserId: $ownerUserId,
+            source: $source,
         );
         if ($response === null) {
             Log::warning('KeywordMetricsService.refresh: client returned null (check API key + log lines above)');

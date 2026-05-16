@@ -67,6 +67,7 @@ class KeywordEnrichmentService
             country: $keyword->country !== 'global' ? $keyword->country : 'global',
             ownerUserId: null,
             websiteId: $website?->id,
+            source: 'research',
         );
 
         if (! is_array($resp) || ! isset($resp['data'][0])) {

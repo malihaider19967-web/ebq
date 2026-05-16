@@ -52,6 +52,7 @@ class KeywordExpansionService
             'type' => 'autocomplete',
             'gl' => $country !== 'global' ? $country : null,
             '__website_id' => $website?->id,
+            '__source' => 'research',
         ]);
 
         if (is_array($autocomplete)) {

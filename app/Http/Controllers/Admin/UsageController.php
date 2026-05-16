@@ -28,6 +28,10 @@ class UsageController extends Controller
             'label' => 'Serper SERP API',
             'unit' => 'call',
         ],
+        'mistral' => [
+            'label' => 'Mistral AI',
+            'unit' => 'tokens',
+        ],
     ];
 
     public function index(Request $request): View
@@ -141,6 +145,13 @@ class UsageController extends Controller
             ->get();
         $dailySeries = $this->buildDailySeries($daily, $startDate, $endDate);
 
+        // ─── Per-client plan-window utilisation ───────────────────────
+        // Each user's monthly window is anchored to their subscription
+        // start day (see UsageMeter::currentWindowStart), so this can't
+        // be one bulk SQL — we resolve the window per user. Bounded by
+        // the top-clients list (capped at 50) so the loop stays cheap.
+        $utilisation = $this->buildPerClientUtilisation($byClient, $users);
+
         // ─── Recent calls feed (most-recent 50) ────────────────────────
         $recent = ClientActivity::query()
             ->with(['user:id,name,email', 'website:id,domain'])
@@ -164,6 +175,7 @@ class UsageController extends Controller
             'byWebsite' => $websitesAgg,
             'websites' => $websites,
             'dailySeries' => $dailySeries,
+            'utilisation' => $utilisation,
             'recent' => $recent,
             'filters' => [
                 'provider' => $providerFilter,
@@ -179,6 +191,10 @@ class UsageController extends Controller
         return [
             'keywords_everywhere' => (float) config('services.keywords_everywhere.cost_per_keyword_usd', 0.0001),
             'serp_api' => (float) config('services.serper.cost_per_call_usd', 0.0003),
+            // Mistral Small ~ $0.10 / 1M input tokens, $0.30 / 1M output —
+            // we don't split the two in the activity log so blend to a
+            // single per-token rate that errs on the conservative side.
+            'mistral' => (float) config('services.mistral.cost_per_token_usd', 0.0000003),
         ];
     }
 
@@ -282,6 +298,65 @@ class UsageController extends Controller
             'labels' => array_keys($days),
             'series' => array_map('array_values', $series),
         ];
+    }
+
+    /**
+     * For each user in the top-clients list, report their consumption in
+     * the *current subscription-anchored window* against their plan cap.
+     * This is the canonical "is this customer about to hit their cap?"
+     * view — independent of the date-range filter above, which is mainly
+     * for cost retrospection.
+     *
+     * @param  array<int, array{user_id: int, units: int, cost: float, providers: array}>  $byClient
+     * @param  \Illuminate\Support\Collection<int, \App\Models\User>  $users
+     * @return list<array{user_id: int, window_start: string, providers: array<string, array{used: int, limit: ?int, pct: ?float}>, tracker: array{used: int, limit: ?int, pct: ?float}}>
+     */
+    private function buildPerClientUtilisation(array $byClient, $users): array
+    {
+        $meter = app(\App\Services\Usage\UsageMeter::class);
+        $providers = ['keywords_everywhere', 'serp_api', 'mistral'];
+        $out = [];
+        foreach ($byClient as $row) {
+            $user = $users[$row['user_id']] ?? null;
+            if (! $user instanceof \App\Models\User) {
+                // Re-hydrate so we have effectivePlan() (the listing fetches
+                // a subset of columns; effectivePlan reads stripe_id +
+                // current_plan_slug + the Cashier subscription so we need a
+                // full model).
+                $user = \App\Models\User::find($row['user_id']);
+                if (! $user) {
+                    continue;
+                }
+            } else {
+                // The pre-fetched user collection only loaded id/name/email;
+                // refresh to a full model so Cashier billing methods work.
+                $user = \App\Models\User::find($user->id);
+            }
+            $windowStart = $meter->currentWindowStart($user);
+            $perProvider = [];
+            foreach ($providers as $p) {
+                $used = $meter->consumedInWindow($user, $p);
+                $limit = $meter->limit($user, $p);
+                $perProvider[$p] = [
+                    'used'  => $used,
+                    'limit' => $limit,
+                    'pct'   => ($limit !== null && $limit > 0) ? min(100.0, round($used * 100 / $limit, 1)) : null,
+                ];
+            }
+            $trackerUsed = $meter->activeTrackedKeywordCount($user);
+            $trackerCap  = $meter->rankTrackerCap($user);
+            $out[] = [
+                'user_id'      => $user->id,
+                'window_start' => $windowStart->toDateString(),
+                'providers'    => $perProvider,
+                'tracker'      => [
+                    'used'  => $trackerUsed,
+                    'limit' => $trackerCap,
+                    'pct'   => ($trackerCap !== null && $trackerCap > 0) ? min(100.0, round($trackerUsed * 100 / $trackerCap, 1)) : null,
+                ],
+            ];
+        }
+        return $out;
     }
 
     private function parseDate(?string $s): ?Carbon

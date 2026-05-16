@@ -8,6 +8,7 @@ use App\Models\SearchConsoleData;
 use App\Models\Website;
 use App\Services\KeywordMetricsService;
 use App\Services\SerpFeatureRiskService;
+use App\Services\Usage\UsageMeter;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -235,12 +236,42 @@ class RankTrackingManager extends Component
         $language = strtolower(trim($this->bulkLanguage)) ?: 'en';
         $device = in_array($this->bulkDevice, ['desktop', 'mobile'], true) ? $this->bulkDevice : 'desktop';
 
+        // Plan cap: count slots remaining before partial-accepting. Bill
+        // the website owner, not necessarily the actor (team members may
+        // add keywords but the owner's plan caps them).
+        $billedUser = $website?->owner ?? $user;
+        $meter = app(UsageMeter::class);
+        $cap = $meter->rankTrackerCap($billedUser);
+        $remaining = $cap === null ? PHP_INT_MAX : max(0, $cap - $meter->activeTrackedKeywordCount($billedUser));
+
         $created = 0;
         $skipped = 0;
+        $capBlocked = 0;
         foreach ($picked as $kw) {
             $kw = trim($kw);
             if ($kw === '') {
                 continue;
+            }
+
+            // If this exact tracking-key already exists we won't burn a
+            // slot — updateOrCreate will just refresh it. Otherwise we
+            // need a free slot before creating.
+            $existing = RankTrackingKeyword::query()
+                ->where('website_id', $this->websiteId)
+                ->where('keyword_hash', RankTrackingKeyword::hashKeyword($kw))
+                ->where('search_engine', 'google')
+                ->where('search_type', 'organic')
+                ->where('country', $country)
+                ->where('language', $language)
+                ->where('device', $device)
+                ->whereNull('location')
+                ->first();
+            if ($existing === null) {
+                if ($remaining <= 0) {
+                    $capBlocked++;
+                    continue;
+                }
+                $remaining--;
             }
 
             $row = RankTrackingKeyword::updateOrCreate(
@@ -276,11 +307,14 @@ class RankTrackingManager extends Component
         }
 
         $this->bulkSelected = [];
-        $this->bulkStatus = sprintf(
-            '%d keyword(s) added.%s',
-            $created,
-            $skipped > 0 ? " {$skipped} were already tracked and skipped." : ''
-        );
+        $parts = [sprintf('%d keyword(s) added.', $created)];
+        if ($skipped > 0) {
+            $parts[] = "{$skipped} were already tracked and skipped.";
+        }
+        if ($capBlocked > 0) {
+            $parts[] = "{$capBlocked} skipped — plan cap of {$cap} active tracked keywords reached. Pause or remove keywords to free slots, or upgrade your plan.";
+        }
+        $this->bulkStatus = implode(' ', $parts);
         session()->flash('rank_tracking_status', $this->bulkStatus);
     }
 
@@ -346,6 +380,39 @@ class RankTrackingManager extends Component
             ->filter()
             ->values()
             ->all();
+
+        // Plan cap on active tracked keywords. Only blocks brand-new
+        // rows — re-saving an already-tracked combination is treated as
+        // an edit and doesn't consume a slot.
+        $website = Website::find($this->websiteId);
+        $billedUser = $website?->owner ?? $user;
+        $meter = app(UsageMeter::class);
+        $cap = $meter->rankTrackerCap($billedUser);
+        if ($cap !== null) {
+            $existing = RankTrackingKeyword::query()
+                ->where('website_id', $this->websiteId)
+                ->where('keyword_hash', RankTrackingKeyword::hashKeyword($this->newKeyword))
+                ->where('search_engine', $this->newSearchEngine)
+                ->where('search_type', $this->newSearchType)
+                ->where('country', strtolower($this->newCountry))
+                ->where('language', strtolower($this->newLanguage))
+                ->where('device', $this->newDevice)
+                ->where(function ($q) {
+                    if ($this->newLocation === '' || $this->newLocation === null) {
+                        $q->whereNull('location');
+                    } else {
+                        $q->where('location', $this->newLocation);
+                    }
+                })
+                ->first();
+            if ($existing === null && $meter->activeTrackedKeywordCount($billedUser) >= $cap) {
+                $this->addError(
+                    'newKeyword',
+                    "You're at your plan's limit of {$cap} active tracked keywords. Pause or remove keywords to add new ones, or upgrade your plan."
+                );
+                return;
+            }
+        }
 
         $keyword = RankTrackingKeyword::updateOrCreate(
             [

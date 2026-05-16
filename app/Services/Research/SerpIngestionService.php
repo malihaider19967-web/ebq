@@ -61,6 +61,7 @@ class SerpIngestionService
             'location' => $location,
             'type' => 'organic',
             '__website_id' => $website?->id,
+            '__source' => 'research',
         ]);
 
         if (! is_array($payload)) {

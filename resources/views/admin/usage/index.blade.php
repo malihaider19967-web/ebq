@@ -20,6 +20,7 @@
         $providerColor = [
             'keywords_everywhere' => 'bg-amber-50 text-amber-700 border-amber-200',
             'serp_api' => 'bg-indigo-50 text-indigo-700 border-indigo-200',
+            'mistral'  => 'bg-purple-50 text-purple-700 border-purple-200',
         ];
 
         // Build sparkline path for a series.
@@ -256,6 +257,60 @@
                 </table>
             </div>
         </div>
+
+        {{-- Per-client plan-window utilisation (independent of the date
+             filter — uses each user's subscription-anchored monthly
+             window). Highlights clients near or over their plan cap. --}}
+        @if (! empty($utilisation))
+            <div class="rounded-lg border border-slate-200 bg-white">
+                <div class="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                    <h2 class="text-sm font-semibold">Plan utilisation this cycle</h2>
+                    <span class="text-[10px] uppercase tracking-wider text-slate-400">
+                        Per-user monthly window
+                    </span>
+                </div>
+                <div class="overflow-auto">
+                    <table class="min-w-full text-sm">
+                        <thead class="bg-slate-50 text-left text-xs">
+                            <tr>
+                                <th class="px-4 py-2">Client</th>
+                                <th class="px-4 py-2">Window started</th>
+                                <th class="px-4 py-2">KE credits</th>
+                                <th class="px-4 py-2">Serper calls</th>
+                                <th class="px-4 py-2">Mistral tokens</th>
+                                <th class="px-4 py-2">Tracked keywords</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach ($utilisation as $u)
+                                @php
+                                    $renderCell = function (array $cell) use ($fmtN) {
+                                        if ($cell['limit'] === null) {
+                                            return $fmtN($cell['used']) . ' / <span class="text-slate-400">∞</span>';
+                                        }
+                                        $pct = $cell['pct'] ?? 0;
+                                        $color = $pct >= 100 ? 'text-red-700' : ($pct >= 80 ? 'text-amber-700' : 'text-slate-700');
+                                        return '<span class="' . $color . '">' . $fmtN($cell['used']) . ' / ' . $fmtN($cell['limit']) . '</span> <span class="text-[10px] text-slate-400">(' . number_format($pct, 0) . '%)</span>';
+                                    };
+                                    $user = $users[$u['user_id']] ?? null;
+                                @endphp
+                                <tr>
+                                    <td class="px-4 py-2">
+                                        <div class="font-medium">{{ $user?->name ?? ('User #' . $u['user_id']) }}</div>
+                                        <div class="text-xs text-slate-500">{{ $user?->email }}</div>
+                                    </td>
+                                    <td class="px-4 py-2 text-xs text-slate-500">{{ $u['window_start'] }}</td>
+                                    <td class="px-4 py-2 text-xs">{!! $renderCell($u['providers']['keywords_everywhere']) !!}</td>
+                                    <td class="px-4 py-2 text-xs">{!! $renderCell($u['providers']['serp_api']) !!}</td>
+                                    <td class="px-4 py-2 text-xs">{!! $renderCell($u['providers']['mistral']) !!}</td>
+                                    <td class="px-4 py-2 text-xs">{!! $renderCell($u['tracker']) !!}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
 
         {{-- Recent calls feed --}}
         <div class="rounded-lg border border-slate-200 bg-white">

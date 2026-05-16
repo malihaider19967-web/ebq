@@ -78,6 +78,7 @@ class ResearchAggregateService
             'hl' => $language,
             '__website_id' => $website->id,
             '__owner_user_id' => $website->user_id,
+            '__source' => 'research',
         ]);
 
         $organic = is_array($serpRes['organic'] ?? null) ? $serpRes['organic'] : [];

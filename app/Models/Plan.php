@@ -34,6 +34,7 @@ class Plan extends Model
         'max_websites',
         'features',
         'research_limits',
+        'api_limits',
         'display_order',
         'is_active',
         'is_highlighted',
@@ -44,6 +45,7 @@ class Plan extends Model
         return [
             'features' => 'array',
             'research_limits' => 'array',
+            'api_limits' => 'array',
             'price_monthly_usd' => 'integer',
             'price_yearly_usd' => 'integer',
             'trial_days' => 'integer',
@@ -62,6 +64,34 @@ class Plan extends Model
         }
 
         return $default;
+    }
+
+    /**
+     * Look up a per-provider cap from the `api_limits` JSON via a dot path
+     * like "keywords_everywhere.monthly_credits". Returns null if the key
+     * is absent or its value is null — callers interpret null as
+     * "unlimited" for that provider.
+     */
+    public function apiLimit(string $path): ?int
+    {
+        $limits = $this->api_limits;
+        if (! is_array($limits)) {
+            return null;
+        }
+
+        $node = $limits;
+        foreach (explode('.', $path) as $segment) {
+            if (! is_array($node) || ! array_key_exists($segment, $node)) {
+                return null;
+            }
+            $node = $node[$segment];
+        }
+
+        if ($node === null || ! is_numeric($node)) {
+            return null;
+        }
+
+        return (int) $node;
     }
 
     /**

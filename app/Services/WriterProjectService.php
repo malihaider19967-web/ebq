@@ -604,6 +604,7 @@ class WriterProjectService
             'num' => max(1, min(40, $num)),
             '__website_id' => $project->website_id,
             '__owner_user_id' => $project->user_id,
+            '__source' => 'plugin_writer',
         ]);
 
         $results = [];

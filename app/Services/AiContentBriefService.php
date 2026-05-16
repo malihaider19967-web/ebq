@@ -116,6 +116,7 @@ class AiContentBriefService
             $language,
             websiteId: $website->id,
             ownerUserId: $website->user_id,
+            source: 'plugin_writer',
         );
         if (! is_array($serp) || empty($serp['organic'])) {
             return ['ok' => false, 'error' => 'no_serp_data'];

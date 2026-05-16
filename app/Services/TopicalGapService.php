@@ -99,7 +99,7 @@ class TopicalGapService
     private function compute(Website $website, string $kw, string $contentText, string $country, string $language): array
     {
         // ── Step 1: top-5 SERP results.
-        $serp = $this->serper->search($kw, 5, $country, $language, $website->id, $website->user_id);
+        $serp = $this->serper->search($kw, 5, $country, $language, $website->id, $website->user_id, source: 'plugin_writer');
         $organic = is_array($serp['organic'] ?? null) ? $serp['organic'] : [];
         $organic = array_slice($organic, 0, 5);
         if (empty($organic)) {

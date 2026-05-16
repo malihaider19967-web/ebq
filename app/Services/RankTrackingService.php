@@ -28,6 +28,7 @@ class RankTrackingService
             // and written into client_activities.{user_id, website_id}.
             '__website_id'    => $keyword->website_id,
             '__owner_user_id' => $keyword->user_id,
+            '__source'        => 'tracker',
         ];
 
         $json = $this->serper->query($params);

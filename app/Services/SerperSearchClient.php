@@ -2,8 +2,11 @@
 
 namespace App\Services;
 
-use Illuminate\Support\Facades\Http;
+use App\Models\User;
+use App\Services\Usage\UsageMeter;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class SerperSearchClient
@@ -37,6 +40,7 @@ class SerperSearchClient
         ?string $hl = null,
         ?int $websiteId = null,
         ?int $ownerUserId = null,
+        ?string $source = null,
     ): ?array {
         return $this->query([
             'q' => $query,
@@ -45,6 +49,7 @@ class SerperSearchClient
             'hl' => $hl,
             '__website_id' => $websiteId,
             '__owner_user_id' => $ownerUserId,
+            '__source' => $source,
         ]);
     }
 
@@ -129,6 +134,14 @@ class SerperSearchClient
             $body['tbs'] = trim($params['tbs']);
         }
 
+        $billedUser = $this->resolveBilledUser(
+            isset($params['__website_id']) ? (int) $params['__website_id'] : null,
+            isset($params['__owner_user_id']) ? (int) $params['__owner_user_id'] : null,
+        );
+        if ($billedUser !== null) {
+            app(UsageMeter::class)->assertCanSpend($billedUser, 'serp_api', 1);
+        }
+
         try {
             $response = Http::timeout(30)
                 ->connectTimeout(10)
@@ -160,22 +173,45 @@ class SerperSearchClient
         $websiteId = isset($params['__website_id']) ? (int) $params['__website_id'] : null;
         $ownerUserId = isset($params['__owner_user_id']) ? (int) $params['__owner_user_id'] : null;
 
+        $meta = [
+            'query' => mb_substr($q, 0, 120),
+            'type' => $type,
+            'num' => $body['num'] ?? null,
+            'page' => $body['page'] ?? null,
+            'gl' => $body['gl'] ?? null,
+            'device' => $body['device'] ?? null,
+        ];
+        $source = isset($params['__source']) ? (string) $params['__source'] : '';
+        if ($source !== '') {
+            $meta['source'] = $source;
+        }
         app(ClientActivityLogger::class)->log(
             'api_usage.serp_api',
             userId: $ownerUserId ?? Auth::id(),
             websiteId: $websiteId ?: null,
             provider: 'serp_api',
-            meta: [
-                'query' => mb_substr($q, 0, 120),
-                'type' => $type,
-                'num' => $body['num'] ?? null,
-                'page' => $body['page'] ?? null,
-                'gl' => $body['gl'] ?? null,
-                'device' => $body['device'] ?? null,
-            ],
+            meta: $meta,
             unitsConsumed: 1,
         );
 
         return is_array($json) ? $json : null;
+    }
+
+    private function resolveBilledUser(?int $websiteId, ?int $ownerUserId): ?User
+    {
+        if ($websiteId !== null && $websiteId > 0) {
+            $ownerId = DB::table('website_user')
+                ->where('website_id', $websiteId)
+                ->where('role', \App\Support\TeamPermissions::ROLE_OWNER)
+                ->value('user_id');
+            if ($ownerId === null) {
+                $ownerId = DB::table('websites')->where('id', $websiteId)->value('user_id');
+            }
+            if ($ownerId !== null) {
+                return User::find((int) $ownerId);
+            }
+        }
+        $id = $ownerUserId ?: Auth::id();
+        return $id ? User::find($id) : null;
     }
 }

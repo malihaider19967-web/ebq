@@ -114,6 +114,7 @@ class CompetitorBacklinkService
             $this->limit(),
             websiteId: $websiteId,
             ownerUserId: $ownerUserId,
+            source: 'backlinks',
         );
         // Mark fresh as soon as KE returns — including null / empty — so the
         // gate covers 0-result cases and we don't re-bill on the next call.

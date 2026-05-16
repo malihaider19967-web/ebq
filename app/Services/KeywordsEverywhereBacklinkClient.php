@@ -2,7 +2,10 @@
 
 namespace App\Services;
 
+use App\Models\User;
+use App\Services\Usage\UsageMeter;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
@@ -43,6 +46,7 @@ class KeywordsEverywhereBacklinkClient
         int $limit = 50,
         ?int $websiteId = null,
         ?int $ownerUserId = null,
+        ?string $source = null,
     ): ?array {
         $key = config('services.keywords_everywhere.key');
         if (! is_string($key) || trim($key) === '') {
@@ -61,6 +65,15 @@ class KeywordsEverywhereBacklinkClient
         $url = $baseUrl.(str_starts_with($endpoint, '/') ? $endpoint : '/'.$endpoint);
 
         $limit = max(1, min(1000, $limit));
+
+        // Pre-flight cap check against the worst-case credit spend (1 per
+        // requested row). Backlinks credits aren't refunded if KE returns
+        // fewer rows than asked for, so this is the right ceiling.
+        $billedUser = $this->resolveBilledUser($websiteId, $ownerUserId);
+        if ($billedUser !== null) {
+            app(UsageMeter::class)->assertCanSpend($billedUser, 'keywords_everywhere', $limit);
+        }
+
         $country = strtolower((string) config('services.keywords_everywhere.backlinks_country', 'us'));
         $currency = strtoupper((string) config('services.keywords_everywhere.backlinks_currency', 'USD'));
         $dataSource = (string) config('services.keywords_everywhere.backlinks_data_source', 'g');
@@ -129,21 +142,25 @@ class KeywordsEverywhereBacklinkClient
                 $creditsRemaining = (int) $json['credits'];
             }
 
+            $meta = [
+                'operation' => 'backlinks_for_domain',
+                'domain' => $domain,
+                'limit' => $limit,
+                'returned' => count($items),
+                'credits_consumed' => $unitsConsumed,
+                'credits_remaining' => $creditsRemaining,
+                'country' => $country,
+                'data_source' => $dataSource,
+            ];
+            if ($source !== null && $source !== '') {
+                $meta['source'] = $source;
+            }
             app(ClientActivityLogger::class)->log(
                 'api_usage.keywords_everywhere',
                 userId: $ownerUserId ?? Auth::id(),
                 websiteId: $websiteId,
                 provider: 'keywords_everywhere',
-                meta: [
-                    'operation' => 'backlinks_for_domain',
-                    'domain' => $domain,
-                    'limit' => $limit,
-                    'returned' => count($items),
-                    'credits_consumed' => $unitsConsumed,
-                    'credits_remaining' => $creditsRemaining,
-                    'country' => $country,
-                    'data_source' => $dataSource,
-                ],
+                meta: $meta,
                 unitsConsumed: $unitsConsumed,
             );
 
@@ -156,5 +173,23 @@ class KeywordsEverywhereBacklinkClient
 
             return null;
         }
+    }
+
+    private function resolveBilledUser(?int $websiteId, ?int $ownerUserId): ?User
+    {
+        if ($websiteId !== null) {
+            $ownerId = DB::table('website_user')
+                ->where('website_id', $websiteId)
+                ->where('role', \App\Support\TeamPermissions::ROLE_OWNER)
+                ->value('user_id');
+            if ($ownerId === null) {
+                $ownerId = DB::table('websites')->where('id', $websiteId)->value('user_id');
+            }
+            if ($ownerId !== null) {
+                return User::find((int) $ownerId);
+            }
+        }
+        $id = $ownerUserId ?? Auth::id();
+        return $id ? User::find($id) : null;
     }
 }

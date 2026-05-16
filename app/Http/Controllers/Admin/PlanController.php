@@ -103,6 +103,13 @@ class PlanController extends Controller
             'display_order' => 'required|integer|min:0|max:9999',
             'is_active' => 'sometimes|boolean',
             'is_highlighted' => 'sometimes|boolean',
+            // Per-plan API caps. Blank field => unlimited (stored as
+            // null inside the api_limits JSON column).
+            'api_limits' => 'sometimes|array',
+            'api_limits.keywords_everywhere.monthly_credits' => 'nullable|integer|min:0|max:10000000',
+            'api_limits.serper.monthly_calls' => 'nullable|integer|min:0|max:10000000',
+            'api_limits.mistral.monthly_tokens' => 'nullable|integer|min:0|max:1000000000',
+            'api_limits.rank_tracker.max_active_keywords' => 'nullable|integer|min:0|max:100000',
         ];
         if ($isNew) {
             $rules['slug'] = 'required|string|max:32|alpha_dash|unique:plans,slug';
@@ -122,6 +129,24 @@ class PlanController extends Controller
         // Checkboxes only POST when checked.
         $data['is_active'] = $request->boolean('is_active');
         $data['is_highlighted'] = $request->boolean('is_highlighted');
+
+        // Compact api_limits: drop empty fields so null = unlimited
+        // round-trips cleanly. Empty namespaces are stripped too.
+        $apiLimits = $data['api_limits'] ?? [];
+        $cleanLimits = [];
+        foreach (['keywords_everywhere', 'serper', 'mistral', 'rank_tracker'] as $ns) {
+            $node = $apiLimits[$ns] ?? [];
+            if (! is_array($node)) {
+                continue;
+            }
+            foreach ($node as $k => $v) {
+                if ($v === null || $v === '') {
+                    continue;
+                }
+                $cleanLimits[$ns][$k] = (int) $v;
+            }
+        }
+        $data['api_limits'] = $cleanLimits !== [] ? $cleanLimits : null;
 
         return $data;
     }

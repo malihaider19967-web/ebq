@@ -42,4 +42,17 @@ return Application::configure(basePath: dirname(__DIR__))
         // auth challenges) and is a no-op when SENTRY_LARAVEL_DSN is empty,
         // so this is safe in local/dev environments without configuration.
         \Sentry\Laravel\Integration::handles($exceptions);
+
+        // Per-user API quota — 402 JSON for API/JSON callers (WP plugin
+        // renders this as a banner), flash + redirect to billing for
+        // browser flows so platform pages can show the same banner via
+        // resources/views/partials/quota-banner.blade.php.
+        $exceptions->render(function (\App\Exceptions\QuotaExceededException $e, \Illuminate\Http\Request $request) {
+            if ($request->expectsJson() || $request->is('api/*')) {
+                return response()->json($e->toPayload(), 402);
+            }
+            return redirect()
+                ->back(fallback: route('dashboard', absolute: false) ?: '/')
+                ->with('quota_notice', $e->toPayload());
+        });
     })->create();
