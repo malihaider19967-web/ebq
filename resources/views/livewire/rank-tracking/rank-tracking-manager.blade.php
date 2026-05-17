@@ -250,13 +250,7 @@
                             class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
                         @error('newKeyword')<p class="mt-1 text-[11px] text-red-500">{{ $message }}</p>@enderror
                     </div>
-                    <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Target domain</label>
-                        <input type="text" value="{{ $newTargetDomain }}" readonly
-                            class="h-9 w-full cursor-not-allowed rounded-md border border-slate-200 bg-slate-50 px-3 text-xs text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400" />
-                        @error('newTargetDomain')<p class="mt-1 text-[11px] text-red-500">{{ $message }}</p>@enderror
-                    </div>
-                    <div>
+                    <div class="md:col-span-2">
                         <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Target URL (optional)</label>
                         <div class="flex h-9 overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
                             <span class="flex max-w-[55%] shrink-0 items-center border-r border-slate-200 bg-slate-50 px-2 text-[10px] text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">{{ $targetUrlPrefix }}</span>
