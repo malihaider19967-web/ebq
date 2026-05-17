@@ -64,7 +64,7 @@ return [
     | admins open EBQ in the browser at localhost or a public domain.
     |
     */
-    'public_url' => env('APP_PUBLIC_URL', env('APP_URL', 'http://localhost')),
+    'public_url' => env('APP_PUBLIC_URL', env('EBQ_PUBLIC_URL', env('APP_URL', 'https://ebq.io'))),
 
     /*
     |--------------------------------------------------------------------------
