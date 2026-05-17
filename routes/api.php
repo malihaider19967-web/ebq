@@ -111,6 +111,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/insights/{type}', [PluginHqController::class, 'insights'])
                 ->where('type', '[a-z_]+')
                 ->name('insights');
+            Route::get('/insight-counts', [PluginHqController::class, 'insightCounts'])->name('insight-counts');
 
             // Phase 3 — network-effect features
             Route::get('/serp-features', [PluginHqController::class, 'serpFeatures'])->name('serp-features');

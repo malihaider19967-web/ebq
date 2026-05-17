@@ -900,11 +900,19 @@ class PluginInsightsController extends Controller
     {
         $website = $this->resolveWebsite($request);
         $insight = (string) $request->query('insight', 'cannibalization');
+        $view = (string) $request->query('view', '');
+
+        $params = ['website' => $website->id];
+        if ($view === 'email') {
+            $params['view'] = 'email';
+        } else {
+            $params['insight'] = $insight;
+        }
 
         $signed = URL::temporarySignedRoute(
             'reports.index',
             Carbon::now()->addMinutes(5),
-            ['insight' => $insight, 'website' => $website->id],
+            $params,
         );
 
         return response()->json([

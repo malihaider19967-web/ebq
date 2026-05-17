@@ -1039,6 +1039,8 @@ class PluginHqController extends Controller
             'decay' => $this->reports->contentDecay($website->id, $limit),
             'index_fails' => ['rows' => $this->reports->indexingFailsWithTraffic($website->id, 14, $limit)],
             'quick_wins' => ['rows' => $this->reports->quickWins($website->id, $limit)],
+            'audit_performance' => ['rows' => app(\App\Services\AuditPerformanceService::class)->underperformingPages($website->id, 28, $limit)],
+            'backlink_impact' => ['rows' => app(\App\Services\BacklinkImpactService::class)->impactByTargetPage($website->id, 28, $limit)],
             default => abort(404),
         };
 
@@ -1046,6 +1048,19 @@ class PluginHqController extends Controller
             'type' => $type,
             'website_domain' => $website->domain,
             'payload' => $payload,
+        ]);
+    }
+
+    /**
+     * Insight category counts for the HQ Reports tab tiles.
+     *   GET /api/v1/hq/insight-counts
+     */
+    public function insightCounts(Request $request): JsonResponse
+    {
+        $website = $this->website($request);
+
+        return response()->json([
+            'counts' => $this->reports->insightCounts($website->id),
         ]);
     }
 
