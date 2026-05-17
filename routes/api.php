@@ -115,6 +115,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/growth-report', [PluginHqController::class, 'growthReport'])->name('growth-report');
             Route::post('/growth-report/send', [PluginHqController::class, 'growthReportSend'])->name('growth-report.send');
 
+            Route::get('/page-audit/countries', [PluginHqController::class, 'pageAuditCountries'])->name('page-audit.countries');
             Route::get('/page-audit/suggestions', [PluginHqController::class, 'pageAuditSuggestions'])->name('page-audit.suggestions');
             Route::post('/page-audit', [PluginHqController::class, 'pageAuditQueue'])->name('page-audit.queue');
             Route::get('/page-audits', [PluginHqController::class, 'pageAudits'])->name('page-audits.index');

@@ -1229,20 +1229,25 @@ class PluginHqController extends Controller
             $hint = (string) ($peek['recommendation_hint'] ?? '');
         }
 
-        $countries = [];
-        foreach (SerpGlCatalog::selectOptions() as $code => $label) {
-            $countries[] = ['code' => $code, 'label' => $label];
-        }
-
         return response()->json([
             'ok' => true,
             'page_url' => $pageUrl,
             'keywords' => $keywords,
-            'country' => [
-                'recommended_gl' => $recommendedGl,
-                'hint' => $hint,
-                'options' => $countries,
-            ],
+            'country' => $this->serpCountryOptionsPayload($recommendedGl, $hint),
+        ]);
+    }
+
+    /**
+     * SERP country catalog for the HQ SEO Analysis form (no page URL required).
+     *   GET /api/v1/hq/page-audit/countries
+     */
+    public function pageAuditCountries(Request $request): JsonResponse
+    {
+        $this->website($request);
+
+        return response()->json([
+            'ok' => true,
+            'country' => $this->serpCountryOptionsPayload('us', ''),
         ]);
     }
 
@@ -1576,6 +1581,28 @@ class PluginHqController extends Controller
     /**
      * @return array<string, mixed>
      */
+    /**
+     * @return array{recommended_gl: string, hint: string, options: list<array{code: string, label: string}>}
+     */
+    private function serpCountryOptionsPayload(string $recommendedGl, string $hint = ''): array
+    {
+        $gl = strtolower(trim($recommendedGl));
+        if (! SerpGlCatalog::isAllowedGl($gl)) {
+            $gl = 'us';
+        }
+
+        $countries = [];
+        foreach (SerpGlCatalog::selectOptions() as $code => $label) {
+            $countries[] = ['code' => $code, 'label' => $label];
+        }
+
+        return [
+            'recommended_gl' => $gl,
+            'hint' => $hint,
+            'options' => $countries,
+        ];
+    }
+
     private function formatPageAuditRow(CustomPageAudit $row): array
     {
         return [

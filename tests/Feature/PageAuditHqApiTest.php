@@ -19,6 +19,30 @@ class PageAuditHqApiTest extends TestCase
         parent::tearDown();
     }
 
+    public function test_hq_page_audit_countries_returns_serp_catalog(): void
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->create(['user_id' => $user->id]);
+        $token = $website->createToken('test', ['read:insights'])->plainTextToken;
+
+        $response = $this->withToken($token)
+            ->getJson('/api/v1/hq/page-audit/countries')
+            ->assertOk()
+            ->assertJsonPath('ok', true)
+            ->assertJsonPath('country.recommended_gl', 'us');
+
+        $options = $response->json('country.options');
+        $this->assertIsArray($options);
+        $this->assertGreaterThan(10, count($options));
+        $codes = array_column($options, 'code');
+        $this->assertContains('us', $codes);
+        $this->assertContains('gb', $codes);
+        $this->assertContains('fr', $codes);
+        $us = collect($options)->firstWhere('code', 'us');
+        $this->assertIsArray($us);
+        $this->assertNotEmpty($us['label'] ?? '');
+    }
+
     public function test_hq_page_audit_suggestions_requires_valid_url_on_site(): void
     {
         $user = User::factory()->create();
