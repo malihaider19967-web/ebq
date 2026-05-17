@@ -6,6 +6,7 @@ use App\Models\CompetitorBacklink;
 use App\Models\CustomPageAudit;
 use App\Services\CompetitorBacklinkService;
 use App\Services\PageAuditService;
+use App\Support\AuditConfig;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -105,6 +106,10 @@ class RunCustomPageAudit implements ShouldBeUnique, ShouldQueue
      */
     private function queueCompetitorBacklinks(\App\Models\PageAuditReport $report): void
     {
+        if (! AuditConfig::competitorKeywordsEverywhereEnabled()) {
+            return;
+        }
+
         $competitors = data_get($report->result, 'benchmark.competitors', []);
         if (! is_array($competitors) || $competitors === []) {
             return;

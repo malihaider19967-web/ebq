@@ -181,9 +181,9 @@
         <section class="rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900" aria-labelledby="custom-audit-history-heading">
             <div class="flex flex-col gap-1 border-b border-slate-100 px-5 py-4 dark:border-slate-800 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h2 id="custom-audit-history-heading" class="text-sm font-bold text-slate-900 dark:text-slate-100">Recent custom audits</h2>
+                    <h2 id="custom-audit-history-heading" class="text-sm font-bold text-slate-900 dark:text-slate-100">Recent audits</h2>
                     <p class="mt-1 max-w-2xl text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">
-                        Each row is a run you started from this page. Opening the report shows the <span class="font-medium text-slate-600 dark:text-slate-300">latest saved audit</span> for that URL; a newer run (here or from Pages) can replace the same report row.
+                        Runs from this page, WordPress SEO Analysis, and page-level audits on EBQ. Opening the report shows the <span class="font-medium text-slate-600 dark:text-slate-300">latest saved audit</span> for that URL.
                     </p>
                 </div>
                 @if ($recentAudits->isNotEmpty())
@@ -197,6 +197,7 @@
                         <thead class="bg-slate-50 text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:bg-slate-800/80 dark:text-slate-400">
                             <tr>
                                 <th scope="col" class="whitespace-nowrap px-4 py-3">When</th>
+                                <th scope="col" class="whitespace-nowrap px-4 py-3">Source</th>
                                 <th scope="col" class="min-w-[10rem] px-4 py-3">Page</th>
                                 <th scope="col" class="min-w-[7rem] px-4 py-3">Market</th>
                                 <th scope="col" class="min-w-[8rem] px-4 py-3">Keyword</th>
@@ -210,6 +211,9 @@
                                 <tr class="bg-white transition hover:bg-slate-50/80 dark:bg-slate-900 dark:hover:bg-slate-800/40">
                                     <td class="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
                                         <time datetime="{{ $row->created_at->toIso8601String() }}" title="{{ $row->created_at->toIso8601String() }}">{{ $row->created_at->diffForHumans() }}</time>
+                                    </td>
+                                    <td class="whitespace-nowrap px-4 py-3 text-slate-600 dark:text-slate-300">
+                                        {{ $row->portalSourceLabel() }}
                                     </td>
                                     <td class="max-w-[14rem] px-4 py-3">
                                         <span class="block truncate font-mono text-[11px] text-slate-800 dark:text-slate-200" title="{{ $row->page_url }}">{{ Str::limit($row->page_url, 56) }}</span>

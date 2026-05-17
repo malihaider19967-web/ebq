@@ -275,7 +275,7 @@ class CustomAudit extends Component
             $website = Website::query()->find($this->websiteId);
             $recentAudits = CustomPageAudit::query()
                 ->where('website_id', $this->websiteId)
-                ->where('source', CustomPageAudit::SOURCE_CUSTOM)
+                ->portalHistory()
                 ->with(['user:id,name', 'pageAuditReport'])
                 ->latest()
                 ->limit(50)

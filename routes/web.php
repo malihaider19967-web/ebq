@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\WebsiteFeatureController as AdminWebsiteFeatureCo
 use App\Http\Controllers\Admin\BillingController as AdminBillingController;
 use App\Http\Controllers\Admin\PlanController as AdminPlanController;
 use App\Http\Controllers\Admin\ArtisanCommandsController as AdminArtisanCommandsController;
+use App\Http\Controllers\Admin\AuditSettingsController as AdminAuditSettingsController;
 use App\Http\Controllers\Admin\RankTrackerSettingsController as AdminRankTrackerSettingsController;
 use App\Http\Controllers\WordPressConnectController;
 use App\Http\Controllers\WordPressEmbedController;
@@ -185,6 +186,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         ->name('rank-tracker.settings');
     Route::put('/rank-tracker', [AdminRankTrackerSettingsController::class, 'update'])
         ->name('rank-tracker.settings.update');
+
+    Route::get('/audit', [AdminAuditSettingsController::class, 'edit'])
+        ->name('audit.settings');
+    Route::put('/audit', [AdminAuditSettingsController::class, 'update'])
+        ->name('audit.settings.update');
 });
 
 Route::middleware('auth')->post('/admin/impersonation/stop', [ClientImpersonationController::class, 'stop'])->name('admin.impersonation.stop');

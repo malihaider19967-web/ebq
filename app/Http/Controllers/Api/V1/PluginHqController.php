@@ -1364,7 +1364,7 @@ class PluginHqController extends Controller
 
         $rows = CustomPageAudit::query()
             ->where('website_id', $website->id)
-            ->whereIn('source', [CustomPageAudit::SOURCE_HQ_WP, CustomPageAudit::SOURCE_CUSTOM])
+            ->portalHistory()
             ->with('pageAuditReport:id,status')
             ->latest()
             ->limit(30)

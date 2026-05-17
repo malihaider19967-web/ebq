@@ -70,6 +70,11 @@
                         'match_routes' => ['admin.rank-tracker.'],
                     ],
                     [
+                        'route' => 'admin.audit.settings',
+                        'label' => 'Page audits',
+                        'match_routes' => ['admin.audit.'],
+                    ],
+                    [
                         'route' => 'admin.plugin-releases.index',
                         'label' => 'WordPress Plugin',
                         'match_routes' => [

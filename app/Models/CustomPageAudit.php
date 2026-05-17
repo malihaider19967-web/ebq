@@ -22,6 +22,18 @@ class CustomPageAudit extends Model
     /** Queued from the WordPress HQ “SEO Analysis” tab. */
     public const SOURCE_HQ_WP = 'hq_wp';
 
+    /**
+     * Audit sources shown in EBQ portal history (custom audit page, etc.).
+     * Excludes {@see SOURCE_LIVE_SCORE} — editor background runs only.
+     *
+     * @var list<string>
+     */
+    public const SOURCES_PORTAL_HISTORY = [
+        self::SOURCE_CUSTOM,
+        self::SOURCE_PAGE_DETAIL,
+        self::SOURCE_HQ_WP,
+    ];
+
     public const STATUS_QUEUED = 'queued';
 
     public const STATUS_RUNNING = 'running';
@@ -172,6 +184,21 @@ class CustomPageAudit extends Model
     public function scopePending(Builder $q): Builder
     {
         return $q->whereIn('status', [self::STATUS_QUEUED, self::STATUS_RUNNING]);
+    }
+
+    /** User-initiated audits for portal lists (custom audit, HQ API history). */
+    public function scopePortalHistory(Builder $q): Builder
+    {
+        return $q->whereIn('source', self::SOURCES_PORTAL_HISTORY);
+    }
+
+    public function portalSourceLabel(): string
+    {
+        return match ($this->source) {
+            self::SOURCE_HQ_WP => 'WordPress',
+            self::SOURCE_PAGE_DETAIL => 'Pages',
+            default => 'EBQ',
+        };
     }
 
     public function isPending(): bool

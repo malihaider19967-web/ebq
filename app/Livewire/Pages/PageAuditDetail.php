@@ -4,6 +4,7 @@ namespace App\Livewire\Pages;
 
 use App\Mail\PageAuditReportMail;
 use App\Models\PageAuditReport;
+use App\Support\AuditConfig;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -69,7 +70,7 @@ class PageAuditDetail extends Component
         // populates on the next view. Safe to call every render — the service
         // no-ops for domains that are already fresh.
         $competitors = data_get($this->pageAuditReport->result, 'benchmark.competitors', []);
-        if (is_array($competitors) && $competitors !== []) {
+        if (AuditConfig::competitorKeywordsEverywhereEnabled() && is_array($competitors) && $competitors !== []) {
             $domains = [];
             foreach ($competitors as $row) {
                 if (isset($row['url']) && is_string($row['url'])) {

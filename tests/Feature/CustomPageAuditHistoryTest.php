@@ -48,7 +48,7 @@ class CustomPageAuditHistoryTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('unique serp phrase xyz', false);
-        $response->assertSee('Recent custom audits', false);
+        $response->assertSee('Recent audits', false);
 
         $this->actingAs($user)
             ->withSession(['current_website_id' => $website->id])
@@ -57,5 +57,28 @@ class CustomPageAuditHistoryTest extends TestCase
             ->assertSee('unique serp phrase xyz', false)
             ->assertSee('Primary keyword', false)
             ->assertSee('Page audit', false);
+    }
+
+    public function test_custom_audit_page_lists_wordpress_hq_audits(): void
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->create(['user_id' => $user->id]);
+        $pageUrl = 'https://'.$website->domain.'/from-wp';
+
+        CustomPageAudit::queue(
+            websiteId: $website->id,
+            userId: $user->id,
+            pageUrl: $pageUrl,
+            targetKeyword: 'wp audit keyword',
+            serpSampleGl: 'us',
+            source: CustomPageAudit::SOURCE_HQ_WP,
+        );
+
+        $this->actingAs($user)
+            ->withSession(['current_website_id' => $website->id])
+            ->get(route('custom-audit.index'))
+            ->assertOk()
+            ->assertSee('wp audit keyword', false)
+            ->assertSee('WordPress', false);
     }
 }
