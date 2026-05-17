@@ -120,6 +120,15 @@ return [
         'enabled' => filter_var(env('LANGUAGE_DETECTION_ENABLED', true), FILTER_VALIDATE_BOOLEAN),
     ],
 
+    /*
+     * Public EBQ app URL — used for signed WP plugin deep-links (Reports, etc.).
+     * Must match the host that serves /wordpress/embed/* and share APP_KEY with
+     * the API the plugin calls.
+     */
+    'ebq' => [
+        'public_url' => rtrim((string) env('EBQ_PUBLIC_URL', env('APP_PUBLIC_URL', 'https://ebq.io')), '/'),
+    ],
+
     'mistral' => [
         'key' => env('MISTRAL_API_KEY'),
         // Default to small-latest (currently Mistral Small 3.2). Per-task
