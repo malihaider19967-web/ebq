@@ -65,6 +65,11 @@
                     ['route' => 'admin.activities.index', 'label' => 'Activities'],
                     ['route' => 'admin.usage.index', 'label' => 'API Usage'],
                     [
+                        'route' => 'admin.rank-tracker.settings',
+                        'label' => 'Rank Tracker',
+                        'match_routes' => ['admin.rank-tracker.'],
+                    ],
+                    [
                         'route' => 'admin.plugin-releases.index',
                         'label' => 'WordPress Plugin',
                         'match_routes' => [

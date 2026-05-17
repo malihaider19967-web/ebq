@@ -9,6 +9,7 @@ use App\Models\Website;
 use App\Services\KeywordMetricsService;
 use App\Services\SerpFeatureRiskService;
 use App\Services\Usage\UsageMeter;
+use App\Support\RankTrackerConfig;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -33,21 +34,17 @@ class RankTrackingManager extends Component
 
     public string $newKeyword = '';
     public string $newTargetDomain = '';
-    public string $newTargetUrl = '';
+    /** Path on the connected domain (e.g. /blog/post) — combined with target domain on save. */
+    public string $newTargetUrlPath = '';
     public string $newSearchEngine = 'google';
     public string $newSearchType = 'organic';
     public string $newCountry = 'us';
     public string $newLanguage = 'en';
-    public string $newLocation = '';
     public string $newDevice = 'desktop';
-    public int $newDepth = 100;
-    public string $newTbs = '';
     public bool $newAutocorrect = true;
     public bool $newSafeSearch = false;
     public string $newCompetitors = '';
-    public string $newTags = '';
     public string $newNotes = '';
-    public int $newIntervalHours = 12;
 
     // Bulk-add panel state — populated from existing GSC traffic so users can
     // import their best-performing organic queries with one click.
@@ -289,10 +286,10 @@ class RankTrackingManager extends Component
                     'user_id' => $user->id,
                     'keyword' => $kw,
                     'target_domain' => $domain,
-                    'depth' => 100,
+                    'depth' => RankTrackerConfig::DEFAULT_DEPTH,
                     'autocorrect' => true,
                     'safe_search' => false,
-                    'check_interval_hours' => 12,
+                    'check_interval_hours' => RankTrackerConfig::checkIntervalHours(),
                     'is_active' => true,
                     'next_check_at' => Carbon::now(),
                 ]
@@ -350,16 +347,12 @@ class RankTrackingManager extends Component
         $this->validate([
             'newKeyword' => 'required|string|min:1|max:500',
             'newTargetDomain' => 'required|string|max:255',
-            'newTargetUrl' => 'nullable|string|max:2048',
+            'newTargetUrlPath' => 'nullable|string|max:2048',
             'newSearchEngine' => 'required|in:google',
             'newSearchType' => 'required|in:organic,news,images,videos,shopping,maps,scholar',
             'newCountry' => 'required|string|size:2',
             'newLanguage' => 'required|string|min:2|max:10',
-            'newLocation' => 'nullable|string|max:255',
             'newDevice' => 'required|in:desktop,mobile',
-            'newDepth' => 'required|integer|min:10|max:100',
-            'newTbs' => 'nullable|string|max:64',
-            'newIntervalHours' => 'required|integer|min:1|max:168',
         ]);
 
         $user = Auth::user();
@@ -375,11 +368,12 @@ class RankTrackingManager extends Component
             ->values()
             ->all();
 
-        $tags = collect(explode(',', $this->newTags))
-            ->map(fn ($v) => trim((string) $v))
-            ->filter()
-            ->values()
-            ->all();
+        $targetUrl = RankTrackerConfig::normalizeTargetUrl($this->newTargetDomain, $this->newTargetUrlPath);
+        if ($this->newTargetUrlPath !== '' && $targetUrl === null) {
+            $this->addError('newTargetUrlPath', 'Target URL must be a path on your connected domain.');
+
+            return;
+        }
 
         // Plan cap on active tracked keywords. Only blocks brand-new
         // rows — re-saving an already-tracked combination is treated as
@@ -397,13 +391,7 @@ class RankTrackingManager extends Component
                 ->where('country', strtolower($this->newCountry))
                 ->where('language', strtolower($this->newLanguage))
                 ->where('device', $this->newDevice)
-                ->where(function ($q) {
-                    if ($this->newLocation === '' || $this->newLocation === null) {
-                        $q->whereNull('location');
-                    } else {
-                        $q->where('location', $this->newLocation);
-                    }
-                })
+                ->whereNull('location')
                 ->first();
             if ($existing === null && $meter->activeTrackedKeywordCount($billedUser) >= $cap) {
                 $this->addError(
@@ -423,21 +411,21 @@ class RankTrackingManager extends Component
                 'country' => strtolower($this->newCountry),
                 'language' => strtolower($this->newLanguage),
                 'device' => $this->newDevice,
-                'location' => $this->newLocation ?: null,
+                'location' => null,
             ],
             [
                 'user_id' => $user->id,
                 'keyword' => trim($this->newKeyword),
                 'target_domain' => trim($this->newTargetDomain),
-                'target_url' => $this->newTargetUrl ?: null,
-                'depth' => $this->newDepth,
-                'tbs' => $this->newTbs ?: null,
+                'target_url' => $targetUrl,
+                'depth' => RankTrackerConfig::DEFAULT_DEPTH,
+                'tbs' => null,
                 'autocorrect' => $this->newAutocorrect,
                 'safe_search' => $this->newSafeSearch,
                 'competitors' => $competitors,
-                'tags' => $tags,
+                'tags' => [],
                 'notes' => $this->newNotes ?: null,
-                'check_interval_hours' => $this->newIntervalHours,
+                'check_interval_hours' => RankTrackerConfig::checkIntervalHours(),
                 'is_active' => true,
                 'next_check_at' => Carbon::now(),
             ]
@@ -447,11 +435,8 @@ class RankTrackingManager extends Component
 
         $this->reset([
             'newKeyword',
-            'newTargetUrl',
-            'newLocation',
-            'newTbs',
+            'newTargetUrlPath',
             'newCompetitors',
-            'newTags',
             'newNotes',
             'showForm',
         ]);
@@ -605,6 +590,8 @@ class RankTrackingManager extends Component
             'languages' => $this->languages(),
             'keMetrics' => $keMetrics,
             'detectedLanguages' => $detectedLanguages,
+            'targetUrlPrefix' => RankTrackerConfig::targetUrlPrefix($this->newTargetDomain),
+            'defaultCheckIntervalHours' => RankTrackerConfig::checkIntervalHours(),
         ]);
     }
 

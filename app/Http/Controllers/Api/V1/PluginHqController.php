@@ -14,6 +14,7 @@ use App\Services\CrossSiteBenchmarkService;
 use App\Services\Google\GoogleClientFactory;
 use App\Services\PluginInsightResolver;
 use App\Services\ReportDataService;
+use App\Support\RankTrackerConfig;
 use App\Support\UrlNormalizer;
 use App\Services\SerpFeatureTrackerService;
 use App\Services\TopicalAuthorityService;
@@ -260,35 +261,38 @@ class PluginHqController extends Controller
 
         $data = $request->validate([
             'keyword'              => 'required|string|min:1|max:500',
-            'target_domain'        => 'nullable|string|max:255',
             'target_url'           => 'nullable|string|max:2048',
             'search_engine'        => ['nullable', Rule::in(['google'])],
             'search_type'          => ['nullable', Rule::in(['organic', 'news', 'images', 'videos', 'shopping', 'maps', 'scholar'])],
             'country'              => 'nullable|string|size:2',
             'language'             => 'nullable|string|min:2|max:10',
-            'location'             => 'nullable|string|max:255',
             'device'               => ['nullable', Rule::in(['desktop', 'mobile'])],
-            'depth'                => 'nullable|integer|min:10|max:100',
-            'tbs'                  => 'nullable|string|max:64',
             'autocorrect'          => 'nullable|boolean',
             'safe_search'          => 'nullable|boolean',
             'competitors'          => 'nullable|array|max:20',
             'competitors.*'        => 'string|max:255',
-            'tags'                 => 'nullable|array|max:20',
-            'tags.*'               => 'string|max:60',
             'notes'                => 'nullable|string|max:2000',
-            'check_interval_hours' => 'nullable|integer|min:1|max:168',
         ]);
 
+        $domain = (string) $website->domain;
+        $targetUrl = RankTrackerConfig::normalizeTargetUrl($domain, $data['target_url'] ?? null);
+        if (! empty($data['target_url']) && $targetUrl === null) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'invalid_target_url',
+                'message' => 'Target URL must be a path on your connected domain.',
+            ], 422);
+        }
+
         $defaults = [
-            'target_domain'        => $data['target_domain'] ?? $website->domain,
+            'target_domain'        => $domain,
             'search_engine'        => $data['search_engine'] ?? 'google',
             'search_type'          => $data['search_type'] ?? 'organic',
             'country'              => strtolower($data['country'] ?? 'us'),
             'language'             => strtolower($data['language'] ?? 'en'),
             'device'               => $data['device'] ?? 'desktop',
-            'depth'                => $data['depth'] ?? 100,
-            'check_interval_hours' => $data['check_interval_hours'] ?? 24,
+            'depth'                => RankTrackerConfig::DEFAULT_DEPTH,
+            'check_interval_hours' => RankTrackerConfig::checkIntervalHours(),
             'autocorrect'          => $data['autocorrect'] ?? false,
             'safe_search'          => $data['safe_search'] ?? false,
         ];
@@ -302,19 +306,19 @@ class PluginHqController extends Controller
                 'country'       => $defaults['country'],
                 'language'      => $defaults['language'],
                 'device'        => $defaults['device'],
-                'location'      => $data['location'] ?? null,
+                'location'      => null,
             ],
             [
                 'user_id'              => $website->user_id,
                 'keyword'              => trim($data['keyword']),
                 'target_domain'        => trim($defaults['target_domain']),
-                'target_url'           => $data['target_url'] ?? null,
+                'target_url'           => $targetUrl,
                 'depth'                => $defaults['depth'],
-                'tbs'                  => $data['tbs'] ?? null,
+                'tbs'                  => null,
                 'autocorrect'          => (bool) $defaults['autocorrect'],
                 'safe_search'          => (bool) $defaults['safe_search'],
                 'competitors'          => $data['competitors'] ?? [],
-                'tags'                 => $data['tags'] ?? [],
+                'tags'                 => [],
                 'notes'                => $data['notes'] ?? null,
                 'check_interval_hours' => $defaults['check_interval_hours'],
                 'is_active'            => true,
@@ -352,13 +356,22 @@ class PluginHqController extends Controller
             ->findOrFail($id);
 
         $data = $request->validate([
-            'is_active'            => 'sometimes|boolean',
-            'tags'                 => 'sometimes|array|max:20',
-            'tags.*'               => 'string|max:60',
-            'notes'                => 'sometimes|nullable|string|max:2000',
-            'check_interval_hours' => 'sometimes|integer|min:1|max:168',
-            'target_url'           => 'sometimes|nullable|string|max:2048',
+            'is_active'  => 'sometimes|boolean',
+            'notes'      => 'sometimes|nullable|string|max:2000',
+            'target_url' => 'sometimes|nullable|string|max:2048',
         ]);
+
+        if (array_key_exists('target_url', $data)) {
+            $normalized = RankTrackerConfig::normalizeTargetUrl((string) $website->domain, $data['target_url']);
+            if ($data['target_url'] !== null && $data['target_url'] !== '' && $normalized === null) {
+                return response()->json([
+                    'ok' => false,
+                    'error' => 'invalid_target_url',
+                    'message' => 'Target URL must be a path on your connected domain.',
+                ], 422);
+            }
+            $data['target_url'] = $normalized;
+        }
 
         $keyword->fill($data)->save();
 

@@ -83,10 +83,10 @@ class KeywordDetail extends Component
                 'user_id' => $user->id,
                 'keyword' => $this->query,
                 'target_domain' => $domain,
-                'depth' => 100,
+                'depth' => \App\Support\RankTrackerConfig::DEFAULT_DEPTH,
                 'autocorrect' => true,
                 'safe_search' => false,
-                'check_interval_hours' => 12,
+                'check_interval_hours' => \App\Support\RankTrackerConfig::checkIntervalHours(),
                 'is_active' => true,
                 'next_check_at' => Carbon::now(),
             ]

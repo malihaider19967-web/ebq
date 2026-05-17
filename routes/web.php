@@ -13,6 +13,7 @@ use App\Http\Controllers\Admin\WebsiteFeatureController as AdminWebsiteFeatureCo
 use App\Http\Controllers\Admin\BillingController as AdminBillingController;
 use App\Http\Controllers\Admin\PlanController as AdminPlanController;
 use App\Http\Controllers\Admin\ArtisanCommandsController as AdminArtisanCommandsController;
+use App\Http\Controllers\Admin\RankTrackerSettingsController as AdminRankTrackerSettingsController;
 use App\Http\Controllers\WordPressConnectController;
 use App\Http\Controllers\WordPressEmbedController;
 use App\Http\Controllers\WordPressPluginDownloadController;
@@ -175,6 +176,11 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // ArtisanCommandsController::CATALOG, signatures come live from
     // Artisan::all() so the page can't drift from `php artisan list`.
     Route::get('/commands', [AdminArtisanCommandsController::class, 'index'])->name('commands.index');
+
+    Route::get('/rank-tracker', [AdminRankTrackerSettingsController::class, 'edit'])
+        ->name('rank-tracker.settings');
+    Route::put('/rank-tracker', [AdminRankTrackerSettingsController::class, 'update'])
+        ->name('rank-tracker.settings.update');
 });
 
 Route::middleware('auth')->post('/admin/impersonation/stop', [ClientImpersonationController::class, 'stop'])->name('admin.impersonation.stop');

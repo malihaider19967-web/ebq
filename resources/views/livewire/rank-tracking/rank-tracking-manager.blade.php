@@ -238,9 +238,8 @@
     @if ($showForm)
         <form wire:submit.prevent="addKeyword"
             class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-            <div class="mb-4 flex items-center justify-between">
+            <div class="mb-4">
                 <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Track a new keyword</h3>
-                <span class="text-[10px] uppercase tracking-wider text-slate-400">All options configurable</span>
             </div>
 
             <div class="space-y-5">
@@ -252,27 +251,24 @@
                         @error('newKeyword')<p class="mt-1 text-[11px] text-red-500">{{ $message }}</p>@enderror
                     </div>
                     <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Target domain <span class="text-red-500">*</span></label>
-                        <input wire:model="newTargetDomain" type="text" placeholder="example.com"
-                            class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Target domain</label>
+                        <input type="text" value="{{ $newTargetDomain }}" readonly
+                            class="h-9 w-full cursor-not-allowed rounded-md border border-slate-200 bg-slate-50 px-3 text-xs text-slate-600 shadow-sm dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400" />
                         @error('newTargetDomain')<p class="mt-1 text-[11px] text-red-500">{{ $message }}</p>@enderror
                     </div>
                     <div>
-                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Specific URL (optional)</label>
-                        <input wire:model="newTargetUrl" type="text" placeholder="https://example.com/page"
-                            class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
+                        <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Target URL (optional)</label>
+                        <div class="flex h-9 overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                            <span class="flex max-w-[55%] shrink-0 items-center border-r border-slate-200 bg-slate-50 px-2 text-[10px] text-slate-500 dark:border-slate-700 dark:bg-slate-800/60 dark:text-slate-400">{{ $targetUrlPrefix }}</span>
+                            <input wire:model="newTargetUrlPath" type="text" placeholder="/page-path"
+                                class="min-w-0 flex-1 border-0 bg-transparent px-2 text-xs focus:outline-none focus:ring-0 dark:text-slate-100" />
+                        </div>
+                        @error('newTargetUrlPath')<p class="mt-1 text-[11px] text-red-500">{{ $message }}</p>@enderror
+                        <p class="mt-1 text-[10px] text-slate-400">Path on your connected domain. Leave blank to match any URL.</p>
                     </div>
                 </div>
 
-                <div class="border-t border-slate-100 pt-4 dark:border-slate-800">
-                    <div class="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">SERP targeting</div>
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Search engine</label>
-                            <select wire:model="newSearchEngine" class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                                <option value="google">Google</option>
-                            </select>
-                        </div>
+                <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
                         <div>
                             <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Search type</label>
                             <select wire:model="newSearchType" class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800">
@@ -283,13 +279,6 @@
                                 <option value="shopping">Shopping</option>
                                 <option value="maps">Maps / Places</option>
                                 <option value="scholar">Scholar</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Device</label>
-                            <select wire:model="newDevice" class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                                <option value="desktop">Desktop</option>
-                                <option value="mobile">Mobile</option>
                             </select>
                         </div>
                         <div>
@@ -309,73 +298,35 @@
                             </select>
                         </div>
                         <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Location (optional)</label>
-                            <input wire:model="newLocation" type="text" placeholder="New York, NY, United States"
+                            <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Device</label>
+                            <select wire:model="newDevice" class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                                <option value="desktop">Desktop</option>
+                                <option value="mobile">Mobile</option>
+                            </select>
+                        </div>
+                        <div class="md:col-span-2">
+                            <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Competitor domains</label>
+                            <input wire:model="newCompetitors" type="text" placeholder="competitor1.com, competitor2.com"
                                 class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800" />
                         </div>
                     </div>
-                </div>
 
-                <div class="border-t border-slate-100 pt-4 dark:border-slate-800">
-                    <div class="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Search parameters</div>
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">SERP depth</label>
-                            <select wire:model="newDepth" class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                                <option value="10">Top 10</option>
-                                <option value="20">Top 20</option>
-                                <option value="30">Top 30</option>
-                                <option value="50">Top 50</option>
-                                <option value="100">Top 100</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Time filter</label>
-                            <select wire:model="newTbs" class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800">
-                                <option value="">Any time</option>
-                                <option value="qdr:h">Past hour</option>
-                                <option value="qdr:d">Past 24 hours</option>
-                                <option value="qdr:w">Past week</option>
-                                <option value="qdr:m">Past month</option>
-                                <option value="qdr:y">Past year</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Re-check every (hours)</label>
-                            <input wire:model="newIntervalHours" type="number" min="1" max="168"
-                                class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800" />
-                        </div>
-                    </div>
-                    <div class="mt-3 flex flex-wrap items-center gap-5">
+                <div class="flex flex-wrap items-center gap-5">
                         <label class="flex cursor-pointer items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                             <input wire:model="newAutocorrect" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" /> Autocorrect queries
                         </label>
                         <label class="flex cursor-pointer items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                             <input wire:model="newSafeSearch" type="checkbox" class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" /> Safe search
                         </label>
-                    </div>
                 </div>
 
-                <div class="border-t border-slate-100 pt-4 dark:border-slate-800">
-                    <div class="mb-3 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Organization</div>
-                    <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Competitor domains</label>
-                            <input wire:model="newCompetitors" type="text" placeholder="competitor1.com, competitor2.com"
-                                class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800" />
-                        </div>
-                        <div>
-                            <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Tags</label>
-                            <input wire:model="newTags" type="text" placeholder="homepage, brand, priority"
-                                class="h-9 w-full rounded-md border border-slate-200 bg-white px-3 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800" />
-                        </div>
-                        <div class="md:col-span-2">
-                            <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Notes</label>
-                            <textarea wire:model="newNotes" rows="2"
-                                class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800"></textarea>
-                        </div>
-                    </div>
+                <div>
+                    <label class="mb-1 block text-xs font-medium text-slate-600 dark:text-slate-400">Notes</label>
+                    <textarea wire:model="newNotes" rows="2"
+                        class="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm dark:border-slate-700 dark:bg-slate-800"></textarea>
                 </div>
+
+                <p class="text-[10px] text-slate-400">Rankings are checked every {{ $defaultCheckIntervalHours }} hours (top {{ \App\Support\RankTrackerConfig::DEFAULT_DEPTH }} SERP results).</p>
             </div>
 
             <div class="mt-5 flex items-center justify-end gap-2">
@@ -457,9 +408,6 @@
                                             @if ($risk && $risk['lost_feature'])
                                                 <span class="rounded bg-red-100 px-1.5 py-px text-[9px] font-semibold uppercase text-red-700 dark:bg-red-500/10 dark:text-red-400" title="Lost SERP feature: {{ implode(', ', $risk['features_lost']) }}">lost feature</span>
                                             @endif
-                                            @foreach ((array) $kw->tags as $tag)
-                                                <span class="rounded bg-indigo-50 px-1.5 py-px text-[9px] text-indigo-700 dark:bg-indigo-500/10 dark:text-indigo-300">{{ $tag }}</span>
-                                            @endforeach
                                         </div>
                                     </td>
                                     <td class="px-4 py-3 text-slate-700 dark:text-slate-300">
@@ -475,7 +423,6 @@
                                             <span class="text-[10px]">·</span>
                                             <span class="text-[10px] capitalize">{{ $kw->device }}</span>
                                         </div>
-                                        @if ($kw->location)<div class="mt-0.5 text-[10px] text-slate-400">{{ $kw->location }}</div>@endif
                                     </td>
                                     <td class="px-4 py-3 text-right">
                                         @if ($kw->current_position)
@@ -629,7 +576,7 @@
                     @if ($search || $filterDevice || $filterCountry || $filterType || $filterStatus)
                         Try adjusting your filters or clear them to see everything.
                     @else
-                        Add your first keyword to start monitoring its SERP position. Rankings are checked every 12 hours by default; you can force a re-check anytime.
+                        Add your first keyword to start monitoring its SERP position. Rankings are checked every {{ $defaultCheckIntervalHours }} hours; you can force a re-check anytime.
                     @endif
                 </p>
                 <div class="mt-4 flex gap-2">
