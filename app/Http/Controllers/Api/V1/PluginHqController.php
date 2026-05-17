@@ -622,10 +622,11 @@ class PluginHqController extends Controller
     public function indexStatus(Request $request): JsonResponse
     {
         $website = $this->website($request);
-        $status = strtoupper((string) $request->query('status', ''));
-        $perPage = max(10, min(100, (int) $request->query('per_page', 25)));
-        $page = max(1, (int) $request->query('page', 1));
-        $search = trim((string) $request->query('search', ''));
+        $status = strtoupper((string) ($request->input('status', $request->query('status', ''))));
+        $perPage = max(10, min(100, (int) ($request->input('per_page', $request->query('per_page', 25)))));
+        $page = max(1, (int) ($request->input('page', $request->query('page', 1))));
+        $search = trim((string) ($request->input('search', $request->query('search', ''))));
+        $sitemapUrls = $this->parseSitemapUrls($request->input('sitemap_urls', []));
 
         $windowFrom = $website->gscKeywordWindowStartDate();
         $windowDays = $website->effectiveGscKeywordLookbackDays();
@@ -668,20 +669,29 @@ class PluginHqController extends Controller
 
         $pisByNormalized = $this->insightResolver->indexingStatusesByNormalizedPage($pisRows);
 
-        $pages = collect($this->insightResolver->dedupePageUrlsForIndexStatus($indexedPages, $pisByNormalized));
+        $sitemapNormSet = [];
+        foreach ($sitemapUrls as $sitemapUrl) {
+            if ($sitemapUrl === '') {
+                continue;
+            }
+            $sitemapNormSet[UrlNormalizer::normalize($sitemapUrl)] = true;
+        }
 
-        $merged = $pages->map(function (string $pageUrl) use ($pisByNormalized, $recentImpressionsByNorm, $indexedPagesNormSet, $windowDays) {
+        $pages = collect($this->insightResolver->dedupePageUrlsForIndexStatus($indexedPages, $pisByNormalized, $sitemapUrls));
+
+        $merged = $pages->map(function (string $pageUrl) use ($pisByNormalized, $recentImpressionsByNorm, $indexedPagesNormSet, $sitemapNormSet, $windowDays) {
             $norm = UrlNormalizer::normalize($pageUrl);
             /** @var PageIndexingStatus|null $pis */
             $pis = $pisByNormalized->get($norm);
             $recentImpressions = (int) ($recentImpressionsByNorm[$norm] ?? 0);
-            $hasAnyImpressions = isset($indexedPagesNormSet[$norm]);
+            $hasGscImpressions = isset($indexedPagesNormSet[$norm]);
+            $inSitemap = isset($sitemapNormSet[$norm]);
 
             $explicitVerdict = $pis?->google_verdict;
             if (is_string($explicitVerdict) && $explicitVerdict !== '') {
                 $verdict = strtoupper($explicitVerdict);
                 $verdictSource = 'url_inspection';
-            } elseif ($hasAnyImpressions) {
+            } elseif ($hasGscImpressions) {
                 $verdict = 'PASS';
                 $verdictSource = 'impressions';
             } else {
@@ -700,6 +710,9 @@ class PluginHqController extends Controller
                 'last_reindex_requested_at' => $pis?->last_reindex_requested_at?->toIso8601String(),
                 'impressions' => $recentImpressions,
                 'impressions_window_days' => $windowDays,
+                'in_sitemap' => $inSitemap,
+                'has_gsc_impressions' => $hasGscImpressions,
+                '_sort_priority' => $this->indexStatusSortPriority($verdict, $hasGscImpressions, $inSitemap),
                 '_sort_checked_at' => $pis?->last_google_status_checked_at?->getTimestamp() ?? 0,
             ];
         });
@@ -725,6 +738,14 @@ class PluginHqController extends Controller
             $filtered = $filtered->filter(fn (array $r) => $r['verdict'] === $status)->values();
         } elseif ($status === 'UNKNOWN') {
             $filtered = $filtered->filter(fn (array $r) => $r['verdict'] === null)->values();
+        } elseif ($status === 'NEEDS_INDEX') {
+            $filtered = $filtered->filter(function (array $r) {
+                if (in_array($r['verdict'], ['FAIL', 'PARTIAL'], true)) {
+                    return true;
+                }
+
+                return $r['verdict'] === null && ! ($r['has_gsc_impressions'] ?? false);
+            })->values();
         }
 
         if ($search !== '') {
@@ -733,14 +754,16 @@ class PluginHqController extends Controller
         }
 
         $sorted = $filtered
-            ->sortByDesc('_sort_checked_at')
+            ->sortBy('page')
+            ->sortBy('_sort_checked_at')
+            ->sortBy('_sort_priority')
             ->values();
 
         $total = $sorted->count();
         $sliced = $sorted->slice(($page - 1) * $perPage, $perPage)->values();
 
         $data = $sliced->map(function (array $r) {
-            unset($r['_sort_checked_at']);
+            unset($r['_sort_checked_at'], $r['_sort_priority']);
 
             return $r;
         })->all();
@@ -754,8 +777,50 @@ class PluginHqController extends Controller
                 'total' => $total,
                 'last_page' => max(1, (int) ceil($total / $perPage)),
                 'status' => $status ?: null,
+                'sitemap_url_count' => count($sitemapUrls),
             ],
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function parseSitemapUrls(mixed $raw): array
+    {
+        if (! is_array($raw)) {
+            return [];
+        }
+
+        $urls = [];
+        foreach ($raw as $url) {
+            if (! is_string($url)) {
+                continue;
+            }
+            $trimmed = trim($url);
+            if ($trimmed !== '') {
+                $urls[] = $trimmed;
+            }
+        }
+
+        return array_values(array_unique($urls));
+    }
+
+    private function indexStatusSortPriority(?string $verdict, bool $hasGscImpressions, bool $inSitemap): int
+    {
+        if ($verdict === 'FAIL') {
+            return 0;
+        }
+        if ($verdict === 'PARTIAL') {
+            return 1;
+        }
+        if ($verdict === null && ! $hasGscImpressions) {
+            return $inSitemap ? 2 : 3;
+        }
+        if ($verdict === 'NEUTRAL') {
+            return 4;
+        }
+
+        return 5;
     }
 
     /**

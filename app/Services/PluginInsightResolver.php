@@ -825,14 +825,15 @@ class PluginInsightResolver
     }
 
     /**
-     * One URL per normalized key for HQ index-status (GSC ∪ PIS).
-     * Indexing-status rows win over GSC-only strings.
+     * One URL per normalized key for HQ index-status (PIS ∪ GSC ∪ sitemap).
+     * Priority: URL Inspection row → GSC page string → WP sitemap permalink.
      *
      * @param  list<string>  $indexedPages
      * @param  Collection<string, PageIndexingStatus>  $pisByNormalized
+     * @param  list<string>  $sitemapUrls
      * @return list<string>
      */
-    public function dedupePageUrlsForIndexStatus(array $indexedPages, Collection $pisByNormalized): array
+    public function dedupePageUrlsForIndexStatus(array $indexedPages, Collection $pisByNormalized, array $sitemapUrls = []): array
     {
         $byNorm = [];
 
@@ -841,6 +842,16 @@ class PluginInsightResolver
         }
 
         foreach ($indexedPages as $page) {
+            if ($page === '') {
+                continue;
+            }
+            $norm = UrlNormalizer::normalize($page);
+            if (! isset($byNorm[$norm])) {
+                $byNorm[$norm] = $page;
+            }
+        }
+
+        foreach ($sitemapUrls as $page) {
             if ($page === '') {
                 continue;
             }
