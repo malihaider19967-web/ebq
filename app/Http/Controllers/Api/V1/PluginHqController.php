@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Jobs\TrackKeywordRankJob;
+use App\Mail\GrowthReportMail;
 use App\Models\PageIndexingStatus;
 use App\Models\RankTrackingKeyword;
 use App\Models\SearchConsoleData;
@@ -20,7 +21,10 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Validation\Rule;
+use Throwable;
 
 /**
  * "EBQ HQ" admin-page API. Powers the top-level WordPress admin menu the
@@ -1065,6 +1069,111 @@ class PluginHqController extends Controller
     }
 
     /**
+     * Growth report preview — same payload as EBQ Reports → Custom report.
+     *   GET /api/v1/hq/growth-report?report_type=weekly&start_date=&end_date=&country=
+     */
+    public function growthReport(Request $request): JsonResponse
+    {
+        $website = $this->website($request);
+        $dates = $this->resolveGrowthReportRequest($request);
+
+        if (isset($dates['error'])) {
+            return response()->json($dates, 422);
+        }
+
+        $country = $dates['country'] !== '' ? strtoupper($dates['country']) : null;
+
+        return response()->json([
+            'ok' => true,
+            'domain' => $website->domain,
+            'report_type' => $dates['report_type'],
+            'start_date' => $dates['start_date'],
+            'end_date' => $dates['end_date'],
+            'country' => $country,
+            'report' => $this->reports->generate(
+                $website->id,
+                $dates['start_date'],
+                $dates['end_date'],
+                $country,
+            ),
+        ]);
+    }
+
+    /**
+     * Email growth report to configured recipients (MOAT: mail + data on EBQ).
+     *   POST /api/v1/hq/growth-report/send
+     */
+    public function growthReportSend(Request $request): JsonResponse
+    {
+        $website = $this->website($request);
+        $dates = $this->resolveGrowthReportRequest($request);
+
+        if (isset($dates['error'])) {
+            return response()->json($dates, 422);
+        }
+
+        $rateKey = 'hq-growth-report:'.$website->id;
+        if (RateLimiter::tooManyAttempts($rateKey, 5)) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'rate_limited',
+                'message' => 'Too many report emails sent. Try again later.',
+                'retry_after' => RateLimiter::availableIn($rateKey),
+            ], 429);
+        }
+
+        $recipients = $website->getReportRecipientUsers();
+        if ($recipients->isEmpty()) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'no_recipients',
+                'message' => 'No report recipients configured for this website in EBQ.',
+            ], 422);
+        }
+
+        $owner = $website->user;
+        if ($owner === null) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'no_owner',
+                'message' => 'Website owner not found.',
+            ], 422);
+        }
+
+        try {
+            $emails = [];
+            foreach ($recipients as $recipient) {
+                Mail::to($recipient->email)->send(
+                    new GrowthReportMail(
+                        $recipient,
+                        $website,
+                        $dates['start_date'],
+                        $dates['end_date'],
+                        $dates['report_type'],
+                    )
+                );
+                $emails[] = $recipient->email;
+            }
+
+            RateLimiter::hit($rateKey, 3600);
+
+            return response()->json([
+                'ok' => true,
+                'message' => ucfirst($dates['report_type']).' report for '.$website->domain.' sent to '.implode(', ', $emails).'.',
+                'recipients' => $emails,
+            ]);
+        } catch (Throwable $e) {
+            report($e);
+
+            return response()->json([
+                'ok' => false,
+                'error' => 'send_failed',
+                'message' => 'Could not send the report. Check mail configuration on EBQ.',
+            ], 502);
+        }
+    }
+
+    /**
      * Phase 3 #6 — SERP-feature presence timeline for tracked keywords.
      *   GET /api/v1/hq/serp-features?days=30
      */
@@ -1196,6 +1305,46 @@ class PluginHqController extends Controller
         $w = $request->attributes->get('api_website');
         abort_unless($w instanceof Website, 500, 'Website context missing');
         return $w;
+    }
+
+    /**
+     * @return array{report_type: string, start_date: string, end_date: string, country: string}|array{error: string, message: string}
+     */
+    private function resolveGrowthReportRequest(Request $request): array
+    {
+        $reportType = (string) ($request->input('report_type') ?? $request->query('report_type', 'weekly'));
+        if (! in_array($reportType, ['daily', 'weekly', 'monthly', 'custom'], true)) {
+            return ['error' => 'invalid_report_type', 'message' => 'Invalid report type.'];
+        }
+
+        $tz = config('app.timezone');
+        $endDate = (string) ($request->input('end_date') ?? $request->query('end_date', ''));
+        $startDate = (string) ($request->input('start_date') ?? $request->query('start_date', ''));
+
+        if ($endDate === '' || $startDate === '') {
+            $end = Carbon::yesterday($tz)->toDateString();
+            $start = match ($reportType) {
+                'daily' => $end,
+                'weekly' => Carbon::parse($end, $tz)->subDays(6)->toDateString(),
+                'monthly' => Carbon::parse($end, $tz)->subDays(29)->toDateString(),
+                default => Carbon::parse($end, $tz)->subDays(6)->toDateString(),
+            };
+            $endDate = $end;
+            $startDate = $start;
+        }
+
+        if (Carbon::parse($startDate)->gt(Carbon::parse($endDate))) {
+            return ['error' => 'invalid_range', 'message' => 'Start date must be before or equal to end date.'];
+        }
+
+        $country = strtoupper(trim((string) ($request->input('country') ?? $request->query('country', ''))));
+
+        return [
+            'report_type' => $reportType,
+            'start_date' => $startDate,
+            'end_date' => $endDate,
+            'country' => $country,
+        ];
     }
 
     /**

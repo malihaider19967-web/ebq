@@ -112,6 +112,8 @@ Route::prefix('v1')->group(function (): void {
                 ->where('type', '[a-z_]+')
                 ->name('insights');
             Route::get('/insight-counts', [PluginHqController::class, 'insightCounts'])->name('insight-counts');
+            Route::get('/growth-report', [PluginHqController::class, 'growthReport'])->name('growth-report');
+            Route::post('/growth-report/send', [PluginHqController::class, 'growthReportSend'])->name('growth-report.send');
 
             // Phase 3 — network-effect features
             Route::get('/serp-features', [PluginHqController::class, 'serpFeatures'])->name('serp-features');
