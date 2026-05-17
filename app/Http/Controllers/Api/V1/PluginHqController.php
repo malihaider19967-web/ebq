@@ -11,7 +11,9 @@ use App\Models\Website;
 use App\Services\BacklinkProspectingService;
 use App\Services\CrossSiteBenchmarkService;
 use App\Services\Google\GoogleClientFactory;
+use App\Services\PluginInsightResolver;
 use App\Services\ReportDataService;
+use App\Support\UrlNormalizer;
 use App\Services\SerpFeatureTrackerService;
 use App\Services\TopicalAuthorityService;
 use Illuminate\Http\JsonResponse;
@@ -33,8 +35,10 @@ use Illuminate\Validation\Rule;
  */
 class PluginHqController extends Controller
 {
-    public function __construct(private readonly ReportDataService $reports)
-    {
+    public function __construct(
+        private readonly ReportDataService $reports,
+        private readonly PluginInsightResolver $insightResolver,
+    ) {
     }
 
     /**
@@ -637,7 +641,10 @@ class PluginHqController extends Controller
             ->distinct()
             ->pluck('page')
             ->all();
-        $indexedPagesSet = array_flip($indexedPages);
+        $indexedPagesNormSet = [];
+        foreach ($indexedPages as $gscPage) {
+            $indexedPagesNormSet[UrlNormalizer::normalize($gscPage)] = true;
+        }
 
         // Recent-window impressions only feed the per-row "Impressions (Nd)"
         // display — they're not used for the indexed/not-indexed decision.
@@ -649,21 +656,26 @@ class PluginHqController extends Controller
             ->groupBy('page')
             ->pluck('impressions', 'page');
 
-        $pisByPage = PageIndexingStatus::query()
+        $recentImpressionsByNorm = [];
+        foreach ($recentImpressionsByPage as $gscPage => $impressions) {
+            $normKey = UrlNormalizer::normalize((string) $gscPage);
+            $recentImpressionsByNorm[$normKey] = ($recentImpressionsByNorm[$normKey] ?? 0) + (int) $impressions;
+        }
+
+        $pisRows = PageIndexingStatus::query()
             ->where('website_id', $website->id)
-            ->get()
-            ->keyBy('page');
+            ->get();
 
-        $pages = collect($indexedPages)
-            ->concat($pisByPage->keys())
-            ->unique()
-            ->values();
+        $pisByNormalized = $this->insightResolver->indexingStatusesByNormalizedPage($pisRows);
 
-        $merged = $pages->map(function (string $pageUrl) use ($pisByPage, $recentImpressionsByPage, $indexedPagesSet, $windowDays) {
+        $pages = collect($this->insightResolver->dedupePageUrlsForIndexStatus($indexedPages, $pisByNormalized));
+
+        $merged = $pages->map(function (string $pageUrl) use ($pisByNormalized, $recentImpressionsByNorm, $indexedPagesNormSet, $windowDays) {
+            $norm = UrlNormalizer::normalize($pageUrl);
             /** @var PageIndexingStatus|null $pis */
-            $pis = $pisByPage->get($pageUrl);
-            $recentImpressions = (int) ($recentImpressionsByPage->get($pageUrl) ?? 0);
-            $hasAnyImpressions = isset($indexedPagesSet[$pageUrl]);
+            $pis = $pisByNormalized->get($norm);
+            $recentImpressions = (int) ($recentImpressionsByNorm[$norm] ?? 0);
+            $hasAnyImpressions = isset($indexedPagesNormSet[$norm]);
 
             $explicitVerdict = $pis?->google_verdict;
             if (is_string($explicitVerdict) && $explicitVerdict !== '') {
@@ -798,10 +810,12 @@ class PluginHqController extends Controller
             ], 500);
         }
 
+        $storedPage = $this->insightResolver->resolveStoredPageUrl($website, $url);
+
         $response = Http::withToken($accessToken)
             ->acceptJson()
             ->post('https://indexing.googleapis.com/v3/urlNotifications:publish', [
-                'url' => $url,
+                'url' => $storedPage,
                 'type' => 'URL_UPDATED',
             ]);
 
@@ -822,14 +836,124 @@ class PluginHqController extends Controller
         $parsed = is_string($notifyTime) ? Carbon::parse($notifyTime) : now();
 
         PageIndexingStatus::query()->updateOrCreate(
-            ['website_id' => $website->id, 'page' => $url],
+            ['website_id' => $website->id, 'page' => $storedPage],
             ['last_reindex_requested_at' => $parsed],
         );
 
         return response()->json([
             'ok' => true,
             'message' => 'Reindex request submitted to Google. Processing is not guaranteed and may take time.',
+            'page' => $storedPage,
             'last_reindex_requested_at' => $parsed->toIso8601String(),
+        ]);
+    }
+
+    /**
+     * Live URL Inspection recheck — mirrors EBQ.io Page Detail "Refresh status".
+     * Fetches the latest verdict / coverage / crawl time from Search Console.
+     *
+     *   POST /api/v1/hq/index-status/recheck  { "url": "https://..." }
+     */
+    public function indexStatusRecheck(Request $request, GoogleClientFactory $googleClientFactory): JsonResponse
+    {
+        $website = $this->website($request);
+        $url = trim((string) $request->input('url', ''));
+
+        if ($url === '' || ! $website->isAuditUrlForThisSite($url)) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'invalid_url',
+                'message' => 'URL is missing or does not belong to this website.',
+            ], 422);
+        }
+
+        if ($website->gsc_site_url === '') {
+            return response()->json([
+                'ok' => false,
+                'error' => 'no_gsc_property',
+                'message' => 'Connect a Search Console property for this site in EBQ.io.',
+            ], 400);
+        }
+
+        $account = $website->user?->googleAccounts()->latest('id')->first();
+        if (! $account) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'not_connected',
+                'message' => 'Connect a Google account in EBQ.io to recheck indexing status.',
+            ], 400);
+        }
+
+        try {
+            $client = $googleClientFactory->make($account);
+            $accessToken = (string) ($client->getAccessToken()['access_token'] ?? '');
+            if ($accessToken === '') {
+                return response()->json([
+                    'ok' => false,
+                    'error' => 'no_access_token',
+                    'message' => 'Google access token is missing — reconnect Google in EBQ.io.',
+                    'needs_google_reconnect' => true,
+                ], 400);
+            }
+        } catch (\Throwable $e) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'token_failed',
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+
+        $storedPage = $this->insightResolver->resolveStoredPageUrl($website, $url);
+
+        $response = Http::withToken($accessToken)
+            ->acceptJson()
+            ->post('https://searchconsole.googleapis.com/v1/urlInspection/index:inspect', [
+                'inspectionUrl' => $storedPage,
+                'siteUrl' => $website->gsc_site_url,
+                'languageCode' => 'en-US',
+            ]);
+
+        if (! $response->successful()) {
+            $msg = (string) data_get($response->json(), 'error.message', 'Failed to fetch indexing status from Google.');
+            $needsReconnect = str_contains(strtolower($msg), 'insufficient');
+
+            return response()->json([
+                'ok' => false,
+                'error' => 'google_error',
+                'message' => $needsReconnect ? $msg.' Reconnect Google to grant required Search Console scope.' : $msg,
+                'status' => $response->status(),
+                'needs_google_reconnect' => $needsReconnect,
+            ], 502);
+        }
+
+        $indexStatus = (array) data_get($response->json(), 'inspectionResult.indexStatusResult', []);
+        $lastCrawlAt = data_get($indexStatus, 'lastCrawlTime');
+        $verdict = data_get($indexStatus, 'verdict');
+        $checkedAt = now();
+
+        $row = PageIndexingStatus::query()->updateOrCreate(
+            ['website_id' => $website->id, 'page' => $storedPage],
+            [
+                'last_google_status_checked_at' => $checkedAt,
+                'google_verdict' => is_string($verdict) ? $verdict : null,
+                'google_coverage_state' => data_get($indexStatus, 'coverageState'),
+                'google_indexing_state' => data_get($indexStatus, 'indexingState'),
+                'google_last_crawl_at' => is_string($lastCrawlAt) ? Carbon::parse($lastCrawlAt) : null,
+                'google_status_payload' => $indexStatus,
+            ],
+        );
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Google indexing status refreshed.',
+            'page' => $storedPage,
+            'verdict' => is_string($verdict) && $verdict !== '' ? strtoupper($verdict) : null,
+            'verdict_source' => 'url_inspection',
+            'coverage_state' => $row->google_coverage_state,
+            'indexing_state' => $row->google_indexing_state,
+            'last_crawl_at' => $row->google_last_crawl_at?->toIso8601String(),
+            'last_checked_at' => $checkedAt->toIso8601String(),
+            'last_reindex_requested_at' => $row->last_reindex_requested_at?->toIso8601String(),
         ]);
     }
 

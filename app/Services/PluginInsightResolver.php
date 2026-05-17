@@ -9,7 +9,9 @@ use App\Models\RankTrackingKeyword;
 use App\Models\RankTrackingSnapshot;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
+use App\Support\UrlNormalizer;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 
 /**
  * Assembles the payload the WordPress plugin shows beside a single post:
@@ -762,6 +764,123 @@ class PluginInsightResolver
     public function __publicApplyPageMatch(\Illuminate\Database\Eloquent\Builder|\Illuminate\Database\Query\Builder $query, string $url): void
     {
         $this->applyPageMatch($query, $url);
+    }
+
+    /**
+     * Canonical `page` value for page_indexing_statuses — matches GSC / existing
+     * rows (trailing slash, www, scheme) so submit does not fork duplicates.
+     */
+    public function resolveStoredPageUrl(Website $website, string $url): string
+    {
+        $url = trim($url);
+        if ($url === '') {
+            return '';
+        }
+
+        $existing = PageIndexingStatus::query()
+            ->where('website_id', $website->id)
+            ->tap(fn ($q) => $this->applyPageMatch($q, $url))
+            ->orderByDesc('last_google_status_checked_at')
+            ->orderByDesc('last_reindex_requested_at')
+            ->get();
+
+        if ($existing->isNotEmpty()) {
+            $keeper = $existing->first();
+            $this->deleteDuplicateIndexingStatuses($website->id, $existing, $keeper);
+
+            return $keeper->page;
+        }
+
+        $gscPage = SearchConsoleData::query()
+            ->where('website_id', $website->id)
+            ->where('page', '!=', '')
+            ->tap(fn ($q) => $this->applyPageMatch($q, $url))
+            ->orderByDesc('impressions')
+            ->value('page');
+
+        if (is_string($gscPage) && $gscPage !== '') {
+            return $gscPage;
+        }
+
+        return UrlNormalizer::normalize($url);
+    }
+
+    /**
+     * @param  Collection<int, PageIndexingStatus>  $rows
+     * @return Collection<string, PageIndexingStatus>  normalized page → row
+     */
+    public function indexingStatusesByNormalizedPage(Collection $rows): Collection
+    {
+        $byNorm = collect();
+
+        foreach ($rows as $row) {
+            $norm = UrlNormalizer::normalize((string) $row->page);
+            $current = $byNorm->get($norm);
+            if ($current === null || $this->indexingStatusRowIsNewer($row, $current)) {
+                $byNorm->put($norm, $row);
+            }
+        }
+
+        return $byNorm;
+    }
+
+    /**
+     * One URL per normalized key for HQ index-status (GSC ∪ PIS).
+     * Indexing-status rows win over GSC-only strings.
+     *
+     * @param  list<string>  $indexedPages
+     * @param  Collection<string, PageIndexingStatus>  $pisByNormalized
+     * @return list<string>
+     */
+    public function dedupePageUrlsForIndexStatus(array $indexedPages, Collection $pisByNormalized): array
+    {
+        $byNorm = [];
+
+        foreach ($pisByNormalized as $norm => $pis) {
+            $byNorm[$norm] = (string) $pis->page;
+        }
+
+        foreach ($indexedPages as $page) {
+            if ($page === '') {
+                continue;
+            }
+            $norm = UrlNormalizer::normalize($page);
+            if (! isset($byNorm[$norm])) {
+                $byNorm[$norm] = $page;
+            }
+        }
+
+        return array_values($byNorm);
+    }
+
+    /**
+     * @param  Collection<int, PageIndexingStatus>  $rows
+     */
+    private function deleteDuplicateIndexingStatuses(int $websiteId, Collection $rows, PageIndexingStatus $keeper): void
+    {
+        $duplicateIds = $rows->where('id', '!=', $keeper->id)->pluck('id');
+        if ($duplicateIds->isEmpty()) {
+            return;
+        }
+
+        PageIndexingStatus::query()
+            ->where('website_id', $websiteId)
+            ->whereIn('id', $duplicateIds)
+            ->delete();
+    }
+
+    private function indexingStatusRowIsNewer(PageIndexingStatus $candidate, PageIndexingStatus $incumbent): bool
+    {
+        $cChecked = $candidate->last_google_status_checked_at?->getTimestamp() ?? 0;
+        $iChecked = $incumbent->last_google_status_checked_at?->getTimestamp() ?? 0;
+        if ($cChecked !== $iChecked) {
+            return $cChecked > $iChecked;
+        }
+
+        $cReindex = $candidate->last_reindex_requested_at?->getTimestamp() ?? 0;
+        $iReindex = $incumbent->last_reindex_requested_at?->getTimestamp() ?? 0;
+
+        return $cReindex > $iReindex;
     }
 
     private function pageVariants(string $url): array

@@ -106,6 +106,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/pages', [PluginHqController::class, 'pages'])->name('pages');
             Route::get('/index-status', [PluginHqController::class, 'indexStatus'])->name('index-status');
             Route::post('/index-status/submit', [PluginHqController::class, 'indexStatusSubmit'])->name('index-status.submit');
+            Route::post('/index-status/recheck', [PluginHqController::class, 'indexStatusRecheck'])->name('index-status.recheck');
             Route::get('/insights/{type}', [PluginHqController::class, 'insights'])
                 ->where('type', '[a-z_]+')
                 ->name('insights');

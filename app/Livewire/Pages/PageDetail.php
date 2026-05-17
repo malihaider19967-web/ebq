@@ -112,10 +112,13 @@ class PageDetail extends Component
         try {
             $accessToken = $this->resolveGoogleAccessToken($googleClientFactory, $user);
 
+            $storedPage = app(\App\Services\PluginInsightResolver::class)
+                ->resolveStoredPageUrl($website, $this->pageUrl);
+
             $response = Http::withToken($accessToken)
                 ->acceptJson()
                 ->post('https://indexing.googleapis.com/v3/urlNotifications:publish', [
-                    'url' => $this->pageUrl,
+                    'url' => $storedPage,
                     'type' => 'URL_UPDATED',
                 ]);
 
@@ -125,7 +128,7 @@ class PageDetail extends Component
                 PageIndexingStatus::query()->updateOrCreate(
                     [
                         'website_id' => $this->websiteId,
-                        'page' => $this->pageUrl,
+                        'page' => $storedPage,
                     ],
                     [
                         'last_reindex_requested_at' => $parsedIndexedAt,
@@ -171,10 +174,13 @@ class PageDetail extends Component
         try {
             $accessToken = $this->resolveGoogleAccessToken($googleClientFactory, $user);
 
+            $storedPage = app(\App\Services\PluginInsightResolver::class)
+                ->resolveStoredPageUrl($website, $this->pageUrl);
+
             $response = Http::withToken($accessToken)
                 ->acceptJson()
                 ->post('https://searchconsole.googleapis.com/v1/urlInspection/index:inspect', [
-                    'inspectionUrl' => $this->pageUrl,
+                    'inspectionUrl' => $storedPage,
                     'siteUrl' => $website->gsc_site_url,
                     'languageCode' => 'en-US',
                 ]);
@@ -196,7 +202,7 @@ class PageDetail extends Component
             PageIndexingStatus::query()->updateOrCreate(
                 [
                     'website_id' => $this->websiteId,
-                    'page' => $this->pageUrl,
+                    'page' => $storedPage,
                 ],
                 [
                     'last_google_status_checked_at' => now(),
