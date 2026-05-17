@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\BillingController as AdminBillingController;
 use App\Http\Controllers\Admin\PlanController as AdminPlanController;
 use App\Http\Controllers\Admin\ArtisanCommandsController as AdminArtisanCommandsController;
 use App\Http\Controllers\WordPressConnectController;
+use App\Http\Controllers\WordPressEmbedController;
 use App\Http\Controllers\WordPressPluginDownloadController;
 use App\Http\Controllers\WordPressPluginVersionController;
 use Illuminate\Support\Facades\Route;
@@ -79,6 +80,11 @@ Route::middleware(['web', 'auth'])->group(function (): void {
     Route::get('/wordpress/connect', [WordPressConnectController::class, 'start'])->name('wordpress.connect.start');
     Route::post('/wordpress/connect', [WordPressConnectController::class, 'approve'])->name('wordpress.connect.approve');
 });
+
+// Signed deep-link from WP HQ — opens Reports in a full tab (session auth).
+Route::get('/wordpress/embed/reports', [WordPressEmbedController::class, 'reports'])
+    ->middleware(['web', 'signed'])
+    ->name('wordpress.embed.reports');
 
 Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/dashboard', 'dashboard')->middleware('feature:dashboard')->name('dashboard');

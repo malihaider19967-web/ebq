@@ -56,6 +56,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Browser-facing application URL
+    |--------------------------------------------------------------------------
+    |
+    | URLs returned to the WordPress plugin for "Open in EBQ" links. Use this
+    | when APP_URL is an internal hostname (e.g. host.docker.internal) but
+    | admins open EBQ in the browser at localhost or a public domain.
+    |
+    */
+    'public_url' => env('APP_PUBLIC_URL', env('APP_URL', 'http://localhost')),
+
+    /*
+    |--------------------------------------------------------------------------
     | Promotional Free Pro Mode
     |--------------------------------------------------------------------------
     |

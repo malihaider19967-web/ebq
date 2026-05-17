@@ -909,15 +909,28 @@ class PluginInsightsController extends Controller
             $params['insight'] = $insight;
         }
 
-        $signed = URL::temporarySignedRoute(
-            'reports.index',
-            Carbon::now()->addMinutes(5),
-            $params,
-        );
+        $publicRoot = (string) config('services.ebq.public_url', 'https://ebq.io');
+        $previousRoot = config('app.url');
+        if ($publicRoot !== '' && $publicRoot !== rtrim((string) $previousRoot, '/')) {
+            URL::forceRootUrl($publicRoot);
+        }
+
+        try {
+            $signed = URL::temporarySignedRoute(
+                'wordpress.embed.reports',
+                Carbon::now()->addMinutes(15),
+                $params,
+            );
+        } finally {
+            if ($publicRoot !== '' && $publicRoot !== rtrim((string) $previousRoot, '/')) {
+                URL::forceRootUrl(rtrim((string) $previousRoot, '/'));
+            }
+        }
 
         return response()->json([
             'url' => $signed,
-            'expires_at' => Carbon::now()->addMinutes(5)->toIso8601String(),
+            'portal_url' => $publicRoot,
+            'expires_at' => Carbon::now()->addMinutes(15)->toIso8601String(),
         ]);
     }
 
