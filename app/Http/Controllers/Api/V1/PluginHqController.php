@@ -1370,7 +1370,7 @@ class PluginHqController extends Controller
         $rows = CustomPageAudit::query()
             ->where('website_id', $website->id)
             ->portalHistory()
-            ->with('pageAuditReport:id,status')
+            ->with('pageAuditReport:id,status,result,http_status,response_time_ms,page_size_bytes,audited_at')
             ->latest()
             ->limit(30)
             ->get()
@@ -1579,9 +1579,6 @@ class PluginHqController extends Controller
     }
 
     /**
-     * @return array<string, mixed>
-     */
-    /**
      * @return array{recommended_gl: string, hint: string, options: list<array{code: string, label: string}>}
      */
     private function serpCountryOptionsPayload(string $recommendedGl, string $hint = ''): array
@@ -1605,7 +1602,7 @@ class PluginHqController extends Controller
 
     private function formatPageAuditRow(CustomPageAudit $row): array
     {
-        return [
+        $out = [
             'id' => $row->id,
             'status' => (string) $row->status,
             'page_url' => (string) $row->page_url,
@@ -1616,6 +1613,19 @@ class PluginHqController extends Controller
             'created_at' => $row->created_at?->toIso8601String(),
             'finished_at' => $row->finished_at?->toIso8601String(),
         ];
+
+        if ($row->started_at && $row->finished_at) {
+            $out['duration_sec'] = max(0, $row->started_at->diffInSeconds($row->finished_at));
+        }
+
+        if ($row->isCompleted() && $row->relationLoaded('pageAuditReport') && $row->pageAuditReport) {
+            $summary = \App\Support\Audit\PageAuditReportSummary::fromReport($row->pageAuditReport);
+            if ($summary !== null) {
+                $out['summary'] = $summary;
+            }
+        }
+
+        return $out;
     }
 
     private function website(Request $request): Website

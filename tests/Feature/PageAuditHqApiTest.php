@@ -2,9 +2,12 @@
 
 namespace Tests\Feature;
 
+use App\Models\CustomPageAudit;
+use App\Models\PageAuditReport;
 use App\Models\User;
 use App\Models\Website;
 use App\Services\PageAuditService;
+use App\Support\Audit\RecommendationEngine;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
@@ -122,5 +125,54 @@ class PageAuditHqApiTest extends TestCase
             ->assertOk()
             ->assertJsonPath('ok', true)
             ->assertJsonStructure(['audits', 'has_pending']);
+    }
+
+    public function test_hq_page_audits_includes_summary_for_completed_run(): void
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->create([
+            'user_id' => $user->id,
+            'domain' => 'example.test',
+        ]);
+        $token = $website->createToken('test', ['read:insights'])->plainTextToken;
+        $pageUrl = 'https://example.test/landing';
+
+        $report = PageAuditReport::query()->create([
+            'website_id' => $website->id,
+            'page' => mb_substr($pageUrl, 0, 700),
+            'page_hash' => hash('sha256', $pageUrl),
+            'status' => 'completed',
+            'audited_at' => now(),
+            'http_status' => 200,
+            'response_time_ms' => 180,
+            'result' => [
+                'content' => ['word_count' => 900],
+                'recommendations' => [
+                    ['severity' => RecommendationEngine::SEV_CRITICAL, 'title' => 'Broken canonical'],
+                ],
+            ],
+        ]);
+
+        $audit = CustomPageAudit::recordRun(
+            $website->id,
+            $user->id,
+            $pageUrl,
+            $report,
+            'widgets',
+            CustomPageAudit::SOURCE_HQ_WP,
+        );
+        $audit->forceFill([
+            'started_at' => now()->subSeconds(42),
+            'finished_at' => now(),
+        ])->save();
+
+        $this->withToken($token)
+            ->getJson('/api/v1/hq/page-audits')
+            ->assertOk()
+            ->assertJsonPath('audits.0.id', $audit->id)
+            ->assertJsonPath('audits.0.summary.score', 85)
+            ->assertJsonPath('audits.0.summary.top_issue', 'Broken canonical')
+            ->assertJsonPath('audits.0.summary.word_count', 900)
+            ->assertJsonPath('audits.0.duration_sec', 42);
     }
 }
