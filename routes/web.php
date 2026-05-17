@@ -87,6 +87,10 @@ Route::get('/wordpress/embed/reports', [WordPressEmbedController::class, 'report
     ->middleware(['web', 'signed'])
     ->name('wordpress.embed.reports');
 
+Route::get('/wordpress/embed/page-audit', [WordPressEmbedController::class, 'pageAudit'])
+    ->middleware(['web', 'signed'])
+    ->name('wordpress.embed.page-audit');
+
 Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/dashboard', 'dashboard')->middleware('feature:dashboard')->name('dashboard');
     Route::view('/keywords', 'keywords.index')->middleware('feature:keywords')->name('keywords.index');

@@ -3,19 +3,24 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\RunCustomPageAudit;
 use App\Jobs\TrackKeywordRankJob;
 use App\Mail\GrowthReportMail;
+use App\Models\CustomPageAudit;
 use App\Models\PageIndexingStatus;
 use App\Models\RankTrackingKeyword;
 use App\Models\SearchConsoleData;
 use App\Models\Website;
+use App\Services\PageAuditService;
 use App\Services\BacklinkProspectingService;
 use App\Services\CrossSiteBenchmarkService;
 use App\Services\Google\GoogleClientFactory;
 use App\Services\PluginInsightResolver;
 use App\Services\ReportDataService;
+use App\Support\Audit\SerpGlCatalog;
 use App\Support\RankTrackerConfig;
 use App\Support\UrlNormalizer;
+use Illuminate\Support\Facades\URL;
 use App\Services\SerpFeatureTrackerService;
 use App\Services\TopicalAuthorityService;
 use Illuminate\Http\JsonResponse;
@@ -1187,6 +1192,248 @@ class PluginHqController extends Controller
     }
 
     /**
+     * GSC keyword + SERP country suggestions for the HQ SEO Analysis form.
+     *   GET /api/v1/hq/page-audit/suggestions?page_url=https://…
+     */
+    public function pageAuditSuggestions(Request $request, PageAuditService $pageAuditService): JsonResponse
+    {
+        $website = $this->website($request);
+        $pageUrl = $this->normalizeAuditPageUrl((string) $request->query('page_url', ''));
+
+        if ($pageUrl === '') {
+            return response()->json([
+                'ok' => false,
+                'error' => 'invalid_url',
+                'message' => 'Enter a page URL on your connected domain.',
+            ], 422);
+        }
+
+        if (! $website->isAuditUrlForThisSite($pageUrl)) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'invalid_domain',
+                'message' => 'The URL must use your website domain ('.$website->domain.') or a subdomain of it.',
+            ], 422);
+        }
+
+        $keywords = $this->insightResolver->focusKeywordSuggestions($website, $pageUrl, 12);
+
+        $peek = $pageAuditService->peekSerpCountryChoiceNeeded($website->id, $pageUrl, true);
+        $recommendedGl = 'us';
+        $hint = '';
+        if (($peek['ok'] ?? false) === true) {
+            $recommendedGl = (string) ($peek['recommended_gl'] ?? 'us');
+            if (! SerpGlCatalog::isAllowedGl($recommendedGl)) {
+                $recommendedGl = 'us';
+            }
+            $hint = (string) ($peek['recommendation_hint'] ?? '');
+        }
+
+        $countries = [];
+        foreach (SerpGlCatalog::selectOptions() as $code => $label) {
+            $countries[] = ['code' => $code, 'label' => $label];
+        }
+
+        return response()->json([
+            'ok' => true,
+            'page_url' => $pageUrl,
+            'keywords' => $keywords,
+            'country' => [
+                'recommended_gl' => $recommendedGl,
+                'hint' => $hint,
+                'options' => $countries,
+            ],
+        ]);
+    }
+
+    /**
+     * Queue a full page audit from the WordPress HQ SEO Analysis tab.
+     * Mirrors CustomAudit::queueAudit — first POST without confirm_country
+     * returns needs_country; second POST with serp_country_gl queues the job.
+     *
+     *   POST /api/v1/hq/page-audit
+     */
+    public function pageAuditQueue(Request $request, PageAuditService $pageAuditService): JsonResponse
+    {
+        $website = $this->website($request);
+        $owner = $website->owner;
+        if ($owner === null) {
+            return response()->json(['ok' => false, 'error' => 'no_owner'], 404);
+        }
+
+        $data = $request->validate([
+            'page_url' => 'required|string|max:2000',
+            'target_keyword' => 'required|string|min:2|max:200',
+            'serp_country_gl' => 'nullable|string|size:2',
+            'confirm_country' => 'nullable|boolean',
+        ]);
+
+        $pageUrl = $this->normalizeAuditPageUrl($data['page_url']);
+        $keyword = trim($data['target_keyword']);
+
+        if ($pageUrl === '' || ! $website->isAuditUrlForThisSite($pageUrl)) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'invalid_domain',
+                'message' => 'The URL must use your website domain ('.$website->domain.') or a subdomain of it.',
+            ], 422);
+        }
+
+        $confirmCountry = (bool) ($data['confirm_country'] ?? false);
+
+        if (! $confirmCountry) {
+            $peek = $pageAuditService->peekSerpCountryChoiceNeeded($website->id, $pageUrl, true);
+            if (! ($peek['ok'] ?? false)) {
+                return response()->json([
+                    'ok' => false,
+                    'error' => 'peek_failed',
+                    'message' => $peek['error'] ?? 'Could not read the page to detect locale.',
+                ], 422);
+            }
+
+            $recommendedGl = (string) ($peek['recommended_gl'] ?? 'us');
+            if (! SerpGlCatalog::isAllowedGl($recommendedGl)) {
+                $recommendedGl = 'us';
+            }
+
+            return response()->json([
+                'ok' => true,
+                'needs_country' => true,
+                'recommended_gl' => $recommendedGl,
+                'recommendation_hint' => (string) ($peek['recommendation_hint'] ?? ''),
+                'message' => 'Confirm the Google SERP country, then run the analysis again.',
+            ]);
+        }
+
+        $serpGl = strtolower(trim((string) ($data['serp_country_gl'] ?? '')));
+        if (! SerpGlCatalog::isAllowedGl($serpGl)) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'invalid_country',
+                'message' => 'Pick a valid country for the SERP sample.',
+            ], 422);
+        }
+
+        $active = CustomPageAudit::findActiveFor($website->id, $pageUrl, $owner->id);
+        if ($active instanceof CustomPageAudit) {
+            return response()->json([
+                'ok' => true,
+                'already_queued' => true,
+                'audit' => $this->formatPageAuditRow($active),
+                'message' => 'An analysis for this URL is already queued or running.',
+            ]);
+        }
+
+        $rateKey = 'custom-audit:'.$owner->id;
+        if (RateLimiter::tooManyAttempts($rateKey, 8)) {
+            $seconds = RateLimiter::availableIn($rateKey);
+
+            return response()->json([
+                'ok' => false,
+                'error' => 'rate_limited',
+                'message' => "Too many analyses. Try again in {$seconds}s.",
+            ], 429);
+        }
+        RateLimiter::hit($rateKey, 120);
+
+        $audit = CustomPageAudit::queue(
+            websiteId: $website->id,
+            userId: $owner->id,
+            pageUrl: $pageUrl,
+            targetKeyword: $keyword,
+            serpSampleGl: $serpGl,
+            source: CustomPageAudit::SOURCE_HQ_WP,
+        );
+
+        RunCustomPageAudit::dispatch($audit->id);
+
+        return response()->json([
+            'ok' => true,
+            'audit' => $this->formatPageAuditRow($audit->fresh(['pageAuditReport'])),
+            'message' => 'Analysis queued — open the report on EBQ when it completes.',
+        ], 201);
+    }
+
+    /**
+     * Recent page audits for this website (HQ SEO Analysis history).
+     *   GET /api/v1/hq/page-audits
+     */
+    public function pageAudits(Request $request): JsonResponse
+    {
+        $website = $this->website($request);
+
+        $rows = CustomPageAudit::query()
+            ->where('website_id', $website->id)
+            ->whereIn('source', [CustomPageAudit::SOURCE_HQ_WP, CustomPageAudit::SOURCE_CUSTOM])
+            ->with('pageAuditReport:id,status')
+            ->latest()
+            ->limit(30)
+            ->get()
+            ->map(fn (CustomPageAudit $row) => $this->formatPageAuditRow($row))
+            ->values()
+            ->all();
+
+        return response()->json([
+            'ok' => true,
+            'audits' => $rows,
+            'has_pending' => collect($rows)->contains(fn (array $r) => in_array($r['status'], ['queued', 'running'], true)),
+        ]);
+    }
+
+    /**
+     * Signed URL to view a completed audit on EBQ.io (full report UI — MOAT).
+     *   GET /api/v1/hq/page-audits/{id}/report-url
+     */
+    public function pageAuditReportUrl(Request $request, int $id): JsonResponse
+    {
+        $website = $this->website($request);
+
+        $audit = CustomPageAudit::query()
+            ->where('website_id', $website->id)
+            ->with('pageAuditReport')
+            ->find($id);
+
+        if ($audit === null) {
+            return response()->json(['ok' => false, 'error' => 'not_found'], 404);
+        }
+
+        if ($audit->status !== CustomPageAudit::STATUS_COMPLETED || $audit->page_audit_report_id === null) {
+            return response()->json([
+                'ok' => false,
+                'error' => 'not_ready',
+                'message' => 'The report is not ready yet.',
+            ], 409);
+        }
+
+        $publicRoot = (string) config('services.ebq.public_url', 'https://ebq.io');
+        $previousRoot = config('app.url');
+        if ($publicRoot !== '' && $publicRoot !== rtrim((string) $previousRoot, '/')) {
+            URL::forceRootUrl($publicRoot);
+        }
+
+        try {
+            $signed = URL::temporarySignedRoute(
+                'wordpress.embed.page-audit',
+                Carbon::now()->addMinutes(20),
+                [
+                    'website' => $website->id,
+                    'report' => (int) $audit->page_audit_report_id,
+                ],
+            );
+        } finally {
+            if ($publicRoot !== '' && $publicRoot !== rtrim((string) $previousRoot, '/')) {
+                URL::forceRootUrl(rtrim((string) $previousRoot, '/'));
+            }
+        }
+
+        return response()->json([
+            'ok' => true,
+            'url' => $signed,
+            'expires_at' => Carbon::now()->addMinutes(20)->toIso8601String(),
+        ]);
+    }
+
+    /**
      * Phase 3 #6 — SERP-feature presence timeline for tracked keywords.
      *   GET /api/v1/hq/serp-features?days=30
      */
@@ -1312,6 +1559,37 @@ class PluginHqController extends Controller
     }
 
     /* ─── Helpers ──────────────────────────────────────────── */
+
+    private function normalizeAuditPageUrl(string $raw): string
+    {
+        $raw = trim($raw);
+        if ($raw === '') {
+            return '';
+        }
+        if (! preg_match('#^https?://#i', $raw)) {
+            $raw = 'https://'.$raw;
+        }
+
+        return $raw;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function formatPageAuditRow(CustomPageAudit $row): array
+    {
+        return [
+            'id' => $row->id,
+            'status' => (string) $row->status,
+            'page_url' => (string) $row->page_url,
+            'target_keyword' => (string) $row->target_keyword,
+            'serp_country_gl' => (string) ($row->serp_sample_gl ?? ''),
+            'page_audit_report_id' => $row->page_audit_report_id,
+            'error_message' => $row->error_message,
+            'created_at' => $row->created_at?->toIso8601String(),
+            'finished_at' => $row->finished_at?->toIso8601String(),
+        ];
+    }
 
     private function website(Request $request): Website
     {

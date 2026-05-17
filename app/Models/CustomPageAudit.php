@@ -19,6 +19,9 @@ class CustomPageAudit extends Model
      */
     public const SOURCE_LIVE_SCORE = 'live_score';
 
+    /** Queued from the WordPress HQ “SEO Analysis” tab. */
+    public const SOURCE_HQ_WP = 'hq_wp';
+
     public const STATUS_QUEUED = 'queued';
 
     public const STATUS_RUNNING = 'running';
@@ -71,7 +74,7 @@ class CustomPageAudit extends Model
         return self::query()->create([
             'website_id' => $websiteId,
             'user_id' => $userId,
-            'source' => in_array($source, [self::SOURCE_CUSTOM, self::SOURCE_PAGE_DETAIL, self::SOURCE_LIVE_SCORE], true)
+            'source' => in_array($source, [self::SOURCE_CUSTOM, self::SOURCE_PAGE_DETAIL, self::SOURCE_LIVE_SCORE, self::SOURCE_HQ_WP], true)
                 ? $source
                 : self::SOURCE_CUSTOM,
             'page_url' => $pageUrl,
@@ -103,7 +106,7 @@ class CustomPageAudit extends Model
         return self::query()->create([
             'website_id' => $websiteId,
             'user_id' => $userId,
-            'source' => in_array($source, [self::SOURCE_CUSTOM, self::SOURCE_PAGE_DETAIL, self::SOURCE_LIVE_SCORE], true)
+            'source' => in_array($source, [self::SOURCE_CUSTOM, self::SOURCE_PAGE_DETAIL, self::SOURCE_LIVE_SCORE, self::SOURCE_HQ_WP], true)
                 ? $source
                 : self::SOURCE_CUSTOM,
             'page_url' => $pageUrlAsAudited,

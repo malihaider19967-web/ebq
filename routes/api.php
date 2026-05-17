@@ -115,6 +115,13 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/growth-report', [PluginHqController::class, 'growthReport'])->name('growth-report');
             Route::post('/growth-report/send', [PluginHqController::class, 'growthReportSend'])->name('growth-report.send');
 
+            Route::get('/page-audit/suggestions', [PluginHqController::class, 'pageAuditSuggestions'])->name('page-audit.suggestions');
+            Route::post('/page-audit', [PluginHqController::class, 'pageAuditQueue'])->name('page-audit.queue');
+            Route::get('/page-audits', [PluginHqController::class, 'pageAudits'])->name('page-audits.index');
+            Route::get('/page-audits/{id}/report-url', [PluginHqController::class, 'pageAuditReportUrl'])
+                ->whereNumber('id')
+                ->name('page-audits.report-url');
+
             // Phase 3 — network-effect features
             Route::get('/serp-features', [PluginHqController::class, 'serpFeatures'])->name('serp-features');
             Route::post('/backlink-prospects', [PluginHqController::class, 'backlinkProspects'])->name('backlink-prospects');

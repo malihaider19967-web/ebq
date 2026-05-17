@@ -39,4 +39,24 @@ class WordPressEmbedController extends Controller
 
         return redirect()->route('reports.index', $params);
     }
+
+    /**
+     * Signed deep-link to a completed page audit report on EBQ.io.
+     */
+    public function pageAudit(Request $request): RedirectResponse
+    {
+        $websiteId = (int) $request->query('website');
+        $reportId = (int) $request->query('report');
+        abort_unless($websiteId > 0 && $reportId > 0, 404);
+
+        $website = Website::query()->with('user')->findOrFail($websiteId);
+        $user = $website->user;
+        abort_unless($user !== null, 404);
+
+        Auth::login($user);
+        $request->session()->regenerate();
+        session(['current_website_id' => $websiteId]);
+
+        return redirect()->route('page-audits.show', $reportId);
+    }
 }
