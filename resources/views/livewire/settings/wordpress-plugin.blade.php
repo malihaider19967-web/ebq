@@ -6,9 +6,10 @@
                 Install the EBQ SEO plugin on your WordPress site and click <span class="font-semibold">Connect to EBQ</span> — you'll be bounced here to approve. No codes or tokens to copy.
             </p>
         </div>
-        <span class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-amber-200 bg-amber-50 px-3 text-[11px] font-semibold text-amber-700 dark:border-amber-800/60 dark:bg-amber-900/20 dark:text-amber-300">
-            Downloads temporarily unavailable
-        </span>
+        <a href="https://wordpress.org/plugins/ebq-seo/" target="_blank" rel="noopener"
+            class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+            Install from WordPress.org →
+        </a>
     </div>
 
     @if ($statusMessage)
@@ -21,7 +22,7 @@
         <div class="mt-5 flex flex-col items-start gap-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 p-4 dark:border-slate-700 dark:bg-slate-800/40">
             <p class="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Not connected yet</p>
             <p class="text-xs text-slate-600 dark:text-slate-300">
-                Plugin downloads are temporarily unavailable while we ship a license-gated release. Existing installations keep working — once you're connected, manage tokens here.
+                Install <span class="font-semibold">EBQ SEO</span> from the WordPress plugin directory, activate it on your site, then click <span class="font-semibold">Connect to EBQ</span> — you'll be bounced back here to approve. Active connections will appear in this list.
             </p>
         </div>
     @else
