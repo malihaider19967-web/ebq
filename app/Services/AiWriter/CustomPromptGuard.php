@@ -98,11 +98,16 @@ class CustomPromptGuard
             ],
         ];
 
+        // Tight timeout — the classifier returns a tiny JSON object, so a
+        // healthy call completes in 1–3s. MistralClient retries 3x on
+        // failure, so worst-case wall time is ~24s with this 8s ceiling.
+        // We fail open below if the response shape isn't usable, so a
+        // slow / flaky classifier never blocks a legitimate prompt.
         $response = $this->llm->completeJson($messages, [
             'temperature' => 0.0,
             'max_tokens' => 200,
             'json_object' => true,
-            'timeout' => 20,
+            'timeout' => 8,
         ]);
 
         if (! is_array($response) || ! array_key_exists('allow', $response)) {
