@@ -161,7 +161,8 @@
       "PowerShell(Compress-Archive *)",
       "PowerShell(Add-Type -AssemblyName System.IO.Compression.FileSystem; $z = [System.IO.Compression.ZipFile]::Open\\('C:\\\\Users\\\\malih\\\\Desktop\\\\ebq\\\\ebq-seo.zip', 'Update'\\); \\($z.Entries | Where-Object { $_.FullName -eq 'ebq-seo/languages/.gitkeep' }\\) | ForEach-Object { $_.Delete\\(\\) }; $z.Dispose\\(\\); $f = Get-Item 'C:\\\\Users\\\\malih\\\\Desktop\\\\ebq\\\\ebq-seo.zip'; \"Final: {0}\" -f $f.FullName; \"Size:  {0:N0} bytes \\({1:N2} MB\\)\" -f $f.Length, \\($f.Length/1MB\\); $z = [System.IO.Compression.ZipFile]::OpenRead\\($f.FullName\\); \"Entries: $\\($z.Entries.Count\\)\"; $z.Dispose\\(\\))",
       "PowerShell(Add-Type -AssemblyName System.IO.Compression.FileSystem; $z = [System.IO.Compression.ZipFile]::OpenRead\\('C:\\\\Users\\\\malih\\\\Desktop\\\\ebq\\\\ebq-seo.zip'\\); $hits = @{}; foreach \\($e in $z.Entries\\) { if \\($e.FullName -match '\\\\.\\(php|js|css|txt|pot|json\\)$'\\) { $r = New-Object System.IO.StreamReader\\($e.Open\\(\\)\\); $content = $r.ReadToEnd\\(\\); $r.Close\\(\\); $patterns = @\\('Yoast','Rank Math','RankMath','AIOSEO','wpseo','rank_math','aioseo'\\); $found = @\\(\\); foreach \\($p in $patterns\\) { if \\($content.IndexOf\\($p, [StringComparison]::OrdinalIgnoreCase\\) -ge 0\\) { $found += $p } }; if \\($found.Count -gt 0\\) { $hits[$e.FullName] = \\($found | Sort-Object -Unique\\) -join ',' } } }; $z.Dispose\\(\\); \"Files in zip still containing competitor names:\"; \"\"; $hits.GetEnumerator\\(\\) | Sort-Object Key | ForEach-Object { \"{0,-60} {1}\" -f $_.Key, $_.Value })",
-      "PowerShell(Import-Csv *)"
+      "PowerShell(Import-Csv *)",
+      "mcp__code-review-graph__list_repos_tool"
     ]
   },
   "enableAllProjectMcpServers": true,

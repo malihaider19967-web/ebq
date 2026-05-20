@@ -282,6 +282,10 @@ class WriterProjectService
             (array) ($input['additional_keywords'] ?? []),
         ), static fn ($v) => $v !== ''));
 
+        $customPrompt = isset($input['custom_prompt']) && is_string($input['custom_prompt'])
+            ? trim($input['custom_prompt'])
+            : '';
+
         return WriterProject::create([
             'website_id' => $website->id,
             'user_id' => $userId,
@@ -292,6 +296,7 @@ class WriterProjectService
             'language' => $this->normalizeLanguage($input['language'] ?? null),
             'tone' => $this->normalizeTone($input['tone'] ?? null),
             'audience' => $this->normalizeAudience($input['audience'] ?? null),
+            'custom_prompt' => $customPrompt !== '' ? $customPrompt : null,
             'step' => WriterProject::STEP_TOPIC,
         ]);
     }
@@ -725,6 +730,11 @@ class WriterProjectService
             'language' => (string) ($project->language ?? ''),
             'tone' => (string) ($project->tone ?? ''),
             'audience' => (string) ($project->audience ?? ''),
+            // User's free-form custom prompt from Step 1 — appended as
+            // ADVISORY guidance below the strict-output rules in the
+            // writer's system message. Validated upstream by
+            // CustomPromptGuard before persisting.
+            'custom_prompt' => (string) ($project->custom_prompt ?? ''),
             // User-curated links from the strategy step. When internal
             // is non-empty, AiWriterService bypasses the GSC smart-link
             // lookup and uses these instead. External is a new prompt

@@ -113,6 +113,11 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->hasMany(CustomPageAudit::class);
     }
 
+    public function aiWriterPrompts(): HasMany
+    {
+        return $this->hasMany(AiWriterPrompt::class);
+    }
+
     public function sharedWebsites(): BelongsToMany
     {
         return $this->belongsToMany(Website::class, 'website_user')

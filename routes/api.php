@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\V1\AiToolController;
+use App\Http\Controllers\Api\V1\AiWriterPromptController;
 use App\Http\Controllers\Api\V1\PluginHqController;
 use App\Http\Controllers\Api\V1\PluginInsightsController;
 use App\Http\Controllers\Api\V1\PluginHeartbeatController;
@@ -168,6 +169,17 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/writer-projects/{externalId}/credits', [WriterProjectController::class, 'credits'])
                 ->where('externalId', '[A-Za-z0-9\-]+')
                 ->name('writer-projects.credits');
+
+            // AI Writer prompt library — per-user saved instructions
+            // reusable across all the user's websites. Wizard step 1
+            // reads/writes this; the resolved body is also bound to the
+            // project as `custom_prompt` so prompt deletes don't
+            // retroactively alter past drafts.
+            Route::get('/ai-writer-prompts', [AiWriterPromptController::class, 'index'])->name('ai-writer-prompts.index');
+            Route::post('/ai-writer-prompts', [AiWriterPromptController::class, 'store'])->name('ai-writer-prompts.store');
+            Route::delete('/ai-writer-prompts/{externalId}', [AiWriterPromptController::class, 'destroy'])
+                ->where('externalId', '[A-Za-z0-9\-]+')
+                ->name('ai-writer-prompts.destroy');
 
             // AI Studio — registry-driven tool catalog. Single execution
             // path for every AI feature (research, writing, improvement,

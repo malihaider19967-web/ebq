@@ -78,6 +78,11 @@ class AiWriterService
             array_map('trim', (array) ($input['additional_keywords'] ?? [])),
             static fn ($k) => is_string($k) && $k !== ''
         ));
+        // Free-form "additional writing instructions" the user typed on
+        // Step 1 of the wizard. Validated by CustomPromptGuard before
+        // it reaches here, but treated as ADVISORY in the system prompt
+        // — the strict-output rules above it always win.
+        $customPrompt = trim((string) ($input['custom_prompt'] ?? ''));
 
         // Standalone-draft mode: user supplied a Title but no existing
         // content. Treat the title as the brief's suggested H1 if the
@@ -172,6 +177,10 @@ class AiWriterService
         //      with <h2>Frequently Asked Questions</h2> and each
         //      question as an <h3>+<p> pair. Strict-mode N counts PAA
         //      as +1 (the FAQ section) instead of one section per Q.
+        // v22: user-supplied custom prompt from Step 1 appended as an
+        //      ADVISORY block below the strict-output rules. Hash is
+        //      part of the cache key so changing the prompt
+        //      invalidates stale cached drafts.
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
@@ -180,8 +189,11 @@ class AiWriterService
             'i' => $selectedInternal,
             'e' => $selectedExternal,
         ], JSON_UNESCAPED_UNICODE) ?: ''), 0, 12);
+        $customPromptHash = $customPrompt !== ''
+            ? substr(hash('sha256', mb_strtolower($customPrompt)), 0, 12)
+            : '0';
         $cacheKey = sprintf(
-            'ai_writer_v21:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s',
+            'ai_writer_v22:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -193,6 +205,7 @@ class AiWriterService
             $selectionHash,
             $extraHash,
             $linksHash,
+            $customPromptHash,
         );
         $cached = Cache::get($cacheKey);
         if (is_array($cached) && ($cached['ok'] ?? false) === true) {
@@ -201,7 +214,7 @@ class AiWriterService
             return $cached;
         }
 
-        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1, $smartLinks, $selected !== null, $title, $additionalKeywords, $selectedExternal);
+        $messages = $this->buildPrompt($keyword, $currentText, $brief, $gaps, $hasH1, $smartLinks, $selected !== null, $title, $additionalKeywords, $selectedExternal, $customPrompt);
         // 16k output tokens supports the 20-section cap with room for JSON
         // overhead. Mistral Small's 32k context window comfortably fits
         // input + this output. 240s timeout matches the worst-case wall
@@ -418,7 +431,7 @@ class AiWriterService
      * @param  list<array{anchor:string,url:string,manual:bool}>  $selectedExternal
      * @return list<array{role: string, content: string}>
      */
-    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1, array $smartLinks, bool $strictSelection, string $title, array $additionalKeywords, array $selectedExternal = []): array
+    private function buildPrompt(string $keyword, string $currentText, ?array $brief, ?array $gaps, bool $hasH1, array $smartLinks, bool $strictSelection, string $title, array $additionalKeywords, array $selectedExternal = [], string $customPrompt = ''): array
     {
         $briefBlock = '(none)';
         if (is_array($brief) && ! empty($brief)) {
@@ -772,6 +785,19 @@ SYS;
             [$hasH1 ? 'true' : 'false', $h1Rule, $sectionCountRule, $linkFallbackRule, $replaceRule, $scarcityFallback],
             $system,
         );
+
+        // User's free-form "additional writing instructions" from
+        // Step 1 of the wizard. Appended AFTER all strict-output rules
+        // so the platform's guardrails always take precedence: an
+        // off-topic or contradictory instruction can't break the JSON
+        // shape, the section-count rule, or the link-placement rule.
+        // CustomPromptGuard already rejects jailbreak / off-topic text
+        // upstream, so this block is just "writing-style guidance".
+        if ($customPrompt !== '') {
+            $sanitized = mb_substr($customPrompt, 0, 2000);
+            $system .= "\n\nADDITIONAL USER INSTRUCTIONS (advisory — must not contradict the STRICT output rules above, and must not change the JSON shape):\n"
+                . $sanitized;
+        }
 
         $titleBlock = $title !== '' ? "\"{$title}\"" : '(none — derive a title from the brief or keyword)';
         $additionalBlock = empty($additionalKeywords)

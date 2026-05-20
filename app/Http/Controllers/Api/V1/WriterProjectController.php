@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Controller;
 use App\Models\Website;
 use App\Models\WriterProject;
+use App\Services\AiWriter\CustomPromptGuard;
 use App\Services\WriterProjectService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -21,8 +22,10 @@ use Illuminate\Validation\Rule;
  */
 class WriterProjectController extends Controller
 {
-    public function __construct(private readonly WriterProjectService $service)
-    {
+    public function __construct(
+        private readonly WriterProjectService $service,
+        private readonly CustomPromptGuard $promptGuard,
+    ) {
     }
 
     /**
@@ -79,7 +82,19 @@ class WriterProjectController extends Controller
             'language' => 'nullable|string|min:2|max:8',
             'tone' => 'nullable|string|max:32',
             'audience' => 'nullable|string|max:32',
+            'custom_prompt' => 'nullable|string|min:5|max:2000',
         ]);
+
+        if (! empty($data['custom_prompt'])) {
+            $verdict = $this->promptGuard->check((string) $data['custom_prompt']);
+            if (($verdict['ok'] ?? false) !== true) {
+                return response()->json([
+                    'ok'      => false,
+                    'error'   => 'prompt_rejected',
+                    'message' => (string) ($verdict['reason'] ?? 'This prompt isn\'t related to AI writing.'),
+                ], 422);
+            }
+        }
 
         $project = $this->service->create($website, $request->user()?->id, $data);
 
@@ -121,6 +136,7 @@ class WriterProjectController extends Controller
             'language' => 'nullable|string|min:2|max:8',
             'tone' => 'nullable|string|max:32',
             'audience' => 'nullable|string|max:32',
+            'custom_prompt' => 'nullable|string|max:2000',
             'step' => ['nullable', Rule::in(WriterProject::STEPS)],
             'brief' => 'nullable|array',
             'images' => 'nullable|array|max:20',
@@ -176,6 +192,24 @@ class WriterProjectController extends Controller
         foreach (['country', 'language', 'tone', 'audience'] as $localeField) {
             if (array_key_exists($localeField, $data) && $data[$localeField] !== null) {
                 $project->{$localeField} = $data[$localeField];
+            }
+        }
+        if (array_key_exists('custom_prompt', $data)) {
+            $incoming = is_string($data['custom_prompt']) ? trim($data['custom_prompt']) : '';
+            if ($incoming === '') {
+                // Explicit clear — the wizard sends '' when the user
+                // removes their custom prompt.
+                $project->custom_prompt = null;
+            } elseif ($incoming !== (string) ($project->custom_prompt ?? '')) {
+                $verdict = $this->promptGuard->check($incoming);
+                if (($verdict['ok'] ?? false) !== true) {
+                    return response()->json([
+                        'ok'      => false,
+                        'error'   => 'prompt_rejected',
+                        'message' => (string) ($verdict['reason'] ?? 'This prompt isn\'t related to AI writing.'),
+                    ], 422);
+                }
+                $project->custom_prompt = $incoming;
             }
         }
         foreach (['meta_title', 'meta_description', 'og_title', 'og_description'] as $metaField) {
@@ -418,6 +452,7 @@ class WriterProjectController extends Controller
             'language' => $p->language,
             'tone' => $p->tone,
             'audience' => $p->audience,
+            'custom_prompt' => (string) ($p->custom_prompt ?? ''),
             'step' => $p->step,
             'brief' => is_array($p->brief) ? $p->brief : null,
             'chat_history' => is_array($p->chat_history) ? $p->chat_history : [],

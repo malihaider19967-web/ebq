@@ -56,6 +56,7 @@ class WriterProject extends Model
         'language',
         'tone',
         'audience',
+        'custom_prompt',
         'step',
         'brief',
         'chat_history',
