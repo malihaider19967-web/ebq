@@ -160,7 +160,13 @@ class Website extends Model
             }
         }
 
-        return $effective;
+        // 5. Trim to the plugin-shipped key set. The Plan map is wider
+        //    than Website::FEATURE_KEYS (it includes platform-only
+        //    features like `report_whitelabel` that the WP plugin
+        //    doesn't consume). Sending unknown keys to the plugin is
+        //    harmless (KNOWN_FEATURES drops them) but wasteful and
+        //    leaks platform internals into the public payload.
+        return array_intersect_key($effective, array_flip(self::FEATURE_KEYS));
     }
 
     /**

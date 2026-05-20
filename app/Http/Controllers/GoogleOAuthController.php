@@ -21,6 +21,11 @@ class GoogleOAuthController extends Controller
         $request->session()->put('google_sso.intent', (string) $request->query('intent', 'login'));
         $request->session()->put('google_sso.invite', (string) $request->query('invite', ''));
 
+        // No `include_granted_scopes` here — login is conceptually a
+        // fresh flow, and Google's behavior with that flag is to surface
+        // every previously-granted scope (including unrelated ones like
+        // gmail.send from the report-mail transport) on the consent
+        // screen. We explicitly list the scopes login should ask for.
         return Socialite::driver('google')
             ->redirectUrl(route('google.sso.callback', absolute: true))
             ->scopes([
@@ -34,7 +39,6 @@ class GoogleOAuthController extends Controller
             ->with([
                 'access_type' => 'offline',
                 'prompt' => 'consent',
-                'include_granted_scopes' => 'true',
             ])
             ->redirect();
     }
@@ -111,9 +115,13 @@ class GoogleOAuthController extends Controller
         // syncing GSC / Analytics in the background without re-prompting.
         // `prompt=consent` ensures the refresh token is actually issued
         // (Google omits it on subsequent OAuth flows when the same scopes
-        // are already granted). `include_granted_scopes=true` lets the
-        // user grant additional scopes incrementally without re-confirming
-        // ones they've already approved — Google's recommended pattern.
+        // are already granted).
+        //
+        // `include_granted_scopes` is intentionally OFF here: this flow is
+        // scoped to the Analytics/GSC connect — surfacing previously
+        // granted scopes (e.g. gmail.send from the report-mail panel)
+        // would clutter the consent screen with unrelated permissions and
+        // confuse users who just want to (re)connect their data sources.
         return Socialite::driver('google')
             ->scopes([
                 'https://www.googleapis.com/auth/analytics.readonly',
@@ -123,7 +131,6 @@ class GoogleOAuthController extends Controller
             ->with([
                 'access_type' => 'offline',
                 'prompt' => 'consent',
-                'include_granted_scopes' => 'true',
             ])
             ->redirect();
     }
