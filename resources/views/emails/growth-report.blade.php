@@ -16,7 +16,6 @@
         .section-badge { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #fff; margin-bottom: 14px; }
         .badge-analytics { background: #3b82f6; }
         .badge-search { background: #8b5cf6; }
-        .badge-backlinks { background: #10b981; }
 
         .section-title { font-size: 16px; font-weight: 700; margin: 0 0 16px; color: #0f172a; }
         .section-divider { border: none; border-top: 1px solid #e2e8f0; margin: 28px 0; }
@@ -387,66 +386,11 @@
 
         <hr class="section-divider">
 
-        {{-- ==================== BACKLINKS ==================== --}}
-        <span class="section-badge badge-backlinks">Backlinks</span>
-        <h2 class="section-title">Link Profile</h2>
-
-        <table class="kpi-grid" role="presentation">
-            <tr>
-                <td>
-                    <span class="kpi-value">{{ number_format($report['backlinks']['count']['current']) }}</span>
-                    <span class="kpi-label">New Backlinks</span>
-                    @include('emails.partials.change-badge', ['metric' => $report['backlinks']['count']])
-                    <span class="kpi-prev">was {{ number_format($report['backlinks']['count']['previous']) }}</span>
-                </td>
-                <td>
-                    <span class="kpi-value">{{ $report['backlinks']['avg_da']['current'] }}</span>
-                    <span class="kpi-label">Avg DA</span>
-                    @include('emails.partials.change-badge', ['metric' => $report['backlinks']['avg_da']])
-                    <span class="kpi-prev">was {{ $report['backlinks']['avg_da']['previous'] }}</span>
-                </td>
-                <td>
-                    <span class="kpi-value">{{ number_format($report['backlinks']['dofollow']['current']) }}</span>
-                    <span class="kpi-label">Dofollow</span>
-                    @include('emails.partials.change-badge', ['metric' => $report['backlinks']['dofollow']])
-                    <span class="kpi-prev">was {{ number_format($report['backlinks']['dofollow']['previous']) }}</span>
-                </td>
-                <td>
-                    <span class="kpi-value">{{ number_format($report['backlinks']['nofollow']['current']) }}</span>
-                    <span class="kpi-label">Nofollow</span>
-                    @include('emails.partials.change-badge', ['metric' => $report['backlinks']['nofollow']])
-                    <span class="kpi-prev">was {{ number_format($report['backlinks']['nofollow']['previous']) }}</span>
-                </td>
-            </tr>
-        </table>
-
-        @if (count($report['backlinks']['top_backlinks']) > 0)
-            <p class="sub-heading">Top Backlinks by Domain Authority</p>
-            <table class="data-table" role="presentation">
-                <thead>
-                    <tr>
-                        <th>Referring Page</th>
-                        <th>Target</th>
-                        <th class="right">DA</th>
-                        <th>Follow</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach ($report['backlinks']['top_backlinks'] as $b)
-                        <tr>
-                            <td><a href="{{ $b['referring_page_url'] }}" style="color:#4f46e5">{{ \Illuminate\Support\Str::limit($b['referring_page_url'], 40) }}</a></td>
-                            <td>{{ \Illuminate\Support\Str::limit($b['target_page_url'], 35) }}</td>
-                            <td class="right">{{ $b['domain_authority'] ?? '—' }}</td>
-                            <td>{{ $b['is_dofollow'] ? 'Do' : 'No' }}</td>
-                        </tr>
-                    @endforeach
-                </tbody>
-            </table>
-        @else
-            <p class="empty-note">No backlinks recorded for this period.</p>
-        @endif
-
-        <hr class="section-divider">
+        {{-- Backlinks section intentionally omitted from the report email.
+             Live backlink data still lives at /backlinks in-app; emailing
+             it on every report was noisy and the metrics rarely move
+             enough between report periods to justify the inbox real
+             estate. Remove this comment block if the section is restored. --}}
 
         {{-- ==================== INDEXING STATUS ==================== --}}
         <span class="section-badge" style="background:#0891b2">Indexing</span>

@@ -20,7 +20,6 @@
         .section-badge { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: #fff; margin: 14px 0 8px; }
         .badge-analytics { background: #3b82f6; }
         .badge-search { background: #8b5cf6; }
-        .badge-backlinks { background: #10b981; }
 
         .section-title { font-size: 13px; font-weight: 700; margin: 0 0 8px; color: #0f172a; }
 
