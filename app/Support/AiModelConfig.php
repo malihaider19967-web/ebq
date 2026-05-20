@@ -29,23 +29,40 @@ class AiModelConfig
     private const MODELS_ENDPOINT = 'https://api.mistral.ai/v1/models';
 
     /** Cache TTL for the live models list. */
-    private const MODELS_CACHE_KEY = 'ai_model_config:available_models:v1';
+    private const MODELS_CACHE_KEY = 'ai_model_config:available_models:v2';
     private const MODELS_CACHE_TTL_SEC = 3600;
 
     /**
      * Known-good fallback when the API key is missing or Mistral is
      * unreachable. Keeps the admin dropdown usable rather than empty.
+     *
+     * Each entry is `[id, human-readable-name]`. We pad this list with
+     * both the rolling `*-latest` aliases AND specific dated IDs so
+     * admins can pin to a precise model (e.g. "Mistral Small 3.2" =
+     * `mistral-small-2506`) without depending on the live API call.
      */
     private const FALLBACK_MODELS = [
-        'mistral-small-latest',
-        'mistral-medium-latest',
-        'mistral-large-latest',
-        'ministral-3b-latest',
-        'ministral-8b-latest',
-        'codestral-latest',
-        'open-mistral-7b',
-        'open-mixtral-8x7b',
-        'open-mixtral-8x22b',
+        ['mistral-small-latest',  'Mistral Small (latest alias)'],
+        ['mistral-small-2506',    'Mistral Small 3.2'],
+        ['mistral-small-2503',    'Mistral Small 3.1'],
+        ['mistral-small-2501',    'Mistral Small 3'],
+        ['mistral-medium-latest', 'Mistral Medium (latest alias)'],
+        ['mistral-medium-2508',   'Mistral Medium 3.1'],
+        ['mistral-medium-2505',   'Mistral Medium 3'],
+        ['mistral-large-latest',  'Mistral Large (latest alias)'],
+        ['mistral-large-2411',    'Mistral Large 2.1'],
+        ['mistral-large-2407',    'Mistral Large 2'],
+        ['ministral-3b-latest',   'Ministral 3B'],
+        ['ministral-8b-latest',   'Ministral 8B'],
+        ['magistral-medium-latest', 'Magistral Medium (reasoning, latest alias)'],
+        ['magistral-small-latest',  'Magistral Small (reasoning, latest alias)'],
+        ['codestral-latest',      'Codestral (latest alias)'],
+        ['codestral-2508',        'Codestral 25.08'],
+        ['pixtral-large-latest',  'Pixtral Large (vision, latest alias)'],
+        ['pixtral-12b-2409',      'Pixtral 12B'],
+        ['open-mistral-7b',       'Open Mistral 7B'],
+        ['open-mixtral-8x7b',     'Open Mixtral 8x7B'],
+        ['open-mixtral-8x22b',    'Open Mixtral 8x22B'],
     ];
 
     /**
@@ -119,6 +136,7 @@ class AiModelConfig
 
         $data = (array) ($response->json('data') ?? []);
         $shaped = [];
+        $seen = [];
         foreach ($data as $row) {
             if (! is_array($row)) {
                 continue;
@@ -134,13 +152,29 @@ class AiModelConfig
             if (array_key_exists('completion_chat', $caps) && ! (bool) $caps['completion_chat']) {
                 continue;
             }
+            $deprecation = (string) ($row['deprecation'] ?? '');
+            $name = trim((string) ($row['name'] ?? ''));
             $description = trim((string) ($row['description'] ?? ''));
-            $shaped[] = [
-                'id'    => $id,
-                'label' => $description !== ''
-                    ? sprintf('%s — %s', $id, mb_substr($description, 0, 80))
-                    : $id,
-            ];
+
+            $primary = self::shapeRow($id, $name, $description, $deprecation);
+            if (! isset($seen[$primary['id']])) {
+                $shaped[] = $primary;
+                $seen[$primary['id']] = true;
+            }
+
+            // Mistral's models endpoint groups versioned variants under
+            // an `aliases` array on the rolling alias row (and vice
+            // versa). Expand them as separate dropdown entries so an
+            // admin can pin to "Mistral Small 3.2" (id
+            // `mistral-small-2506`) instead of being stuck on the
+            // moving `mistral-small-latest` target.
+            foreach ((array) ($row['aliases'] ?? []) as $aliasId) {
+                if (! is_string($aliasId) || $aliasId === '' || isset($seen[$aliasId])) {
+                    continue;
+                }
+                $shaped[] = self::shapeRow($aliasId, $name, $description, $deprecation);
+                $seen[$aliasId] = true;
+            }
         }
 
         usort($shaped, static fn (array $a, array $b) => strcmp($a['id'], $b['id']));
@@ -151,6 +185,34 @@ class AiModelConfig
 
         Cache::put(self::MODELS_CACHE_KEY, $shaped, self::MODELS_CACHE_TTL_SEC);
         return $shaped;
+    }
+
+    /**
+     * Compose a `{id, label}` row for the dropdown. The label puts the
+     * human-readable name first when Mistral provided one, then the
+     * raw id in parens, then a short description tail. Deprecated
+     * models get a "(deprecated)" suffix so admins don't pin to them.
+     *
+     * @return array{id:string,label:string}
+     */
+    private static function shapeRow(string $id, string $name, string $description, string $deprecation): array
+    {
+        $parts = [];
+        if ($name !== '') {
+            $parts[] = $name.' ('.$id.')';
+        } else {
+            $parts[] = $id;
+        }
+        if ($description !== '') {
+            $parts[] = mb_substr($description, 0, 80);
+        }
+        if ($deprecation !== '') {
+            $parts[] = '⚠ deprecated';
+        }
+        return [
+            'id'    => $id,
+            'label' => implode(' — ', $parts),
+        ];
     }
 
     /** Clear the cached models list — call after admin changes the API key. */
@@ -165,7 +227,7 @@ class AiModelConfig
     private static function fallbackList(): array
     {
         return array_map(
-            static fn (string $id) => ['id' => $id, 'label' => $id],
+            static fn (array $row) => self::shapeRow($row[0], $row[1], '', ''),
             self::FALLBACK_MODELS,
         );
     }
