@@ -164,6 +164,10 @@ class AiWriterService
         // v19: `anchor_locked` boolean added to internal + external
         //      link payloads. Manually-typed anchors must be used
         //      verbatim; AI-suggested anchors stay paraphraseable.
+        // v20: anchor-locked rule elevated above placement paraphrase
+        //      allowance; post-response enforceLockedAnchors() rewrites
+        //      any <a> whose href matches a locked URL so the rendered
+        //      anchor is byte-identical to the user's input.
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
@@ -173,7 +177,7 @@ class AiWriterService
             'e' => $selectedExternal,
         ], JSON_UNESCAPED_UNICODE) ?: ''), 0, 12);
         $cacheKey = sprintf(
-            'ai_writer_v19:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s',
+            'ai_writer_v20:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -327,6 +331,36 @@ class AiWriterService
             $linkCount += preg_match_all('/<a\s+href=/i', (string) ($section['proposed_html'] ?? ''));
         }
 
+        // Hard guarantee for locked anchors. The prompt forbids any
+        // modification, but LLMs sometimes still capitalise differently
+        // or pluralise inside the <a>. We rewrite every <a> whose href
+        // matches a locked URL so the inner text is the user's anchor
+        // verbatim — no matter what the model produced.
+        //
+        // Locked URLs come from two sources:
+        //   1. smartLinks where source === 'user_manual' (internal)
+        //   2. $selectedExternal entries with manual === true (external)
+        $lockedAnchors = [];
+        foreach ($smartLinks as $l) {
+            if (($l['source'] ?? '') === 'user_manual') {
+                $lockedAnchors[strtolower((string) $l['url'])] = (string) $l['anchor'];
+            }
+        }
+        foreach ($selectedExternal as $l) {
+            if (! empty($l['manual'])) {
+                $lockedAnchors[strtolower((string) $l['url'])] = (string) $l['anchor'];
+            }
+        }
+        if ($lockedAnchors !== []) {
+            $sections = array_map(function (array $s) use ($lockedAnchors): array {
+                if (! isset($s['proposed_html']) || ! is_string($s['proposed_html'])) {
+                    return $s;
+                }
+                $s['proposed_html'] = self::enforceLockedAnchors((string) $s['proposed_html'], $lockedAnchors);
+                return $s;
+            }, $sections);
+        }
+
         // Auto-build schema suggestions from the generated sections — the
         // user picks which to apply and the plugin writes them into
         // _ebq_schemas. Multiple types stack: Article is always offered
@@ -476,37 +510,48 @@ Output rules (STRICT — non-compliance breaks the consumer):
 - INTERNAL LINKS — REQUIRED. The user provides a topic-tagged list of
   internal_links. Each entry has:
     • url             — the page to link to
-    • anchor          — anchor text. See `anchor_locked` for paraphrase
-                        rules.
+    • anchor          — anchor text (subject to the ANCHOR rules below)
     • best_fit_topic  — the topic that page is the strongest fit for
-    • anchor_locked   — boolean. When TRUE, use the anchor EXACTLY as
-                        given — no paraphrase, no pluralisation tweak,
-                        no synonym swap. The user typed this anchor by
-                        hand and is relying on the exact wording. You
-                        may still place it inside an informative
-                        sentence (see PLACEMENT below) by writing the
-                        surrounding prose around the locked anchor.
-                        When FALSE, you may paraphrase the anchor if it
-                        reads more naturally in context, so long as the
-                        meaning is preserved and the URL is unchanged.
-  For EVERY entry you MUST include exactly ONE <a href="<url>">…</a> in
-  the response. Place each link in the section whose subject most
+    • anchor_locked   — boolean (see ANCHOR rules)
+
+  ANCHOR rules — these override every other "paraphrase" allowance
+  elsewhere in this prompt:
+
+    • anchor_locked: true  → The text between <a>…</a> MUST be a
+      character-for-character match of the `anchor` field. Do NOT
+      capitalize differently. Do NOT add or remove punctuation. Do NOT
+      pluralise / singularise. Do NOT change articles (a / the). Do
+      NOT swap a word for a synonym. Copy the string verbatim.
+      The user typed this anchor by hand and is relying on it
+      appearing exactly as written (often for brand or campaign
+      reasons the model cannot see). ANY modification of a
+      locked anchor is a task failure.
+
+    • anchor_locked: false → You MAY paraphrase the anchor to fit the
+      sentence's grammar (e.g. "vegan protein" → "vegan-protein
+      sources"), so long as the meaning is preserved and the URL is
+      unchanged.
+
+  Whether locked or not, the link STILL must read as natural prose
+  (see PLACEMENT below). When `anchor_locked` is true, that means
+  building the surrounding sentence so the verbatim anchor reads as
+  an organic noun phrase inside it.
+
+  For EVERY entry you MUST include exactly ONE <a href="<url>">…</a>
+  in the response. Place each link in the section whose subject most
   overlaps with the entry's best_fit_topic.
   %LINK_FALLBACK_RULE%
   Do not link to the same URL twice. Do not skip any entry.
 
-  PLACEMENT — links must read as natural prose, not bolt-ons.
+  PLACEMENT — links must read as natural prose, not bolt-ons:
 
-    REQUIRED:
-    1. Wrap the link around an EXISTING noun phrase in a sentence that
+    1. Wrap the link around a noun phrase inside a sentence that
        carries information on its own. The sentence must make sense
        even if the <a> tags were stripped.
     2. Place links INSIDE a paragraph, NOT at its end as a separate
        sentence. The link is part of the flow, not an afterthought.
-    3. The anchor can be paraphrased to fit the sentence's grammar
-       (e.g. "vegan protein" → "vegan-protein sources" or "plant-based
-       protein options") so long as the meaning is preserved and the
-       URL is unchanged.
+    3. Anchor paraphrasing is governed by `anchor_locked` (see ANCHOR
+       rules above). Never paraphrase a locked anchor.
 
     FORBIDDEN sentence shapes (these read as bolt-ons — never produce
     a sentence whose ONLY purpose is to host a link):
@@ -516,27 +561,52 @@ Output rules (STRICT — non-compliance breaks the consumer):
       ✗ "Learn more about <a>X</a>."
       ✗ Any sentence that loses substance when the <a>…</a> is removed.
 
-    GOOD example (link inside an informative sentence):
+    GOOD example — unlocked anchor, paraphrased to fit grammar:
       internal_links = [{
         "url":"https://example.com/protein-guide",
         "anchor":"vegan protein",
-        "best_fit_topic":"vegan protein sources"
+        "best_fit_topic":"vegan protein sources",
+        "anchor_locked": false
       }]
       → "<p>Tempeh, lentils, and seitan are among the highest-density
          <a href=\"https://example.com/protein-guide\">vegan protein</a>
          sources, each delivering more than 15g per 100g serving.</p>"
-      Here the anchor sits inside a sentence that informs the reader
-      about protein density — stripping the <a> leaves a useful claim.
 
-    BAD example (the same link as a bolt-on):
+    GOOD example — locked anchor, used verbatim, built into prose:
+      internal_links = [{
+        "url":"https://example.com/onboarding",
+        "anchor":"Start Your Free Trial",
+        "best_fit_topic":"signup flow",
+        "anchor_locked": true
+      }]
+      → "<p>Teams that complete onboarding in under five minutes are
+         3x more likely to renew, which is why we surface a
+         <a href=\"https://example.com/onboarding\">Start Your Free
+         Trial</a> call-to-action at the end of the demo video.</p>"
+      Note the anchor reads "Start Your Free Trial" exactly — same
+      case, same words, in the same order. The surrounding prose was
+      built to host it without modification.
+
+    BAD example — locked anchor was modified (this is the failure
+    mode to avoid):
+      Same input as the previous GOOD example.
+      ✗ "<p>…we surface a <a href=\"...\">start your free trial</a>
+         button…</p>"        (case changed — FORBIDDEN)
+      ✗ "<p>…we surface a <a href=\"...\">free trial signup</a>
+         link…</p>"          (words changed — FORBIDDEN)
+      ✗ "<p>…we surface a <a href=\"...\">Start Free Trial</a>
+         button…</p>"        (word dropped — FORBIDDEN)
+
+    BAD example — link as a bolt-on sentence:
       → "<p>Tempeh, lentils, and seitan are good sources of protein.
          For a deeper look, see our <a href=\"...\">vegan protein</a>
          guide.</p>"
       The second sentence exists only to host the link — strip the <a>
       and it collapses to nothing useful. DO NOT DO THIS.
 
-  Failing to include any internal_link is a failure of the task, but
-  shoehorning a link into a bolt-on sentence is also a failure.
+  Failing to include any internal_link is a failure of the task.
+  Shoehorning a link into a bolt-on sentence is a failure.
+  Modifying a locked anchor is a failure.
 - EXTERNAL LINKS — when the user message includes an EXTERNAL LINKS
   list (may be empty), entries have the same shape as internal_links
   minus `best_fit_topic`. `anchor_locked: true` carries the same
@@ -1536,5 +1606,53 @@ USER;
         $s = (string) preg_replace('/,\s*,/', ',', $s);
         $s = (string) preg_replace('/([.!?])\s*,\s*/u', '$1 ', $s);
         return $s;
+    }
+
+    /**
+     * Force every <a> tag whose href matches a locked URL to render its
+     * inner content as the user's verbatim anchor. The prompt forbids
+     * modification but LLMs sometimes case-fold, pluralise, or swap a
+     * word — this is the hard guarantee that fires post-response.
+     *
+     * Matches are URL-keyed and case-insensitive on the href, but the
+     * replacement anchor is reinserted exactly as the user typed it
+     * (case, punctuation, spacing all preserved).
+     *
+     * @param  array<string, string>  $lockedAnchors  map of lowercase URL → exact anchor
+     */
+    public static function enforceLockedAnchors(string $html, array $lockedAnchors): string
+    {
+        if ($html === '' || $lockedAnchors === []) {
+            return $html;
+        }
+
+        return (string) preg_replace_callback(
+            // <a> tag with any attributes; capture the attribute string
+            // and the inner HTML. Non-greedy on the inner so nested
+            // emphasis tags inside a link's anchor don't swallow into
+            // the closing </a> of a later link.
+            '#<a\b([^>]*?)>(.*?)</a>#is',
+            static function (array $m) use ($lockedAnchors): string {
+                $attrs = $m[1];
+                $inner = $m[2];
+                if (! preg_match('/\bhref\s*=\s*(["\'])([^"\']+)\1/i', $attrs, $hm)) {
+                    return $m[0];
+                }
+                $href = strtolower(trim($hm[2]));
+                if (! isset($lockedAnchors[$href])) {
+                    return $m[0];
+                }
+                $exact = htmlspecialchars($lockedAnchors[$href], ENT_QUOTES | ENT_HTML5, 'UTF-8', false);
+                // Only rewrite when the rendered text actually differs
+                // from the locked anchor — leaves byte-identical
+                // already-correct cases alone so we don't churn HTML.
+                $rendered = trim(html_entity_decode(strip_tags($inner), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+                if ($rendered === $lockedAnchors[$href]) {
+                    return $m[0];
+                }
+                return '<a' . $attrs . '>' . $exact . '</a>';
+            },
+            $html
+        );
     }
 }
