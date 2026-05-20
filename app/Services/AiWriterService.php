@@ -157,6 +157,13 @@ class AiWriterService
         // v17: user-curated internal + external link selection wired
         //      into the prompt; cache key includes their hashes so a
         //      changed picks list invalidates stale cached drafts.
+        // v18: link placement rule rewritten to forbid bolt-on
+        //      "for more see our X" sentences — links must wrap an
+        //      existing noun phrase inside an informative sentence,
+        //      not sit at the end of a paragraph as an afterthought.
+        // v19: `anchor_locked` boolean added to internal + external
+        //      link payloads. Manually-typed anchors must be used
+        //      verbatim; AI-suggested anchors stay paraphraseable.
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
@@ -166,7 +173,7 @@ class AiWriterService
             'e' => $selectedExternal,
         ], JSON_UNESCAPED_UNICODE) ?: ''), 0, 12);
         $cacheKey = sprintf(
-            'ai_writer_v17:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s',
+            'ai_writer_v19:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -399,22 +406,34 @@ class AiWriterService
         // When the user manually curated internal links on the strategy
         // step, those override the GSC-derived smartLinks via the
         // resolveSmartInternalLinks() bypass above.
+        //
+        // `anchor_locked` carries the manual-vs-suggested distinction
+        // into the prompt: true = use this anchor verbatim, false =
+        // paraphrase if it reads more naturally in context. smartLinks
+        // built from `smartLinksFromSelection` stamp `source` with
+        // `user_manual` for manually-typed entries; everything else
+        // (GSC-derived candidates, ticked AI suggestions) is unlocked.
         $smartLinksBlock = empty($smartLinks)
             ? '(none)'
             : json_encode(array_map(static fn (array $l) => [
                 'url' => $l['url'],
                 'anchor' => $l['anchor'],
                 'best_fit_topic' => $l['topic'],
+                'anchor_locked' => ($l['source'] ?? '') === 'user_manual',
             ], $smartLinks), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         // External links the user explicitly added on the strategy step.
         // No GSC fallback exists for external — if the array is empty
         // the prompt simply doesn't ask the writer for outbound links.
+        // `anchor_locked` mirrors the internal-link semantics: manual
+        // entries lock the anchor; ticked AI suggestions allow
+        // paraphrase for grammatical fit.
         $externalLinksBlock = empty($selectedExternal)
             ? '(none)'
             : json_encode(array_map(static fn (array $l) => [
                 'url' => $l['url'],
                 'anchor' => $l['anchor'],
+                'anchor_locked' => (bool) ($l['manual'] ?? false),
             ], $selectedExternal), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 
         $gapsBlock = '(none)';
@@ -457,26 +476,81 @@ Output rules (STRICT — non-compliance breaks the consumer):
 - INTERNAL LINKS — REQUIRED. The user provides a topic-tagged list of
   internal_links. Each entry has:
     • url             — the page to link to
-    • anchor          — suggested anchor text (paraphrase if it reads
-                        more naturally; do not invent a different URL)
-    • best_fit_topic  — the topic that page is the strongest fit for,
-                        derived from the GSC query that drives the
-                        most clicks to it
-  For EVERY entry you MUST include exactly ONE <a href="<url>"><anchor
-  or paraphrase></a> in the response. Place each link in the section
-  whose subject most overlaps with the entry's best_fit_topic.
+    • anchor          — anchor text. See `anchor_locked` for paraphrase
+                        rules.
+    • best_fit_topic  — the topic that page is the strongest fit for
+    • anchor_locked   — boolean. When TRUE, use the anchor EXACTLY as
+                        given — no paraphrase, no pluralisation tweak,
+                        no synonym swap. The user typed this anchor by
+                        hand and is relying on the exact wording. You
+                        may still place it inside an informative
+                        sentence (see PLACEMENT below) by writing the
+                        surrounding prose around the locked anchor.
+                        When FALSE, you may paraphrase the anchor if it
+                        reads more naturally in context, so long as the
+                        meaning is preserved and the URL is unchanged.
+  For EVERY entry you MUST include exactly ONE <a href="<url>">…</a> in
+  the response. Place each link in the section whose subject most
+  overlaps with the entry's best_fit_topic.
   %LINK_FALLBACK_RULE%
   Do not link to the same URL twice. Do not skip any entry.
 
-  Concrete example: if internal_links contains
-    [{"url":"https://example.com/protein-guide",
-      "anchor":"vegan protein",
-      "best_fit_topic":"vegan protein sources"}]
-  then your section about protein sources must include something like
-    <p>For an in-depth comparison see our
-    <a href="https://example.com/protein-guide">vegan protein</a>
-    guide.</p>
-  Failing to include any internal_link is a failure of the task.
+  PLACEMENT — links must read as natural prose, not bolt-ons.
+
+    REQUIRED:
+    1. Wrap the link around an EXISTING noun phrase in a sentence that
+       carries information on its own. The sentence must make sense
+       even if the <a> tags were stripped.
+    2. Place links INSIDE a paragraph, NOT at its end as a separate
+       sentence. The link is part of the flow, not an afterthought.
+    3. The anchor can be paraphrased to fit the sentence's grammar
+       (e.g. "vegan protein" → "vegan-protein sources" or "plant-based
+       protein options") so long as the meaning is preserved and the
+       URL is unchanged.
+
+    FORBIDDEN sentence shapes (these read as bolt-ons — never produce
+    a sentence whose ONLY purpose is to host a link):
+      ✗ "For more, see our <a>vegan protein guide</a>."
+      ✗ "Read our <a>full guide</a> here."
+      ✗ "Check out <a>this article</a> to learn more."
+      ✗ "Learn more about <a>X</a>."
+      ✗ Any sentence that loses substance when the <a>…</a> is removed.
+
+    GOOD example (link inside an informative sentence):
+      internal_links = [{
+        "url":"https://example.com/protein-guide",
+        "anchor":"vegan protein",
+        "best_fit_topic":"vegan protein sources"
+      }]
+      → "<p>Tempeh, lentils, and seitan are among the highest-density
+         <a href=\"https://example.com/protein-guide\">vegan protein</a>
+         sources, each delivering more than 15g per 100g serving.</p>"
+      Here the anchor sits inside a sentence that informs the reader
+      about protein density — stripping the <a> leaves a useful claim.
+
+    BAD example (the same link as a bolt-on):
+      → "<p>Tempeh, lentils, and seitan are good sources of protein.
+         For a deeper look, see our <a href=\"...\">vegan protein</a>
+         guide.</p>"
+      The second sentence exists only to host the link — strip the <a>
+      and it collapses to nothing useful. DO NOT DO THIS.
+
+  Failing to include any internal_link is a failure of the task, but
+  shoehorning a link into a bolt-on sentence is also a failure.
+- EXTERNAL LINKS — when the user message includes an EXTERNAL LINKS
+  list (may be empty), entries have the same shape as internal_links
+  minus `best_fit_topic`. `anchor_locked: true` carries the same
+  meaning: use the anchor verbatim, do not paraphrase. The same
+  placement rules apply: wrap an existing noun phrase, never produce
+  a bolt-on sentence whose only job is to host the link. The link
+  MUST use `target="_blank" rel="noopener"` on the <a> tag (because
+  the URL takes the reader off-site). For EVERY entry you must
+  include exactly ONE such <a> in the response, placed in the
+  section where the cited source is most relevant; if no section is
+  a clean fit, weave it into the closest-related paragraph as
+  supporting evidence inside an informative sentence. Do not invent
+  new URLs; use only what the EXTERNAL LINKS list provides. Do not
+  link to the same external URL twice.
 - proposed_html: valid HTML using a focused tag palette designed to
   support content density without inviting visual cruft. Allowed tags:
     Structural:    <h1>, <h2>, <h3>
@@ -618,13 +692,10 @@ INTERNAL LINKS — topic-tagged candidates pulled from this site's own GSC
 footprint, ordered by topical fit (may be empty):
 {$smartLinksBlock}
 
-EXTERNAL LINKS — user-curated outbound links the article must cite (may
-be empty). For EVERY entry you MUST include exactly ONE <a href="<url>"
-target="_blank" rel="noopener"><anchor or close paraphrase></a> in the
-response, placed in a section where the cited resource is relevant. If
-no section is a natural fit, weave it into the most adjacent paragraph
-as supporting evidence. Do not invent new URLs; only use the URLs in
-this list. Do not link to the same external URL twice.
+EXTERNAL LINKS — user-curated outbound links (may be empty). See the
+EXTERNAL LINKS rule in the system message for placement requirements
+— wrap an existing noun phrase, never produce a sentence whose only
+job is to host the link, and always set target="_blank" rel="noopener".
 {$externalLinksBlock}
 
 TOPICAL GAPS vs. top SERP (may be empty):
