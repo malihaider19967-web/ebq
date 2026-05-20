@@ -39,9 +39,14 @@ class AppServiceProvider extends ServiceProvider
         // (e.g. Claude for copywriting in Phase 2) can take a concrete
         // class via constructor injection instead of the interface.
         $this->app->bind(\App\Services\Llm\LlmClient::class, function () {
+            // Model resolution goes through AiModelConfig so the admin's
+            // dropdown choice (persisted in `settings.ai.llm.model`)
+            // takes precedence over the .env-driven config default.
+            // Per-call `model` overrides on individual LLM calls still
+            // win — this is just the platform-wide fallback.
             return new \App\Services\Llm\MistralClient(
                 (string) config('services.mistral.key', ''),
-                (string) config('services.mistral.model', 'mistral-small-latest'),
+                \App\Support\AiModelConfig::currentModel(),
             );
         });
     }

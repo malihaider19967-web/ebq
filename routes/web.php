@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\WebsiteFeatureController as AdminWebsiteFeatureCo
 use App\Http\Controllers\Admin\BillingController as AdminBillingController;
 use App\Http\Controllers\Admin\PlanController as AdminPlanController;
 use App\Http\Controllers\Admin\ArtisanCommandsController as AdminArtisanCommandsController;
+use App\Http\Controllers\Admin\AiModelSettingsController as AdminAiModelSettingsController;
 use App\Http\Controllers\Admin\AuditSettingsController as AdminAuditSettingsController;
 use App\Http\Controllers\Admin\RankTrackerSettingsController as AdminRankTrackerSettingsController;
 use App\Http\Controllers\WordPressConnectController;
@@ -198,6 +199,16 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
         ->name('audit.settings');
     Route::put('/audit', [AdminAuditSettingsController::class, 'update'])
         ->name('audit.settings.update');
+
+    // AI model picker — global default model used by every AI feature
+    // that doesn't pin a model on its call. List comes live from
+    // Mistral's /v1/models endpoint (cached 1h).
+    Route::get('/ai-model', [AdminAiModelSettingsController::class, 'edit'])
+        ->name('ai-model.settings');
+    Route::put('/ai-model', [AdminAiModelSettingsController::class, 'update'])
+        ->name('ai-model.settings.update');
+    Route::post('/ai-model/refresh', [AdminAiModelSettingsController::class, 'refresh'])
+        ->name('ai-model.settings.refresh');
 });
 
 Route::middleware('auth')->post('/admin/impersonation/stop', [ClientImpersonationController::class, 'stop'])->name('admin.impersonation.stop');

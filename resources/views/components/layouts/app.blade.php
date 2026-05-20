@@ -75,6 +75,11 @@
                         'match_routes' => ['admin.audit.'],
                     ],
                     [
+                        'route' => 'admin.ai-model.settings',
+                        'label' => 'AI model',
+                        'match_routes' => ['admin.ai-model.'],
+                    ],
+                    [
                         'route' => 'admin.plugin-releases.index',
                         'label' => 'WordPress Plugin',
                         'match_routes' => [
