@@ -504,7 +504,16 @@ class WriterProjectService
      * Generate (or regenerate) the topic brief for step 2. The brief is
      * persisted on the project and the step advances to 'brief'.
      */
-    public function generateBrief(WriterProject $project, Website $website): WriterProject
+    /**
+     * Generate (or regenerate) the topic brief. Returns a tuple-shaped
+     * array so the controller can distinguish "brief written" from
+     * "Serper/LLM failed and nothing was saved" — the previous version
+     * silently wrote an empty brief shape on every failure, which left
+     * the user staring at an empty Step 2 with no explanation.
+     *
+     * @return array{project: WriterProject, ok: bool, error?: string, message?: string, cached?: bool}
+     */
+    public function generateBrief(WriterProject $project, Website $website): array
     {
         @set_time_limit(180);
 
@@ -514,11 +523,23 @@ class WriterProjectService
             'language' => null,
         ]);
 
-        $brief = (is_array($briefRes) && ($briefRes['ok'] ?? false) === true && is_array($briefRes['brief'] ?? null))
-            ? $briefRes['brief']
-            : null;
+        if (! is_array($briefRes) || ($briefRes['ok'] ?? false) !== true || ! is_array($briefRes['brief'] ?? null)) {
+            $error = is_array($briefRes) ? (string) ($briefRes['error'] ?? 'brief_generation_failed') : 'brief_generation_failed';
+            Log::warning('WriterProjectService: brief generation failed', [
+                'project_id' => $project->id,
+                'website_id' => $website->id,
+                'focus_keyword' => $project->focus_keyword,
+                'error' => $error,
+            ]);
+            return [
+                'project' => $project,
+                'ok'      => false,
+                'error'   => $error,
+                'message' => $this->briefErrorMessage($error),
+            ];
+        }
 
-        $shaped = $this->shapeBrief($brief);
+        $shaped = $this->shapeBrief($briefRes['brief']);
         $project->brief = $shaped;
         if ($project->step === WriterProject::STEP_TOPIC) {
             $project->step = WriterProject::STEP_BRIEF;
@@ -532,7 +553,29 @@ class WriterProjectService
             ['cached' => (bool) ($briefRes['cached'] ?? false)],
         );
 
-        return $project->refresh();
+        return [
+            'project' => $project->refresh(),
+            'ok'      => true,
+            'cached'  => (bool) ($briefRes['cached'] ?? false),
+        ];
+    }
+
+    /**
+     * Translate the briefService's machine error codes into UI copy
+     * that points at the actual root cause instead of "something went
+     * wrong." Most of these are recoverable on retry; the messages
+     * tell the user when a different input would help.
+     */
+    private function briefErrorMessage(string $error): string
+    {
+        return match ($error) {
+            'no_serp_data'           => 'No search results came back for that keyword. Try a more common phrasing, switch country/language, or wait a minute and retry.',
+            'llm_parse_failed'       => 'The AI returned a brief in an unexpected shape. Try again, or use a more specific focus keyword so the model has clearer signals.',
+            'llm_not_configured'     => 'The AI provider isn\'t configured. Contact support.',
+            'missing_focus_keyword'  => 'A focus keyword is required to build a brief.',
+            'mistral_network_error'  => 'The AI provider didn\'t respond in time. Wait a few seconds and click "Regenerate brief".',
+            default                  => 'Could not generate brief ('.$error.'). Try again.',
+        };
     }
 
     /**

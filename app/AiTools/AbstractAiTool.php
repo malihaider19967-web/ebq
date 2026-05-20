@@ -40,6 +40,32 @@ abstract class AbstractAiTool implements AiTool
     abstract public function meta(): AiToolMeta;
 
     /**
+     * Translate raw `mistral_*` / `llm_*` error codes into actionable
+     * UI copy. The old single "model did not respond" message hid
+     * three very different failure modes (missing key, rate-limit,
+     * network timeout, upstream 5xx) that each need different fixes.
+     */
+    private static function llmErrorMessage(string $code): string
+    {
+        if (str_starts_with($code, 'mistral_http_429') || $code === 'mistral_http_429') {
+            return 'The AI provider rate-limited the request. Wait 30s and try again.';
+        }
+        if (str_starts_with($code, 'mistral_http_401') || str_starts_with($code, 'mistral_http_403')) {
+            return 'The AI provider rejected the API key. An admin needs to refresh the Mistral credentials.';
+        }
+        if (str_starts_with($code, 'mistral_http_5')) {
+            return 'The AI provider returned a server error. Try again in a moment.';
+        }
+        return match ($code) {
+            'mistral_api_key_missing' => 'The AI provider isn\'t configured. An admin needs to set the Mistral API key.',
+            'mistral_network_error'   => 'Couldn\'t reach the AI provider. Check the server\'s outbound connection and retry.',
+            'llm_not_configured'      => 'The AI provider isn\'t configured. Contact an admin.',
+            'llm_failed'              => 'The model did not respond. Try again in a moment.',
+            default                   => 'The model did not respond ('.$code.'). Try again in a moment.',
+        };
+    }
+
+    /**
      * @param  array<string, mixed>  $input
      */
     abstract protected function buildUserPrompt(array $input, ToolContext $context): string;
@@ -72,9 +98,14 @@ abstract class AbstractAiTool implements AiTool
             : $this->llm->complete($messages, $options);
 
         if (! is_array($response) || ($response['ok'] ?? false) !== true) {
+            $errorCode = is_array($response) ? (string) ($response['error'] ?? 'llm_failed') : 'llm_failed';
+            \Illuminate\Support\Facades\Log::warning('AbstractAiTool: LLM call failed', [
+                'tool'  => $this->meta()->id ?? static::class,
+                'error' => $errorCode,
+            ]);
             return AiToolResult::fail(
-                error: is_array($response) ? (string) ($response['error'] ?? 'llm_failed') : 'llm_failed',
-                message: 'The model did not respond. Try again in a moment.',
+                error: $errorCode,
+                message: self::llmErrorMessage($errorCode),
                 outputType: $this->meta()->outputType,
             );
         }

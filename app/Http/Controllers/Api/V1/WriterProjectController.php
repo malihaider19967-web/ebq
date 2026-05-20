@@ -290,10 +290,23 @@ class WriterProjectController extends Controller
         $project = $this->resolve($request, $externalId);
         $website = $this->website($request);
 
-        $project = $this->service->generateBrief($project, $website);
+        $result = $this->service->generateBrief($project, $website);
+
+        if (($result['ok'] ?? false) !== true) {
+            // 200 so the WP REST proxy and @wordpress/api-fetch pass the
+            // structured body through; the frontend reads `error` /
+            // `message` to display the actual reason instead of a
+            // silently-empty brief screen.
+            return response()->json([
+                'ok'      => false,
+                'error'   => (string) ($result['error'] ?? 'brief_generation_failed'),
+                'message' => (string) ($result['message'] ?? 'Brief generation failed.'),
+                'project' => $this->full($result['project']),
+            ]);
+        }
 
         return response()->json([
-            'project' => $this->full($project),
+            'project' => $this->full($result['project']),
         ]);
     }
 
