@@ -168,6 +168,10 @@ class AiWriterService
         //      allowance; post-response enforceLockedAnchors() rewrites
         //      any <a> whose href matches a locked URL so the rendered
         //      anchor is byte-identical to the user's input.
+        // v21: PAA questions consolidated into a SINGLE FAQ section
+        //      with <h2>Frequently Asked Questions</h2> and each
+        //      question as an <h3>+<p> pair. Strict-mode N counts PAA
+        //      as +1 (the FAQ section) instead of one section per Q.
         $selectionHash = $selected !== null
             ? substr(hash('sha256', json_encode($selected, JSON_UNESCAPED_UNICODE) ?: ''), 0, 12)
             : '0';
@@ -177,7 +181,7 @@ class AiWriterService
             'e' => $selectedExternal,
         ], JSON_UNESCAPED_UNICODE) ?: ''), 0, 12);
         $cacheKey = sprintf(
-            'ai_writer_v20:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s',
+            'ai_writer_v21:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),
@@ -277,11 +281,12 @@ class AiWriterService
             }, $sections);
 
             // Diagnostics: did the model actually produce N sections?
-            // Compute the expected N (union of outline + subtopics + paa
-            // + gap missing) and warn if the add-section count doesn't
-            // match. The frontend already shows the inputs, so a
-            // mismatch is recoverable by Regenerate; we just log so the
-            // root cause is visible.
+            // Compute the expected N (union of outline + subtopics +
+            // gap missing) plus +1 when PAA is non-empty (the single
+            // consolidated FAQ section). Warn if the add-section count
+            // doesn't match. The frontend already shows the inputs, so
+            // a mismatch is recoverable by Regenerate; we just log so
+            // the root cause is visible.
             $unionSeen = [];
             $countItems = static function (array $list) use (&$unionSeen): void {
                 foreach ($list as $v) {
@@ -296,7 +301,6 @@ class AiWriterService
             };
             $countItems((array) ($brief['suggested_outline'] ?? []));
             $countItems((array) ($brief['subtopics'] ?? []));
-            $countItems((array) ($brief['people_also_ask'] ?? []));
             foreach ((array) ($gaps['missing'] ?? []) as $m) {
                 if (is_array($m) && is_string($m['topic'] ?? null)) {
                     $k = mb_strtolower(trim($m['topic']));
@@ -305,7 +309,8 @@ class AiWriterService
                     }
                 }
             }
-            $expectedN = count($unionSeen);
+            $paaList = array_filter((array) ($brief['people_also_ask'] ?? []), 'is_string');
+            $expectedN = count($unionSeen) + (count($paaList) > 0 ? 1 : 0);
             $addCount = count(array_filter($sections, static fn (array $s) => ($s['kind'] ?? '') === 'add'));
             if ($expectedN > 0 && $addCount !== $expectedN) {
                 Log::info('AiWriterService: strict-mode section count mismatch', [
@@ -497,12 +502,40 @@ Output rules (STRICT — non-compliance breaks the consumer):
 - Section count: %SECTION_COUNT_RULE%
 - 200–500 words per section is the sweet spot; up to 800 when the topic
   genuinely warrants depth. Don't pad. Don't undersell.
-- "people also ask" handling — REQUIRED: for EACH question in the
-  brief's `people_also_ask` array, produce one section whose <h2> is the
-  question itself (or a near-paraphrase). The first <p> after that <h2>
-  must be a direct, snippet-ready answer (40–60 words, no preamble).
-  Tag these with source_tags ⊇ ["brief"] (since PAA comes from the
-  brief). Do NOT skip PAA questions — every one gets a section.
+- "people also ask" handling — REQUIRED: when the brief's
+  `people_also_ask` array is NON-EMPTY, produce exactly ONE consolidated
+  FAQ section. Structure:
+    • kind: "add"
+    • Section <h2> is "Frequently Asked Questions" (or "FAQs" — keep
+      it generic; do NOT use the focus keyword in this heading).
+    • For EACH PAA question, emit an <h3> with the question itself
+      (or a near-paraphrase that keeps the meaning intact). Question
+      headings are <h3>, never <h2> — they are nested INSIDE the FAQ
+      section's <h2>, not parallel to it.
+    • IMMEDIATELY after each <h3>, emit one <p> with a direct,
+      snippet-ready answer (40–60 words, no preamble like "Well," or
+      "The answer is").
+    • Order the Q&A pairs to match the brief's `people_also_ask` array.
+    • Do NOT skip any PAA question — every one becomes an <h3> + <p>
+      pair inside the single FAQ section.
+    • Tag this section's source_tags ⊇ ["brief"] (since PAA comes
+      from the brief).
+    • Do NOT produce multiple FAQ sections. ONE section, all questions
+      grouped under its <h2>.
+  When `people_also_ask` is empty or absent, do NOT emit a FAQ section.
+  Example skeleton (with two PAA questions):
+    <h2>Frequently Asked Questions</h2>
+    <h3>Is vegan protein complete?</h3>
+    <p>Yes — combining sources like beans and rice gives the full
+       amino-acid profile. Soy, quinoa, and buckwheat are individually
+       complete proteins, so a single-ingredient meal still hits the
+       essentials. The "incomplete" myth dates to 1970s research that
+       has since been refuted by the ADA.</p>
+    <h3>How much protein do vegans need daily?</h3>
+    <p>The RDA of 0.8 g/kg bodyweight applies to vegans too; active
+       adults trend toward 1.2–1.6 g/kg. A 70 kg vegan athlete
+       targets ~100 g, easily hit through three meals containing
+       tempeh, lentils, or seitan plus a high-protein snack.</p>
 - For every topical-gap "missing" topic, produce a section that closes
   it. Tag with source_tags ⊇ ["gaps"].
 - For every must-have entity, weave it naturally into at least one
@@ -719,8 +752,8 @@ SYS;
                 : 'When the post has no existing <h1>, the FIRST add (or the replace, if any) MUST start with ONE <h1> that includes the focus keyword naturally, IMMEDIATELY FOLLOWED by an intro <p> paragraph of 2–4 sentences. Only after that intro paragraph may any <h2> appear. Never place an <h2> directly after an <h1> with no intervening body content. Subsequent sections must NOT include another <h1>.');
 
         $sectionCountRule = $strictSelection
-            ? "STRICT-SELECTION MODE — the user curated their inputs in a prior step. Follow these rules exactly:\n  (1) Build the INPUT LIST as the case-insensitive UNION of all items in: `suggested_outline` + `subtopics` + `people_also_ask` + the gap analysis's `missing` array. Deduplicate so the same string never appears twice. Call its size N.\n      (Do NOT count `must_have_entities`, `top_serp_titles`, or internal_links — those are CONTEXT for prose, not section drivers.)\n  (2) Generate EXACTLY N sections of kind=\"add\", one per item in the input list, in this order: outline first, then subtopics, then people_also_ask, then gap topics. Each section's <h2> uses or closely paraphrases its source item.\n  (3) NEVER use kind=\"replace\" in strict mode, EVEN WHEN THE POST IS EMPTY. Always emit N add sections instead.\n  (4) Do NOT invent new topics, do NOT pad with extra sections, do NOT split an input into multiple sections, do NOT merge two inputs into one section. One input → one section.\n  (5) Optionally append `edit` sections for weak passages of the existing post (improvements). These do NOT count toward N and are extra, not substitutes.\n  (6) Verify before emitting: the number of `add` sections in your output must equal N exactly. If you produce N-1 or N+1, the response is invalid."
-            : 'BETWEEN 12 AND 20 sections. Coverage is the point — produce one section per brief subtopic, one per topical gap, and one per "people also ask" question. Combining is allowed only when two inputs cover the same ground; otherwise each gets its own section. Returning fewer than 12 sections when richer inputs are available is a failure of the task.';
+            ? "STRICT-SELECTION MODE — the user curated their inputs in a prior step. Follow these rules exactly:\n  (1) Build the INPUT LIST as the case-insensitive UNION of all items in: `suggested_outline` + `subtopics` + the gap analysis's `missing` array. Deduplicate so the same string never appears twice. Call its size M.\n      PAA does NOT contribute to M — when `people_also_ask` is non-empty, the consolidated FAQ section adds +1 to the total. Call the final count N = M + (people_also_ask non-empty ? 1 : 0).\n      (Do NOT count `must_have_entities`, `top_serp_titles`, or internal_links — those are CONTEXT for prose, not section drivers.)\n  (2) Generate EXACTLY N sections of kind=\"add\":\n      - M sections, one per item in the input list, ordered: outline → subtopics → gap topics. Each section's <h2> uses or closely paraphrases its source item.\n      - When PAA is non-empty, append ONE additional consolidated FAQ section per the \"people also ask\" handling rule above (one <h2>, all PAA questions as <h3>+<p> pairs nested inside).\n  (3) NEVER use kind=\"replace\" in strict mode, EVEN WHEN THE POST IS EMPTY. Always emit N add sections instead.\n  (4) Do NOT invent new topics, do NOT pad with extra sections, do NOT split an input into multiple sections, do NOT merge two inputs into one section. One input → one section. PAA questions are the exception — they all live inside the single FAQ section as <h3>s.\n  (5) Optionally append `edit` sections for weak passages of the existing post (improvements). These do NOT count toward N and are extra, not substitutes.\n  (6) Verify before emitting: the number of `add` sections in your output must equal N exactly. If you produce N-1 or N+1, the response is invalid."
+            : 'BETWEEN 12 AND 20 sections. Coverage is the point — produce one section per brief subtopic, one per topical gap, and ONE consolidated FAQ section that absorbs every "people also ask" question as a nested <h3>+<p> pair. Returning fewer than 12 sections when richer inputs are available is a failure of the task.';
 
         $linkFallbackRule = $strictSelection
             ? 'If no section is a clean fit, place the link in the closest-related section anyway — DO NOT invent a new section to host the link in strict mode.'
