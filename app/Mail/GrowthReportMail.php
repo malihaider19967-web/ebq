@@ -117,23 +117,15 @@ class GrowthReportMail extends Mailable
     }
 
     /**
-     * PDF attachment — only included when whitelabel branding is in
-     * effect (i.e. not the EBQ-default fallback). The PDF is the same
-     * report rendered through a print-friendly companion template.
-     *
-     * Keeping the PDF gated by `isDefault()` is the cheapest possible
-     * implementation of the plan gate: when the plan disables the
-     * feature, ReportBrandingResolver returns the default which has
-     * `exists === false`, and this method returns an empty array.
+     * PDF attachment — always included on report emails, branded or not.
+     * When the plan disables whitelabel, the PDF renders with the EBQ
+     * default branding (no logo, EBQ accent color) so the recipient
+     * still gets a saveable / shareable artifact.
      *
      * @return list<Attachment>
      */
     public function attachments(): array
     {
-        if ($this->branding->isDefault()) {
-            return [];
-        }
-
         $renderer = app(ReportPdfRenderer::class);
         $bytes = $renderer->render(
             user: $this->user,
