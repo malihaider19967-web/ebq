@@ -159,10 +159,47 @@
         </form>
 
         {{-- Clients table --}}
+        @php
+            $selfId = (int) (auth()->id() ?? 0);
+            $selectableIds = $clients->getCollection()
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->filter(fn (int $id) => $id !== $selfId)
+                ->values()
+                ->all();
+        @endphp
+        <div
+            x-data="{
+                selected: [],
+                allIds: @js($selectableIds),
+                toggleAll(checked) { this.selected = checked ? [...this.allIds] : []; },
+                togglePage(checked) { this.toggleAll(checked); },
+                isSelected(id) { return this.selected.includes(id); },
+                toggle(id) {
+                    const i = this.selected.indexOf(id);
+                    if (i === -1) this.selected.push(id); else this.selected.splice(i, 1);
+                },
+                clear() { this.selected = []; },
+                get allSelected() { return this.allIds.length > 0 && this.selected.length === this.allIds.length; },
+                get someSelected() { return this.selected.length > 0 && this.selected.length < this.allIds.length; },
+            }"
+            class="space-y-3"
+        >
         <div class="overflow-hidden rounded-md border border-slate-200 bg-white">
             <table class="min-w-full text-sm">
                 <thead class="border-b border-slate-200 bg-slate-50/70 text-left">
                     <tr>
+                        <th class="w-9 px-3 py-2">
+                            <input
+                                type="checkbox"
+                                aria-label="Select all clients on this page"
+                                class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:opacity-40"
+                                :checked="allSelected"
+                                :indeterminate.camel="someSelected"
+                                @change="togglePage($event.target.checked)"
+                                :disabled="allIds.length === 0"
+                            />
+                        </th>
                         <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Client</th>
                         <th class="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">Status</th>
                         <th class="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wider text-slate-500">Sites</th>
@@ -181,7 +218,25 @@
                             $isExpanded = $editId === $client->id;
                         @endphp
 
-                        <tr @class(['border-t border-slate-100 align-middle', 'bg-slate-50/40' => $isExpanded, 'opacity-60' => $client->is_disabled])>
+                        <tr
+                            @class(['border-t border-slate-100 align-middle', 'bg-slate-50/40' => $isExpanded, 'opacity-60' => $client->is_disabled])
+                            :class="isSelected({{ $client->id }}) ? 'bg-indigo-50/60' : ''"
+                        >
+                            <td class="w-9 px-3 py-2.5">
+                                @if ($client->id === $selfId)
+                                    <span class="inline-flex h-4 w-4 items-center justify-center" title="Your own account — bulk-disable is locked">
+                                        <svg class="h-3.5 w-3.5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/></svg>
+                                    </span>
+                                @else
+                                    <input
+                                        type="checkbox"
+                                        aria-label="Select client {{ $client->email }}"
+                                        class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                                        :checked="isSelected({{ $client->id }})"
+                                        @change="toggle({{ $client->id }})"
+                                    />
+                                @endif
+                            </td>
                             <td class="px-3 py-2.5">
                                 <div class="flex items-center gap-2.5">
                                     <span @class(['flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold', $avatarBg($client->id)])>
@@ -263,7 +318,7 @@
                         {{-- Inline expanded edit row --}}
                         @if ($isExpanded)
                             <tr id="row-{{ $client->id }}" class="border-t border-slate-100 bg-slate-50/40">
-                                <td colspan="7" class="px-3 py-3">
+                                <td colspan="8" class="px-3 py-3">
                                     <form method="POST" action="{{ route('admin.clients.update', $client) }}" class="space-y-3">
                                         @csrf
                                         @method('PUT')
@@ -313,7 +368,7 @@
                         @endif
                     @empty
                         <tr>
-                            <td colspan="7" class="px-3 py-12 text-center">
+                            <td colspan="8" class="px-3 py-12 text-center">
                                 <p class="text-sm text-slate-500">
                                     No clients match.
                                     @if ($q !== '' || $status !== 'all')
@@ -326,6 +381,67 @@
                 </tbody>
             </table>
         </div>
+
+        {{-- Floating bulk-action bar — appears when one or more rows are
+             selected. Submits to admin.clients.bulk with action=disable|enable
+             and the selected ids[]. --}}
+        <div
+            x-show="selected.length > 0"
+            x-transition.opacity
+            x-cloak
+            class="pointer-events-none fixed inset-x-0 bottom-4 z-30 flex justify-center px-4"
+        >
+            <form
+                method="POST"
+                action="{{ route('admin.clients.bulk') }}"
+                class="pointer-events-auto flex w-full max-w-2xl items-center gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-lg ring-1 ring-black/5"
+                @submit="$nextTick(() => { selected = [] })"
+            >
+                @csrf
+                <template x-for="id in selected" :key="id">
+                    <input type="hidden" name="ids[]" :value="id">
+                </template>
+                @foreach (request()->query() as $k => $v)
+                    @if (is_scalar($v))
+                        <input type="hidden" name="{{ $k }}" value="{{ $v }}">
+                    @endif
+                @endforeach
+                <div class="flex flex-1 items-center gap-2 pl-2 text-xs text-slate-700">
+                    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-indigo-100 font-bold text-indigo-700 tabular-nums" x-text="selected.length"></span>
+                    <span class="font-medium">
+                        <span x-text="selected.length === 1 ? 'client' : 'clients'"></span> selected
+                    </span>
+                    <button
+                        type="button"
+                        @click="clear()"
+                        class="ml-2 text-[11px] font-semibold text-slate-500 hover:text-slate-800 hover:underline"
+                    >
+                        Clear
+                    </button>
+                </div>
+                <button
+                    type="submit"
+                    name="action"
+                    value="enable"
+                    class="inline-flex items-center gap-1 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
+                >
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    Enable
+                </button>
+                <button
+                    type="submit"
+                    name="action"
+                    value="disable"
+                    class="inline-flex items-center gap-1 rounded-md bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+                    @click="if (!confirm('Disable ' + selected.length + ' client' + (selected.length === 1 ? '' : 's') + '? They will be blocked from logging in.')) $event.preventDefault();"
+                >
+                    <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728A9 9 0 005.636 5.636"/></svg>
+                    Disable
+                </button>
+            </form>
+        </div>
+
+        </div>{{-- /x-data --}}
 
         {{-- Pagination --}}
         @if ($clients->hasPages())

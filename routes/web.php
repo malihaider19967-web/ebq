@@ -157,6 +157,7 @@ Route::post('/auth/google/cap/events', GoogleCapController::class)
 Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(function (): void {
     Route::get('/clients', [AdminClientController::class, 'index'])->name('clients.index');
     Route::post('/clients', [AdminClientController::class, 'store'])->name('clients.store');
+    Route::post('/clients/bulk', [AdminClientController::class, 'bulk'])->name('clients.bulk');
     Route::put('/clients/{user}', [AdminClientController::class, 'update'])->name('clients.update');
     Route::post('/clients/{user}/impersonate', [ClientImpersonationController::class, 'start'])->name('clients.impersonate');
 

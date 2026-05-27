@@ -115,6 +115,59 @@ class ClientController extends Controller
         return redirect()->route('admin.clients.index')->with('status', "Client {$client->email} created.");
     }
 
+    /**
+     * Bulk-toggle the disabled flag across a checkbox selection.
+     *
+     * The current admin's own id is filtered server-side so an operator
+     * can't accidentally lock themselves out by clicking "Select all"
+     * before "Disable" — the row checkbox is also hidden client-side,
+     * but this is the load-bearing guard.
+     */
+    public function bulk(Request $request, ClientActivityLogger $logger): RedirectResponse
+    {
+        $data = $request->validate([
+            'action' => ['required', 'string', 'in:disable,enable'],
+            'ids' => ['required', 'array', 'min:1', 'max:500'],
+            'ids.*' => ['integer', 'min:1'],
+        ]);
+
+        $selfId = (int) ($request->user()?->id ?? 0);
+        $ids = collect($data['ids'])
+            ->map(fn ($id) => (int) $id)
+            ->filter(fn (int $id) => $id > 0 && $id !== $selfId)
+            ->unique()
+            ->values()
+            ->all();
+
+        $skippedSelf = in_array($selfId, array_map('intval', $data['ids']), true);
+
+        if ($ids === []) {
+            return redirect()
+                ->route('admin.clients.index', $request->query())
+                ->with('status', $skippedSelf
+                    ? 'You cannot disable your own account.'
+                    : 'Nothing to update.');
+        }
+
+        $isDisable = $data['action'] === 'disable';
+        $count = User::query()->whereIn('id', $ids)->update(['is_disabled' => $isDisable]);
+
+        $type = $isDisable ? 'admin.clients_bulk_disabled' : 'admin.clients_bulk_enabled';
+        foreach ($ids as $id) {
+            $logger->log($type, userId: $id, meta: ['count' => $count]);
+        }
+
+        $verb = $isDisable ? 'Disabled' : 'Enabled';
+        $msg = "{$verb} {$count} client" . ($count === 1 ? '' : 's') . '.';
+        if ($skippedSelf) {
+            $msg .= ' Your own account was skipped.';
+        }
+
+        return redirect()
+            ->route('admin.clients.index', $request->query())
+            ->with('status', $msg);
+    }
+
     public function update(Request $request, User $user, ClientActivityLogger $logger): RedirectResponse
     {
         $data = $request->validate([
