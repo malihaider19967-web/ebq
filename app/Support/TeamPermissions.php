@@ -51,6 +51,11 @@ class TeamPermissions
             'description' => 'Scheduled and on-demand reports.',
             'route' => 'reports.index',
         ],
+        'ai_studio' => [
+            'label' => 'AI Studio',
+            'description' => 'AI Studio — 47 tools for research, writing, improvement, marketing, eCommerce, media.',
+            'route' => 'ai-studio.index',
+        ],
         'settings' => [
             'label' => 'Settings',
             'description' => 'Site configuration and integrations.',

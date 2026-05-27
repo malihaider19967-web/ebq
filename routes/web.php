@@ -121,6 +121,20 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/team', 'team.index')->middleware('feature:team')->name('team.index');
     Route::view('/reports', 'reports.index')->middleware('feature:reports')->name('reports.index');
     Route::view('/settings', 'settings.index')->middleware('feature:settings')->name('settings.index');
+
+    Route::middleware('feature:ai_studio')->group(function (): void {
+        Route::get('/ai-studio', [\App\Http\Controllers\AiStudioController::class, 'index'])
+            ->name('ai-studio.index');
+        Route::post('/ai-studio/tools/{toolId}/run', [\App\Http\Controllers\AiStudioController::class, 'run'])
+            ->where('toolId', '[a-z0-9\-]+')
+            ->middleware('throttle:30,1')
+            ->name('ai-studio.run');
+        Route::put('/ai-studio/brand-voice', [\App\Http\Controllers\AiStudioController::class, 'brandVoiceUpdate'])
+            ->middleware('throttle:10,1')
+            ->name('ai-studio.brand-voice.update');
+        Route::delete('/ai-studio/brand-voice', [\App\Http\Controllers\AiStudioController::class, 'brandVoiceDestroy'])
+            ->name('ai-studio.brand-voice.destroy');
+    });
 });
 
 Route::middleware(['auth', 'verified', 'throttle:oauth'])->group(function () {
