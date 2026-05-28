@@ -23,6 +23,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'landing')->name('landing');
 Route::view('/features', 'features')->name('features');
+Route::view('/wordpress-plugin', 'wordpress-plugin')->name('wordpress-plugin');
 Route::view('/pricing', 'pricing')->name('pricing');
 Route::view('/contact', 'contact')->name('contact');
 Route::view('/terms-conditions', 'legal.terms')->name('terms-conditions');

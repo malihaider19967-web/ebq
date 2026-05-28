@@ -44,8 +44,7 @@
                 <a href="{{ route('guide') }}" class="transition hover:text-slate-900 {{ $active === 'guide' ? 'text-slate-900' : '' }}">Guide</a>
                 <a href="{{ route('pricing') }}" class="transition hover:text-slate-900 {{ $active === 'pricing' ? 'text-slate-900' : '' }}">Pricing</a>
                 <a href="{{ route('contact') }}" class="transition hover:text-slate-900 {{ $active === 'contact' ? 'text-slate-900' : '' }}">Contact</a>
-                <a href="{{ route('landing') }}#wordpress" class="transition hover:text-slate-900">WordPress</a>
-                <a href="{{ route('wordpress.plugin.download') }}" class="transition hover:text-slate-900">Download plugin</a>
+                <a href="{{ route('wordpress-plugin') }}" class="transition hover:text-slate-900 {{ $active === 'wordpress' ? 'text-slate-900' : '' }}">WordPress</a>
                 <a href="{{ route('landing') }}#faq" class="transition hover:text-slate-900">FAQ</a>
             </nav>
 
@@ -74,7 +73,7 @@
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('features') }}">Features</a></li>
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('guide') }}">Guide</a></li>
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('pricing') }}">Pricing</a></li>
-                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('landing') }}#wordpress">WordPress plugin</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('wordpress-plugin') }}">WordPress plugin</a></li>
                 </ul>
             </div>
             <div>
