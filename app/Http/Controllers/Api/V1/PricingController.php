@@ -109,7 +109,7 @@ class PricingController extends Controller
             return null;
         }
         return [
-            'headline' => 'All Pro features are unlocked free for a limited time.',
+            'headline' => 'Free for a limited time, then just $5/month.',
             'expires_at' => null,
         ];
     }

@@ -19,13 +19,13 @@
 
     $heroEyebrow   = $free ? 'Limited-time promotion' : 'Pricing';
     $heroTitle     = $free
-        ? 'All Pro features are unlocked free for a limited time.'
+        ? 'Free for a limited time, then just $5/month.'
         : 'Pay for the sites you manage. Nothing else.';
     $heroSub       = $free
-        ? 'Every account currently gets Pro capabilities at no cost during this promotional period.'
+        ? 'Every account currently gets full Pro capabilities at no cost during this promotional period. When the promotion ends, plans start at just $5/month — and we will let you know well before anything changes.'
         : 'Every plan includes the EBQ workspace, WordPress plugin, and unlimited team members. Annual subscriptions only — every paid plan starts with a 1-month free trial.';
     $heroBadge     = $free
-        ? 'Free Pro access for a limited time'
+        ? 'Free now · then from $5/month'
         : '1-month free trial · Cancel during trial, no charge';
 
     // Pull plans straight from the DB — `Admin\PlanController` keeps
@@ -225,10 +225,10 @@
                 <div class="rounded-3xl border border-emerald-200 bg-emerald-50/60 px-8 py-14 text-center">
                     <p class="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-700">Limited-time offer</p>
                     <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">
-                        You currently have full Pro usage at no cost.
+                        Full Pro usage at no cost — then just $5/month.
                     </h2>
                     <p class="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600">
-                        Create your account and use Pro features now. We will notify users in advance before standard pricing resumes.
+                        Create your account and use every Pro feature now, free. When the promotion ends, plans start at just $5/month — and we will notify you well in advance before any charge.
                     </p>
                     <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
                         <a href="{{ $registerUrl }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-2">Start free</a>
@@ -237,7 +237,7 @@
                 </div>
 
                 <p class="mt-6 text-center text-xs text-slate-500">
-                    Standard plans will resume in the future. Existing accounts will receive at least 30 days’ notice before any change.
+                    Pricing starts at $5/month once the promotion ends. Existing accounts will receive at least 30 days’ notice before any change.
                 </p>
             </div>
         </section>
