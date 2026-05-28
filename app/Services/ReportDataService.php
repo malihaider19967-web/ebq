@@ -751,8 +751,9 @@ class ReportDataService
         $country = $this->normalizeCountry($country);
 
         return Cache::remember(
+            // v2: row shape gained `page` + `page_position` (ranking URL).
             sprintf(
-                'report:strikingDistance:v1:%d:%s:%s:%d:%s:%d',
+                'report:strikingDistance:v2:%d:%s:%s:%d:%s:%d',
                 $websiteId,
                 $start->toDateString(),
                 $end->toDateString(),
