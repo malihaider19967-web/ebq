@@ -66,19 +66,9 @@
                     ['route' => 'admin.activities.index', 'label' => 'Activities'],
                     ['route' => 'admin.usage.index', 'label' => 'API Usage'],
                     [
-                        'route' => 'admin.rank-tracker.settings',
-                        'label' => 'Rank Tracker',
-                        'match_routes' => ['admin.rank-tracker.'],
-                    ],
-                    [
-                        'route' => 'admin.audit.settings',
-                        'label' => 'Page audits',
-                        'match_routes' => ['admin.audit.'],
-                    ],
-                    [
-                        'route' => 'admin.ai-model.settings',
-                        'label' => 'AI model',
-                        'match_routes' => ['admin.ai-model.'],
+                        'route' => 'admin.settings',
+                        'label' => 'Settings',
+                        'match_routes' => ['admin.settings'],
                     ],
                     [
                         'route' => 'admin.plugin-releases.index',

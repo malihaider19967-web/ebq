@@ -1,0 +1,102 @@
+<x-layouts.app>
+    <div class="mx-auto max-w-2xl">
+        <div class="mb-6">
+            <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-100">Settings</h1>
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                Platform defaults: AI model, rank-tracker re-check interval, and Keywords Everywhere usage.
+            </p>
+        </div>
+
+        @if (session('status'))
+            <div class="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+                {{ session('status') }}
+            </div>
+        @endif
+
+        @if ($errors->any())
+            <div class="mb-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-2.5 text-sm text-rose-800 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+                <ul class="list-disc pl-5">
+                    @foreach ($errors->all() as $err)
+                        <li>{{ $err }}</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        <form method="POST" action="{{ route('admin.settings.update') }}" class="space-y-6">
+            @csrf
+            @method('PUT')
+
+            {{-- ── AI model ─────────────────────────────────────────── --}}
+            <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">AI model</h2>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Default Mistral model for every AI feature (brief, writer, strategy tools, custom-prompt classifier). Per-call overrides still win when a service pins a model.
+                </p>
+
+                <label for="model" class="mt-4 block text-xs font-semibold text-slate-700 dark:text-slate-300">Default model</label>
+                <select id="model" name="model"
+                    class="mt-1 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                    @foreach ($models as $m)
+                        <option value="{{ $m['id'] }}" @selected(old('model', $currentModel) === $m['id'])>
+                            {{ $m['label'] ?? $m['id'] }}
+                        </option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    Currently active: <code class="rounded bg-slate-100 px-1.5 py-px font-mono text-[11px] dark:bg-slate-800 dark:text-slate-200">{{ $currentModel }}</code>
+                </p>
+            </section>
+
+            {{-- ── Rank tracker ─────────────────────────────────────── --}}
+            <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Rank tracker</h2>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Default re-check interval applied to newly tracked keywords. Existing keywords keep their own interval.
+                </p>
+
+                <label for="default_check_interval_hours" class="mt-4 block text-xs font-semibold text-slate-700 dark:text-slate-300">Default re-check interval (hours)</label>
+                <input type="number" id="default_check_interval_hours" name="default_check_interval_hours"
+                    min="1" max="168" required
+                    value="{{ old('default_check_interval_hours', $checkIntervalHours) }}"
+                    class="mt-1 w-40 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100" />
+                <p class="mt-1 text-[11px] text-slate-500 dark:text-slate-400">Between 1 and 168 hours (7 days). Default SERP depth is {{ $defaultDepth }}.</p>
+            </section>
+
+            {{-- ── Keywords Everywhere ──────────────────────────────── --}}
+            <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Keywords Everywhere</h2>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Controls competitor-data lookups, which spend Keywords Everywhere credits.
+                </p>
+
+                <label class="mt-4 flex items-start gap-2.5 text-sm text-slate-700 dark:text-slate-200">
+                    <input type="hidden" name="competitor_keywords_everywhere" value="0" />
+                    <input type="checkbox" name="competitor_keywords_everywhere" value="1"
+                        class="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        @checked(old('competitor_keywords_everywhere', $competitorKeywordsEverywhere)) />
+                    <span>
+                        <span class="font-medium">Fetch competitor data from Keywords Everywhere after audits</span>
+                        <span class="mt-0.5 block text-[11px] text-slate-500 dark:text-slate-400">
+                            Opening an audit report can also refresh stale domains. Each domain call spends Keywords Everywhere credits.
+                        </span>
+                    </span>
+                </label>
+            </section>
+
+            <div class="flex items-center justify-end">
+                <button class="rounded-md bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700">
+                    Save settings
+                </button>
+            </div>
+        </form>
+
+        {{-- Model-list refresh is a separate action so it doesn't save the form. --}}
+        <form method="POST" action="{{ route('admin.settings.refresh-models') }}" class="mt-4 flex justify-end">
+            @csrf
+            <button class="text-xs font-semibold text-indigo-600 hover:underline dark:text-indigo-400">
+                Refresh AI model list from provider
+            </button>
+        </form>
+    </div>
+</x-layouts.app>

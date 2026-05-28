@@ -14,9 +14,7 @@ use App\Http\Controllers\Admin\WebsiteFeatureController as AdminWebsiteFeatureCo
 use App\Http\Controllers\Admin\BillingController as AdminBillingController;
 use App\Http\Controllers\Admin\PlanController as AdminPlanController;
 use App\Http\Controllers\Admin\ArtisanCommandsController as AdminArtisanCommandsController;
-use App\Http\Controllers\Admin\AiModelSettingsController as AdminAiModelSettingsController;
-use App\Http\Controllers\Admin\AuditSettingsController as AdminAuditSettingsController;
-use App\Http\Controllers\Admin\RankTrackerSettingsController as AdminRankTrackerSettingsController;
+use App\Http\Controllers\Admin\PlatformSettingsController as AdminPlatformSettingsController;
 use App\Http\Controllers\WordPressConnectController;
 use App\Http\Controllers\WordPressEmbedController;
 use App\Http\Controllers\WordPressPluginDownloadController;
@@ -206,25 +204,15 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     // Artisan::all() so the page can't drift from `php artisan list`.
     Route::get('/commands', [AdminArtisanCommandsController::class, 'index'])->name('commands.index');
 
-    Route::get('/rank-tracker', [AdminRankTrackerSettingsController::class, 'edit'])
-        ->name('rank-tracker.settings');
-    Route::put('/rank-tracker', [AdminRankTrackerSettingsController::class, 'update'])
-        ->name('rank-tracker.settings.update');
-
-    Route::get('/audit', [AdminAuditSettingsController::class, 'edit'])
-        ->name('audit.settings');
-    Route::put('/audit', [AdminAuditSettingsController::class, 'update'])
-        ->name('audit.settings.update');
-
-    // AI model picker — global default model used by every AI feature
-    // that doesn't pin a model on its call. List comes live from
-    // Mistral's /v1/models endpoint (cached 1h).
-    Route::get('/ai-model', [AdminAiModelSettingsController::class, 'edit'])
-        ->name('ai-model.settings');
-    Route::put('/ai-model', [AdminAiModelSettingsController::class, 'update'])
-        ->name('ai-model.settings.update');
-    Route::post('/ai-model/refresh', [AdminAiModelSettingsController::class, 'refresh'])
-        ->name('ai-model.settings.refresh');
+    // Consolidated platform settings — AI model, rank-tracker default
+    // re-check interval, and the Keywords Everywhere competitor-data toggle,
+    // all on one page.
+    Route::get('/settings', [AdminPlatformSettingsController::class, 'edit'])
+        ->name('settings');
+    Route::put('/settings', [AdminPlatformSettingsController::class, 'update'])
+        ->name('settings.update');
+    Route::post('/settings/refresh-models', [AdminPlatformSettingsController::class, 'refreshModels'])
+        ->name('settings.refresh-models');
 });
 
 Route::middleware('auth')->post('/admin/impersonation/stop', [ClientImpersonationController::class, 'stop'])->name('admin.impersonation.stop');
