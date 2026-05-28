@@ -4,20 +4,19 @@
 >
     {{-- Page-specific structured data: the product itself. --}}
     <x-slot:schema>
-        <script type="application/ld+json">@json([
-            '@context' => 'https://schema.org',
-            '@type' => 'SoftwareApplication',
-            'name' => 'EBQ',
-            'applicationCategory' => 'BusinessApplication',
-            'operatingSystem' => 'Web, WordPress',
-            'url' => route('landing'),
-            'description' => 'Free SEO analysis and audit tool: detailed technical insights, live Google Search Console data, rank tracking, backlinks, and actionable fixes.',
-            'offers' => [
-                '@type' => 'Offer',
-                'price' => '0',
-                'priceCurrency' => 'USD',
-            ],
-        ], JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT)</script>
+        @php
+            $landingSchema = [
+                '@context' => 'https://schema.org',
+                '@type' => 'SoftwareApplication',
+                'name' => 'EBQ',
+                'applicationCategory' => 'BusinessApplication',
+                'operatingSystem' => 'Web, WordPress',
+                'url' => route('landing'),
+                'description' => 'Free SEO analysis and audit tool: detailed technical insights, live Google Search Console data, rank tracking, backlinks, and actionable fixes.',
+                'offers' => ['@type' => 'Offer', 'price' => '0', 'priceCurrency' => 'USD'],
+            ];
+        @endphp
+        <script type="application/ld+json">{!! json_encode($landingSchema, JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
     </x-slot:schema>
 
     {{-- ── Hero ──────────────────────────────────────────────── --}}

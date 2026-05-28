@@ -1,8 +1,38 @@
 <x-marketing.page
     active="wordpress"
-    title="EBQ SEO — WordPress plugin"
-    description="The EBQ SEO WordPress plugin: real-data focus keyword scoring, live SERP insights, rank tracking, AI writing, schema, sitemap, redirects, and one-click connect to your EBQ workspace."
+    title="EBQ SEO – WordPress SEO Plugin with Actionable Audits"
+    description="Supercharge your rankings. Get the best WordPress SEO plugin with actionable audits, live GSC insights, automated rank tracking, and a 47-tool AI studio."
 >
+    {{-- Page-specific structured data: the plugin itself + breadcrumb. --}}
+    <x-slot:schema>
+        @php
+            $jsonFlags = JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+            $appSchema = [
+                '@context' => 'https://schema.org',
+                '@type' => 'SoftwareApplication',
+                'name' => 'EBQ SEO',
+                'applicationCategory' => 'BusinessApplication',
+                'operatingSystem' => 'WordPress',
+                'url' => route('wordpress-plugin'),
+                'downloadUrl' => route('wordpress.plugin.download'),
+                'softwareVersion' => '1.0.5',
+                'description' => 'WordPress SEO plugin with actionable audits, live Google Search Console insights, automated rank tracking, schema, sitemaps, redirects, and a 47-tool AI studio.',
+                'offers' => ['@type' => 'Offer', 'price' => '0', 'priceCurrency' => 'USD'],
+                'publisher' => ['@type' => 'Organization', 'name' => 'EBQ', 'url' => route('landing')],
+            ];
+            $breadcrumbSchema = [
+                '@context' => 'https://schema.org',
+                '@type' => 'BreadcrumbList',
+                'itemListElement' => [
+                    ['@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => route('landing')],
+                    ['@type' => 'ListItem', 'position' => 2, 'name' => 'WordPress SEO Plugin', 'item' => route('wordpress-plugin')],
+                ],
+            ];
+        @endphp
+        <script type="application/ld+json">{!! json_encode($appSchema, $jsonFlags) !!}</script>
+        <script type="application/ld+json">{!! json_encode($breadcrumbSchema, $jsonFlags) !!}</script>
+    </x-slot:schema>
+
     @php
         $downloadUrl = route('wordpress.plugin.download');
 
