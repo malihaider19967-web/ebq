@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Setting;
 use App\Models\Website;
 use App\Services\PluginReleaseResolver;
 use Illuminate\Http\JsonResponse;
@@ -44,6 +45,11 @@ class WordPressPluginVersionController extends Controller
                 'php' => $requiresPhp,
             ],
             'tested' => $tested,
+            // Global update kill-switch, toggled from the EBQ admin
+            // (Plugin Releases page). When false, every install's
+            // EBQ_Updater suppresses the "update available" offer. Absent
+            // => enabled (back-compat with older plugin builds).
+            'updates_enabled' => ((string) Setting::get('plugin.updates_enabled', '1')) !== '0',
             'homepage' => url('/features').'#wordpress',
             'changelog_url' => url('/features').'#wordpress',
             'release_notes' => $release?->release_notes,

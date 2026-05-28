@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\PluginRelease;
+use App\Models\Setting;
 use App\Services\ClientActivityLogger;
 use App\Services\PluginReleaseResolver;
 use App\Services\WordPressPluginSourceService;
@@ -22,7 +23,27 @@ class PluginReleaseController extends Controller
         return view('admin.plugin-releases.index', [
             'releases' => PluginRelease::query()->latest('id')->paginate(20),
             'sourceVersion' => $source->readCurrentVersion(),
+            'updatesEnabled' => ((string) Setting::get('plugin.updates_enabled', '1')) !== '0',
         ]);
+    }
+
+    /**
+     * Global update kill-switch. When disabled, the /wordpress/plugin/version
+     * endpoint broadcasts updates_enabled=false and every install's
+     * EBQ_Updater suppresses the "update available" offer until re-enabled.
+     */
+    public function toggleUpdates(Request $request, ClientActivityLogger $logger): RedirectResponse
+    {
+        $enabled = $request->boolean('enabled');
+        Setting::set('plugin.updates_enabled', $enabled ? '1' : '0');
+
+        $logger->log('admin.plugin_updates_toggled', meta: ['enabled' => $enabled]);
+
+        return redirect()
+            ->route('admin.plugin-releases.index')
+            ->with('status', $enabled
+                ? 'Plugin updates re-enabled — installs will see the latest published release.'
+                : 'Plugin updates disabled — no install will be offered an update until re-enabled.');
     }
 
     public function store(

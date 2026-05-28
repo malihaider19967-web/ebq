@@ -27,6 +27,28 @@
             </div>
         @endif
 
+        {{-- Global update kill-switch: broadcast via /wordpress/plugin/version
+             to every install. Off = no site is offered an update until re-enabled. --}}
+        <div class="flex flex-col gap-3 rounded border p-4 sm:flex-row sm:items-center sm:justify-between {{ $updatesEnabled ? 'border-emerald-200 bg-emerald-50' : 'border-amber-300 bg-amber-50' }}">
+            <div>
+                <p class="text-sm font-semibold {{ $updatesEnabled ? 'text-emerald-800' : 'text-amber-900' }}">
+                    Plugin updates are {{ $updatesEnabled ? 'ENABLED' : 'DISABLED' }}
+                </p>
+                <p class="mt-0.5 text-xs {{ $updatesEnabled ? 'text-emerald-700' : 'text-amber-800' }}">
+                    {{ $updatesEnabled
+                        ? 'Every connected WordPress install sees the latest published release on its Plugins page.'
+                        : 'No install is being offered an update. Re-enable to resume the rollout of the latest published release.' }}
+                </p>
+            </div>
+            <form method="POST" action="{{ route('admin.plugin-releases.toggle-updates') }}">
+                @csrf
+                <input type="hidden" name="enabled" value="{{ $updatesEnabled ? '0' : '1' }}" />
+                <button class="rounded px-4 py-2 text-sm font-semibold text-white {{ $updatesEnabled ? 'bg-amber-600 hover:bg-amber-700' : 'bg-emerald-600 hover:bg-emerald-700' }}">
+                    {{ $updatesEnabled ? 'Disable updates' : 'Re-enable updates' }}
+                </button>
+            </form>
+        </div>
+
         <form method="POST" action="{{ route('admin.plugin-releases.store') }}" enctype="multipart/form-data" class="rounded border border-slate-200 bg-white p-4">
             @csrf
             <div class="grid gap-2 md:grid-cols-3">
