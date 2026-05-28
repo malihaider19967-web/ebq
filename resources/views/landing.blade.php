@@ -7,188 +7,49 @@
         <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.08),transparent_60%)]"></div>
 
         <div class="mx-auto max-w-6xl px-6 pb-20 pt-16 lg:px-8 lg:pb-28 lg:pt-24">
-            <div class="mx-auto max-w-3xl text-center">
-                <a href="{{ route('features') }}" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900">
-                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
-                    New: Anomaly alerts and backlink impact
-                    <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
-                </a>
-
-                <h1 class="mt-6 text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-                    The SEO command center for teams that ship.
-                </h1>
-
-                <p class="mx-auto mt-6 max-w-2xl text-balance text-[17px] leading-8 text-slate-600">
-                    Unify Search Console, Analytics, ranking, audits, and backlinks into one quiet workspace. EBQ tells you what to fix this week, what to ship next, and what changed after release.
-                </p>
-
-                <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                    <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
-                        Start free trial
-                        <svg class="ml-1.5 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5l7.5 7.5-7.5 7.5M21 12H3" /></svg>
+            <div class="grid items-center gap-10 lg:grid-cols-2 lg:gap-12">
+                {{-- ── Hero copy ─────────────────────────────────── --}}
+                <div class="max-w-xl text-center lg:text-left">
+                    <a href="{{ route('features') }}" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900">
+                        <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+                        New: Anomaly alerts and backlink impact
+                        <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
                     </a>
-                    <a href="{{ route('features') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">
-                        Explore product
-                    </a>
-                </div>
 
-                <p class="mt-5 text-xs text-slate-500">1-month free trial · No credit card to view free plan · Cancel anytime</p>
-            </div>
+                    <h1 class="mt-6 text-balance text-4xl font-semibold tracking-tight text-slate-900 sm:text-5xl">
+                        The SEO command center for teams that ship.
+                    </h1>
 
-            {{-- ── Hero product mockup ──────────────────────────── --}}
-            <div class="relative mx-auto mt-16 max-w-5xl">
-                <div aria-hidden="true" class="pointer-events-none absolute -inset-x-8 -inset-y-6 -z-10 rounded-[28px] bg-gradient-to-b from-slate-100 to-transparent"></div>
+                    <p class="mt-6 text-balance text-[17px] leading-8 text-slate-600">
+                        Unify Search Console, Analytics, ranking, audits, and backlinks into one quiet workspace. EBQ tells you what to fix this week, what to ship next, and what changed after release.
+                    </p>
 
-                <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_60px_-24px_rgba(15,23,42,0.18)]">
-                    {{-- Mock chrome --}}
-                    <div class="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
-                        <span class="h-2.5 w-2.5 rounded-full bg-slate-300"></span>
-                        <span class="h-2.5 w-2.5 rounded-full bg-slate-300"></span>
-                        <span class="h-2.5 w-2.5 rounded-full bg-slate-300"></span>
-                        <div class="ml-3 flex h-6 max-w-md flex-1 items-center gap-1.5 rounded-md bg-white px-3 text-[11px] text-slate-400 ring-1 ring-slate-200">
-                            <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>
-                            app.ebq.io / dashboard
-                        </div>
+                    <div class="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row lg:justify-start">
+                        <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
+                            Start free trial
+                            <svg class="ml-1.5 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5l7.5 7.5-7.5 7.5M21 12H3" /></svg>
+                        </a>
+                        <a href="{{ route('features') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">
+                            Explore product
+                        </a>
                     </div>
 
-                    <div class="grid grid-cols-12">
-                        {{-- Mock sidebar --}}
-                        <div class="col-span-2 hidden border-r border-slate-200 bg-slate-50/50 p-3 lg:block">
-                            <div class="space-y-0.5">
-                                @foreach (['Dashboard' => true, 'Keywords' => false, 'Rank Tracking' => false, 'Pages' => false, 'Audits' => false, 'Backlinks' => false, 'Reports' => false] as $label => $active)
-                                    <div @class([
-                                        'flex items-center gap-2 rounded-md px-2 py-1.5 text-[11px] font-medium',
-                                        'bg-white text-slate-900 ring-1 ring-slate-200' => $active,
-                                        'text-slate-500' => !$active,
-                                    ])>
-                                        <span class="h-1.5 w-1.5 rounded-full {{ $active ? 'bg-indigo-500' : 'bg-slate-300' }}"></span>
-                                        {{ $label }}
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
+                    <p class="mt-5 text-xs text-slate-500">1-month free trial · No credit card to view free plan · Cancel anytime</p>
+                </div>
 
-                        {{-- Mock content --}}
-                        <div class="col-span-12 p-5 lg:col-span-10 lg:p-7">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Dashboard</p>
-                                    <h3 class="mt-1 text-base font-semibold text-slate-900">example.com · Last 28 days</h3>
-                                </div>
-                                <div class="flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100">
-                                    <svg class="h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18 9 11.25l4.306 4.306a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941" /></svg>
-                                    Visibility +18.4%
-                                </div>
-                            </div>
-
-                            {{-- KPI row --}}
-                            <div class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                @foreach ([
-                                    ['Clicks', '24.8k', '+12%', 'emerald'],
-                                    ['Impressions', '486k', '+8%', 'emerald'],
-                                    ['Avg position', '12.4', '-0.8', 'emerald'],
-                                    ['Indexed pages', '1,284', '+24', 'slate'],
-                                ] as [$label, $value, $delta, $tone])
-                                    <div class="rounded-lg border border-slate-200 bg-white p-3.5">
-                                        <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ $label }}</p>
-                                        <div class="mt-1.5 flex items-baseline justify-between">
-                                            <span class="text-xl font-semibold tabular-nums text-slate-900">{{ $value }}</span>
-                                            <span @class([
-                                                'text-[11px] font-semibold tabular-nums',
-                                                'text-emerald-600' => $tone === 'emerald',
-                                                'text-slate-500' => $tone === 'slate',
-                                            ])>{{ $delta }}</span>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-
-                            {{-- Chart + insights --}}
-                            <div class="mt-4 grid gap-3 lg:grid-cols-3">
-                                <div class="lg:col-span-2 rounded-lg border border-slate-200 bg-white p-4">
-                                    <div class="flex items-center justify-between">
-                                        <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Search clicks · 28d</p>
-                                        <div class="flex gap-3 text-[11px]">
-                                            <span class="flex items-center gap-1.5 text-slate-700"><span class="h-1.5 w-3 rounded bg-indigo-500"></span>This period</span>
-                                            <span class="flex items-center gap-1.5 text-slate-400"><span class="h-1.5 w-3 rounded bg-slate-300"></span>Prior</span>
-                                        </div>
-                                    </div>
-                                    <svg viewBox="0 0 600 140" class="mt-3 h-32 w-full" aria-hidden="true">
-                                        <defs>
-                                            <linearGradient id="lp-fill" x1="0" x2="0" y1="0" y2="1">
-                                                <stop offset="0%" stop-color="#6366f1" stop-opacity="0.18"/>
-                                                <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
-                                            </linearGradient>
-                                        </defs>
-                                        <path d="M0 110 L40 100 L80 105 L120 95 L160 90 L200 80 L240 78 L280 65 L320 60 L360 55 L400 48 L440 38 L480 30 L520 26 L560 20 L600 16" fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round"/>
-                                        <path d="M0 110 L40 100 L80 105 L120 95 L160 90 L200 80 L240 78 L280 65 L320 60 L360 55 L400 48 L440 38 L480 30 L520 26 L560 20 L600 16 L600 140 L0 140 Z" fill="url(#lp-fill)"/>
-                                        <path d="M0 120 L40 118 L80 115 L120 110 L160 108 L200 105 L240 102 L280 98 L320 92 L360 88 L400 86 L440 80 L480 78 L520 72 L560 68 L600 64" fill="none" stroke="#cbd5e1" stroke-width="1.5" stroke-dasharray="3 3" stroke-linejoin="round"/>
-                                    </svg>
-                                </div>
-
-                                <div class="rounded-lg border border-slate-200 bg-white p-4">
-                                    <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Action insights</p>
-                                    <ul class="mt-3 space-y-2.5 text-[12px]">
-                                        @foreach ([
-                                            ['Striking distance', '27', 'indigo'],
-                                            ['Cannibalizations', '14', 'amber'],
-                                            ['Indexing fails', '3', 'rose'],
-                                            ['Content decay', '8', 'slate'],
-                                        ] as [$label, $count, $tone])
-                                            <li class="flex items-center justify-between">
-                                                <span class="text-slate-600">{{ $label }}</span>
-                                                <span @class([
-                                                    'rounded-md px-1.5 py-0.5 text-[11px] font-semibold tabular-nums',
-                                                    'bg-indigo-50 text-indigo-700' => $tone === 'indigo',
-                                                    'bg-amber-50 text-amber-700' => $tone === 'amber',
-                                                    'bg-rose-50 text-rose-700' => $tone === 'rose',
-                                                    'bg-slate-100 text-slate-700' => $tone === 'slate',
-                                                ])>{{ $count }}</span>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </div>
-                            </div>
-
-                            {{-- Mock keyword table --}}
-                            <div class="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white">
-                                <div class="flex items-center justify-between border-b border-slate-200 px-4 py-2.5">
-                                    <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Top opportunities</p>
-                                    <span class="text-[11px] text-slate-400">8 keywords near page 1</span>
-                                </div>
-                                <table class="min-w-full text-[12px]">
-                                    <thead class="bg-slate-50/60 text-[10px] uppercase tracking-wider text-slate-500">
-                                        <tr>
-                                            <th class="px-4 py-2 text-left font-semibold">Query</th>
-                                            <th class="px-3 py-2 text-right font-semibold">Pos</th>
-                                            <th class="px-3 py-2 text-right font-semibold">Impr</th>
-                                            <th class="px-3 py-2 text-right font-semibold">CTR</th>
-                                            <th class="px-3 py-2 text-right font-semibold">Δ Clicks</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-slate-100">
-                                        @foreach ([
-                                            ['best seo tools', '5.2', '12,840', '1.2%', '+412', 'emerald'],
-                                            ['on-page seo checklist', '7.1', '8,120', '0.9%', '+186', 'emerald'],
-                                            ['saas seo strategy', '11.4', '5,890', '0.4%', '+94', 'emerald'],
-                                            ['seo audit template', '9.8', '4,210', '0.7%', '-22', 'rose'],
-                                        ] as [$q, $pos, $impr, $ctr, $delta, $tone])
-                                            <tr class="hover:bg-slate-50/60">
-                                                <td class="px-4 py-2.5 font-medium text-slate-800">{{ $q }}</td>
-                                                <td class="px-3 py-2.5 text-right tabular-nums text-slate-600">{{ $pos }}</td>
-                                                <td class="px-3 py-2.5 text-right tabular-nums text-slate-600">{{ $impr }}</td>
-                                                <td class="px-3 py-2.5 text-right tabular-nums text-slate-600">{{ $ctr }}</td>
-                                                <td @class([
-                                                    'px-3 py-2.5 text-right tabular-nums font-semibold',
-                                                    'text-emerald-600' => $tone === 'emerald',
-                                                    'text-rose-600' => $tone === 'rose',
-                                                ])>{{ $delta }}</td>
-                                            </tr>
-                                        @endforeach
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                {{-- ── Hero intro video ─────────────────────────────── --}}
+                <div class="relative">
+                    <div aria-hidden="true" class="pointer-events-none absolute -inset-x-6 -inset-y-6 -z-10 rounded-[28px] bg-gradient-to-b from-slate-100 to-transparent"></div>
+                    <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-[0_24px_60px_-24px_rgba(15,23,42,0.18)]" style="padding-top:56.25%">
+                        <iframe
+                            class="absolute inset-0 h-full w-full"
+                            src="https://www.youtube-nocookie.com/embed/Rzme7QvSbLE"
+                            title="EBQ intro video"
+                            loading="lazy"
+                            frameborder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            referrerpolicy="strict-origin-when-cross-origin"
+                            allowfullscreen></iframe>
                     </div>
                 </div>
             </div>
