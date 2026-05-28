@@ -55,6 +55,8 @@ class DemoDataSeeder
         '/features/backlinks',
         '/blog/seo-audit-checklist',
         '/blog/keyword-research-guide',
+        '/blog/gsc-alternative',
+        '/blog/best-seo-software',
         '/guide',
     ];
 
@@ -90,9 +92,10 @@ class DemoDataSeeder
         ['q' => 'serp position tracker',         'page' => '/features/rank-tracking',    'role' => 'striking', 'vol' => 1700, 'comp' => 0.35, 'cpc' => 8.20],
         ['q' => 'content optimization tool',     'page' => '/features/keyword-research', 'role' => 'striking', 'vol' => 2200, 'comp' => 0.44, 'cpc' => 7.50],
 
-        // Content decay: was strong, declining the last 28 days.
-        ['q' => 'google search console alternative','page' => '/features',               'role' => 'decay',    'vol' => 1900, 'comp' => 0.38, 'cpc' => 6.40],
-        ['q' => 'best seo software',             'page' => '/pricing',                   'role' => 'decay',    'vol' => 14000,'comp' => 0.70, 'cpc' => 12.00],
+        // Content decay: dedicated pages (no growing queries on them, so the
+        // page-level total clearly declines in the last 28 days).
+        ['q' => 'google search console alternative','page' => '/blog/gsc-alternative',   'role' => 'decay',    'vol' => 1900, 'comp' => 0.38, 'cpc' => 6.40],
+        ['q' => 'best seo software',             'page' => '/blog/best-seo-software',     'role' => 'decay',    'vol' => 14000,'comp' => 0.70, 'cpc' => 12.00],
 
         // Quick wins: high volume, low competition, ranking deep (>10).
         ['q' => 'free keyword research tool',    'page' => '/features/keyword-research', 'role' => 'quickwin', 'vol' => 8800, 'comp' => 0.33, 'cpc' => 5.20],
@@ -256,14 +259,25 @@ class DemoDataSeeder
             $base = (int) round($base * 1.2);
         }
 
-        // Linear growth across the window + weekly seasonality + noise.
+        // Trend across the window + weekly seasonality + noise.
         $progress = $dayIndex / max(1, $days - 1);
-        $growth = 1 + 0.6 * $progress;
         $dow = $dayIndex % 7;
         $weekend = ($dow === 5 || $dow === 6) ? 0.75 : 1.0;
         $noise = 0.85 + ($this->rand($seed.'|'.$dayIndex, 0, 30) / 100); // 0.85–1.15
+        $daysFromEnd = ($days - 1) - $dayIndex; // 0 = most recent day
 
-        $impr = (int) round($base * $growth * $weekend * $noise);
+        if ($entry['role'] === 'decay') {
+            // High through the prior-28d window, then a clear slide across the
+            // most recent 28 days so the page-level clicks drop well past the
+            // -15% gate contentDecay() requires.
+            $trend = $daysFromEnd < 28
+                ? 0.40 + 0.25 * ($daysFromEnd / 27) // 0.40 today → 0.65 at 28d ago
+                : 1.15;                              // prior + older window stays strong
+        } else {
+            $trend = 1 + 0.6 * $progress; // healthy linear growth
+        }
+
+        $impr = (int) round($base * $trend * $weekend * $noise);
 
         // Position by role.
         $pos = match ($entry['role']) {
@@ -279,11 +293,8 @@ class DemoDataSeeder
         // last 28 days; others drift slightly.
         if ($entry['role'] === 'normal' || $entry['role'] === 'cannibal') {
             $posF = max(1.0, $posF - 1.5 * $progress);
-        } elseif ($entry['role'] === 'decay') {
-            $daysFromEnd = ($days - 1) - $dayIndex;
-            if ($daysFromEnd < 28) {
-                $posF += (28 - $daysFromEnd) * 0.12; // sink as we approach today
-            }
+        } elseif ($entry['role'] === 'decay' && $daysFromEnd < 28) {
+            $posF += (28 - $daysFromEnd) * 0.12; // sink as we approach today
         }
         $posF = round($posF + ($this->rand($seed.'|p|'.$dayIndex, -5, 5) / 10), 1);
         $posF = max(1.0, $posF);
@@ -297,11 +308,8 @@ class DemoDataSeeder
             $posF <= 20 => 0.02,
             default => 0.008,
         };
-        if ($entry['role'] === 'decay') {
-            $daysFromEnd = ($days - 1) - $dayIndex;
-            if ($daysFromEnd < 28) {
-                $ctr *= 0.5;
-            }
+        if ($entry['role'] === 'decay' && $daysFromEnd < 28) {
+            $ctr *= 0.5; // recent CTR collapse compounds the impression decline
         }
         $clicks = (int) round($impr * $ctr);
 
