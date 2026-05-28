@@ -3,7 +3,6 @@
 namespace App\Livewire\Reports;
 
 use App\Services\AuditPerformanceService;
-use App\Services\BacklinkImpactService;
 use App\Services\ReportDataService;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
@@ -20,7 +19,7 @@ class InsightsPanel extends Component
     #[Url(as: 'country', history: true)]
     public string $country = '';
 
-    private const ALLOWED_TABS = ['cannibalization', 'striking_distance', 'content_decay', 'indexing_fails', 'audit_performance', 'backlink_impact', 'quick_wins'];
+    private const ALLOWED_TABS = ['cannibalization', 'striking_distance', 'content_decay', 'audit_performance', 'quick_wins'];
 
     public function mount(): void
     {
@@ -72,9 +71,7 @@ class InsightsPanel extends Component
             'cannibalization' => [],
             'striking_distance' => [],
             'content_decay' => ['pages' => [], 'has_yoy_history' => false],
-            'indexing_fails' => [],
             'audit_performance' => [],
-            'backlink_impact' => [],
             'quick_wins' => [],
         ];
 
@@ -83,11 +80,9 @@ class InsightsPanel extends Component
                 'cannibalization' => $service->cannibalizationReport($this->websiteId, null, null, 50, $country),
                 'striking_distance' => $service->strikingDistance($this->websiteId, null, null, 50, $country),
                 'content_decay' => $service->contentDecay($this->websiteId, 25, $country),
-                'indexing_fails' => $service->indexingFailsWithTraffic($this->websiteId, 14, 50, $country),
-                // Quick-wins + backlink impact aren't country-segmented today — both stay aggregate.
+                // Quick-wins isn't country-segmented today — stays aggregate.
                 'quick_wins' => $service->quickWins($this->websiteId, 25),
                 'audit_performance' => app(AuditPerformanceService::class)->underperformingPages($this->websiteId, 28, 25, $country),
-                'backlink_impact' => app(BacklinkImpactService::class)->impactByTargetPage($this->websiteId),
                 default => [],
             };
         }

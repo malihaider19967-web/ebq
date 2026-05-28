@@ -770,25 +770,38 @@ class ReportDataService
      */
     private function buildStrikingDistance(int $websiteId, Carbon $start, Carbon $end, int $limit, ?string $country): array
     {
+        // Group by (query, page) so we can surface the ranking URL for each
+        // query, then aggregate the per-page rows up to one row per query.
         $list = SearchConsoleData::query()
             ->where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
             ->where('query', '!=', '')
+            ->where('page', '!=', '')
             ->when($country, fn ($q, $c) => $q->where('country', $c))
-            ->selectRaw('query, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as avg_position')
-            ->groupBy('query')
+            ->selectRaw('query, page, SUM(clicks) as clicks, SUM(impressions) as impressions, AVG(position) as avg_position')
+            ->groupBy('query', 'page')
             ->get()
-            ->map(function ($row) {
-                $impressions = (int) $row->impressions;
-                $clicks = (int) $row->clicks;
+            ->groupBy('query')
+            ->map(function ($pageRows, $query) {
+                $impressions = (int) $pageRows->sum('impressions');
+                $clicks = (int) $pageRows->sum('clicks');
                 $ctr = $impressions > 0 ? ($clicks / $impressions) * 100 : 0.0;
-                $position = round((float) $row->avg_position, 1);
+                // Impression-weighted average position across the query's pages.
+                $position = round(
+                    $pageRows->reduce(fn ($c, $r) => $c + ((float) $r->avg_position * (int) $r->impressions), 0.0)
+                        / max(1, $impressions),
+                    1
+                );
                 if ($impressions < 200 || $position < 5 || $position > 20) {
                     return null;
                 }
+                // The ranking URL = the page with the most impressions for this query.
+                $top = $pageRows->sortByDesc('impressions')->first();
                 $score = round(($impressions / 100) + (20 - $position) - ($ctr * 0.6), 1);
                 return [
-                    'query' => (string) $row->query,
+                    'query' => (string) $query,
+                    'page' => (string) $top->page,
+                    'page_position' => round((float) $top->avg_position, 1),
                     'impressions' => $impressions,
                     'clicks' => $clicks,
                     'ctr' => round($ctr, 2),
