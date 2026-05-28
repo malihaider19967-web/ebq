@@ -203,13 +203,39 @@
             'url'           => url()->current(),
         ],
     ];
+
+    // FAQPage from the visible Q&As below, plus a breadcrumb trail.
+    $faqSchema = [
+        '@context' => 'https://schema.org',
+        '@type' => 'FAQPage',
+        'mainEntity' => array_map(fn ($f) => [
+            '@type' => 'Question',
+            'name' => $f[0],
+            'acceptedAnswer' => ['@type' => 'Answer', 'text' => $f[1]],
+        ], $faqs),
+    ];
+    $breadcrumbSchema = [
+        '@context' => 'https://schema.org',
+        '@type' => 'BreadcrumbList',
+        'itemListElement' => [
+            ['@type' => 'ListItem', 'position' => 1, 'name' => 'Home', 'item' => route('landing')],
+            ['@type' => 'ListItem', 'position' => 2, 'name' => 'Pricing', 'item' => route('pricing')],
+        ],
+    ];
+    $pricingJsonFlags = JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
 @endphp
 
 <x-marketing.page
-    title="Pricing — EBQ"
-    description="Simple annual pricing for SEO teams. Free plan available. 1-month free trial on every paid plan."
+    title="EBQ Pricing | Simple Plans for Advanced AI & SEO Audits"
+    description="View EBQ pricing plans. Scale your traffic with a 47-tool AI studio, automated rank tracking, and deep multi-site SEO audits. Try it risk-free today!"
     active="pricing"
 >
+    {{-- Page-specific structured data: product offers, FAQ, breadcrumb. --}}
+    <x-slot:schema>
+        <script type="application/ld+json">{!! json_encode($jsonLd, $pricingJsonFlags) !!}</script>
+        <script type="application/ld+json">{!! json_encode($faqSchema, $pricingJsonFlags) !!}</script>
+        <script type="application/ld+json">{!! json_encode($breadcrumbSchema, $pricingJsonFlags) !!}</script>
+    </x-slot:schema>
     {{-- ── Hero ──────────────────────────────────────────────── --}}
     <section class="border-b border-slate-200 bg-white">
         <div class="mx-auto max-w-6xl px-6 py-20 text-center lg:px-8 lg:py-24">
@@ -460,8 +486,4 @@
             </div>
         </div>
     </section>
-
-    @if (! $free)
-        <script type="application/ld+json">{!! json_encode($jsonLd, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) !!}</script>
-    @endif
 </x-marketing.page>
