@@ -535,19 +535,21 @@ class DemoDataSeeder
     {
         $auditPages = array_slice(self::PAGES, 0, 8);
         foreach ($auditPages as $i => $page) {
-            $score = $this->rand('score'.$page, 58, 96);
+            $url = 'https://'.self::DEMO_DOMAIN.$page;
+            $primary = self::QUERIES[$i]['q'] ?? 'seo audit';
+            $auditedAt = Carbon::now()->subDays($this->rand('au'.$page, 0, 14));
             $report = PageAuditReport::create([
                 'website_id' => $websiteId,
-                'page' => 'https://'.self::DEMO_DOMAIN.$page,
-                'page_hash' => hash('sha256', 'https://'.self::DEMO_DOMAIN.$page),
-                'primary_keyword' => self::QUERIES[$i]['q'] ?? null,
+                'page' => $url,
+                'page_hash' => hash('sha256', $url),
+                'primary_keyword' => $primary,
                 'primary_keyword_source' => 'gsc',
                 'status' => 'completed',
-                'audited_at' => Carbon::now()->subDays($this->rand('au'.$page, 0, 14)),
+                'audited_at' => $auditedAt,
                 'http_status' => 200,
-                'response_time_ms' => $this->rand('rt'.$page, 180, 920),
-                'page_size_bytes' => $this->rand('ps'.$page, 240_000, 2_400_000),
-                'result' => $this->auditResult($page, $score),
+                'response_time_ms' => $this->rand('rt'.$page, 120, 240),
+                'page_size_bytes' => $this->rand('ps'.$page, 380_000, 920_000),
+                'result' => $this->auditResult($page, $url, $primary, $auditedAt),
             ]);
 
             // Link a couple as user-triggered audits.
@@ -556,9 +558,9 @@ class DemoDataSeeder
                     'website_id' => $websiteId,
                     'user_id' => self::DEMO_USER_ID,
                     'source' => 'custom',
-                    'page_url' => 'https://'.self::DEMO_DOMAIN.$page,
-                    'page_url_hash' => hash('sha256', 'https://'.self::DEMO_DOMAIN.$page),
-                    'target_keyword' => self::QUERIES[$i]['q'] ?? null,
+                    'page_url' => $url,
+                    'page_url_hash' => hash('sha256', $url),
+                    'target_keyword' => $primary,
                     'serp_sample_gl' => 'us',
                     'page_audit_report_id' => $report->id,
                     'status' => 'completed',
@@ -572,30 +574,193 @@ class DemoDataSeeder
     }
 
     /**
+     * Full audit-report payload matching the shape the audit view renders
+     * (metadata / content / images / links / technical / advanced /
+     * core_web_vitals / recommendations). Everything is healthy and green:
+     * passing CWV on mobile + desktop, complete metadata, no broken links,
+     * no missing alt text, and only "good"/"info" recommendations.
+     *
      * @return array<string, mixed>
      */
-    private function auditResult(string $page, int $score): array
+    private function auditResult(string $page, string $url, string $primary, Carbon $auditedAt): array
     {
+        $title = $this->pageTitle($page);
+        $desc = $this->pageDescription($page);
+        $wordCount = $this->rand('wc'.$page, 1100, 2200);
+
+        $internal = [];
+        foreach (array_slice(self::PAGES, 0, 6) as $p) {
+            if ($p === $page) {
+                continue;
+            }
+            $internal[] = ['href' => 'https://'.self::DEMO_DOMAIN.$p];
+        }
+        $external = [
+            ['href' => 'https://developers.google.com/search'],
+            ['href' => 'https://web.dev/vitals'],
+            ['href' => 'https://schema.org'],
+        ];
+
+        $imageTotal = $this->rand('imgt'.$page, 4, 9);
+
         return [
-            'seo_score' => $score,
-            'core_web_vitals' => [
-                'lcp_ms' => $this->rand('lcp'.$page, 1200, 3800),
-                'cls' => round($this->rand('cls'.$page, 1, 24) / 100, 2),
-                'inp_ms' => $this->rand('inp'.$page, 90, 420),
-                'tbt_ms' => $this->rand('tbt'.$page, 50, 600),
-                'fcp_ms' => $this->rand('fcp'.$page, 700, 2400),
-                'ttfb_ms' => $this->rand('ttfb'.$page, 120, 800),
+            'seo_score' => $this->rand('score'.$page, 92, 99),
+            'metadata' => [
+                'title' => $title,
+                'title_length' => mb_strlen($title),
+                'meta_description' => $desc,
+                'meta_description_length' => mb_strlen($desc),
+                'canonical' => $url,
+                'canonical_matches' => true,
+                'og_tag_count' => 6,
+                'twitter_tag_count' => 4,
+                'robots' => 'index, follow, max-image-preview:large',
+                'viewport' => 'width=device-width, initial-scale=1',
             ],
+            'page_locale' => ['lang' => 'en', 'country' => 'us'],
             'content' => [
-                'word_count' => $this->rand('wc'.$page, 420, 2600),
-                'reading_grade' => round($this->rand('rg'.$page, 60, 110) / 10, 1),
-                'top_keywords' => ['seo audit', 'keyword research', 'rank tracking'],
+                'word_count' => $wordCount,
+                'h1_count' => 1,
+                'heading_order_ok' => true,
+                'first_150_words' => 'EBQ is a connected SEO suite that pairs your WordPress editor with live Search Console, rank tracking, and audit data so every content decision is grounded in real numbers. This page covers '.$primary.' with practical, up-to-date guidance you can act on today.',
+                'keyword_density' => $this->keywordDensity($primary),
+                'headings' => $this->headings($primary),
             ],
-            'issues' => [
-                ['severity' => 'warning', 'label' => 'Meta description slightly long', 'detail' => '162 characters (sweet spot 120–158).'],
-                ['severity' => 'info', 'label' => 'Add one more internal link', 'detail' => 'This page links out to 2 internal pages.'],
-                ['severity' => $score < 70 ? 'error' : 'info', 'label' => 'Largest Contentful Paint', 'detail' => 'Optimise the hero image.'],
+            'images' => [
+                'total' => $imageTotal,
+                'missing_alt_count' => 0,
+                'missing_alt' => [],
+                'modern_format_count' => $imageTotal,
             ],
+            'links' => [
+                'internal_count' => count($internal),
+                'external_count' => count($external),
+                'broken' => [],
+                'internal' => $internal,
+                'external' => $external,
+            ],
+            'technical' => [
+                'http_status' => 200,
+                'ttfb_ms' => $this->rand('ttfb'.$page, 90, 240),
+                'page_size_bytes' => $this->rand('ps2'.$page, 380_000, 920_000),
+                'compression' => 'gzip',
+                'is_https' => true,
+                'stack' => ['label' => 'WordPress + EBQ', 'type' => 'modern'],
+            ],
+            'advanced' => [
+                'schema_blocks' => $this->rand('schema'.$page, 2, 4),
+                'readability' => [
+                    'flesch' => $this->rand('flesch'.$page, 62, 74),
+                    'grade' => 'Grade 7 — Plain English',
+                ],
+                'has_favicon' => true,
+            ],
+            'core_web_vitals' => [
+                'fetched_at' => $auditedAt->toIso8601String(),
+                'mobile' => [
+                    'performance_score' => $this->rand('mscore'.$page, 90, 97),
+                    'lcp_ms' => $this->rand('mlcp'.$page, 1600, 2400),
+                    'cls' => round($this->rand('mcls'.$page, 1, 8) / 100, 2),
+                    'tbt_ms' => $this->rand('mtbt'.$page, 60, 180),
+                    'fcp_ms' => $this->rand('mfcp'.$page, 1100, 1700),
+                    'ttfb_ms' => $this->rand('mttfb'.$page, 200, 600),
+                    'speed_index_ms' => $this->rand('msi'.$page, 1800, 2900),
+                ],
+                'desktop' => [
+                    'performance_score' => $this->rand('dscore'.$page, 97, 100),
+                    'lcp_ms' => $this->rand('dlcp'.$page, 700, 1200),
+                    'cls' => round($this->rand('dcls'.$page, 0, 3) / 100, 2),
+                    'tbt_ms' => $this->rand('dtbt'.$page, 0, 60),
+                    'fcp_ms' => $this->rand('dfcp'.$page, 500, 900),
+                    'ttfb_ms' => $this->rand('dttfb'.$page, 90, 220),
+                    'speed_index_ms' => $this->rand('dsi'.$page, 800, 1400),
+                ],
+            ],
+            'keywords' => ['available' => false],
+            'recommendations' => [
+                ['severity' => 'good', 'section' => 'Metadata',    'title' => 'Title and meta description are well optimised', 'why' => 'Both sit inside the ideal length and lead with the focus keyword.', 'fix' => 'No action needed — keep the focus keyword near the front.'],
+                ['severity' => 'good', 'section' => 'Performance', 'title' => 'Core Web Vitals pass on mobile and desktop',      'why' => 'LCP, CLS and TBT are all inside Google\'s "good" thresholds.', 'fix' => 'No action needed — monitor after large template changes.'],
+                ['severity' => 'good', 'section' => 'Technical',   'title' => 'Served over HTTPS with compression',             'why' => 'The page is HTTPS and gzip-compressed with a fast TTFB.', 'fix' => 'No action needed.'],
+                ['severity' => 'good', 'section' => 'Images',      'title' => 'Every image has descriptive alt text',          'why' => 'All '.$imageTotal.' images include alt attributes in modern formats.', 'fix' => 'No action needed.'],
+                ['severity' => 'good', 'section' => 'Links',       'title' => 'No broken links detected',                      'why' => 'All internal and external links resolved with a 200 status.', 'fix' => 'No action needed.'],
+                ['severity' => 'info', 'section' => 'Content',     'title' => 'Consider adding an FAQ block',                  'why' => 'An FAQ section can win the People Also Ask box for "'.$primary.'".', 'fix' => 'Add 3–5 question/answer pairs near the end of the article.'],
+            ],
+        ];
+    }
+
+    /** Realistic SEO page title per path (50–60 chars where possible). */
+    private function pageTitle(string $page): string
+    {
+        return match ($page) {
+            '/' => 'EBQ SEO — Connected SEO Suite for WordPress',
+            '/features' => 'Features — Rank Tracking, Audits & AI | EBQ SEO',
+            '/pricing' => 'Pricing — Plans for Every SEO Team | EBQ SEO',
+            '/features/rank-tracking' => 'Rank Tracking Software with Daily SERP Snapshots | EBQ',
+            '/features/keyword-research' => 'Keyword Research Tool Built on Real GSC Data | EBQ',
+            '/features/site-audit' => 'SEO Site Audit Tool with Core Web Vitals | EBQ',
+            '/features/backlinks' => 'Backlink Checker & Monitoring | EBQ SEO',
+            '/blog/seo-audit-checklist' => 'The Complete SEO Audit Checklist for 2026 | EBQ',
+            '/blog/keyword-research-guide' => 'Keyword Research Guide: Find Keywords That Rank | EBQ',
+            default => 'EBQ SEO — Connected SEO Suite',
+        };
+    }
+
+    /** Meta description per path (120–158 chars, focus keyword included). */
+    private function pageDescription(string $page): string
+    {
+        return match ($page) {
+            '/' => 'EBQ is a connected SEO suite for WordPress: real-data keyword scoring, live rank tracking, site audits, and an AI writer in one dashboard.',
+            '/features' => 'Explore EBQ features: rank tracking, keyword research, site audits, backlink monitoring, and an AI content writer, all grounded in your GSC data.',
+            '/pricing' => 'Simple EBQ pricing for freelancers, agencies, and in-house teams. Start free, then scale rank tracking, audits, and AI as your sites grow.',
+            '/features/rank-tracking' => 'Track keyword positions daily with EBQ rank tracking software: device and country targeting, SERP features, and movement alerts.',
+            '/features/keyword-research' => 'Find long-tail keywords that rank with EBQ keyword research, built on your real Search Console data and live SERP intent.',
+            '/features/site-audit' => 'Run a full SEO site audit with EBQ: Core Web Vitals, metadata, content, links, and prioritised fixes in one report.',
+            '/features/backlinks' => 'Monitor your backlink profile with EBQ: live link verification, anchor text, domain authority, and lost-link alerts.',
+            '/blog/seo-audit-checklist' => 'A practical SEO audit checklist for 2026: technical, on-page, content, and Core Web Vitals checks you can run before every refresh.',
+            '/blog/keyword-research-guide' => 'Learn keyword research the right way: map intent, find low-competition wins, and prioritise terms using real Search Console data.',
+            default => 'EBQ is a connected SEO suite for WordPress with rank tracking, audits, keyword research, and an AI writer in one dashboard.',
+        };
+    }
+
+    /**
+     * @return list<array{term:string, count:int, density:float}>
+     */
+    private function keywordDensity(string $primary): array
+    {
+        $terms = array_values(array_unique(array_merge(
+            explode(' ', $primary),
+            ['seo', 'keyword', 'ranking', 'search', 'content', 'audit', 'traffic'],
+        )));
+        $out = [];
+        foreach (array_slice($terms, 0, 12) as $i => $term) {
+            if (mb_strlen($term) < 3) {
+                continue;
+            }
+            $count = $this->rand('kd'.$primary.$term, 3, 18);
+            $out[] = [
+                'term' => $term,
+                'count' => $count,
+                'density' => round($this->rand('kdd'.$primary.$term, 4, 22) / 10, 1), // 0.4–2.2% (no stuffing)
+            ];
+        }
+        usort($out, fn ($a, $b) => $b['density'] <=> $a['density']);
+        return $out;
+    }
+
+    /**
+     * @return list<array{level:int, text:string}>
+     */
+    private function headings(string $primary): array
+    {
+        $title = Str::title($primary);
+        return [
+            ['level' => 1, 'text' => $title],
+            ['level' => 2, 'text' => 'What is '.$title.'?'],
+            ['level' => 2, 'text' => 'Why it matters for SEO'],
+            ['level' => 3, 'text' => 'Key metrics to watch'],
+            ['level' => 2, 'text' => 'How EBQ helps'],
+            ['level' => 3, 'text' => 'Step-by-step workflow'],
+            ['level' => 2, 'text' => 'Frequently asked questions'],
         ];
     }
 
