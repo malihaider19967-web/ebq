@@ -47,10 +47,11 @@
         <form wire:submit="save" class="mt-4 space-y-4">
             {{-- Provider radio cards --}}
             <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {{-- Gmail and Outlook are hidden for now; the platform defaults
+                     to the EBQ mailer with Custom SMTP as the only override.
+                     Re-add the 'gmail'/'outlook' entries here to restore them. --}}
                 @php $providers = [
                     ''        => ['EBQ default', 'Send from EBQ\'s default mailer. No branding sender, no setup.'],
-                    'gmail'   => ['Gmail', 'Send via your connected Google account using the Gmail API.'],
-                    'outlook' => ['Outlook', 'Send via Microsoft Graph from your connected Outlook account.'],
                     'smtp'    => ['Custom SMTP', 'Connect to any SMTP server (Mailgun, Postmark, your own MX).'],
                 ]; @endphp
                 @foreach ($providers as $key => [$label, $help])

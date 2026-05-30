@@ -70,7 +70,13 @@ class MailTransport extends Component
             return;
         }
         $this->validate([
-            'provider'        => ['required', 'in:,gmail,outlook,smtp'],
+            // `present`, not `required` — an empty provider is the valid
+            // "EBQ default / remove transport" selection, which `required`
+            // would silently reject (empty string fails `required`), making
+            // Save appear to do nothing. gmail/outlook stay accepted so any
+            // pre-existing saved rows keep validating even while those
+            // options are hidden from the picker.
+            'provider'        => ['present', 'in:,gmail,outlook,smtp'],
             'from_address'    => ['required_unless:provider,', 'email', 'max:191'],
             'display_name'    => ['nullable', 'string', 'max:120'],
             'smtp_host'       => ['required_if:provider,smtp', 'nullable', 'string', 'max:191'],
