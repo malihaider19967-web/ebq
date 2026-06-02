@@ -311,17 +311,10 @@
                             <p class="mt-4 text-sm text-slate-600">{{ $plan['tagline'] }}</p>
 
                             <ul class="mt-6 space-y-2.5 text-[13px] text-slate-700">
-                                {{-- Auto-generated "Includes:" list driven by
-                                     plan_features + api_limits + max_websites
-                                     in /admin/plans. Always rendered before
-                                     the marketing bullets so the entitlement
-                                     truth is front-and-centre. --}}
-                                @foreach ($plan['includes'] as $feature)
-                                    <li class="flex gap-2.5">
-                                        <svg class="mt-0.5 h-4 w-4 flex-none text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                                        <span>{{ $feature }}</span>
-                                    </li>
-                                @endforeach
+                                {{-- Hand-written marketing bullets only. A bullet
+                                     with a YouTube link in admin renders a
+                                     prominent red play badge that opens the
+                                     auto-playing video modal. --}}
                                 @foreach ($plan['features'] as $feature)
                                     <li class="flex gap-2.5">
                                         <svg class="mt-0.5 h-4 w-4 flex-none text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -329,20 +322,16 @@
                                             <button type="button"
                                                     data-ebq-video="{{ $feature['video_id'] }}"
                                                     aria-haspopup="dialog"
-                                                    class="group/vid inline-flex items-start gap-1 text-left text-slate-700 underline decoration-dotted decoration-slate-400 underline-offset-2 transition hover:text-slate-900 hover:decoration-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-1">
-                                                <span>{{ $feature['text'] }}</span>
-                                                <svg class="mt-0.5 h-3.5 w-3.5 flex-none text-slate-400 transition group-hover/vid:text-slate-900" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+                                                    class="group/vid inline-flex items-center gap-1.5 text-left font-medium text-slate-800 transition hover:text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-1">
+                                                <span class="underline decoration-dotted decoration-slate-300 underline-offset-2 group-hover/vid:decoration-slate-500">{{ $feature['text'] }}</span>
+                                                <span class="inline-flex h-5 w-5 flex-none items-center justify-center rounded-full bg-red-600 text-white shadow-sm transition group-hover/vid:bg-red-700 group-hover/vid:scale-110">
+                                                    <svg class="h-3 w-3 translate-x-[1px]" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+                                                </span>
                                                 <span class="sr-only">— play video</span>
                                             </button>
                                         @else
                                             <span>{{ $feature['text'] }}</span>
                                         @endif
-                                    </li>
-                                @endforeach
-                                @foreach ($plan['excluded'] as $excluded)
-                                    <li class="flex gap-2.5 text-slate-400">
-                                        <svg class="mt-0.5 h-4 w-4 flex-none" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" /></svg>
-                                        <span>{{ $excluded }}</span>
                                     </li>
                                 @endforeach
                             </ul>

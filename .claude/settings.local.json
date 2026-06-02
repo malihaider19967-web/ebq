@@ -163,7 +163,8 @@
       "PowerShell(Add-Type -AssemblyName System.IO.Compression.FileSystem; $z = [System.IO.Compression.ZipFile]::OpenRead\\('C:\\\\Users\\\\malih\\\\Desktop\\\\ebq\\\\ebq-seo.zip'\\); $hits = @{}; foreach \\($e in $z.Entries\\) { if \\($e.FullName -match '\\\\.\\(php|js|css|txt|pot|json\\)$'\\) { $r = New-Object System.IO.StreamReader\\($e.Open\\(\\)\\); $content = $r.ReadToEnd\\(\\); $r.Close\\(\\); $patterns = @\\('Yoast','Rank Math','RankMath','AIOSEO','wpseo','rank_math','aioseo'\\); $found = @\\(\\); foreach \\($p in $patterns\\) { if \\($content.IndexOf\\($p, [StringComparison]::OrdinalIgnoreCase\\) -ge 0\\) { $found += $p } }; if \\($found.Count -gt 0\\) { $hits[$e.FullName] = \\($found | Sort-Object -Unique\\) -join ',' } } }; $z.Dispose\\(\\); \"Files in zip still containing competitor names:\"; \"\"; $hits.GetEnumerator\\(\\) | Sort-Object Key | ForEach-Object { \"{0,-60} {1}\" -f $_.Key, $_.Value })",
       "PowerShell(Import-Csv *)",
       "mcp__code-review-graph__list_repos_tool",
-      "PowerShell(Get-Content *)"
+      "PowerShell(Get-Content *)",
+      "Bash(APP_ENV=testing php artisan *)"
     ]
   },
   "enableAllProjectMcpServers": true,
