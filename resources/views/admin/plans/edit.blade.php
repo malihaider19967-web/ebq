@@ -4,8 +4,19 @@
          * @var \App\Models\Plan $plan
          * @var bool             $isNew
          */
-        $featuresText = is_array($plan->features) ? implode("\n", $plan->features) : '';
         $action = $isNew ? route('admin.plans.store') : route('admin.plans.update', $plan);
+
+        // Rebuild the newline textarea from the stored bullets, appending
+        // " | <video-url>" for any bullet that has an explainer video so
+        // the operator edits text and video in one place.
+        $featureBullets = is_array($plan->features) ? array_values($plan->features) : [];
+        $featureVideos = is_array($plan->feature_videos ?? null) ? $plan->feature_videos : [];
+        $featureLines = [];
+        foreach ($featureBullets as $i => $bullet) {
+            $videoUrl = $featureVideos[(string) $i] ?? ($featureVideos[$i] ?? null);
+            $featureLines[] = $videoUrl ? $bullet.' | '.$videoUrl : $bullet;
+        }
+        $featuresText = implode("\n", $featureLines);
     @endphp
 
     <div class="space-y-6 max-w-3xl">
@@ -143,10 +154,16 @@
                 <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Marketing bullets (one per line)</label>
                 <textarea name="features" rows="8"
                           class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
-                          placeholder="Everything in Pro&#10;5 websites, 250 tracked keywords&#10;500 page audits / month">{{ old('features', $featuresText) }}</textarea>
+                          placeholder="Everything in Pro&#10;5 websites, 250 tracked keywords | https://youtu.be/dQw4w9WgXcQ&#10;500 page audits / month">{{ old('features', $featuresText) }}</textarea>
                 <p class="text-[11px] text-slate-500 mt-1">
                     Free-text bullet points shown on /pricing and inside the WP plugin's setup wizard pricing step.
                     Display copy only — the <strong>Plugin features</strong> grid below is the authoritative entitlement matrix.
+                </p>
+                <p class="text-[11px] text-slate-500 mt-1">
+                    <strong>Optional video:</strong> add a YouTube link after a pipe on the same line —
+                    <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">Bullet text | https://youtu.be/VIDEO_ID</code>.
+                    On /pricing that bullet becomes clickable and opens the video in an auto-playing modal.
+                    Plain <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">watch?v=</code>, <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">youtu.be</code>, and <code class="rounded bg-slate-100 px-1 py-0.5 font-mono text-[10px]">/shorts/</code> URLs all work; a pipe with no valid YouTube link after it is treated as ordinary text.
                 </p>
             </div>
 

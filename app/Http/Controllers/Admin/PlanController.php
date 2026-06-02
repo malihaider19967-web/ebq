@@ -124,13 +124,43 @@ class PlanController extends Controller
         $data = $request->validate($rules);
 
         // Features textarea → array. One feature per line, trimmed,
-        // empty lines dropped.
-        $features = $data['features'] ?? '';
-        $data['features'] = collect(preg_split('/\r?\n/', (string) $features))
-            ->map(fn ($line) => trim($line))
-            ->filter()
-            ->values()
-            ->all();
+        // empty lines dropped. A line may carry an optional explainer
+        // video using the form "Bullet text | https://youtu.be/…": we
+        // split on the first pipe and treat the right side as a video
+        // only when it parses as a YouTube URL (so legitimate pipes in
+        // bullet copy survive). The video map is position-keyed against
+        // the cleaned features list, so both stay aligned.
+        $features = [];
+        $videos = [];
+        foreach (preg_split('/\r?\n/', (string) ($data['features'] ?? '')) as $line) {
+            $line = trim($line);
+            if ($line === '') {
+                continue;
+            }
+
+            $text = $line;
+            $video = null;
+            if (str_contains($line, '|')) {
+                [$left, $right] = explode('|', $line, 2);
+                $candidate = trim($right);
+                if (Plan::youtubeId($candidate) !== null) {
+                    $text = trim($left);
+                    $video = $candidate;
+                }
+            }
+
+            // "| url" with no label left of the pipe — nothing to show.
+            if ($text === '') {
+                continue;
+            }
+
+            if ($video !== null) {
+                $videos[(string) count($features)] = $video;
+            }
+            $features[] = $text;
+        }
+        $data['features'] = $features;
+        $data['feature_videos'] = $videos !== [] ? $videos : null;
 
         // Checkboxes only POST when checked.
         $data['is_active'] = $request->boolean('is_active');

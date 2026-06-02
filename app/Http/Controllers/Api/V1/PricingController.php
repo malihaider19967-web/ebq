@@ -64,6 +64,20 @@ class PricingController extends Controller
                 ? $plan->max_websites
                 : ($plan['max_websites'] ?? null);
 
+            // Optional explainer videos, as a sparse bullet-index => bare
+            // YouTube ID map aligned with `features`. Resolved to IDs here
+            // so consumers embed the /embed form without parsing URLs.
+            $rawVideos = $plan instanceof Plan
+                ? (is_array($plan->feature_videos) ? $plan->feature_videos : [])
+                : (is_array($plan['feature_videos'] ?? null) ? $plan['feature_videos'] : []);
+            $featureVideos = [];
+            foreach ($rawVideos as $idx => $url) {
+                $videoId = Plan::youtubeId(is_string($url) ? $url : null);
+                if ($videoId !== null) {
+                    $featureVideos[(string) $idx] = $videoId;
+                }
+            }
+
             return [
                 'slug' => $slug,
                 'name' => $plan['name'],
@@ -74,6 +88,9 @@ class PricingController extends Controller
                 'features' => is_array($plan['features'] ?? null)
                     ? array_values($plan['features'])
                     : [],
+                // Sparse { "<bullet index>": "<youtube id>" } map; empty
+                // when no bullet has a video. Optional, additive.
+                'feature_videos' => $featureVideos,
                 // Authoritative entitlement matrix — the WP plugin's
                 // setup wizard reads this to render checkmark grids and
                 // the public pricing page derives its "Includes:" list

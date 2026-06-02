@@ -56,6 +56,11 @@ class Plan extends Model
         'trial_days',
         'max_websites',
         'features',
+        // Sparse map of bullet-index => YouTube URL for the optional
+        // explainer video shown next to a marketing bullet. Kept separate
+        // from `features` so that column stays a plain string list for the
+        // public API + WP wizard.
+        'feature_videos',
         'api_limits',
         // Plugin entitlement matrix — the authoritative "which of the 8
         // feature flags is this plan allowed to enable" boolean map. The
@@ -74,6 +79,7 @@ class Plan extends Model
     {
         return [
             'features' => 'array',
+            'feature_videos' => 'array',
             'api_limits' => 'array',
             'plan_features' => 'array',
             'research_limits' => 'array',
@@ -85,6 +91,27 @@ class Plan extends Model
             'is_active' => 'boolean',
             'is_highlighted' => 'boolean',
         ];
+    }
+
+    /**
+     * Extract the 11-char YouTube video ID from any common YouTube URL
+     * form (watch?v=, youtu.be/, /embed/, /shorts/, /v/). Returns null
+     * when the string isn't a recognisable YouTube link — callers use
+     * this both to validate operator input and to build the privacy-
+     * friendly embed URL on the marketing page.
+     */
+    public static function youtubeId(?string $url): ?string
+    {
+        if (! is_string($url) || $url === '') {
+            return null;
+        }
+
+        $pattern = '~(?:youtu\.be/|youtube\.com/(?:watch\?(?:.*&)?v=|embed/|shorts/|v/))([A-Za-z0-9_-]{11})~i';
+        if (preg_match($pattern, $url, $m) === 1) {
+            return $m[1];
+        }
+
+        return null;
     }
 
     /**

@@ -129,6 +129,22 @@
             }
         }
 
+        // Hand-written marketing bullets, each optionally carrying an
+        // explainer video. `feature_videos` is a sparse index => URL map
+        // aligned with `features`; we resolve each to a bare YouTube ID
+        // so the template only ever embeds the privacy-friendly /embed
+        // form and never trusts a raw URL.
+        $rawBullets = is_array($p->features) ? array_values($p->features) : [];
+        $bulletVideos = is_array($p->feature_videos ?? null) ? $p->feature_videos : [];
+        $featureItems = [];
+        foreach ($rawBullets as $i => $bullet) {
+            $videoUrl = $bulletVideos[(string) $i] ?? ($bulletVideos[$i] ?? null);
+            $featureItems[] = [
+                'text' => $bullet,
+                'video_id' => \App\Models\Plan::youtubeId($videoUrl),
+            ];
+        }
+
         return [
             'slug'      => $slug,
             'name'      => (string) $p->name,
@@ -138,7 +154,7 @@
                 ? '$' . number_format($yearly) . ' billed yearly'
                 : 'No card required.',
             'tagline'   => (string) ($p->tagline ?? ''),
-            'features'  => is_array($p->features) ? array_values($p->features) : [],
+            'features'  => $featureItems,
             // Auto-generated entitlement bullets driven by plan_features
             // + api_limits + max_websites. Always shown above the
             // hand-written marketing bullets.
@@ -309,7 +325,18 @@
                                 @foreach ($plan['features'] as $feature)
                                     <li class="flex gap-2.5">
                                         <svg class="mt-0.5 h-4 w-4 flex-none text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                                        <span>{{ $feature }}</span>
+                                        @if ($feature['video_id'])
+                                            <button type="button"
+                                                    data-ebq-video="{{ $feature['video_id'] }}"
+                                                    aria-haspopup="dialog"
+                                                    class="group/vid inline-flex items-start gap-1 text-left text-slate-700 underline decoration-dotted decoration-slate-400 underline-offset-2 transition hover:text-slate-900 hover:decoration-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-900 focus-visible:ring-offset-1">
+                                                <span>{{ $feature['text'] }}</span>
+                                                <svg class="mt-0.5 h-3.5 w-3.5 flex-none text-slate-400 transition group-hover/vid:text-slate-900" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z" /></svg>
+                                                <span class="sr-only">— play video</span>
+                                            </button>
+                                        @else
+                                            <span>{{ $feature['text'] }}</span>
+                                        @endif
                                     </li>
                                 @endforeach
                                 @foreach ($plan['excluded'] as $excluded)
@@ -486,4 +513,74 @@
             </div>
         </div>
     </section>
+
+    {{-- ── Bullet explainer-video modal ─────────────────────────
+         Single shared dialog reused by every "play video" bullet. The
+         iframe src is only set on open (with autoplay=1) and cleared on
+         close so audio stops the moment the modal is dismissed. --}}
+    <div id="ebq-video-modal"
+         class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-900/80 p-4 backdrop-blur-sm"
+         role="dialog" aria-modal="true" aria-label="Feature video">
+        <div class="relative w-full max-w-3xl">
+            <button type="button" id="ebq-video-close"
+                    class="absolute -top-9 right-0 inline-flex items-center gap-1 text-sm font-medium text-white/90 transition hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                    aria-label="Close video">
+                <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                Close
+            </button>
+            <div class="aspect-video w-full overflow-hidden rounded-xl bg-black shadow-2xl ring-1 ring-white/10">
+                <iframe id="ebq-video-frame" class="h-full w-full" src="" title="Feature video"
+                        loading="lazy" referrerpolicy="strict-origin-when-cross-origin"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                        allowfullscreen></iframe>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            var modal = document.getElementById('ebq-video-modal');
+            var frame = document.getElementById('ebq-video-frame');
+            var closeBtn = document.getElementById('ebq-video-close');
+            if (!modal || !frame || !closeBtn) {
+                return;
+            }
+
+            function openVideo(id) {
+                if (!/^[A-Za-z0-9_-]{11}$/.test(id)) {
+                    return;
+                }
+                frame.src = 'https://www.youtube-nocookie.com/embed/' + id + '?autoplay=1&rel=0';
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                document.body.style.overflow = 'hidden';
+                closeBtn.focus();
+            }
+
+            function closeVideo() {
+                frame.src = '';
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+                document.body.style.overflow = '';
+            }
+
+            document.querySelectorAll('[data-ebq-video]').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    openVideo(btn.getAttribute('data-ebq-video'));
+                });
+            });
+
+            closeBtn.addEventListener('click', closeVideo);
+            modal.addEventListener('click', function (e) {
+                if (e.target === modal) {
+                    closeVideo();
+                }
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && !modal.classList.contains('hidden')) {
+                    closeVideo();
+                }
+            });
+        })();
+    </script>
 </x-marketing.page>
