@@ -164,7 +164,8 @@
       "PowerShell(Import-Csv *)",
       "mcp__code-review-graph__list_repos_tool",
       "PowerShell(Get-Content *)",
-      "Bash(APP_ENV=testing php artisan *)"
+      "Bash(APP_ENV=testing php artisan *)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   },
   "enableAllProjectMcpServers": true,
