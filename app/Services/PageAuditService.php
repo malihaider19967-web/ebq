@@ -94,179 +94,19 @@ class PageAuditService
                 );
             }
 
-            $fetch = $this->fetch($pageUrl);
+            // Live-score (lite) skips the Serper benchmark; the full flow runs it.
+            $built = $this->buildAuditResult($pageUrl, $website, $serpKeywordArg, $serpGlUserOverride, $lite, $lite, false);
 
-            if (! isset($fetch['body'])) {
+            if (! ($built['ok'] ?? false)) {
                 return $this->persistFailure(
                     $websiteId,
                     $pageUrl,
-                    $fetch['error'] ?? 'Failed to fetch page',
-                    $fetch['http_status'] ?? null,
-                    $fetch['ttfb_ms'] ?? null,
+                    $built['error'] ?? 'Failed to fetch page',
+                    $built['http_status'] ?? null,
+                    $built['ttfb_ms'] ?? null,
                     $failurePrimaryKeyword,
                     $failurePrimarySource,
                 );
-            }
-
-            $html = $fetch['body'];
-            $auditor = new HtmlAuditor($html, $pageUrl);
-
-            $metadata = $auditor->metadata();
-            $localeSignals = $auditor->localeSignals();
-            $pageLocaleResolved = PageLocaleResolver::resolve($localeSignals, $pageUrl);
-
-            $userSerpGl = null;
-            if ($serpGlUserOverride !== null && SerpLocaleDefaults::isValidSerperGl($serpGlUserOverride)) {
-                $userSerpGl = strtolower(trim($serpGlUserOverride));
-            }
-            $serpGlForBenchmark = $userSerpGl ?? $pageLocaleResolved['gl'];
-
-            $headings = $auditor->headings();
-            $content = $auditor->content();
-            $bodyText = $content['body_text'];
-            unset($content['body_text']);
-            $images = $auditor->images();
-            $links = $auditor->links();
-            $schema = $auditor->schema();
-            $favicon = $auditor->favicon();
-            $readability = $auditor->readability($bodyText);
-
-            // Link checking can take up to ~80s for a page with many
-            // outbound links. Skip it in lite mode — the live-score caller
-            // doesn't surface broken-link counts in its factor anyway.
-            if ($lite) {
-                $links['broken'] = [];
-                $links['links_checked'] = 0;
-                $links['links_skipped'] = count($links['internal']) + count($links['external']);
-            } else {
-                $allLinks = array_merge($links['internal'], $links['external']);
-                $linkCheck = $this->checkLinks($allLinks);
-                $links['broken'] = $linkCheck['broken'];
-                $links['links_checked'] = $linkCheck['checked'];
-                $links['links_skipped'] = $linkCheck['skipped'];
-            }
-
-            $technical = [
-                'http_status' => $fetch['http_status'],
-                'ttfb_ms' => $fetch['ttfb_ms'],
-                'page_size_bytes' => $fetch['size'],
-                'compression' => $fetch['compression'],
-                'is_https' => str_starts_with(strtolower($pageUrl), 'https://'),
-                'stack' => $auditor->technology($fetch['headers'] ?? []),
-            ];
-
-            $pageLocaleBlock = [
-                'gl' => $pageLocaleResolved['gl'],
-                'hl' => $pageLocaleResolved['hl'],
-                'source' => $pageLocaleResolved['source'],
-                'bcp47' => $pageLocaleResolved['bcp47'],
-                'hreflang_matched' => $pageLocaleResolved['hreflang_matched'],
-                'signals' => $pageLocaleResolved['signals'],
-            ];
-            if ($userSerpGl !== null) {
-                $pageLocaleBlock['serp_gl_user_chosen'] = $userSerpGl;
-            }
-
-            $serpEffectivePreview = SerpLocaleDefaults::forSerperRequest(
-                $serpGlForBenchmark,
-                $pageLocaleResolved['hl'],
-                $pageLocaleResolved['bcp47'],
-            );
-            $serpEffGl = $serpEffectivePreview['gl'] ?? null;
-            if (SerpLocaleDefaults::isValidSerperGl($serpEffGl)) {
-                $pageLocaleBlock['serp_gl_effective'] = strtolower((string) $serpEffGl);
-            }
-
-            $result = [
-                'metadata' => $metadata,
-                'page_locale' => $pageLocaleBlock,
-                'content' => $content + ['headings' => $headings['headings'], 'h1_count' => $headings['h1_count'], 'heading_order_ok' => $headings['heading_order_ok']],
-                'images' => $images,
-                'links' => $links,
-                'technical' => $technical,
-                'advanced' => [
-                    'schema_blocks' => $schema['count'],
-                    'schema_blocks_detail' => $schema['blocks'],
-                    'readability' => $readability,
-                    'has_favicon' => $favicon['present'],
-                    'favicon_href' => $favicon['href'],
-                ],
-            ];
-
-            $targetKeywords = $this->fetchTargetKeywords($website, $pageUrl);
-            $h1Texts = array_values(array_filter(array_map(
-                fn ($h) => $h['level'] === 1 ? ($h['text'] ?? '') : null,
-                $headings['headings'] ?? []
-            )));
-            $allHeadingsText = implode(' ', array_map(fn ($h) => $h['text'] ?? '', $headings['headings'] ?? []));
-
-            $result['keywords'] = app(KeywordStrategyAnalyzer::class)->analyze($targetKeywords, [
-                'title' => $metadata['title'] ?? '',
-                'meta_description' => $metadata['meta_description'] ?? '',
-                'h1_text' => implode(' ', $h1Texts),
-                'all_headings_text' => $allHeadingsText,
-                'body_text' => $bodyText,
-                'keyword_density' => $content['keyword_density'] ?? [],
-            ], $serpKeywordArg);
-
-            if (is_array($result['keywords'])) {
-                $result['keywords']['gsc_lookback_days'] = $website->effectiveGscKeywordLookbackDays();
-            }
-
-            // Serper benchmark fetches 3 competitor HTML pages + audits them —
-            // adds 20–40s to wall-time. The live-score factors don't surface
-            // benchmark data, so skip it in lite mode.
-            $benchmark = $lite ? null : $this->buildSerperReadabilityBenchmark(
-                $pageUrl,
-                $result['keywords'],
-                is_numeric($readability['flesch'] ?? null) ? (float) $readability['flesch'] : null,
-                (int) ($content['word_count'] ?? 0),
-                (int) ($images['total'] ?? 0),
-                $technical['stack'] ?? null,
-                $serpKeywordArg,
-                $serpGlForBenchmark,
-                $pageLocaleResolved['hl'],
-                $pageLocaleResolved['bcp47'],
-                $websiteId,
-                $website->user_id ?? null,
-            );
-            if ($benchmark !== null) {
-                if (isset($benchmark['your_serp']) && is_array($benchmark['your_serp'])) {
-                    $benchmark['your_serp'] = $this->mergeAuditedPageSerpPreviewIntoYourSerp(
-                        $benchmark['your_serp'],
-                        $pageUrl,
-                        $metadata,
-                    );
-                }
-                $result['benchmark'] = $benchmark;
-            }
-
-            // Core Web Vitals via the standalone ebq-intelegence Lighthouse service.
-            // Runs here (not in the Job) so the sync "Audit this page" flow on
-            // PageDetail gets CWV too. Client returns null silently if the
-            // service is down — audit still completes without CWV.
-            try {
-                $cwv = app(LighthouseClient::class)->fetchMobileAndDesktop($pageUrl);
-                if (is_array($cwv)) {
-                    $result['core_web_vitals'] = $cwv;
-                }
-            } catch (\Throwable $e) {
-                Log::warning('PageAuditService: CWV enrichment failed', [
-                    'url' => $pageUrl,
-                    'exception' => $e->getMessage(),
-                ]);
-            }
-
-            $result['recommendations'] = app(RecommendationEngine::class)->analyze($result);
-
-            $kwBlock = $result['keywords'] ?? [];
-            $storedPrimaryKeyword = null;
-            $storedPrimarySource = null;
-            if (($kwBlock['available'] ?? false) === true) {
-                $pq = isset($kwBlock['primary']['query']) ? trim((string) $kwBlock['primary']['query']) : '';
-                $storedPrimaryKeyword = $pq !== '' ? mb_substr($pq, 0, 200) : null;
-                $src = $kwBlock['primary_source'] ?? null;
-                $storedPrimarySource = is_string($src) && $src !== '' ? mb_substr($src, 0, 32) : null;
             }
 
             return PageAuditReport::updateOrCreate(
@@ -275,13 +115,13 @@ class PageAuditService
                     'page' => mb_substr($pageUrl, 0, 700),
                     'status' => 'completed',
                     'audited_at' => now(),
-                    'http_status' => $fetch['http_status'],
-                    'response_time_ms' => $fetch['ttfb_ms'],
-                    'page_size_bytes' => $fetch['size'],
+                    'http_status' => $built['http_status'],
+                    'response_time_ms' => $built['ttfb_ms'],
+                    'page_size_bytes' => $built['page_size_bytes'],
                     'error_message' => null,
-                    'primary_keyword' => $storedPrimaryKeyword,
-                    'primary_keyword_source' => $storedPrimarySource,
-                    'result' => $result,
+                    'primary_keyword' => $built['primary_keyword'],
+                    'primary_keyword_source' => $built['primary_keyword_source'],
+                    'result' => $built['result'],
                 ]
             );
         } catch (\Throwable $e) {
@@ -297,6 +137,275 @@ class PageAuditService
                 $failurePrimarySource,
             );
         }
+    }
+
+    /**
+     * Run a free, no-signup landing-page audit from a user-supplied URL + keyword.
+     *
+     * No Website / GSC data is involved — keyword analysis runs purely off the
+     * manual keyword (see {@see KeywordStrategyAnalyzer::analyze()} with empty
+     * targets). Lite (skips slow link checking) and runs the Serper SERP
+     * benchmark — competitors + the page's SERP position for the keyword — but
+     * skips the Lighthouse CWV stage. SSRF is enforced by {@see SafeHttpGuard}
+     * inside fetch.
+     *
+     * @return array{status: string, result: ?array<string, mixed>, http_status: ?int, response_time_ms: ?int, primary_keyword: ?string, primary_keyword_source: ?string, error_message: ?string}
+     */
+    public function auditGuest(string $pageUrl, string $keyword, ?string $serpGl = null): array
+    {
+        $kw = trim($keyword);
+        $serpKeywordArg = $kw !== '' ? $kw : null;
+
+        try {
+            // $serpGl is the visitor-chosen SERP country; buildAuditResult validates
+            // it and falls back to the page-detected gl when null/invalid.
+            $built = $this->buildAuditResult($pageUrl, null, $serpKeywordArg, $serpGl, true, false, true);
+        } catch (\Throwable $e) {
+            Log::warning("PageAuditService::auditGuest failed for {$pageUrl}: {$e->getMessage()}");
+
+            return [
+                'status' => 'failed',
+                'result' => null,
+                'http_status' => null,
+                'response_time_ms' => null,
+                'primary_keyword' => $serpKeywordArg,
+                'primary_keyword_source' => $serpKeywordArg !== null ? 'custom_audit' : null,
+                'error_message' => 'We couldn’t analyze that page. Please check the URL and try again.',
+            ];
+        }
+
+        if (! ($built['ok'] ?? false)) {
+            return [
+                'status' => 'failed',
+                'result' => null,
+                'http_status' => $built['http_status'] ?? null,
+                'response_time_ms' => $built['ttfb_ms'] ?? null,
+                'primary_keyword' => $serpKeywordArg,
+                'primary_keyword_source' => $serpKeywordArg !== null ? 'custom_audit' : null,
+                'error_message' => $this->friendlyGuestError($built['error'] ?? null),
+            ];
+        }
+
+        return [
+            'status' => 'completed',
+            'result' => $built['result'],
+            'http_status' => $built['http_status'],
+            'response_time_ms' => $built['ttfb_ms'],
+            'primary_keyword' => $built['primary_keyword'],
+            'primary_keyword_source' => $built['primary_keyword_source'],
+            'error_message' => null,
+        ];
+    }
+
+    /**
+     * Translate an internal fetch/guard error into copy safe to show a stranger.
+     */
+    private function friendlyGuestError(?string $raw): string
+    {
+        $raw = (string) $raw;
+        if (str_contains($raw, 'rejected') || str_contains($raw, 'blocked') || str_contains($raw, 'unsafe')) {
+            return 'That URL can’t be audited. Enter a public website address (https://…).';
+        }
+
+        return 'We couldn’t fetch that page. Check the URL is reachable and try again.';
+    }
+
+    /**
+     * Shared analysis pipeline used by both the authenticated {@see audit()} flow
+     * (which persists a {@see PageAuditReport}) and the anonymous {@see auditGuest()}
+     * flow. When {@see $website} is null there is no GSC keyword source — the
+     * keyword block is built from {@see $serpKeywordArg} alone. {@see $skipSerp} /
+     * {@see $skipCwv} short-circuit the two paid external stages.
+     *
+     * @return array{ok: bool, error?: string, http_status: ?int, ttfb_ms: ?int, page_size_bytes?: ?int, result?: array<string, mixed>, primary_keyword?: ?string, primary_keyword_source?: ?string}
+     */
+    private function buildAuditResult(string $pageUrl, ?Website $website, ?string $serpKeywordArg, ?string $serpGlUserOverride, bool $lite, bool $skipSerp, bool $skipCwv): array
+    {
+        $fetch = $this->fetch($pageUrl);
+
+        if (! isset($fetch['body'])) {
+            return [
+                'ok' => false,
+                'error' => $fetch['error'] ?? 'Failed to fetch page',
+                'http_status' => $fetch['http_status'] ?? null,
+                'ttfb_ms' => $fetch['ttfb_ms'] ?? null,
+            ];
+        }
+
+        $html = $fetch['body'];
+        $auditor = new HtmlAuditor($html, $pageUrl);
+
+        $metadata = $auditor->metadata();
+        $localeSignals = $auditor->localeSignals();
+        $pageLocaleResolved = PageLocaleResolver::resolve($localeSignals, $pageUrl);
+
+        $userSerpGl = null;
+        if ($serpGlUserOverride !== null && SerpLocaleDefaults::isValidSerperGl($serpGlUserOverride)) {
+            $userSerpGl = strtolower(trim($serpGlUserOverride));
+        }
+        $serpGlForBenchmark = $userSerpGl ?? $pageLocaleResolved['gl'];
+
+        $headings = $auditor->headings();
+        $content = $auditor->content();
+        $bodyText = $content['body_text'];
+        unset($content['body_text']);
+        $images = $auditor->images();
+        $links = $auditor->links();
+        $schema = $auditor->schema();
+        $favicon = $auditor->favicon();
+        $readability = $auditor->readability($bodyText);
+
+        // Link checking can take up to ~80s for a page with many
+        // outbound links. Skip it in lite mode — the live-score caller
+        // doesn't surface broken-link counts in its factor anyway.
+        if ($lite) {
+            $links['broken'] = [];
+            $links['links_checked'] = 0;
+            $links['links_skipped'] = count($links['internal']) + count($links['external']);
+        } else {
+            $allLinks = array_merge($links['internal'], $links['external']);
+            $linkCheck = $this->checkLinks($allLinks);
+            $links['broken'] = $linkCheck['broken'];
+            $links['links_checked'] = $linkCheck['checked'];
+            $links['links_skipped'] = $linkCheck['skipped'];
+        }
+
+        $technical = [
+            'http_status' => $fetch['http_status'],
+            'ttfb_ms' => $fetch['ttfb_ms'],
+            'page_size_bytes' => $fetch['size'],
+            'compression' => $fetch['compression'],
+            'is_https' => str_starts_with(strtolower($pageUrl), 'https://'),
+            'stack' => $auditor->technology($fetch['headers'] ?? []),
+        ];
+
+        $pageLocaleBlock = [
+            'gl' => $pageLocaleResolved['gl'],
+            'hl' => $pageLocaleResolved['hl'],
+            'source' => $pageLocaleResolved['source'],
+            'bcp47' => $pageLocaleResolved['bcp47'],
+            'hreflang_matched' => $pageLocaleResolved['hreflang_matched'],
+            'signals' => $pageLocaleResolved['signals'],
+        ];
+        if ($userSerpGl !== null) {
+            $pageLocaleBlock['serp_gl_user_chosen'] = $userSerpGl;
+        }
+
+        $serpEffectivePreview = SerpLocaleDefaults::forSerperRequest(
+            $serpGlForBenchmark,
+            $pageLocaleResolved['hl'],
+            $pageLocaleResolved['bcp47'],
+        );
+        $serpEffGl = $serpEffectivePreview['gl'] ?? null;
+        if (SerpLocaleDefaults::isValidSerperGl($serpEffGl)) {
+            $pageLocaleBlock['serp_gl_effective'] = strtolower((string) $serpEffGl);
+        }
+
+        $result = [
+            'metadata' => $metadata,
+            'page_locale' => $pageLocaleBlock,
+            'content' => $content + ['headings' => $headings['headings'], 'h1_count' => $headings['h1_count'], 'heading_order_ok' => $headings['heading_order_ok']],
+            'images' => $images,
+            'links' => $links,
+            'technical' => $technical,
+            'advanced' => [
+                'schema_blocks' => $schema['count'],
+                'schema_blocks_detail' => $schema['blocks'],
+                'readability' => $readability,
+                'has_favicon' => $favicon['present'],
+                'favicon_href' => $favicon['href'],
+            ],
+        ];
+
+        $targetKeywords = $this->fetchTargetKeywords($website, $pageUrl);
+        $h1Texts = array_values(array_filter(array_map(
+            fn ($h) => $h['level'] === 1 ? ($h['text'] ?? '') : null,
+            $headings['headings'] ?? []
+        )));
+        $allHeadingsText = implode(' ', array_map(fn ($h) => $h['text'] ?? '', $headings['headings'] ?? []));
+
+        $result['keywords'] = app(KeywordStrategyAnalyzer::class)->analyze($targetKeywords, [
+            'title' => $metadata['title'] ?? '',
+            'meta_description' => $metadata['meta_description'] ?? '',
+            'h1_text' => implode(' ', $h1Texts),
+            'all_headings_text' => $allHeadingsText,
+            'body_text' => $bodyText,
+            'keyword_density' => $content['keyword_density'] ?? [],
+        ], $serpKeywordArg);
+
+        if ($website instanceof Website && is_array($result['keywords'])) {
+            $result['keywords']['gsc_lookback_days'] = $website->effectiveGscKeywordLookbackDays();
+        }
+
+        // Serper benchmark fetches 3 competitor HTML pages + audits them —
+        // adds 20–40s to wall-time. Gated solely by $skipSerp so a caller can
+        // stay lite (skip link checking) yet still benchmark — e.g. guest
+        // audits. The authenticated live-score path passes skipSerp=$lite.
+        $benchmark = $skipSerp ? null : $this->buildSerperReadabilityBenchmark(
+            $pageUrl,
+            $result['keywords'],
+            is_numeric($readability['flesch'] ?? null) ? (float) $readability['flesch'] : null,
+            (int) ($content['word_count'] ?? 0),
+            (int) ($images['total'] ?? 0),
+            $technical['stack'] ?? null,
+            $serpKeywordArg,
+            $serpGlForBenchmark,
+            $pageLocaleResolved['hl'],
+            $pageLocaleResolved['bcp47'],
+            $website?->id,
+            $website->user_id ?? null,
+        );
+        if ($benchmark !== null) {
+            if (isset($benchmark['your_serp']) && is_array($benchmark['your_serp'])) {
+                $benchmark['your_serp'] = $this->mergeAuditedPageSerpPreviewIntoYourSerp(
+                    $benchmark['your_serp'],
+                    $pageUrl,
+                    $metadata,
+                );
+            }
+            $result['benchmark'] = $benchmark;
+        }
+
+        // Core Web Vitals via the standalone ebq-intelegence Lighthouse service.
+        // Runs here (not in the Job) so the sync "Audit this page" flow on
+        // PageDetail gets CWV too. Client returns null silently if the
+        // service is down — audit still completes without CWV. Guest audits
+        // skip it (skipCwv) to keep the free run fast + credit-free.
+        if (! $skipCwv) {
+            try {
+                $cwv = app(LighthouseClient::class)->fetchMobileAndDesktop($pageUrl);
+                if (is_array($cwv)) {
+                    $result['core_web_vitals'] = $cwv;
+                }
+            } catch (\Throwable $e) {
+                Log::warning('PageAuditService: CWV enrichment failed', [
+                    'url' => $pageUrl,
+                    'exception' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $result['recommendations'] = app(RecommendationEngine::class)->analyze($result);
+
+        $kwBlock = $result['keywords'] ?? [];
+        $storedPrimaryKeyword = null;
+        $storedPrimarySource = null;
+        if (($kwBlock['available'] ?? false) === true) {
+            $pq = isset($kwBlock['primary']['query']) ? trim((string) $kwBlock['primary']['query']) : '';
+            $storedPrimaryKeyword = $pq !== '' ? mb_substr($pq, 0, 200) : null;
+            $src = $kwBlock['primary_source'] ?? null;
+            $storedPrimarySource = is_string($src) && $src !== '' ? mb_substr($src, 0, 32) : null;
+        }
+
+        return [
+            'ok' => true,
+            'http_status' => $fetch['http_status'],
+            'ttfb_ms' => $fetch['ttfb_ms'],
+            'page_size_bytes' => $fetch['size'],
+            'result' => $result,
+            'primary_keyword' => $storedPrimaryKeyword,
+            'primary_keyword_source' => $storedPrimarySource,
+        ];
     }
 
     /**
@@ -936,8 +1045,14 @@ class PageAuditService
         return preg_replace('/^www\./', '', $host) ?: null;
     }
 
-    private function fetchTargetKeywords(Website $website, string $pageUrl): array
+    private function fetchTargetKeywords(?Website $website, string $pageUrl): array
     {
+        // Guest / no-website audits have no GSC data — keyword analysis runs
+        // off the manual keyword override instead.
+        if (! $website instanceof Website) {
+            return [];
+        }
+
         $from = $website->gscKeywordWindowStartDate();
 
         return SearchConsoleData::query()

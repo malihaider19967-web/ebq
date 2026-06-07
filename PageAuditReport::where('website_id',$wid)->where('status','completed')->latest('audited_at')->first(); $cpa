@@ -1,0 +1,64 @@
+[90m= [39m[34;4mIlluminate\Database\Eloquent\Collection[39;24m {#9059
+    [34mall[39m: [
+      [34;4mApp\Models\ClientActivity[39;24m {#9051
+        [34mid[39m: [35m646[39m,
+        [34mcreated_at[39m: [32m"[39m[32m2026-04-26 06:07:37[39m[32m"[39m,
+        [34munits_consumed[39m: [35m0[39m,
+        [34mmeta[39m: [32m"[39m[32m{[39m\"[32moperation[39m\"[32m:[39m\"[32mbacklinks_for_domain[39m\"[32m,[39m\"[32mdomain[39m\"[32m:[39m\"[32mgbappsup.org.pk[39m\"[32m,[39m\"[32mlimit[39m\"[32m:50,[39m\"[32mreturned[39m\"[32m:0,[39m\"[32mcredits_consumed[39m\"[32m:0,[39m\"[32mcredits_remaining[39m\"[32m:null,[39m\"[32mcountry[39m\"[32m:[39m\"[32mus[39m\"[32m,[39m\"[32mdata_source[39m\"[32m:[39m\"[32mg[39m\"[32m}[39m[32m"[39m,
+      },
+      [34;4mApp\Models\ClientActivity[39;24m {#9050
+        [34mid[39m: [35m645[39m,
+        [34mcreated_at[39m: [32m"[39m[32m2026-04-26 06:07:37[39m[32m"[39m,
+        [34munits_consumed[39m: [35m0[39m,
+        [34mmeta[39m: [32m"[39m[32m{[39m\"[32moperation[39m\"[32m:[39m\"[32mbacklinks_for_domain[39m\"[32m,[39m\"[32mdomain[39m\"[32m:[39m\"[32mgbwta.com[39m\"[32m,[39m\"[32mlimit[39m\"[32m:50,[39m\"[32mreturned[39m\"[32m:0,[39m\"[32mcredits_consumed[39m\"[32m:0,[39m\"[32mcredits_remaining[39m\"[32m:null,[39m\"[32mcountry[39m\"[32m:[39m\"[32mus[39m\"[32m,[39m\"[32mdata_source[39m\"[32m:[39m\"[32mg[39m\"[32m}[39m[32m"[39m,
+      },
+      [34;4mApp\Models\ClientActivity[39;24m {#9049
+        [34mid[39m: [35m644[39m,
+        [34mcreated_at[39m: [32m"[39m[32m2026-04-26 06:07:36[39m[32m"[39m,
+        [34munits_consumed[39m: [35m0[39m,
+        [34mmeta[39m: [32m"[39m[32m{[39m\"[32moperation[39m\"[32m:[39m\"[32mbacklinks_for_domain[39m\"[32m,[39m\"[32mdomain[39m\"[32m:[39m\"[32mgbwhatsp.com[39m\"[32m,[39m\"[32mlimit[39m\"[32m:50,[39m\"[32mreturned[39m\"[32m:0,[39m\"[32mcredits_consumed[39m\"[32m:0,[39m\"[32mcredits_remaining[39m\"[32m:null,[39m\"[32mcountry[39m\"[32m:[39m\"[32mus[39m\"[32m,[39m\"[32mdata_source[39m\"[32m:[39m\"[32mg[39m\"[32m}[39m[32m"[39m,
+      },
+      [34;4mApp\Models\ClientActivity[39;24m {#9048
+        [34mid[39m: [35m437[39m,
+        [34mcreated_at[39m: [32m"[39m[32m2026-04-26 02:48:36[39m[32m"[39m,
+        [34munits_consumed[39m: [35m0[39m,
+        [34mmeta[39m: [32m"[39m[32m{[39m\"[32moperation[39m\"[32m:[39m\"[32mbacklinks_for_domain[39m\"[32m,[39m\"[32mdomain[39m\"[32m:[39m\"[32mgbwta.com[39m\"[32m,[39m\"[32mlimit[39m\"[32m:50,[39m\"[32mreturned[39m\"[32m:0,[39m\"[32mcredits_consumed[39m\"[32m:0,[39m\"[32mcredits_remaining[39m\"[32m:null,[39m\"[32mcountry[39m\"[32m:[39m\"[32mus[39m\"[32m,[39m\"[32mdata_source[39m\"[32m:[39m\"[32mg[39m\"[32m}[39m[32m"[39m,
+      },
+      [34;4mApp\Models\ClientActivity[39;24m {#9047
+        [34mid[39m: [35m436[39m,
+        [34mcreated_at[39m: [32m"[39m[32m2026-04-26 02:48:36[39m[32m"[39m,
+        [34munits_consumed[39m: [35m0[39m,
+        [34mmeta[39m: [32m"[39m[32m{[39m\"[32moperation[39m\"[32m:[39m\"[32mbacklinks_for_domain[39m\"[32m,[39m\"[32mdomain[39m\"[32m:[39m\"[32mgbappsup.org.pk[39m\"[32m,[39m\"[32mlimit[39m\"[32m:50,[39m\"[32mreturned[39m\"[32m:0,[39m\"[32mcredits_consumed[39m\"[32m:0,[39m\"[32mcredits_remaining[39m\"[32m:null,[39m\"[32mcountry[39m\"[32m:[39m\"[32mus[39m\"[32m,[39m\"[32mdata_source[39m\"[32m:[39m\"[32mg[39m\"[32m}[39m[32m"[39m,
+      },
+      [34;4mApp\Models\ClientActivity[39;24m {#9046
+        [34mid[39m: [35m435[39m,
+        [34mcreated_at[39m: [32m"[39m[32m2026-04-26 02:48:35[39m[32m"[39m,
+        [34munits_consumed[39m: [35m0[39m,
+        [34mmeta[39m: [32m"[39m[32m{[39m\"[32moperation[39m\"[32m:[39m\"[32mbacklinks_for_domain[39m\"[32m,[39m\"[32mdomain[39m\"[32m:[39m\"[32mgbwhatsp.com[39m\"[32m,[39m\"[32mlimit[39m\"[32m:50,[39m\"[32mreturned[39m\"[32m:0,[39m\"[32mcredits_consumed[39m\"[32m:0,[39m\"[32mcredits_remaining[39m\"[32m:null,[39m\"[32mcountry[39m\"[32m:[39m\"[32mus[39m\"[32m,[39m\"[32mdata_source[39m\"[32m:[39m\"[32mg[39m\"[32m}[39m[32m"[39m,
+      },
+      [34;4mApp\Models\ClientActivity[39;24m {#9045
+        [34mid[39m: [35m426[39m,
+        [34mcreated_at[39m: [32m"[39m[32m2026-04-26 02:23:48[39m[32m"[39m,
+        [34munits_consumed[39m: [35m0[39m,
+        [34mmeta[39m: [32m"[39m[32m{[39m\"[32moperation[39m\"[32m:[39m\"[32mbacklinks_for_domain[39m\"[32m,[39m\"[32mdomain[39m\"[32m:[39m\"[32mgbappsup.org.pk[39m\"[32m,[39m\"[32mlimit[39m\"[32m:50,[39m\"[32mreturned[39m\"[32m:0,[39m\"[32mcredits_consumed[39m\"[32m:0,[39m\"[32mcredits_remaining[39m\"[32m:null,[39m\"[32mcountry[39m\"[32m:[39m\"[32mus[39m\"[32m,[39m\"[32mdata_source[39m\"[32m:[39m\"[32mg[39m\"[32m}[39m[32m"[39m,
+      },
+      [34;4mApp\Models\ClientActivity[39;24m {#9044
+        [34mid[39m: [35m425[39m,
+        [34mcreated_at[39m: [32m"[39m[32m2026-04-26 02:23:48[39m[32m"[39m,
+        [34munits_consumed[39m: [35m0[39m,
+        [34mmeta[39m: [32m"[39m[32m{[39m\"[32moperation[39m\"[32m:[39m\"[32mbacklinks_for_domain[39m\"[32m,[39m\"[32mdomain[39m\"[32m:[39m\"[32mgbwta.com[39m\"[32m,[39m\"[32mlimit[39m\"[32m:50,[39m\"[32mreturned[39m\"[32m:0,[39m\"[32mcredits_consumed[39m\"[32m:0,[39m\"[32mcredits_remaining[39m\"[32m:null,[39m\"[32mcountry[39m\"[32m:[39m\"[32mus[39m\"[32m,[39m\"[32mdata_source[39m\"[32m:[39m\"[32mg[39m\"[32m}[39m[32m"[39m,
+      },
+      [34;4mApp\Models\ClientActivity[39;24m {#9043
+        [34mid[39m: [35m424[39m,
+        [34mcreated_at[39m: [32m"[39m[32m2026-04-26 02:23:48[39m[32m"[39m,
+        [34munits_consumed[39m: [35m0[39m,
+        [34mmeta[39m: [32m"[39m[32m{[39m\"[32moperation[39m\"[32m:[39m\"[32mbacklinks_for_domain[39m\"[32m,[39m\"[32mdomain[39m\"[32m:[39m\"[32mgbwhatsp.com[39m\"[32m,[39m\"[32mlimit[39m\"[32m:50,[39m\"[32mreturned[39m\"[32m:0,[39m\"[32mcredits_consumed[39m\"[32m:0,[39m\"[32mcredits_remaining[39m\"[32m:null,[39m\"[32mcountry[39m\"[32m:[39m\"[32mus[39m\"[32m,[39m\"[32mdata_source[39m\"[32m:[39m\"[32mg[39m\"[32m}[39m[32m"[39m,
+      },
+      [34;4mApp\Models\ClientActivity[39;24m {#9042
+        [34mid[39m: [35m419[39m,
+        [34mcreated_at[39m: [32m"[39m[32m2026-04-26 02:19:06[39m[32m"[39m,
+        [34munits_consumed[39m: [35m0[39m,
+        [34mmeta[39m: [32m"[39m[32m{[39m\"[32moperation[39m\"[32m:[39m\"[32mbacklinks_for_domain[39m\"[32m,[39m\"[32mdomain[39m\"[32m:[39m\"[32mgbappsup.org.pk[39m\"[32m,[39m\"[32mlimit[39m\"[32m:50,[39m\"[32mreturned[39m\"[32m:0,[39m\"[32mcredits_consumed[39m\"[32m:0,[39m\"[32mcredits_remaining[39m\"[32m:null,[39m\"[32mcountry[39m\"[32m:[39m\"[32mus[39m\"[32m,[39m\"[32mdata_source[39m\"[32m:[39m\"[32mg[39m\"[32m}[39m[32m"[39m,
+      },
+    ],
+  }

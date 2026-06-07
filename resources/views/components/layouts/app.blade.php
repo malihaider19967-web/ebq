@@ -64,6 +64,7 @@
                 $adminItems = [
                     ['route' => 'admin.clients.index', 'label' => 'Clients'],
                     ['route' => 'admin.activities.index', 'label' => 'Activities'],
+                    ['route' => 'admin.leads.index', 'label' => 'Leads'],
                     ['route' => 'admin.usage.index', 'label' => 'API Usage'],
                     [
                         'route' => 'admin.settings',

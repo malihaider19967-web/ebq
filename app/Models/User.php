@@ -20,6 +20,17 @@ class User extends Authenticatable implements MustVerifyEmail
     use Billable, HasFactory, Notifiable;
 
     /**
+     * Tag any matching marketing lead as converted on signup — covers both
+     * password registration and Google SSO (both ultimately create a User).
+     */
+    protected static function booted(): void
+    {
+        static::created(function (User $user): void {
+            Lead::markConvertedFor($user);
+        });
+    }
+
+    /**
      * Subscription tier constants. After the 2026-05-17 rename:
      *
      *   free    — unpaid, default
@@ -279,18 +290,42 @@ class User extends Authenticatable implements MustVerifyEmail
      */
     public function effectivePlan(): ?Plan
     {
-        // Free-promo override: when the platform is in "all Pro free"
-        // mode (env FREE=true) every user resolves to the Pro plan row
-        // regardless of subscription state. Flipping FREE=false snaps
-        // them back to their real subscription on the very next request.
-        // Falls through to the normal resolution chain when the Pro row
-        // is missing (deleted from admin) so we never 500 on a misconfig.
+        $plan = $this->resolveSubscribedPlan();
+
+        // Free-promo override: when the platform is in "all Pro free" mode
+        // (env FREE=true) every user is entitled to at least the Pro tier
+        // regardless of subscription state. Flipping FREE=false snaps them
+        // back to their real plan on the very next request.
+        //
+        // It must only ever *upgrade* — never downgrade a user already on a
+        // higher tier (Startup/Agency). The previous unconditional return of
+        // the Pro row silently stripped Agency/Startup-only entitlements
+        // (e.g. ai_writer / AI Studio) from those users while FREE was on.
+        // Falls through to the resolved plan when the Pro row is missing
+        // (deleted from admin) so we never 500 on a misconfig.
         if ((bool) config('app.free', false)) {
             $pro = Plan::where('slug', self::TIER_PRO)->first();
             if ($pro) {
-                return $pro;
+                $currentRank = self::TIER_ORDER[$plan->slug ?? self::TIER_FREE] ?? 0;
+                $proRank = self::TIER_ORDER[self::TIER_PRO] ?? 0;
+                if ($plan === null || $currentRank < $proRank) {
+                    return $pro;
+                }
             }
         }
+
+        return $plan;
+    }
+
+    /**
+     * Resolve the user's real plan from subscription state, honouring (in
+     * order): an active Cashier subscription matched by yearly price ID, the
+     * snapshotted `current_plan_slug`, then the Free plan row so admin edits
+     * to Free's max_websites / features apply to free-tier users. Returns
+     * null only when the plans table is empty (fresh install pre-seeder).
+     */
+    private function resolveSubscribedPlan(): ?Plan
+    {
         $subscription = $this->subscription('default');
         if ($subscription && $subscription->valid()) {
             $price = (string) $subscription->stripe_price;
@@ -307,10 +342,6 @@ class User extends Authenticatable implements MustVerifyEmail
                 return $plan;
             }
         }
-        // Fall back to the Free plan so admin edits to its max_websites
-        // / features apply to free-tier users. Without this, a free
-        // user with no subscription always saw a hard-coded "1 website"
-        // limit regardless of what the admin set on the Free plan row.
         return Plan::where('slug', self::TIER_FREE)->first();
     }
 

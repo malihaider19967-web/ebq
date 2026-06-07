@@ -65,7 +65,7 @@
         ['key' => 'technical',       'label' => 'Technical',       'count' => null,         'show' => true],
         ['key' => 'benchmark',       'label' => 'SERP benchmark',  'count' => is_array($benchmark) ? count($benchmark['competitors'] ?? []) : null, 'show' => $benchmarkNav],
         ['key' => 'keywords',        'label' => 'Keywords',        'count' => $kwAvailable ? (int) ($keywordData['coverage']['total'] ?? 0) : null, 'show' => true],
-        ['key' => 'country',         'label' => 'Traffic by country', 'count' => null,      'show' => true],
+        ['key' => 'country',         'label' => 'Traffic by country', 'count' => null,      'show' => ($showCountrySection ?? true)],
         ['key' => 'metadata',        'label' => 'Metadata',        'count' => null,         'show' => true],
         ['key' => 'content',         'label' => 'Content',         'count' => null,         'show' => true],
         ['key' => 'links',           'label' => 'Images & Links',  'count' => null,         'show' => true],
@@ -473,6 +473,8 @@
                 </section>
                 @php $sectionHtml['keywords'] = ob_get_clean(); @endphp
 
+                {{-- Country data comes from GSC; hidden for guest/no-website audits via $showCountrySection. --}}
+                @if (($showCountrySection ?? true))
                 @php ob_start(); @endphp
                 {{-- ══════ Traffic by country (GSC) ══════ --}}
                 @php
@@ -541,6 +543,7 @@
                     @endif
                 </section>
                 @php $sectionHtml['country'] = ob_get_clean(); @endphp
+                @endif
 
                 @php ob_start(); @endphp
                 @if ($benchmarkNav)
@@ -1204,7 +1207,8 @@
         @endif
     </details>
 
-    {{-- ═══ Footer toolbar ═══ --}}
+    {{-- ═══ Footer toolbar ═══ (download + email — Livewire/route coupled; hidden for guest audits) --}}
+    @if (($showAuditToolbar ?? true))
     <div class="flex flex-col gap-2 border-t border-slate-200 bg-slate-50 px-5 py-3 sm:flex-row sm:items-center dark:border-slate-800 dark:bg-slate-800/30">
         <a href="{{ route('page-audits.download', $auditReport->id) }}"
            class="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800">
@@ -1226,4 +1230,5 @@
             </button>
         </form>
     </div>
+    @endif
 </div>

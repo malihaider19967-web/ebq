@@ -164,7 +164,17 @@
       "PowerShell(Import-Csv *)",
       "mcp__code-review-graph__list_repos_tool",
       "PowerShell(Get-Content *)",
-      "Bash(APP_ENV=testing php artisan *)"
+      "Bash(APP_ENV=testing php artisan *)",
+      "Read(//etc/php/8.3/fpm/conf.d/**)",
+      "Bash(php-fpm8.3 -i)",
+      "Bash(systemctl list-units *)",
+      "Bash(systemctl status *)",
+      "Bash(sudo systemctl reload php8.3-fpm)",
+      "Bash(systemctl reload *)",
+      "Bash(ps -o pid,lstart,cmd -C php-fpm8.3)",
+      "Bash(sudo systemctl restart php8.3-fpm)",
+      "Bash(systemctl is-active *)",
+      "Bash(systemctl show *)"
     ]
   },
   "enableAllProjectMcpServers": true,

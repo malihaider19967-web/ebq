@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\GoogleOAuthController;
+use App\Http\Controllers\GuestAuditController;
 use App\Http\Controllers\GoogleCapController;
 use App\Http\Controllers\MicrosoftOAuthController;
 use App\Http\Controllers\PageAuditController;
@@ -30,6 +31,13 @@ Route::view('/terms-conditions', 'legal.terms')->name('terms-conditions');
 Route::view('/privacy-policy', 'legal.privacy')->name('privacy-policy');
 Route::view('/refund-policy', 'legal.refund-policy')->name('refund-policy');
 Route::view('/guide', 'guide')->name('guide');
+
+// Public, no-signup SEO audit launched from the landing-page hero. Anonymous —
+// no GSC/GA, no paid SERP/CWV — and rate-limited + reCAPTCHA-gated in the
+// controller. POST keeps default `web` CSRF protection (the form ships a token).
+Route::post('/audit', [GuestAuditController::class, 'store'])->name('guest-audit.store');
+Route::get('/audit/{guestPageAudit}/status', [GuestAuditController::class, 'status'])->name('guest-audit.status');
+Route::get('/audit/{guestPageAudit}', [GuestAuditController::class, 'show'])->name('guest-audit.show');
 
 // Always-fresh download of the latest packaged WP plugin — bypasses public/ caching.
 Route::get('/wordpress/plugin.zip', WordPressPluginDownloadController::class)->name('wordpress.plugin.download');
@@ -161,6 +169,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/clients/{user}/impersonate', [ClientImpersonationController::class, 'start'])->name('clients.impersonate');
 
     Route::get('/activities', [AdminActivityController::class, 'index'])->name('activities.index');
+    Route::get('/leads', [\App\Http\Controllers\Admin\LeadController::class, 'index'])->name('leads.index');
     Route::get('/usage', [AdminUsageController::class, 'index'])->name('usage.index');
     Route::get('/plugin-releases', [AdminPluginReleaseController::class, 'index'])->name('plugin-releases.index');
     Route::post('/plugin-releases/toggle-updates', [AdminPluginReleaseController::class, 'toggleUpdates'])->name('plugin-releases.toggle-updates');
