@@ -35,40 +35,30 @@
                 <div class="grid gap-3 sm:grid-cols-2">
                     <div>
                         <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">GA4 Property</label>
-                        @if (count($gaProperties))
-                            <select wire:model="gaPropertyId"
-                                class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
-                                <option value="">Select a property…</option>
-                                @foreach ($gaProperties as $prop)
-                                    <option value="{{ $prop['id'] }}">{{ $prop['name'] }} ({{ $prop['id'] }})</option>
-                                @endforeach
-                            </select>
-                        @else
-                            <input wire:model="gaPropertyId" type="text" placeholder="properties/123456789"
-                                class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-                            <p class="mt-0.5 text-[11px] text-slate-400">GA4 > Admin > Property Settings > Property ID</p>
-                        @endif
-                        @error('gaPropertyId') <p class="mt-0.5 text-[11px] text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                        <select wire:model="gaSelection"
+                            class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                            <option value="">Skip Analytics</option>
+                            @foreach ($gaOptions as $opt)
+                                <option value="{{ $opt['account_id'] }}|{{ $opt['id'] }}">{{ $opt['name'] }} ({{ $opt['id'] }}) — {{ $opt['account_label'] }}</option>
+                            @endforeach
+                        </select>
+                        @error('gaSelection') <p class="mt-0.5 text-[11px] text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
 
                     <div>
                         <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Search Console Site</label>
-                        @if (count($gscSites))
-                            <select wire:model.live="gscSiteUrl"
-                                class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
-                                <option value="">Select a site…</option>
-                                @foreach ($gscSites as $site)
-                                    <option value="{{ $site['siteUrl'] }}">{{ $site['siteUrl'] }}</option>
-                                @endforeach
-                            </select>
-                        @else
-                            <input wire:model.live="gscSiteUrl" type="text" placeholder="sc-domain:example.com"
-                                class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800" />
-                            <p class="mt-0.5 text-[11px] text-slate-400">Domain property or URL prefix</p>
-                        @endif
-                        @error('gscSiteUrl') <p class="mt-0.5 text-[11px] text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
+                        <select wire:model.live="gscSelection"
+                            class="h-8 w-full rounded-md border border-slate-200 bg-white px-2.5 text-xs shadow-sm transition focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 dark:border-slate-700 dark:bg-slate-800">
+                            <option value="">Skip Search Console</option>
+                            @foreach ($gscOptions as $opt)
+                                <option value="{{ $opt['account_id'] }}|{{ $opt['siteUrl'] }}">{{ $opt['siteUrl'] }} — {{ $opt['account_label'] }}</option>
+                            @endforeach
+                        </select>
+                        @error('gscSelection') <p class="mt-0.5 text-[11px] text-red-600 dark:text-red-400">{{ $message }}</p> @enderror
                     </div>
                 </div>
+
+                <p class="text-[11px] text-slate-400 dark:text-slate-500">Both are optional — add the domain now and connect Analytics or Search Console later in Settings.</p>
 
                 <div>
                     <label class="mb-1 block text-[11px] font-medium text-slate-700 dark:text-slate-300">Domain</label>

@@ -45,8 +45,10 @@ class LoginRequest extends FormRequest
         if (! Auth::attempt($this->only('email', 'password'), $this->boolean('remember'))) {
             RateLimiter::hit($this->throttleKey());
 
+            // Keyed to 'auth' (not 'email') so it renders as a general
+            // authentication error banner, not a field-level validation error.
             throw ValidationException::withMessages([
-                'email' => trans('auth.failed'),
+                'auth' => trans('auth.failed'),
             ]);
         }
 
@@ -56,7 +58,7 @@ class LoginRequest extends FormRequest
             RateLimiter::hit($this->throttleKey());
 
             throw ValidationException::withMessages([
-                'email' => 'Your account has been disabled. Please contact support.',
+                'auth' => 'Your account has been disabled. Please contact support.',
             ]);
         }
 
@@ -77,7 +79,7 @@ class LoginRequest extends FormRequest
         $seconds = RateLimiter::availableIn($this->throttleKey());
 
         throw ValidationException::withMessages([
-            'email' => trans('auth.throttle', [
+            'auth' => trans('auth.throttle', [
                 'seconds' => $seconds,
                 'minutes' => ceil($seconds / 60),
             ]),

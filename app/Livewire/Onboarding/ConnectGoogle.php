@@ -5,29 +5,31 @@ namespace App\Livewire\Onboarding;
 use App\Jobs\SyncAnalyticsData;
 use App\Jobs\SyncSearchConsoleData;
 use App\Models\Website;
-use App\Services\Google\GoogleAnalyticsService;
-use App\Services\Google\SearchConsoleService;
+use App\Support\GoogleSourcePool;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class ConnectGoogle extends Component
 {
     public int $step = 1;
 
-    public string $gaPropertyId = '';
-    public string $gscSiteUrl = '';
+    /**
+     * Picker values encode the source account alongside the property/site
+     * as "accountId|value" so a GA property and a GSC site can come from
+     * two different Google logins. Empty = that source is being skipped.
+     */
+    public string $gaSelection = '';
+    public string $gscSelection = '';
     public string $domain = '';
 
     public bool $googleConnected = false;
-    public bool $loading = false;
     public string $fetchError = '';
 
-    /** @var array<int, array{id: string, name: string}> */
-    public array $gaProperties = [];
+    /** @var array<int, array{id: string, name: string, account_id: int, account_label: string}> */
+    public array $gaOptions = [];
 
-    /** @var array<int, array{siteUrl: string, permissionLevel: string}> */
-    public array $gscSites = [];
+    /** @var array<int, array{siteUrl: string, account_id: int, account_label: string}> */
+    public array $gscOptions = [];
 
     public function mount(): void
     {
@@ -36,6 +38,11 @@ class ConnectGoogle extends Component
 
         if ($this->googleConnected) {
             $this->step = 2;
+            // Restore any in-progress selections that were stashed before
+            // bouncing out to OAuth to connect an extra account.
+            $this->gaSelection = (string) session()->pull('onboarding.ga_selection', $this->gaSelection);
+            $this->gscSelection = (string) session()->pull('onboarding.gsc_selection', $this->gscSelection);
+            $this->domain = (string) session()->pull('onboarding.domain', $this->domain);
             $this->fetchGoogleData();
         }
     }
@@ -49,80 +56,115 @@ class ConnectGoogle extends Component
         $this->step = $step;
     }
 
-    public function updatedGscSiteUrl(string $value): void
+    public function updatedGscSelection(string $value): void
     {
-        if ($value && $this->domain === '') {
-            $this->domain = $this->extractDomain($value);
+        if ($value === '' || $this->domain !== '') {
+            return;
         }
+
+        [, $siteUrl] = $this->splitSelection($value);
+        if ($siteUrl !== '') {
+            $this->domain = $this->extractDomain($siteUrl);
+        }
+    }
+
+    /**
+     * Stash the current picks and bounce to Google so the user can add a
+     * second account (e.g. GA lives on one login, GSC on another). On
+     * return we re-pool with the new account included.
+     */
+    public function connectAnotherAccount(): void
+    {
+        session([
+            'onboarding.ga_selection' => $this->gaSelection,
+            'onboarding.gsc_selection' => $this->gscSelection,
+            'onboarding.domain' => $this->domain,
+        ]);
+
+        $this->redirect(route('google.redirect', ['return' => 'onboarding']));
     }
 
     public function saveWebsite(): void
     {
         $this->validate([
             'domain' => ['required', 'string', 'max:255'],
-            'gaPropertyId' => ['required', 'string', 'max:255'],
-            'gscSiteUrl' => ['required', 'string', 'max:255'],
+            'gaSelection' => ['nullable', 'string', 'max:512'],
+            'gscSelection' => ['nullable', 'string', 'max:512'],
         ]);
 
-        $userId = Auth::id();
-        $user = Auth::user();
-        $existing = Website::query()
-            ->where('user_id', $userId)
-            ->orderByRaw("CASE WHEN domain = '' THEN 0 ELSE 1 END") // placeholder first
-            ->first();
+        [$gaAccountId, $gaPropertyId] = $this->splitSelection($this->gaSelection);
+        [$gscAccountId, $gscSiteUrl] = $this->splitSelection($this->gscSelection);
 
-        // Plan-limit gate. Only blocks the *create* path — updating an
-        // existing row (the pay-first placeholder, or simply re-saving
-        // an existing site) doesn't add a new website to the account.
-        if ($existing === null && $user !== null && ! $user->canAddWebsite()) {
-            $this->redirectRoute('billing.show', navigate: false);
+        // Need at least one real data source — the "connect neither" exit
+        // is the explicit Skip button, not an empty Finish.
+        if ($gaPropertyId === '' && $gscSiteUrl === '') {
+            $this->addError('gaSelection', 'Connect at least one of Google Analytics or Search Console — or use “Skip for now”.');
+
             return;
         }
 
-        if ($existing) {
-            $existing->fill([
-                'domain' => $this->domain,
-                'ga_property_id' => $this->gaPropertyId,
-                'gsc_site_url' => $this->gscSiteUrl,
-            ])->save();
-            $website = $existing;
-        } else {
-            $website = Website::create([
-                'user_id' => $userId,
-                'domain' => $this->domain,
-                'ga_property_id' => $this->gaPropertyId,
-                'gsc_site_url' => $this->gscSiteUrl,
-            ]);
+        $website = $this->persistWebsite([
+            'domain' => $this->domain,
+            'ga_property_id' => $gaPropertyId,
+            'ga_google_account_id' => $gaPropertyId !== '' ? $gaAccountId : null,
+            'gsc_site_url' => $gscSiteUrl,
+            'gsc_google_account_id' => $gscSiteUrl !== '' ? $gscAccountId : null,
+        ]);
+
+        if ($website === null) {
+            return; // plan-limit redirect already issued
         }
 
-        // Kick off the 365-day backfill explicitly. The Website model's
-        // `booted::created` hook already dispatches these for fresh rows,
-        // but the pay-first flow creates a placeholder Website earlier
-        // (with no Google account / no ga_property_id), so the boot-time
-        // dispatch is a no-op. We dispatch again here, after the real
-        // GA/GSC IDs are saved, to actually start fetching data.
-        // NOTE: requires a running queue worker (`php artisan queue:work`)
-        // since QUEUE_CONNECTION=database. Without a worker, jobs sit in
-        // the `jobs` table and the dashboard stays empty regardless of
-        // what's in GSC/GA.
-        SyncAnalyticsData::dispatch($website->id, 365);
-        SyncSearchConsoleData::dispatch($website->id, 365);
+        // Kick off the 365-day backfill for the sources that are actually
+        // connected. The Website model's created hook does the same for
+        // fresh rows, but the pay-first flow updates a pre-existing
+        // placeholder, so we (re)dispatch here once the real IDs are set.
+        // NOTE: requires a running queue worker (QUEUE_CONNECTION=database).
+        if ($website->hasGa()) {
+            SyncAnalyticsData::dispatch($website->id, 365);
+        }
+        if ($website->hasGsc()) {
+            SyncSearchConsoleData::dispatch($website->id, 365);
+            // Pull the sitemap list, then crawl the site's own pages so the SEO
+            // intelligence (broken links, internal-link graph, on-page issues)
+            // is ready alongside the GSC/GA backfill. Chained so sitemaps land
+            // before the crawl builds its frontier.
+            \Illuminate\Support\Facades\Bus::chain([
+                new \App\Jobs\SyncSitemaps($website->id),
+                new \App\Jobs\CrawlWebsitePagesJob($website->id, \App\Models\CrawlRun::TRIGGER_ON_CREATE),
+            ])->dispatch();
+        }
 
-        // Pin this website as the user's "current" so the dashboard's
-        // Livewire components (KpiCards, TrafficChart, etc.) read the
-        // correct website_id on their first render. The EnsureFeatureAccess
-        // middleware also self-heals this on subsequent requests, but
-        // setting it inline here removes a round-trip's worth of empty
-        // dashboard for the first hit.
-        session(['current_website_id' => $website->id]);
+        $this->finishOnboarding($website);
+    }
 
-        // Flag the session so the dashboard knows to show the welcome
-        // / "your data is being pulled" modal on the next request. Single
-        // shot — `flash()` clears it after one request so the modal
-        // never re-appears on subsequent dashboard visits.
-        session()->flash('just_onboarded', true);
+    /**
+     * "Skip for now" — let users in with no Google data at all. They land
+     * on the dashboard (full of connect prompts) and can still use the
+     * free PageSpeed tool. We create a minimal Website row so the
+     * onboarding gate is satisfied.
+     */
+    public function skipForNow(): void
+    {
+        // Require a domain so the skip yields a real, named website (free
+        // tools, crawl, keyword research) rather than an empty placeholder.
+        $this->validate([
+            'domain' => ['required', 'string', 'max:255'],
+        ]);
 
-        $this->redirectRoute('dashboard');
+        $website = $this->persistWebsite([
+            'domain' => $this->domain,
+            'ga_property_id' => '',
+            'ga_google_account_id' => null,
+            'gsc_site_url' => '',
+            'gsc_google_account_id' => null,
+        ]);
+
+        if ($website === null) {
+            return;
+        }
+
+        $this->finishOnboarding($website);
     }
 
     public function render()
@@ -130,27 +172,89 @@ class ConnectGoogle extends Component
         return view('livewire.onboarding.connect-google');
     }
 
+    /**
+     * Reuse the pay-first placeholder row when present, otherwise create.
+     * Returns null when the plan-limit gate redirected the user to billing.
+     *
+     * @param  array<string, mixed>  $attrs
+     */
+    private function persistWebsite(array $attrs): ?Website
+    {
+        $userId = Auth::id();
+        $user = Auth::user();
+
+        $existing = Website::query()
+            ->where('user_id', $userId)
+            ->orderByRaw("CASE WHEN domain = '' THEN 0 ELSE 1 END") // placeholder first
+            ->first();
+
+        // Plan-limit gate only blocks the *create* path — updating an
+        // existing placeholder doesn't add a website to the account.
+        if ($existing === null && $user !== null && ! $user->canAddWebsite()) {
+            $this->redirectRoute('billing.show', navigate: false);
+
+            return null;
+        }
+
+        if ($existing) {
+            $existing->fill($attrs)->save();
+
+            return $existing;
+        }
+
+        return Website::create(array_merge(['user_id' => $userId], $attrs));
+    }
+
+    private function finishOnboarding(Website $website): void
+    {
+        session()->forget(['onboarding.ga_selection', 'onboarding.gsc_selection', 'onboarding.domain']);
+
+        // Pin this website as "current" so the dashboard's Livewire
+        // components read the right website_id on first render.
+        session(['current_website_id' => $website->id]);
+
+        // One-shot flag so the dashboard shows the welcome / "pulling your
+        // data" modal once. flash() clears it after the next request.
+        session()->flash('just_onboarded', true);
+
+        $this->redirectRoute('dashboard');
+    }
+
     private function fetchGoogleData(): void
     {
-        $account = Auth::user()?->googleAccounts()->latest()->first();
-
-        if (! $account) {
+        $user = Auth::user();
+        if ($user === null) {
             return;
         }
 
-        try {
-            $this->gaProperties = app(GoogleAnalyticsService::class)->listProperties($account);
-        } catch (\Throwable $e) {
-            Log::warning('Failed to fetch GA properties: '.$e->getMessage());
-            $this->fetchError = 'Could not load GA4 properties. You can type the ID manually.';
+        $pool = app(GoogleSourcePool::class)->forUser($user);
+        $this->gaOptions = $pool['ga'];
+        $this->gscOptions = $pool['gsc'];
+
+        if ($pool['ga_error'] || $pool['gsc_error']) {
+            $this->fetchError = 'We couldn’t load some of your Google data. You can still continue with what loaded, or reconnect the affected account.';
+        }
+    }
+
+    /**
+     * Split an "accountId|value" picker value into [accountId, value].
+     *
+     * @return array{0: int|null, 1: string}
+     */
+    private function splitSelection(string $selection): array
+    {
+        if ($selection === '') {
+            return [null, ''];
         }
 
-        try {
-            $this->gscSites = app(SearchConsoleService::class)->listSites($account);
-        } catch (\Throwable $e) {
-            Log::warning('Failed to fetch GSC sites: '.$e->getMessage());
-            $this->fetchError = 'Could not load Search Console sites. You can type the URL manually.';
+        $pos = strpos($selection, '|');
+        if ($pos === false) {
+            return [null, $selection];
         }
+
+        $accountId = (int) substr($selection, 0, $pos);
+
+        return [$accountId > 0 ? $accountId : null, substr($selection, $pos + 1)];
     }
 
     private function extractDomain(string $siteUrl): string

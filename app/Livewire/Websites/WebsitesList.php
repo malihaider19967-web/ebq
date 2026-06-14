@@ -3,32 +3,32 @@
 namespace App\Livewire\Websites;
 
 use App\Models\Website;
-use App\Services\Google\GoogleAnalyticsService;
-use App\Services\Google\SearchConsoleService;
+use App\Support\GoogleSourcePool;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Gate;
-use Illuminate\Support\Facades\Log;
 use Livewire\Component;
 
 class WebsitesList extends Component
 {
     public string $domain = '';
-    public string $gaPropertyId = '';
-    public string $gscSiteUrl = '';
+
+    /** "accountId|value" picker values, mirroring onboarding. */
+    public string $gaSelection = '';
+    public string $gscSelection = '';
     public bool $showForm = false;
     public string $fetchError = '';
 
-    /** @var array<int, array{id: string, name: string}> */
-    public array $gaProperties = [];
+    /** @var array<int, array{id: string, name: string, account_id: int, account_label: string}> */
+    public array $gaOptions = [];
 
-    /** @var array<int, array{siteUrl: string, permissionLevel: string}> */
-    public array $gscSites = [];
+    /** @var array<int, array{siteUrl: string, account_id: int, account_label: string}> */
+    public array $gscOptions = [];
 
     public function toggleForm(): void
     {
         $this->showForm = ! $this->showForm;
-        $this->reset(['domain', 'gaPropertyId', 'gscSiteUrl', 'fetchError']);
+        $this->reset(['domain', 'gaSelection', 'gscSelection', 'fetchError']);
         $this->resetValidation();
 
         if ($this->showForm) {
@@ -36,10 +36,15 @@ class WebsitesList extends Component
         }
     }
 
-    public function updatedGscSiteUrl(string $value): void
+    public function updatedGscSelection(string $value): void
     {
-        if ($value && $this->domain === '') {
-            $this->domain = $this->extractDomain($value);
+        if ($value === '' || $this->domain !== '') {
+            return;
+        }
+
+        [, $siteUrl] = $this->splitSelection($value);
+        if ($siteUrl !== '') {
+            $this->domain = $this->extractDomain($siteUrl);
         }
     }
 
@@ -47,13 +52,23 @@ class WebsitesList extends Component
     {
         $this->validate([
             'domain' => ['required', 'string', 'max:255'],
-            'gaPropertyId' => ['required', 'string', 'max:255'],
-            'gscSiteUrl' => ['required', 'string', 'max:255'],
+            'gaSelection' => ['nullable', 'string', 'max:512'],
+            'gscSelection' => ['nullable', 'string', 'max:512'],
         ]);
 
+        [$gaAccountId, $gaPropertyId] = $this->splitSelection($this->gaSelection);
+        [$gscAccountId, $gscSiteUrl] = $this->splitSelection($this->gscSelection);
+
+        // GA and GSC are both optional — a domain-only website is allowed.
+        // The user can connect data sources later in Settings.
         $website = Website::updateOrCreate(
             ['user_id' => Auth::id(), 'domain' => $this->domain],
-            ['ga_property_id' => $this->gaPropertyId, 'gsc_site_url' => $this->gscSiteUrl]
+            [
+                'ga_property_id' => $gaPropertyId,
+                'ga_google_account_id' => $gaPropertyId !== '' ? $gaAccountId : null,
+                'gsc_site_url' => $gscSiteUrl,
+                'gsc_google_account_id' => $gscSiteUrl !== '' ? $gscAccountId : null,
+            ]
         );
 
         if ($website->wasRecentlyCreated) {
@@ -61,9 +76,18 @@ class WebsitesList extends Component
                 '--days' => 365,
                 '--website' => (string) $website->id,
             ]);
+
+            // Crawl the client's own pages (sitemap list first, then crawl) so
+            // Site Health / the action queue have data right after add.
+            if ($website->hasGsc()) {
+                \Illuminate\Support\Facades\Bus::chain([
+                    new \App\Jobs\SyncSitemaps($website->id),
+                    new \App\Jobs\CrawlWebsitePagesJob($website->id, \App\Models\CrawlRun::TRIGGER_ON_CREATE),
+                ])->dispatch();
+            }
         }
 
-        $this->reset(['domain', 'gaPropertyId', 'gscSiteUrl', 'showForm', 'fetchError']);
+        $this->reset(['domain', 'gaSelection', 'gscSelection', 'showForm', 'fetchError']);
     }
 
     public function removeWebsite(int $id): void
@@ -92,26 +116,41 @@ class WebsitesList extends Component
 
     private function fetchGoogleData(): void
     {
-        $account = Auth::user()?->googleAccounts()->latest()->first();
+        $user = Auth::user();
+        if ($user === null || ! $user->googleAccounts()->exists()) {
+            // No Google account is fine — they can still add a domain-only
+            // website now and connect Analytics/Search Console later.
+            $this->fetchError = 'No Google account connected. You can still add a website by domain and connect Analytics or Search Console later in Settings.';
 
-        if (! $account) {
-            $this->fetchError = 'No Google account connected. Connect one in Settings first.';
             return;
         }
 
-        try {
-            $this->gaProperties = app(GoogleAnalyticsService::class)->listProperties($account);
-        } catch (\Throwable $e) {
-            Log::warning('Failed to fetch GA properties: '.$e->getMessage());
-            $this->fetchError = 'Could not load GA4 properties. You can type the ID manually.';
+        $pool = app(GoogleSourcePool::class)->forUser($user);
+        $this->gaOptions = $pool['ga'];
+        $this->gscOptions = $pool['gsc'];
+
+        if ($pool['ga_error'] || $pool['gsc_error']) {
+            $this->fetchError = 'Some Google data could not be loaded. Try reconnecting the affected account in Settings.';
+        }
+    }
+
+    /**
+     * @return array{0: int|null, 1: string}
+     */
+    private function splitSelection(string $selection): array
+    {
+        if ($selection === '') {
+            return [null, ''];
         }
 
-        try {
-            $this->gscSites = app(SearchConsoleService::class)->listSites($account);
-        } catch (\Throwable $e) {
-            Log::warning('Failed to fetch GSC sites: '.$e->getMessage());
-            $this->fetchError = 'Could not load Search Console sites. You can type the URL manually.';
+        $pos = strpos($selection, '|');
+        if ($pos === false) {
+            return [null, $selection];
         }
+
+        $accountId = (int) substr($selection, 0, $pos);
+
+        return [$accountId > 0 ? $accountId : null, substr($selection, $pos + 1)];
     }
 
     private function extractDomain(string $siteUrl): string

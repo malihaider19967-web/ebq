@@ -33,8 +33,16 @@ class Website extends Model
             if ($website->isFrozen()) {
                 return;
             }
-            SyncAnalyticsData::dispatch($website->id, 365);
-            SyncSearchConsoleData::dispatch($website->id, 365);
+            // Only sync the sources that are actually connected. A site
+            // onboarded GA-only (or GSC-only, or with neither — the
+            // PageSpeed-only path) must not dispatch a job for a source
+            // it can't fetch.
+            if ($website->hasGa()) {
+                SyncAnalyticsData::dispatch($website->id, 365);
+            }
+            if ($website->hasGsc()) {
+                SyncSearchConsoleData::dispatch($website->id, 365);
+            }
         });
     }
 
@@ -47,7 +55,9 @@ class Website extends Model
         'domain',
         'feature_flags',
         'ga_property_id',
+        'ga_google_account_id',
         'gsc_site_url',
+        'gsc_google_account_id',
         'gsc_keyword_lookback_days',
         'report_recipients',
         'last_analytics_sync_at',
@@ -411,6 +421,69 @@ class Website extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
+    /**
+     * The Google account that owns this site's GA4 property. Nullable —
+     * a website may have no GA source connected (degraded mode), or its
+     * account may have been deleted (FK nulled on delete).
+     */
+    public function gaAccount(): BelongsTo
+    {
+        return $this->belongsTo(GoogleAccount::class, 'ga_google_account_id');
+    }
+
+    /**
+     * The Google account that owns this site's Search Console property.
+     * Independent from {@see gaAccount()} so GA and GSC can come from
+     * different Google logins.
+     */
+    public function gscAccount(): BelongsTo
+    {
+        return $this->belongsTo(GoogleAccount::class, 'gsc_google_account_id');
+    }
+
+    /**
+     * True when this website has a usable GA4 source: both a property id
+     * and the specific Google account that can read it. We treat the
+     * empty string as "absent" to match the existing placeholder
+     * convention (pay-first rows store '' before onboarding completes).
+     */
+    public function hasGa(): bool
+    {
+        return $this->ga_property_id !== null
+            && $this->ga_property_id !== ''
+            && $this->ga_google_account_id !== null;
+    }
+
+    /**
+     * True when this website has a usable Search Console source.
+     */
+    public function hasGsc(): bool
+    {
+        return $this->gsc_site_url !== null
+            && $this->gsc_site_url !== ''
+            && $this->gsc_google_account_id !== null;
+    }
+
+    /**
+     * Resolve the Google account to use for GA fetches. Prefers the
+     * explicit per-source account; falls back to the owner's most-recent
+     * account so legacy rows the backfill missed still sync. The fallback
+     * is transitional — drop it once backfill is confirmed so account
+     * deletion degrades cleanly.
+     */
+    public function gaAccountResolved(): ?GoogleAccount
+    {
+        return $this->gaAccount ?? $this->user?->googleAccounts()->latest()->first();
+    }
+
+    /**
+     * Resolve the Google account to use for GSC / indexing fetches.
+     */
+    public function gscAccountResolved(): ?GoogleAccount
+    {
+        return $this->gscAccount ?? $this->user?->googleAccounts()->latest()->first();
+    }
+
     public function members(): BelongsToMany
     {
         return $this->belongsToMany(User::class, 'website_user')
@@ -431,6 +504,36 @@ class Website extends Model
     public function searchConsoleData(): HasMany
     {
         return $this->hasMany(SearchConsoleData::class);
+    }
+
+    public function sitemaps(): HasMany
+    {
+        return $this->hasMany(WebsiteSitemap::class);
+    }
+
+    public function pages(): HasMany
+    {
+        return $this->hasMany(WebsitePage::class);
+    }
+
+    public function internalLinks(): HasMany
+    {
+        return $this->hasMany(WebsiteInternalLink::class);
+    }
+
+    public function crawlRuns(): HasMany
+    {
+        return $this->hasMany(CrawlRun::class);
+    }
+
+    public function crawlFindings(): HasMany
+    {
+        return $this->hasMany(CrawlFinding::class);
+    }
+
+    public function latestCrawlRun(): ?CrawlRun
+    {
+        return $this->crawlRuns()->latest('started_at')->first();
     }
 
     public function backlinks(): HasMany
