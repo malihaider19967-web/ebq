@@ -1,4 +1,4 @@
-<div wire:poll.10s>
+<div wire:poll.{{ $pollInterval }}s>
     @if ($crawl)
         <div class="flex items-start gap-3 rounded-xl border border-indigo-200 bg-indigo-50 p-5 dark:border-indigo-500/30 dark:bg-indigo-500/10">
             <div class="flex h-10 w-10 flex-none items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
@@ -10,10 +10,12 @@
             </div>
             @php
                 $finalizing = $crawl->status === \App\Models\CrawlRun::STATUS_FINALIZING;
-                // Cap-relative progress: how far through THIS user's allowance the
-                // shared crawl is. Bounded by the cap so a small-plan user shows
-                // "1,000 / 1,000" (their window is full) while the crawl keeps going.
-                $seen = $cap > 0 ? min((int) $crawl->pages_seen, $cap) : (int) $crawl->pages_seen;
+                // Progress within THIS user's allowance: crawled = pages fetched,
+                // total = pages discovered to crawl, both bounded by the plan cap.
+                // Shown as "crawled / total" with plan allowance remaining separately.
+                $crawled = $cap > 0 ? min((int) $crawl->pages_fetched, $cap) : (int) $crawl->pages_fetched;
+                $total = $cap > 0 ? min((int) $crawl->pages_seen, $cap) : (int) $crawl->pages_seen;
+                $remainingCap = $cap > 0 ? max(0, $cap - $crawled) : null;
             @endphp
             <div class="min-w-0 flex-1">
                 <h3 class="text-sm font-semibold text-slate-900 dark:text-white">
@@ -29,9 +31,14 @@
                         will fill in automatically as the crawl progresses.
                     @endif
                 </p>
-                @if (! $finalizing && $cap > 0 && $crawl->pages_seen > 0)
+                @if (! $finalizing && $total > 0)
                     <p class="mt-2 text-xs font-medium text-indigo-700 dark:text-indigo-300">
-                        {{ number_format($seen) }} of {{ number_format($cap) }} pages crawled
+                        {{ number_format($crawled) }} / {{ number_format($total) }} pages crawled
+                    </p>
+                @endif
+                @if ($remainingCap !== null)
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                        Plan allowance remaining: {{ number_format($remainingCap) }} of {{ number_format($cap) }}
                     </p>
                 @endif
             </div>

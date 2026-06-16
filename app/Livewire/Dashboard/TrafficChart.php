@@ -4,6 +4,7 @@ namespace App\Livewire\Dashboard;
 
 use App\Models\AnalyticsData;
 use App\Models\SearchConsoleData;
+use App\Services\ReportCache;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -51,13 +52,17 @@ class TrafficChart extends Component
             $today = Carbon::today($tz);
             $end = $today->copy()->subDay();
             $start = $end->copy()->subDays(29);
+            // Mix in ReportCache::version so a GSC/GA re-sync of the recent partial
+            // days inside this fixed window invalidates the cache (date range alone
+            // doesn't change after a same-window correction).
             $cacheKey = sprintf(
-                'traffic_chart:v3:%d:%d:%s:%s:%s',
+                'traffic_chart:v3:%d:%d:%s:%s:%s:%d',
                 $this->websiteId,
                 (int) $user->id,
                 str_replace('/', '_', $tz),
                 $start->toDateString(),
-                $end->toDateString()
+                $end->toDateString(),
+                ReportCache::version($this->websiteId)
             );
 
             $cached = Cache::remember($cacheKey, 600, function () use ($start, $end, $user) {

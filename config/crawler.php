@@ -17,8 +17,23 @@ return [
     // as stubs) and crawls those too, repeating until no new pages are found or
     // these bounds are hit. Without this the homepage's nav targets stay uncrawled
     // and the internal-link graph is disconnected (orphan/click-depth false flags).
-    'max_passes' => (int) env('CRAWLER_MAX_PASSES', 6),
+    'max_passes' => (int) env('CRAWLER_MAX_PASSES', 6), // deprecated: superseded by pages_per_pass (CrawlPassJob now derives its own runaway ceiling)
     'max_pages_per_run' => (int) env('CRAWLER_MAX_PAGES_PER_RUN', 200000),
+
+    // Fairness: max pages a single pass enqueues before yielding the crawl queue to
+    // other sites. Small enough that one large site can't monopolise the 5 shared
+    // crawl workers; large enough to keep per-pass overhead low. The multi-pass loop
+    // keeps going (next pass to the back of the queue) until the site is exhausted or
+    // the cap is hit, so this does NOT cap total pages — only the burst per pass.
+    'pages_per_pass' => (int) env('CRAWLER_PAGES_PER_PASS', 1000),
+
+    // Watchdog (ebq:crawl-supervisor): a `running` run whose row hasn't been touched
+    // in this many minutes is treated as wedged (dead multi-pass chain) and resumed
+    // or finalized. Generous so a genuinely-slow batch isn't mistaken for a stall.
+    'stall_minutes' => (int) env('CRAWLER_STALL_MINUTES', 15),
+    // Hard cap on a single run's wall-clock before the supervisor stops resurrecting
+    // it and finalizes with whatever has been crawled.
+    'max_run_hours' => (int) env('CRAWLER_MAX_RUN_HOURS', 6),
 
     // Politeness delay between same-host fetches inside a batch (milliseconds).
     'delay_ms' => (int) env('CRAWLER_DELAY_MS', 250),

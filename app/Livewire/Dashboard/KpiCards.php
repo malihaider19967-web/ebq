@@ -4,6 +4,7 @@ namespace App\Livewire\Dashboard;
 
 use App\Models\AnalyticsData;
 use App\Models\SearchConsoleData;
+use App\Services\ReportCache;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cache;
@@ -66,11 +67,16 @@ class KpiCards extends Component
             $currentStart = $currentEnd->copy()->subDays(29);
             $previousEnd = $currentStart->copy()->subDay();
             $previousStart = $previousEnd->copy()->subDays(29);
+            // Mix in ReportCache::version so a GSC/GA sync that corrects the most
+            // recent (partial) days inside this fixed window invalidates the cache —
+            // the date range alone doesn't change, so without the version these KPIs
+            // stayed stale for the whole TTL after a re-sync.
             $cacheKey = sprintf(
-                'kpis:%d:%s:%s',
+                'kpis:%d:%s:%s:%d',
                 $this->websiteId,
                 $currentStart->toDateString(),
-                $currentEnd->toDateString()
+                $currentEnd->toDateString(),
+                ReportCache::version($this->websiteId)
             );
 
             $data = Cache::remember($cacheKey, 600, function () use ($currentStart, $currentEnd, $previousStart, $previousEnd) {

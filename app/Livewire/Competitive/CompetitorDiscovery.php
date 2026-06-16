@@ -34,7 +34,14 @@ class CompetitorDiscovery extends Component
     {
         $id = (int) session('current_website_id', 0);
 
-        return $id > 0 ? Website::find($id) : null;
+        // Gate on access — Livewire actions don't re-run the route middleware that
+        // validates current_website_id, so trust the session id only if the current
+        // user can still view it (mirrors every other website-scoped component).
+        if ($id <= 0 || ! Auth::user()?->canViewWebsiteId($id)) {
+            return null;
+        }
+
+        return Website::find($id);
     }
 
     public function discover(CompetitorDiscoveryService $service): void

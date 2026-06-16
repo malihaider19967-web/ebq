@@ -135,7 +135,16 @@ class CrawlReportService
     public function summary(int $websiteId): array
     {
         $ctx = $this->context($websiteId);
-        $run = $ctx['cs'] ? CrawlRun::where('crawl_site_id', $ctx['cs'])->latest('started_at')->first() : null;
+        // Health + last-crawled come from the last COMPLETED run, so a later failed/
+        // aborted recrawl can't wipe a healthy score or flash the "we can't crawl
+        // this site" banner over data that's still valid. run_status reflects the
+        // CURRENT (latest) run so the live crawl UI (running/finalizing partial
+        // state) keeps working. blocked only when there is no good crawl to show.
+        $latest = $ctx['cs'] ? CrawlRun::where('crawl_site_id', $ctx['cs'])->latest('started_at')->first() : null;
+        $completed = $ctx['cs']
+            ? CrawlRun::where('crawl_site_id', $ctx['cs'])->where('status', CrawlRun::STATUS_COMPLETED)->latest('finished_at')->first()
+            : null;
+        $display = $completed ?? $latest;
 
         $bySeverity = $this->findingsBase($websiteId)
             ->select('severity', DB::raw('COUNT(*) as c'))->groupBy('severity')->pluck('c', 'severity');
@@ -145,12 +154,12 @@ class CrawlReportService
         $orphans = $this->windowPages($websiteId)->orphans()->count();
 
         return [
-            'has_crawl' => $run !== null,
-            'health_score' => $run?->health_score,
-            'last_crawled_at' => $run?->finished_at ?? $run?->started_at,
-            'run_status' => $run?->status,
-            'blocked' => $run?->isBlocked() ?? false,
-            'blocked_reason' => $run?->blocked_reason,
+            'has_crawl' => $latest !== null,
+            'health_score' => $display?->health_score,
+            'last_crawled_at' => $display?->finished_at ?? $display?->started_at,
+            'run_status' => $latest?->status,
+            'blocked' => $completed === null && ($latest?->isBlocked() ?? false),
+            'blocked_reason' => $completed === null ? $latest?->blocked_reason : null,
             'pages_total' => $pagesTotal,
             'pages_indexable' => $indexable,
             'orphan_count' => $orphans,

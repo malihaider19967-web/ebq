@@ -19,7 +19,10 @@ class CrawlerProgress extends Component
 {
     public function render()
     {
-        $sites = CrawlSite::orderBy('normalized_domain')->get();
+        // Eager-load the subscriber websites + their owners so the admin can see
+        // exactly which website(s)/client(s) each shared crawl belongs to.
+        $sites = CrawlSite::with(['websites:id,crawl_site_id,domain,user_id', 'websites.user:id,name,email'])
+            ->orderBy('normalized_domain')->get();
         $ids = $sites->pluck('id');
 
         // Latest run per crawl_site (one query for the ids, one to load them).
@@ -40,6 +43,11 @@ class CrawlerProgress extends Component
             return [
                 'domain' => $cs->normalized_domain,
                 'subscribers' => (int) $cs->subscriber_count,
+                // Which website(s)/client(s) this shared crawl serves.
+                'clients' => $cs->websites->map(fn ($w) => [
+                    'website' => $w->domain,
+                    'owner' => $w->user?->name ?: ($w->user?->email ?? '—'),
+                ])->all(),
                 'cap' => (int) $cs->effective_cap,
                 'status' => $run?->status ?? 'never',
                 'trigger' => $run?->trigger,

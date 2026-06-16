@@ -52,15 +52,25 @@ class CrawlPassJob implements ShouldQueue
             return;
         }
 
-        $maxPasses = max(1, (int) config('crawler.max_passes', 6));
         // Shared crawl depth = MAX page cap among all subscribers. Re-read each pass
         // so a higher-cap subscriber joining mid-crawl extends the in-flight crawl.
         $maxPages = max(1, (int) $crawlSite->effective_cap ?: (int) config('crawler.max_pages_per_run', 200000));
+        // Fairness: crawl at most this many pages per pass so a large site can't
+        // enqueue its whole frontier in one Bus::batch and starve every other site on
+        // the shared crawl queue. Each pass dispatches the next to the BACK of the
+        // queue, so concurrent crawls interleave (round-robin) instead of one big
+        // site monopolising the 5 workers. Smaller batches also complete faster, so a
+        // worker --max-time recycle is far less likely to drop the batch mid-flight.
+        $pagesPerPass = max(1, (int) config('crawler.pages_per_pass', 1000));
+        // Runaway guard: passes scale with cap / per-pass size, so this ceiling is
+        // generous. Each pass either advances toward maxPages or terminates on an
+        // empty selection, so the loop is bounded even without it.
+        $passCeiling = (int) ceil($maxPages / $pagesPerPass) * 2 + 50;
 
-        // Stop conditions: pass cap or per-run page budget reached → finalize.
-        if ($this->pass > $maxPasses || (int) $run->pages_seen >= $maxPages) {
-            if ($this->pass > $maxPasses) {
-                Log::info("CrawlPassJob: pass cap ({$maxPasses}) reached for run {$run->id}; finalizing.");
+        // Stop conditions: per-run page budget reached or runaway ceiling → finalize.
+        if ($this->pass > $passCeiling || (int) $run->pages_seen >= $maxPages) {
+            if ($this->pass > $passCeiling) {
+                Log::warning("CrawlPassJob: pass ceiling ({$passCeiling}) reached for run {$run->id}; finalizing.");
             }
             AnalyzeSiteJob::dispatch($run->id)->onQueue(\App\Support\Queues::CRAWL);
 
@@ -85,7 +95,9 @@ class CrawlPassJob implements ShouldQueue
         // Respect the remaining per-run budget so a single pass can't blow past it.
         // Crawl the highest-value pages first so a capped budget buys what matters:
         // GSC-trafficked → in sitemap → shallow URLs (closer to the homepage).
-        $remaining = max(0, $maxPages - (int) $run->pages_seen);
+        // Cap this pass at the smaller of the remaining budget and the per-pass limit
+        // (the per-pass limit is what yields the queue to other sites — see above).
+        $remaining = min(max(0, $maxPages - (int) $run->pages_seen), $pagesPerPass);
         $pageIds = CrawlValueRank::order($query)
             ->limit($remaining)->pluck('id')->all();
 

@@ -61,10 +61,14 @@ class CrawlBanner extends Component
 
         return view('livewire.crawl-banner', [
             'crawl' => $crawl,
-            // Progress is shown relative to THIS user's plan cap: a domain crawled
-            // once is shared, but a cap-1000 user sees 500/1,000 while a cap-100k
-            // user sees 500/100,000 for the same run.
+            // Progress is shown relative to THIS user's plan cap (a domain crawled
+            // once is shared; a cap-1000 user sees up to 1,000 of the same run).
             'cap' => $website?->crawlPageCap() ?? 0,
+            // Poll fast (10s) while a crawl is in flight; slow (30s) when idle. We
+            // still poll when idle so the banner appears when a crawl starts, but the
+            // old unconditional 10s poll hammered every page for every user even when
+            // nothing was running.
+            'pollInterval' => $crawl ? 10 : 30,
         ]);
     }
 }

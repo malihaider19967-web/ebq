@@ -24,6 +24,9 @@ Schedule::command('ebq:publish-scheduled-plugin-releases')->everyMinute();
 // sites is run manually after deploy: `php artisan ebq:crawl-websites --backfill`.
 Schedule::command('ebq:crawl-websites')->weeklyOn(1, '02:00');
 Schedule::command('ebq:crawl-websites --sitemap-deltas')->dailyAt('04:30');
+// Watchdog: resume/finalize crawl runs whose multi-pass chain died (worker recycle
+// dropped the Bus::batch callback). withoutOverlapping so a slow tick can't stack.
+Schedule::command('ebq:crawl-supervisor')->everyFiveMinutes()->withoutOverlapping();
 
 // Keep the self-hosted keyword API fleet's health/queue snapshot warm so the
 // load balancer routes to live, least-busy servers.

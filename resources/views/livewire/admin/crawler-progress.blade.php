@@ -46,6 +46,7 @@
             <thead class="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-400 dark:bg-slate-900/40">
                 <tr>
                     <th class="px-4 py-2.5 text-left font-medium">Domain</th>
+                    <th class="px-4 py-2.5 text-left font-medium">Website / Client</th>
                     <th class="px-4 py-2.5 text-left font-medium">Status</th>
                     <th class="px-4 py-2.5 text-left font-medium">Progress</th>
                     <th class="px-4 py-2.5 text-right font-medium">Crawled</th>
@@ -69,6 +70,15 @@
                     @endphp
                     <tr class="hover:bg-slate-50 dark:hover:bg-slate-900/30">
                         <td class="px-4 py-2.5 font-medium text-slate-800 dark:text-slate-100">{{ $r['domain'] }}</td>
+                        <td class="px-4 py-2.5">
+                            @forelse ($r['clients'] as $c)
+                                <div class="text-xs text-slate-700 dark:text-slate-300">
+                                    {{ $c['website'] }} <span class="text-slate-400">· {{ $c['owner'] }}</span>
+                                </div>
+                            @empty
+                                <span class="text-xs text-slate-400">—</span>
+                            @endforelse
+                        </td>
                         <td class="px-4 py-2.5">
                             <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold {{ $statusBadge[$st] ?? $statusBadge['never'] }}">
                                 @if ($isLive)<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-current"></span>@endif
@@ -106,7 +116,7 @@
                         <td class="px-4 py-2.5 text-xs text-slate-500">{{ $relTime($r['finished_at'] ?? $r['started_at']) }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="9" class="px-4 py-8 text-center text-sm text-slate-400">No crawl sites yet.</td></tr>
+                    <tr><td colspan="10" class="px-4 py-8 text-center text-sm text-slate-400">No crawl sites yet.</td></tr>
                 @endforelse
             </tbody>
         </table>
