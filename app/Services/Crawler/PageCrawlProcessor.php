@@ -34,6 +34,7 @@ class PageCrawlProcessor
         private readonly PageAnalyzer $analyzer,
         private readonly BlockDetector $blockDetector,
         private readonly ProxyPool $pool,
+        private readonly DomainRateLimiter $rateLimiter,
     ) {}
 
     public function process(WebsitePage $page, ?CrawlSite $website = null): string
@@ -226,6 +227,11 @@ class PageCrawlProcessor
     {
         $conditional = ['etag' => $page->etag, 'last_modified' => $page->last_modified_header];
         $timeout = (int) config('crawler.timeout', 20);
+
+        // Fleet-wide per-domain politeness (Redis-backed) before we fetch — the local
+        // delay_ms only paces within one worker's batch; many autoscaled workers could
+        // otherwise hammer one domain. See infra/crawler/autoscaling.md.
+        $this->rateLimiter->throttle($website?->normalized_domain ?: parse_url($page->url, PHP_URL_HOST) ?: '');
 
         $proxy = $this->pool->preemptiveFor($website?->crawl_protection) ? $this->pool->pick() : null;
         $res = $this->fetcher->fetch($page->url, $conditional, $timeout, $proxy);

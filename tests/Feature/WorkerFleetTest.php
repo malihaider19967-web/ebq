@@ -93,6 +93,20 @@ class WorkerFleetTest extends TestCase
         $this->assertSame(WorkerNode::STATUS_FAILED, WorkerNode::first()->status);
     }
 
+    public function test_domain_rate_limiter_caps_per_window_and_shares_bucket(): void
+    {
+        config(['crawler.rate_max_wait_ms' => 0]); // fail-open instantly — no sleeping in the test
+        AutoscalerConfig::update(['per_domain_rate' => 2]);
+        $limiter = new \App\Services\Crawler\DomainRateLimiter();
+
+        $limiter->throttle('example.com');
+        $limiter->throttle('https://www.example.com/some/page'); // normalizes to the SAME bucket
+        $limiter->throttle('example.com'); // over the per-second rate → fail-open, no extra hit
+
+        $this->assertSame(2, \Illuminate\Support\Facades\RateLimiter::attempts('crawl-rate:example.com'),
+            'only `rate` requests counted per window; www/scheme variants share one domain bucket');
+    }
+
     public function test_pinned_node_is_never_destroyed(): void
     {
         $pinned = WorkerNode::create([

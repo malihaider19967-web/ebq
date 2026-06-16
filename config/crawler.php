@@ -38,6 +38,11 @@ return [
     // Politeness delay between same-host fetches inside a batch (milliseconds).
     'delay_ms' => (int) env('CRAWLER_DELAY_MS', 250),
 
+    // Fleet-wide per-domain rate limiter (DomainRateLimiter): max ms a worker will
+    // wait for a domain token before proceeding fail-open. The rate itself
+    // (req/sec/domain) is the admin-editable autoscaler.per_domain_rate setting.
+    'rate_max_wait_ms' => (int) env('CRAWLER_RATE_MAX_WAIT_MS', 5000),
+
     // Per-page fetch timeout (seconds).
     'timeout' => (int) env('CRAWLER_TIMEOUT', 20),
 
