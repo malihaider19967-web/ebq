@@ -30,7 +30,7 @@ return [
     // Watchdog (ebq:crawl-supervisor): a `running` run whose row hasn't been touched
     // in this many minutes is treated as wedged (dead multi-pass chain) and resumed
     // or finalized. Generous so a genuinely-slow batch isn't mistaken for a stall.
-    'stall_minutes' => (int) env('CRAWLER_STALL_MINUTES', 15),
+    'stall_minutes' => (int) env('CRAWLER_STALL_MINUTES', 10),
     // Hard cap on a single run's wall-clock before the supervisor stops resurrecting
     // it and finalizes with whatever has been crawled.
     'max_run_hours' => (int) env('CRAWLER_MAX_RUN_HOURS', 6),
