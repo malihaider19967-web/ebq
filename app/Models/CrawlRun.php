@@ -58,6 +58,11 @@ class CrawlRun extends Model
         return $this->belongsTo(Website::class);
     }
 
+    public function crawlSite(): BelongsTo
+    {
+        return $this->belongsTo(CrawlSite::class);
+    }
+
     public function findings(): HasMany
     {
         return $this->hasMany(CrawlFinding::class);

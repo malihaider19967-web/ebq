@@ -121,6 +121,26 @@ class CrawlSite extends Model
         return in_array($this->crawl_protection, ['cloudflare', 'blocked'], true);
     }
 
+    /** Whether this domain's sitemap <lastmod> reliably predicts content change. */
+    public function sitemapLastmodTrusted(): bool
+    {
+        $total = $this->sitemap_lastmod_true + $this->sitemap_lastmod_false;
+        $min = (int) config('crawler.lastmod_min_sample', 20);
+        $ratio = (float) config('crawler.lastmod_trust_ratio', 0.3);
+
+        return $total >= $min && ($this->sitemap_lastmod_true / max(1, $total)) >= $ratio;
+    }
+
+    /** Confirmed-meaningless (always-bumping) lastmod — skip early recrawls. */
+    public function sitemapLastmodConfirmedUntrusted(): bool
+    {
+        $total = $this->sitemap_lastmod_true + $this->sitemap_lastmod_false;
+        $min = (int) config('crawler.lastmod_min_sample', 20);
+        $ratio = (float) config('crawler.lastmod_trust_ratio', 0.3);
+
+        return $total >= $min && ($this->sitemap_lastmod_true / max(1, $total)) < $ratio;
+    }
+
     /**
      * Recompute effective_cap = max crawl page cap across subscribers. Returns the
      * new value. Used when a subscriber joins/leaves so the shared crawl is deep
