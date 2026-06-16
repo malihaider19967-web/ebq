@@ -10,8 +10,11 @@ use App\Models\User;
 use App\Models\Website;
 use App\Models\WebsiteFindingState;
 use App\Models\WebsitePage;
+use App\Jobs\CrawlWebsitePagesJob;
 use App\Services\Crawler\CrawlReportService;
+use App\Services\Crawler\CrawlSiteBootstrapper;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Bus;
 use Tests\TestCase;
 
 class SharedCrawlTest extends TestCase
@@ -93,5 +96,48 @@ class SharedCrawlTest extends TestCase
         WebsiteFindingState::create(['website_id' => $w1->id, 'finding_id' => $finding->id, 'status' => 'ignored']);
         $this->assertSame(0, $report->summary($w1->id)['findings']['total']);
         $this->assertSame(1, $report->summary($w2->id)['findings']['total']);
+    }
+
+    public function test_subscribe_charges_the_cap_and_reuses_existing_crawl(): void
+    {
+        Bus::fake();
+        config(['app.free' => false]);
+        Plan::create(['slug' => 'small', 'name' => 'S', 'max_crawl_pages' => 2, 'is_active' => true]);
+
+        // basepaws already has a completed shared crawl with 3 crawled pages.
+        $a = Website::factory()->create(['user_id' => User::factory()->create()->id, 'domain' => 'basepaws.com']);
+        $cs = $a->crawl_site_id;
+        CrawlRun::create(['crawl_site_id' => $cs, 'trigger' => 'manual', 'status' => 'completed', 'started_at' => now(), 'finished_at' => now()]);
+        $this->page($cs, 'https://basepaws.com/1', 1);
+        $this->page($cs, 'https://basepaws.com/2', 2);
+        $this->page($cs, 'https://basepaws.com/3', 3);
+
+        // A new cap-2 user adds the same domain (www).
+        $b = Website::factory()->create(['user_id' => User::factory()->create(['current_plan_slug' => 'small'])->id, 'domain' => 'www.basepaws.com']);
+        app(CrawlSiteBootstrapper::class)->subscribeWebsite($b);
+
+        // Charged 2 (their cap of the 3 crawled pages), and NO new crawl — instant reuse.
+        $this->assertDatabaseHas('client_activities', [
+            'website_id' => $b->id, 'provider' => 'crawl_reuse', 'units_consumed' => 2,
+        ]);
+        Bus::assertNotDispatched(CrawlWebsitePagesJob::class);
+    }
+
+    public function test_deleting_last_subscriber_gcs_the_shared_crawl(): void
+    {
+        $a = Website::factory()->create(['user_id' => User::factory()->create()->id, 'domain' => 'shared.com']);
+        $b = Website::factory()->create(['user_id' => User::factory()->create()->id, 'domain' => 'shared.com']);
+        $cs = $a->crawl_site_id;
+        $this->page($cs, 'https://shared.com/1', 1);
+
+        // Deleting one subscriber keeps the shared crawl (the other still subscribes).
+        $a->delete();
+        $this->assertDatabaseHas('crawl_sites', ['id' => $cs]);
+        $this->assertDatabaseHas('website_pages', ['crawl_site_id' => $cs]);
+
+        // Deleting the last subscriber GCs the shared crawl + its data.
+        $b->delete();
+        $this->assertDatabaseMissing('crawl_sites', ['id' => $cs]);
+        $this->assertDatabaseMissing('website_pages', ['crawl_site_id' => $cs]);
     }
 }

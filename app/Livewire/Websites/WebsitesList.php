@@ -77,14 +77,9 @@ class WebsitesList extends Component
                 '--website' => (string) $website->id,
             ]);
 
-            // Crawl the client's own pages (sitemap list first, then crawl) so
-            // Site Health / the action queue have data right after add.
-            if ($website->hasGsc()) {
-                \Illuminate\Support\Facades\Bus::chain([
-                    new \App\Jobs\SyncSitemaps($website->id),
-                    new \App\Jobs\CrawlWebsitePagesJob($website->id, \App\Models\CrawlRun::TRIGGER_ON_CREATE),
-                ])->dispatch();
-            }
+            // Subscribe to the shared crawl_site: charge the cap and crawl only if
+            // the domain isn't already covered (else instantly reuse the shared data).
+            app(\App\Services\Crawler\CrawlSiteBootstrapper::class)->subscribeWebsite($website);
         }
 
         $this->reset(['domain', 'gaSelection', 'gscSelection', 'showForm', 'fetchError']);

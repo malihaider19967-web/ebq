@@ -51,6 +51,28 @@ class Website extends Model
             $site->recomputeEffectiveCap();
         });
 
+        // On delete, detach from the shared crawl_site and recompute its cap. If no
+        // subscribers remain, GC the shared crawl + its data (deleting one user's
+        // website never touches the shared crawl while others still subscribe — the
+        // website_id cascade FK was dropped for exactly this reason).
+        static::deleted(function (Website $website): void {
+            if (! $website->crawl_site_id) {
+                return;
+            }
+            $site = CrawlSite::find($website->crawl_site_id);
+            if (! $site) {
+                return;
+            }
+            if ($site->websites()->count() === 0) {
+                foreach (['crawl_findings', 'website_internal_links', 'crawl_runs', 'website_pages'] as $t) {
+                    \Illuminate\Support\Facades\DB::table($t)->where('crawl_site_id', $site->id)->delete();
+                }
+                $site->delete();
+            } else {
+                $site->recomputeEffectiveCap();
+            }
+        });
+
         static::created(function (Website $website): void {
             // Skip the 365-day backfill for websites that boot up
             // already over the user's plan limit (would happen in

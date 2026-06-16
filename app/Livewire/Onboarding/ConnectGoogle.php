@@ -125,15 +125,11 @@ class ConnectGoogle extends Component
         }
         if ($website->hasGsc()) {
             SyncSearchConsoleData::dispatch($website->id, 365);
-            // Pull the sitemap list, then crawl the site's own pages so the SEO
-            // intelligence (broken links, internal-link graph, on-page issues)
-            // is ready alongside the GSC/GA backfill. Chained so sitemaps land
-            // before the crawl builds its frontier.
-            \Illuminate\Support\Facades\Bus::chain([
-                new \App\Jobs\SyncSitemaps($website->id),
-                new \App\Jobs\CrawlWebsitePagesJob($website->id, \App\Models\CrawlRun::TRIGGER_ON_CREATE),
-            ])->dispatch();
         }
+        // Subscribe to the shared crawl_site: charge the cap, and crawl only if the
+        // domain isn't already covered (otherwise the user instantly reuses the
+        // existing shared crawl). Frontier seeds the homepage, so GSC isn't required.
+        app(\App\Services\Crawler\CrawlSiteBootstrapper::class)->subscribeWebsite($website);
 
         $this->finishOnboarding($website);
     }
@@ -163,6 +159,9 @@ class ConnectGoogle extends Component
         if ($website === null) {
             return;
         }
+
+        // A domain-only add of an already-crawled domain still gets the shared data.
+        app(\App\Services\Crawler\CrawlSiteBootstrapper::class)->subscribeWebsite($website);
 
         $this->finishOnboarding($website);
     }
