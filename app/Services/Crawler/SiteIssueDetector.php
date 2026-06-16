@@ -225,7 +225,7 @@ class SiteIssueDetector
                         $website->id, $run->id, (int) $r->id,
                         CrawlFinding::CATEGORY_BROKEN_LINK, 'broken_internal',
                         ($this->clicks[$r->url_hash] ?? 0) > 0 ? 'critical' : 'high',
-                        (float) ($this->clicks[$r->url_hash] ?? 0),
+                        0.0, // per-user impact computed read-time
                         $r->url,
                         $detail,
                     );
@@ -291,8 +291,11 @@ class SiteIssueDetector
 
     private function add(WebsitePage $page, string $category, string $type, string $severity, int $clicks, array $detail = []): void
     {
+        // Stored impact is 0: the shared finding must not carry any user's (or the
+        // aggregate's) click count. Per-user impact is computed read-time in
+        // CrawlReportService from each website's own SearchConsoleData.
         $this->pending[$type.'|'.$page->url_hash] = $this->row(
-            $page->crawl_site_id, 0, $page->id, $category, $type, $severity, (float) $clicks, $page->url, $detail,
+            $page->crawl_site_id, 0, $page->id, $category, $type, $severity, 0.0, $page->url, $detail,
         );
     }
 

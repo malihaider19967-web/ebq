@@ -33,6 +33,24 @@ class Website extends Model
             $website->normalized_domain = $domain !== '' ? CrawlSite::normalizeDomain($domain) : null;
         });
 
+        // Link every website to its shared crawl_site (one per normalized domain).
+        // The bootstrapper adds the charge + crawl dispatch on top of this; here we
+        // only guarantee the membership so all crawl reads/writes have a crawl_site.
+        static::saved(function (Website $website): void {
+            if (! $website->normalized_domain) {
+                return;
+            }
+            if ($website->crawl_site_id && ! $website->wasChanged('normalized_domain')) {
+                return;
+            }
+            $site = CrawlSite::firstOrCreate(['normalized_domain' => $website->normalized_domain]);
+            if ((int) $website->crawl_site_id !== (int) $site->id) {
+                $website->crawl_site_id = $site->id;
+                $website->saveQuietly();
+            }
+            $site->recomputeEffectiveCap();
+        });
+
         static::created(function (Website $website): void {
             // Skip the 365-day backfill for websites that boot up
             // already over the user's plan limit (would happen in
@@ -403,7 +421,7 @@ class Website extends Model
     /** Has the crawler detected this site is behind Cloudflare/a WAF, or blocking us? */
     public function isCrawlProtected(): bool
     {
-        return in_array($this->crawl_protection, ['cloudflare', 'blocked'], true);
+        return $this->crawlSite?->isCrawlProtected() ?? false;
     }
 
     /**
@@ -414,12 +432,7 @@ class Website extends Model
      */
     public function sitemapLastmodTrusted(): bool
     {
-        $total = (int) $this->sitemap_lastmod_true + (int) $this->sitemap_lastmod_false;
-        if ($total < (int) config('crawler.sitemap_trust_min_sample', 20)) {
-            return false;
-        }
-
-        return ((int) $this->sitemap_lastmod_true / $total) >= (float) config('crawler.sitemap_trust_ratio', 0.3);
+        return $this->crawlSite?->sitemapLastmodTrusted() ?? false;
     }
 
     /**
@@ -429,10 +442,7 @@ class Website extends Model
      */
     public function sitemapLastmodConfirmedUntrusted(): bool
     {
-        $total = (int) $this->sitemap_lastmod_true + (int) $this->sitemap_lastmod_false;
-
-        return $total >= (int) config('crawler.sitemap_trust_min_sample', 20)
-            && ((int) $this->sitemap_lastmod_true / $total) < (float) config('crawler.sitemap_trust_ratio', 0.3);
+        return $this->crawlSite?->sitemapLastmodConfirmedUntrusted() ?? false;
     }
 
     /**
@@ -606,22 +616,16 @@ class Website extends Model
 
     public function latestCrawlRun(): ?CrawlRun
     {
-        return $this->crawlRuns()->latest('started_at')->first();
+        return $this->crawlSite?->latestRun();
     }
 
     /**
-     * The in-progress crawl for this site, if any. Recency-guarded: a job that
-     * dies (timeout / worker crash) can leave a run stuck at `running`, so we
-     * only trust runs started within a generous window — far longer than any
-     * normal crawl, so a real crawl is never missed.
+     * The in-progress crawl for this site's shared crawl, if any (recency-guarded).
+     * Delegates to the crawl_site since the crawl is now shared per domain.
      */
     public function runningCrawl(): ?CrawlRun
     {
-        return $this->crawlRuns()
-            ->where('status', CrawlRun::STATUS_RUNNING)
-            ->where('started_at', '>=', now()->subHours(6))
-            ->latest('started_at')
-            ->first();
+        return $this->crawlSite?->runningCrawl();
     }
 
     public function isCrawling(): bool
@@ -629,10 +633,12 @@ class Website extends Model
         return $this->runningCrawl() !== null;
     }
 
-    /** Has this site ever produced a finished crawl (i.e. real data exists)? */
+    /** Has the shared crawl ever produced a finished crawl (i.e. real data exists)? */
     public function hasCompletedCrawl(): bool
     {
-        return $this->crawlRuns()->where('status', CrawlRun::STATUS_COMPLETED)->exists();
+        return $this->crawl_site_id
+            ? CrawlRun::where('crawl_site_id', $this->crawl_site_id)->where('status', CrawlRun::STATUS_COMPLETED)->exists()
+            : false;
     }
 
     /**

@@ -1,0 +1,209 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Mail\CrawlReportMail;
+use App\Models\CrawlFinding;
+use App\Models\CrawlReportSend;
+use App\Models\CrawlRun;
+use App\Models\Website;
+use App\Services\ClientActivityLogger;
+use App\Services\Crawler\CrawlReportService;
+use App\Services\ReportDataService;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
+use Illuminate\View\View;
+
+/**
+ * Admin "Marketing" panel: surfaces client websites whose latest crawl is
+ * finished and that still have open issues, and lets an admin email the client
+ * a numbers + top-3-examples crawl summary. Every send is recorded in
+ * crawl_report_sends so we keep a record of what was sent and to whom.
+ */
+class MarketingController extends Controller
+{
+    public function __construct(
+        private readonly CrawlReportService $crawl,
+        private readonly ReportDataService $reportData,
+    ) {}
+
+    public function index(Request $request): View
+    {
+        $q = trim((string) $request->query('q', ''));
+
+        $websites = Website::query()
+            ->whereHas('crawlSite', fn ($cs) => $cs
+                ->whereHas('crawlRuns', fn ($r) => $r->where('status', CrawlRun::STATUS_COMPLETED))
+                ->whereHas('crawlFindings', fn ($f) => $f->where('status', CrawlFinding::STATUS_OPEN)))
+            ->with('user:id,name,email')
+            ->when($q !== '', fn ($query) => $query->where('domain', 'like', '%'.$q.'%'))
+            ->orderBy('domain')
+            ->paginate(25)
+            ->withQueryString();
+
+        // Per-row crawl numbers. summary() reads each site's latest run; 25 rows
+        // per page keeps this well within a normal admin-page query budget.
+        $rows = $websites->getCollection()->map(function (Website $w): array {
+            $s = $this->crawl->summary($w->id);
+
+            return [
+                'website' => $w,
+                'health' => $s['health_score'],
+                'counts' => $s['findings'],
+                'last_crawled_at' => $s['last_crawled_at'],
+                'run_status' => $s['run_status'],
+            ];
+        });
+
+        $recentSends = CrawlReportSend::with(['website:id,domain', 'sentBy:id,name'])
+            ->latest('id')->limit(10)->get();
+
+        return view('admin.marketing.index', [
+            'websites' => $websites,
+            'rows' => $rows,
+            'recentSends' => $recentSends,
+            'q' => $q,
+        ]);
+    }
+
+    public function send(Request $request, Website $website, ClientActivityLogger $logger): RedirectResponse
+    {
+        $data = $request->validate([
+            'to_email' => ['nullable', 'email'],
+        ]);
+
+        $owner = $website->user;
+        $toEmail = ($data['to_email'] ?? null) ?: $owner?->email;
+
+        if (! $toEmail) {
+            return back()->with('status', "{$website->domain} has no owner email — type a recipient address to send.");
+        }
+
+        $report = $this->buildReport($website);
+        $subject = $this->subject($website, (int) ($report['counts']['total'] ?? 0));
+
+        $status = 'sent';
+        try {
+            Mail::to($toEmail)->queue(new CrawlReportMail($website, $report, $owner?->name));
+        } catch (\Throwable $e) {
+            $status = 'failed';
+            Log::warning("MarketingController: crawl report send failed for {$website->domain} -> {$toEmail}: {$e->getMessage()}");
+        }
+
+        CrawlReportSend::create([
+            'website_id' => $website->id,
+            'recipient_user_id' => $owner?->id,
+            'sent_by_user_id' => $request->user()?->id,
+            'to_email' => $toEmail,
+            'subject' => $subject,
+            'summary' => $report,
+            'status' => $status,
+        ]);
+
+        $logger->log(
+            'admin.crawl_report_sent',
+            userId: $owner?->id,
+            websiteId: $website->id,
+            meta: ['to_email' => $toEmail, 'total' => (int) ($report['counts']['total'] ?? 0), 'status' => $status],
+            actorUserId: $request->user()?->id,
+        );
+
+        return back()->with('status', $status === 'sent'
+            ? "Crawl report sent to {$toEmail} for {$website->domain}."
+            : "Could not send the report for {$website->domain} — logged as failed.");
+    }
+
+    /** Full paginated history of every report we've sent. */
+    public function sends(Request $request): View
+    {
+        $sends = CrawlReportSend::with(['website:id,domain', 'recipient:id,name', 'sentBy:id,name'])
+            ->latest('id')
+            ->paginate(40)
+            ->withQueryString();
+
+        return view('admin.marketing.sends', ['sends' => $sends]);
+    }
+
+    /**
+     * Assemble the numbers + top-3 example errors snapshot stored on the send
+     * record and rendered in the email.
+     *
+     * @return array<string,mixed>
+     */
+    private function buildReport(Website $website): array
+    {
+        $summary = $this->crawl->summary($website->id);
+
+        return [
+            'domain' => $website->domain,
+            'health_score' => $summary['health_score'],
+            'counts' => $summary['findings'],
+            'pages_total' => $summary['pages_total'],
+            'last_crawled_at' => optional($summary['last_crawled_at'])->toIso8601String(),
+            'breakdown' => $this->crawl->reportBreakdown($website->id, 5),
+            'traffic' => $this->buildTraffic($website),
+            'dashboard_url' => url('/dashboard'),
+        ];
+    }
+
+    /**
+     * Headline 28-day traffic numbers (GSC clicks/impressions/position + GA
+     * users/sessions) for the report. Returns null when the site has neither
+     * Search Console nor Analytics connected, and only includes the sub-block
+     * for each source that actually has data. Failures degrade to null so a
+     * traffic hiccup never blocks the crawl report from sending.
+     *
+     * @return array<string,mixed>|null
+     */
+    private function buildTraffic(Website $website): ?array
+    {
+        try {
+            $readiness = $this->reportData->reportReadiness($website);
+            if (! $readiness['any'] || ! $readiness['date']) {
+                return null;
+            }
+
+            $end = $readiness['date']->copy();
+            $start = $end->copy()->subDays(27);
+            $data = $this->reportData->generate($website->id, $start->toDateString(), $end->toDateString());
+            $sc = $data['search_console'] ?? [];
+            $an = $data['analytics'] ?? [];
+
+            $traffic = [
+                'has_gsc' => (bool) $readiness['gsc'],
+                'has_ga' => (bool) $readiness['ga'],
+                'period_label' => '28 days',
+            ];
+            if ($readiness['gsc']) {
+                $traffic['gsc'] = [
+                    'clicks' => (int) ($sc['clicks']['current'] ?? 0),
+                    'clicks_change_percent' => $sc['clicks']['change_percent'] ?? null,
+                    'clicks_direction' => $sc['clicks']['direction'] ?? 'flat',
+                    'impressions' => (int) ($sc['impressions']['current'] ?? 0),
+                    'position' => (float) ($sc['position']['current'] ?? 0),
+                ];
+            }
+            if ($readiness['ga']) {
+                $traffic['ga'] = [
+                    'users' => (int) ($an['users']['current'] ?? 0),
+                    'sessions' => (int) ($an['sessions']['current'] ?? 0),
+                ];
+            }
+
+            return $traffic;
+        } catch (\Throwable $e) {
+            Log::warning("MarketingController: traffic summary failed for {$website->domain}: {$e->getMessage()}");
+
+            return null;
+        }
+    }
+
+    private function subject(Website $website, int $count): string
+    {
+        return "Your {$website->domain} SEO crawl found {$count} ".Str::plural('issue', $count);
+    }
+}
