@@ -17,7 +17,11 @@ class WorkerFleetTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['services.hetzner.token' => 'test-token', 'services.hetzner.location' => 'fsn1']);
+        config([
+            'services.hetzner.token' => 'test-token',
+            'services.hetzner.location' => 'fsn1',
+            'services.hetzner.image' => '12345', // a worker snapshot id, so provision() passes the image guard
+        ]);
     }
 
     public function test_desired_from_backlog_clamps_between_min_and_max(): void
@@ -66,6 +70,19 @@ class WorkerFleetTest extends TestCase
         $this->assertSame('10.0.0.9', $node->private_ip);
         $this->assertSame("ebq-crawl-worker-{$node->id}", $node->name);
         $this->assertSame(1, WorkerNode::billable()->count());
+    }
+
+    public function test_provision_fails_clearly_when_no_image_configured(): void
+    {
+        config(['services.hetzner.image' => null]);
+        AutoscalerConfig::update(['snapshot_id' => null]);
+        Http::fake(); // any Hetzner call here would be a bug — we must fail before it
+
+        $node = app(WorkerFleetService::class)->provision();
+
+        $this->assertSame(WorkerNode::STATUS_FAILED, $node->status);
+        $this->assertStringContainsString('worker image', (string) $node->last_error);
+        Http::assertNothingSent();
     }
 
     public function test_provision_marks_failed_on_api_error(): void

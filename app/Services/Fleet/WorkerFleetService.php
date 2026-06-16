@@ -66,9 +66,22 @@ class WorkerFleetService
         ]);
         $node->update(['name' => "ebq-crawl-worker-{$node->id}"]);
 
+        // Hetzner requires a valid `image` — a snapshot id (int) or a system image
+        // name. Fail clearly if none is configured rather than surfacing the raw
+        // "invalid input field 'image'" API error.
+        $image = AutoscalerConfig::snapshotId();
+        if (! $image) {
+            $node->update([
+                'status' => WorkerNode::STATUS_FAILED,
+                'last_error' => 'No worker image configured. Build a worker snapshot, then set HCLOUD_WORKER_IMAGE (or snapshot_id at /admin/fleet) to its id.',
+            ]);
+
+            return $node->refresh();
+        }
+
         $result = $this->hetzner->createServer($node->name, [
             'server_type' => AutoscalerConfig::serverType(),
-            'image' => AutoscalerConfig::snapshotId(),
+            'image' => $image,
         ]);
 
         if (! $result['ok']) {
@@ -107,10 +120,15 @@ class WorkerFleetService
         $r1 = $this->run("rsync -az {$excludes} -e \"{$ssh}\" /var/www/ebq/ root@{$ip}:/var/www/ebq/");
         // 2) push the worker .env (operator-maintained on the web box: 10.0.0.2 hosts/secrets)
         $r2 = $this->run("rsync -az -e \"{$ssh}\" /var/www/ebq/.env.worker root@{$ip}:/var/www/ebq/.env");
-        // 3) clear cached config + start the crawl workers
-        $r3 = $this->run("{$ssh} root@{$ip} 'rm -f /var/www/ebq/bootstrap/cache/*.php; docker compose -f /var/www/ebq/docker-compose.worker.yml up -d'");
+        // 3) install the CRAWL-ONLY compose (overrides whatever the snapshot shipped —
+        //    e.g. a snapshot of the pinned box has finalize+sync workers we must NOT run
+        //    on an ephemeral box, since a drain could then kill a finalize).
+        $r3 = $this->run("{$ssh} root@{$ip} 'cp /var/www/ebq/docker-compose.ephemeral.yml /var/www/ebq/docker-compose.worker.yml'");
+        // 4) clear cached config + start the crawl workers. --remove-orphans tears down
+        //    any finalize/sync containers a snapshot of the pinned box auto-started on boot.
+        $r4 = $this->run("{$ssh} root@{$ip} 'rm -f /var/www/ebq/bootstrap/cache/*.php; docker compose -f /var/www/ebq/docker-compose.worker.yml up -d --remove-orphans'");
 
-        $ok = $r1 && $r2 && $r3;
+        $ok = $r1 && $r2 && $r3 && $r4;
         $node->update($ok
             ? ['status' => WorkerNode::STATUS_ACTIVE, 'is_healthy' => true, 'last_seen_at' => now(), 'last_error' => null]
             : ['last_error' => 'bootstrap rsync/ssh failed']);

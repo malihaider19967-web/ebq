@@ -1,0 +1,19 @@
+# Crawl-ONLY worker stack for AUTOSCALED ephemeral boxes. The bootstrap copies this
+# over docker-compose.worker.yml on each new box, so an ephemeral box runs only the
+# page-fetch pipeline (`--queue=crawl`, <=300s jobs) — never the long crawl-finalize
+# (AnalyzeSiteJob) or sync queues, which stay on the pinned permanent box. That way a
+# scale-down drain can never interrupt a finalize. See infra/crawler/autoscaling.md.
+#
+# (Unlike docker-compose.worker.yml — which is worker-box-only — this file IS in the
+#  repo so it rsyncs to ephemeral boxes at bootstrap.)
+services:
+  crawl:
+    image: ebq-worker:8.3
+    network_mode: host
+    restart: always
+    stop_grace_period: 360s
+    volumes: [ "/var/www/ebq:/var/www/ebq" ]
+    working_dir: /var/www/ebq
+    command: php -d memory_limit=2048M artisan queue:work redis --queue=crawl --sleep=3 --tries=3 --max-time=3600 --timeout=300
+    deploy:
+      replicas: 5
