@@ -110,7 +110,7 @@ class PageDetail extends Component
         }
 
         try {
-            $accessToken = $this->resolveGoogleAccessToken($googleClientFactory, $user);
+            $accessToken = $this->resolveGoogleAccessToken($googleClientFactory, $website);
 
             $storedPage = app(\App\Services\PluginInsightResolver::class)
                 ->resolveStoredPageUrl($website, $this->pageUrl);
@@ -172,7 +172,7 @@ class PageDetail extends Component
         }
 
         try {
-            $accessToken = $this->resolveGoogleAccessToken($googleClientFactory, $user);
+            $accessToken = $this->resolveGoogleAccessToken($googleClientFactory, $website);
 
             $storedPage = app(\App\Services\PluginInsightResolver::class)
                 ->resolveStoredPageUrl($website, $this->pageUrl);
@@ -537,10 +537,13 @@ class PageDetail extends Component
         $this->auditMessageKind = in_array($kind, ['success', 'info', 'error'], true) ? $kind : 'info';
     }
 
-    private function resolveGoogleAccessToken(GoogleClientFactory $googleClientFactory, $user): string
+    private function resolveGoogleAccessToken(GoogleClientFactory $googleClientFactory, Website $website): string
     {
+        // URL inspection rides the GSC/webmasters scope, so use the
+        // account tied to this site's Search Console source — not just the
+        // user's latest account, which may be a GA-only login.
         /** @var GoogleAccount|null $account */
-        $account = $user->googleAccounts()->latest('id')->first();
+        $account = $website->gscAccountResolved();
         if (! $account) {
             throw new \RuntimeException('Connect your Google account first in Settings.');
         }

@@ -2,6 +2,9 @@
 
 use App\Http\Controllers\GoogleOAuthController;
 use App\Http\Controllers\GuestAuditController;
+use App\Http\Controllers\GuestPageSpeedController;
+use App\Http\Controllers\GuestRankCheckController;
+use App\Http\Controllers\GuestKeywordVolumeController;
 use App\Http\Controllers\GoogleCapController;
 use App\Http\Controllers\MicrosoftOAuthController;
 use App\Http\Controllers\PageAuditController;
@@ -16,6 +19,8 @@ use App\Http\Controllers\Admin\BillingController as AdminBillingController;
 use App\Http\Controllers\Admin\PlanController as AdminPlanController;
 use App\Http\Controllers\Admin\ArtisanCommandsController as AdminArtisanCommandsController;
 use App\Http\Controllers\Admin\PlatformSettingsController as AdminPlatformSettingsController;
+use App\Http\Controllers\Admin\KeywordApiServerController as AdminKeywordApiServerController;
+use App\Http\Controllers\Admin\MarketingController as AdminMarketingController;
 use App\Http\Controllers\WordPressConnectController;
 use App\Http\Controllers\WordPressEmbedController;
 use App\Http\Controllers\WordPressPluginDownloadController;
@@ -26,6 +31,7 @@ Route::view('/', 'landing')->name('landing');
 Route::view('/features', 'features')->name('features');
 Route::view('/wordpress-plugin', 'wordpress-plugin')->name('wordpress-plugin');
 Route::view('/pricing', 'pricing')->name('pricing');
+Route::view('/website-revamp', 'website-revamp')->name('website-revamp');
 Route::view('/contact', 'contact')->name('contact');
 Route::view('/terms-conditions', 'legal.terms')->name('terms-conditions');
 Route::view('/privacy-policy', 'legal.privacy')->name('privacy-policy');
@@ -38,6 +44,36 @@ Route::view('/guide', 'guide')->name('guide');
 Route::post('/audit', [GuestAuditController::class, 'store'])->name('guest-audit.store');
 Route::get('/audit/{guestPageAudit}/status', [GuestAuditController::class, 'status'])->name('guest-audit.status');
 Route::get('/audit/{guestPageAudit}', [GuestAuditController::class, 'show'])->name('guest-audit.show');
+
+// Dedicated public SEO-audit tool page (same flow as the landing hero).
+Route::view('/free-audit', 'tools.audit')->name('tools.audit');
+
+// Public, no-signup PageSpeed test tool — same progressive friction as the
+// guest audit (1st free on-screen, 2nd by email, 3rd → signup). Runs the
+// self-hosted Lighthouse; rate-limited + reCAPTCHA-gated in the controller.
+Route::view('/pagespeed-test', 'tools.page-speed')->name('tools.pagespeed');
+Route::post('/pagespeed-test', [GuestPageSpeedController::class, 'store'])->name('guest-pagespeed.store');
+Route::get('/pagespeed-test/{guestPageSpeed}/status', [GuestPageSpeedController::class, 'status'])->name('guest-pagespeed.status');
+Route::get('/pagespeed-test/{guestPageSpeed}', [GuestPageSpeedController::class, 'show'])->name('guest-pagespeed.show');
+
+// Public, no-signup keyword rank tracker — same progressive friction as the
+// guest audit / PageSpeed test (1st free on-screen, 2nd by email, 3rd → signup).
+// Runs a single Serper organic lookup; rate-limited + reCAPTCHA-gated in the controller.
+Route::view('/rank-tracker', 'tools.rank-tracker')->name('tools.rank-tracker');
+Route::post('/rank-tracker', [GuestRankCheckController::class, 'store'])->name('guest-rank.store');
+Route::get('/rank-tracker/{guestRankCheck}/status', [GuestRankCheckController::class, 'status'])->name('guest-rank.status');
+Route::get('/rank-tracker/{guestRankCheck}', [GuestRankCheckController::class, 'show'])->name('guest-rank.show');
+
+// Public, no-signup keyword search-volume finder — same progressive friction
+// (1st free on-screen, 2nd by email, 3rd → signup). One keyword per check;
+// DB-first against the shared keyword_metrics cache, so it only calls Keywords
+// Everywhere on a cache miss. Rate-limited + reCAPTCHA-gated in the controller.
+// Distinct public path so it doesn't collide with the authenticated portal
+// finder at /keyword-volume (mirrors /pagespeed vs /pagespeed-test).
+Route::view('/keyword-volume-checker', 'tools.keyword-volume')->name('tools.keyword-volume');
+Route::post('/keyword-volume-checker', [GuestKeywordVolumeController::class, 'store'])->name('guest-volume.store');
+Route::get('/keyword-volume-checker/{guestKeywordVolume}/status', [GuestKeywordVolumeController::class, 'status'])->name('guest-volume.status');
+Route::get('/keyword-volume-checker/{guestKeywordVolume}', [GuestKeywordVolumeController::class, 'show'])->name('guest-volume.show');
 
 // Always-fresh download of the latest packaged WP plugin — bypasses public/ caching.
 Route::get('/wordpress/plugin.zip', WordPressPluginDownloadController::class)->name('wordpress.plugin.download');
@@ -54,6 +90,12 @@ Route::get('/api/v1/plans', [\App\Http\Controllers\Api\V1\PricingController::cla
 // verifies via STRIPE_WEBHOOK_SECRET so no extra auth needed.
 Route::post('/stripe/webhook', [\App\Http\Controllers\StripeWebhookController::class, 'handleWebhook'])
     ->name('cashier.webhook');
+
+// Self-hosted keyword API result callback. Server-to-server; CSRF-exempted in
+// bootstrap/app.php. The body is HMAC-signed with the originating server's
+// webhook_secret — the controller verifies it.
+Route::post('/webhooks/keyword-finder', \App\Http\Controllers\Webhooks\KeywordFinderWebhookController::class)
+    ->name('webhooks.keyword-finder');
 
 // Billing — Stripe Checkout + Customer Portal redirects. Auth required
 // because we need the user context to resolve which Website is being
@@ -103,10 +145,27 @@ Route::get('/wordpress/embed/page-audit', [WordPressEmbedController::class, 'pag
 
 Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/dashboard', 'dashboard')->middleware('feature:dashboard')->name('dashboard');
+    // Priority Action Queue drill-down: one filterable + paginated page per issue
+    // group (crawl_* findings and the GSC/keyword action types).
+    Route::get('/issues/{key}', fn (string $key) => view('issues.show', ['key' => $key]))
+        ->middleware('feature:dashboard')
+        ->name('issues.show')->where('key', '[a-z0-9_]+');
+    Route::view('/statistics', 'statistics')->middleware('feature:dashboard')->name('statistics');
     Route::view('/keywords', 'keywords.index')->middleware('feature:keywords')->name('keywords.index');
+    // Registered before the /keywords/{query} catch-all below so it isn't swallowed.
+    Route::view('/keywords/fix', 'keywords.fix')->middleware('feature:audits')->name('keywords.fix');
     Route::get('/keywords/{query}', fn (string $query) => view('keywords.show', ['query' => $query]))
         ->middleware('feature:keywords')
         ->name('keywords.show')->where('query', '.*');
+    // Unified Keyword Research hub (Ideas · Volume · Competitor Gap). The old
+    // per-tool paths redirect here (deep links / bookmarks keep working); the
+    // route names are retained so existing route() callers still resolve.
+    Route::view('/keyword-research', 'keyword-research.index')->middleware('feature:keywords')->name('keyword-research.index');
+    Route::redirect('/keyword-volume', '/keyword-research?tab=volume')->name('keyword-volume.index');
+    Route::redirect('/keyword-ideas', '/keyword-research?tab=ideas')->name('keyword-ideas.index');
+    Route::redirect('/competitive', '/keyword-research?tab=gap')->name('competitive.index');
+    // Competitor auto-discovery — reachable from the Gap tab.
+    Route::view('/competitive/competitors', 'competitive.competitors')->middleware('feature:keywords')->name('competitive.competitors');
     Route::view('/rank-tracking', 'rank-tracking.index')->middleware('feature:rank_tracking')->name('rank-tracking.index');
     Route::get('/rank-tracking/{keywordId}', fn (int $keywordId) => view('rank-tracking.show', ['keywordId' => $keywordId]))
         ->whereNumber('keywordId')
@@ -115,9 +174,12 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     Route::view('/backlinks', 'backlinks.index')->middleware('feature:backlinks')->name('backlinks.index');
     Route::view('/pages', 'pages.index')->middleware('feature:pages')->name('pages.index');
     Route::view('/custom-audit', 'pages.custom-audit')->middleware('feature:audits')->name('custom-audit.index');
+    Route::view('/pagespeed', 'pages.page-speed')->middleware('feature:audits')->name('pagespeed.index');
     Route::get('/pages/{id}', fn (string $id) => view('pages.show', ['pageUrl' => $id]))
         ->middleware('feature:pages')
         ->name('pages.show')->where('id', '.*');
+    Route::view('/sitemaps', 'sitemaps.index')->middleware('feature:sitemaps')->name('sitemaps.index');
+    Route::view('/link-structure', 'link-structure.index')->middleware('feature:link_structure')->name('link-structure.index');
     Route::get('/page-audits/{pageAuditReport}', [PageAuditController::class, 'show'])
         ->middleware('feature:audits')
         ->name('page-audits.show');
@@ -204,9 +266,21 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/clients', [AdminClientController::class, 'store'])->name('clients.store');
     Route::post('/clients/bulk', [AdminClientController::class, 'bulk'])->name('clients.bulk');
     Route::put('/clients/{user}', [AdminClientController::class, 'update'])->name('clients.update');
+    Route::post('/clients/{user}/crawl', [AdminClientController::class, 'crawl'])->name('clients.crawl');
     Route::post('/clients/{user}/impersonate', [ClientImpersonationController::class, 'start'])->name('clients.impersonate');
 
+    Route::view('/docs/site-crawler', 'admin.docs.crawler')->name('docs.crawler');
+
+    Route::view('/proxies', 'admin.proxies')->name('proxies.index');
+
     Route::get('/activities', [AdminActivityController::class, 'index'])->name('activities.index');
+
+    Route::get('/crawler', [\App\Http\Controllers\Admin\CrawlerController::class, 'index'])->name('crawler.index');
+
+    Route::get('/marketing', [AdminMarketingController::class, 'index'])->name('marketing.index');
+    Route::get('/marketing/sends', [AdminMarketingController::class, 'sends'])->name('marketing.sends');
+    Route::post('/marketing/{website}/send', [AdminMarketingController::class, 'send'])->name('marketing.send');
+
     Route::get('/leads', [\App\Http\Controllers\Admin\LeadController::class, 'index'])->name('leads.index');
     Route::get('/usage', [AdminUsageController::class, 'index'])->name('usage.index');
     Route::get('/plugin-releases', [AdminPluginReleaseController::class, 'index'])->name('plugin-releases.index');
@@ -245,6 +319,16 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/plans', [AdminPlanController::class, 'store'])->name('plans.store');
     Route::get('/plans/{plan}/edit', [AdminPlanController::class, 'edit'])->name('plans.edit');
     Route::put('/plans/{plan}', [AdminPlanController::class, 'update'])->name('plans.update');
+
+    // Self-hosted keyword API fleet management — add/edit/remove servers,
+    // live health probes, and sample volume/discovery test dispatches.
+    Route::get('/keyword-servers', [AdminKeywordApiServerController::class, 'index'])->name('keyword-servers.index');
+    Route::post('/keyword-servers', [AdminKeywordApiServerController::class, 'store'])->name('keyword-servers.store');
+    Route::put('/keyword-servers/{keywordServer}', [AdminKeywordApiServerController::class, 'update'])->name('keyword-servers.update');
+    Route::delete('/keyword-servers/{keywordServer}', [AdminKeywordApiServerController::class, 'destroy'])->name('keyword-servers.destroy');
+    Route::post('/keyword-servers/{keywordServer}/test', [AdminKeywordApiServerController::class, 'test'])->name('keyword-servers.test');
+    Route::post('/keyword-servers/{keywordServer}/test-keyword', [AdminKeywordApiServerController::class, 'testKeyword'])->name('keyword-servers.test-keyword');
+    Route::post('/keyword-servers/{keywordServer}/test-website', [AdminKeywordApiServerController::class, 'testWebsite'])->name('keyword-servers.test-website');
 
     // Artisan commands reference — operator-facing docs for every
     // `ebq:*` console command. Read-only; documentation lives in

@@ -47,6 +47,35 @@
         </div>
     @endif
 
+    @if ($website && ! $website->hasGa() && ! $website->hasGsc())
+        {{-- Degraded audit: no Google data connected. The audit still runs
+             (live page + SERP checks), but without Analytics/Search Console
+             we can't enrich it with real traffic, rankings, impressions or
+             indexing status. Prominent CTA opens the connect-sources modal. --}}
+        <div class="overflow-hidden rounded-2xl border border-indigo-300 bg-indigo-50 shadow-sm dark:border-indigo-500/40 dark:bg-indigo-500/10">
+            <div class="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex gap-3">
+                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300">
+                        <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-3.06a4.5 4.5 0 00-1.242-7.244l-4.5-4.5a4.5 4.5 0 00-6.364 6.364L4.34 8.374" /></svg>
+                    </div>
+                    <div class="min-w-0">
+                        <p class="text-sm font-bold text-indigo-900 dark:text-indigo-100">You’re running audits in limited mode</p>
+                        <p class="mt-1 max-w-xl text-xs leading-relaxed text-indigo-800/90 dark:text-indigo-200/80">
+                            No Google Analytics or Search Console is connected for <span class="font-semibold">{{ $website->domain ?: 'this website' }}</span>, so audits can’t show real traffic, keyword rankings, impressions or indexing status. Connect a source to unlock the full audit.
+                        </p>
+                    </div>
+                </div>
+                <button
+                    type="button"
+                    x-on:click="window.dispatchEvent(new CustomEvent('open-connect-sources'))"
+                    class="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-indigo-600 px-4 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+                >
+                    Connect now
+                </button>
+            </div>
+        </div>
+    @endif
+
     @if ($websiteId === 0)
         <div class="rounded-2xl border border-amber-200 bg-amber-50/90 px-5 py-4 shadow-sm dark:border-amber-900/50 dark:bg-amber-500/10">
             <div class="flex gap-3">

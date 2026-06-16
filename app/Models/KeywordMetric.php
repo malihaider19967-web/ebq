@@ -12,6 +12,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $data_source
  * @property ?int $search_volume
  * @property ?float $cpc
+ * @property ?float $low_top_of_page_bid
+ * @property ?float $high_top_of_page_bid
  * @property ?string $currency
  * @property ?float $competition
  * @property ?array $trend_12m
@@ -27,6 +29,8 @@ class KeywordMetric extends Model
         'data_source',
         'search_volume',
         'cpc',
+        'low_top_of_page_bid',
+        'high_top_of_page_bid',
         'currency',
         'competition',
         'trend_12m',
@@ -39,6 +43,8 @@ class KeywordMetric extends Model
         return [
             'search_volume' => 'integer',
             'cpc' => 'float',
+            'low_top_of_page_bid' => 'float',
+            'high_top_of_page_bid' => 'float',
             'competition' => 'float',
             'trend_12m' => 'array',
             'fetched_at' => 'datetime',

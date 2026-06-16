@@ -1,6 +1,6 @@
 {
   "resources/css/app.css": {
-    "file": "assets/app-5Kq21QDL.css",
+    "file": "assets/app-CGf0GPZ-.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -13,5 +13,14 @@
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true
+  },
+  "resources/js/marketing.js": {
+    "file": "assets/marketing-w_kkKb6T.js",
+    "name": "marketing",
+    "src": "resources/js/marketing.js",
+    "isEntry": true,
+    "imports": [
+      "resources/js/app.js"
+    ]
   }
 }

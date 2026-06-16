@@ -255,10 +255,13 @@ USER;
      * site's existing GSC footprint, not a canonical URL.
      *
      * Returns up to 6 candidates with the matched query as the anchor hint.
+     * Pass $excludeUrl to drop a page from the results — e.g. the page we're
+     * trying to rank, which always matches the keyword and would otherwise
+     * surface as a useless self-link.
      *
      * @return list<array{url: string, anchor_hint: string, clicks_30d: int}>
      */
-    private function internalLinkTargets(Website $website, string $keyword): array
+    public function internalLinkTargets(Website $website, string $keyword, ?string $excludeUrl = null): array
     {
         $tokens = $this->significantTokens($keyword);
         if ($tokens === []) {
@@ -270,12 +273,23 @@ USER;
             $end = Carbon::yesterday($tz)->endOfDay();
             $start = $end->copy()->subDays(89)->startOfDay();
 
+            // Exclude the page itself at the SQL level, NOT in PHP afterwards.
+            // The page we're ranking matches the keyword across dozens of query
+            // variations, so it would otherwise fill the top-40 rows and starve
+            // out the genuine source-page candidates once removed.
+            $excludeUrls = [];
+            if ($excludeUrl !== null) {
+                $u = trim($excludeUrl);
+                $excludeUrls = array_values(array_unique([$u, rtrim($u, '/'), rtrim($u, '/') . '/']));
+            }
+
             $rows = SearchConsoleData::query()
                 ->where('website_id', $website->id)
                 ->whereDate('date', '>=', $start->toDateString())
                 ->whereDate('date', '<=', $end->toDateString())
                 ->where('page', '!=', '')
                 ->where('query', '!=', '')
+                ->when($excludeUrls !== [], fn ($q) => $q->whereNotIn('page', $excludeUrls))
                 ->where(function ($w) use ($tokens) {
                     foreach ($tokens as $tok) {
                         $w->orWhere('query', 'LIKE', '%' . $tok . '%');
@@ -287,9 +301,15 @@ USER;
                 ->limit(40)
                 ->get();
 
+            // Belt-and-suspenders: also drop case-only variants the SQL IN missed.
+            $excludeKey = $excludeUrl !== null ? rtrim(mb_strtolower(trim($excludeUrl)), '/') : null;
+
             $byPage = [];
             foreach ($rows as $r) {
                 $page = (string) $r->page;
+                if ($excludeKey !== null && rtrim(mb_strtolower(trim($page)), '/') === $excludeKey) {
+                    continue;
+                }
                 if (! isset($byPage[$page])) {
                     $byPage[$page] = [
                         'url' => $page,

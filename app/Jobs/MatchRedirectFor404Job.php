@@ -41,7 +41,9 @@ class MatchRedirectFor404Job implements ShouldBeUnique, ShouldQueue
         public readonly int $websiteId,
         public readonly string $sourcePath,
         public readonly int $hits = 1,
-    ) {}
+    ) {
+        $this->onQueue(\App\Support\Queues::INTERACTIVE);
+    }
 
     public function uniqueId(): string
     {

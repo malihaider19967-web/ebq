@@ -14,6 +14,7 @@ class GenerateAiInsights implements ShouldQueue
 
     public function __construct(public int $websiteId)
     {
+        $this->onQueue(\App\Support\Queues::DEFAULT);
     }
 
     public function handle(): void

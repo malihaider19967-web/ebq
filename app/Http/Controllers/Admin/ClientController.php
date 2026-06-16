@@ -77,6 +77,7 @@ class ClientController extends Controller
             ->when($sort === 'email', fn ($query) => $query->orderBy('email'))
             ->when($sort === 'spend', fn ($query) => $query->orderByRaw('(ke_units_mtd + serp_units_mtd) DESC'))
             ->when(! in_array($sort, ['name', 'email', 'spend'], true), fn ($query) => $query->orderByDesc('created_at'))
+            ->with('websites:id,user_id,domain') // for the admin recrawl picker
             ->paginate(25)
             ->withQueryString();
 
@@ -227,5 +228,56 @@ class ClientController extends Controller
         }
 
         return redirect()->route('admin.clients.index')->with('status', $msg);
+    }
+
+    /**
+     * Admin-triggered (re)crawl of a client's website. When the client has more
+     * than one website, a website_id must be supplied (the view shows a picker).
+     */
+    public function crawl(Request $request, User $user): RedirectResponse
+    {
+        $websites = $user->websites()->get(['id', 'domain']);
+        if ($websites->isEmpty()) {
+            return redirect()->route('admin.clients.index', $request->query())
+                ->with('status', "Client {$user->email} has no websites to crawl.");
+        }
+
+        $websiteId = (int) $request->input('website_id', 0);
+        $website = $websiteId > 0
+            ? $websites->firstWhere('id', $websiteId)
+            : ($websites->count() === 1 ? $websites->first() : null);
+
+        if (! $website) {
+            return redirect()->route('admin.clients.index', $request->query())
+                ->with('status', 'Select which website to crawl.');
+        }
+
+        // A frozen site (owner is over their plan's website limit) is a hard no-op
+        // in CrawlWebsitePagesJob::handle() — it returns before creating a CrawlRun,
+        // so dispatching here would silently do nothing while flashing "restarted".
+        // Detect it up front and tell the admin why. Checked via the loaded owner's
+        // frozen list because $website was selected with id+domain only (no user_id,
+        // so calling isFrozen() on it would wrongly read as not-frozen).
+        if (in_array((int) $website->id, $user->frozenWebsiteIds(), true)) {
+            return redirect()->route('admin.clients.index', $request->query())
+                ->with('status', "{$website->domain} is frozen — {$user->email} is over their plan's website limit. Raise the limit or remove another site to enable crawling.");
+        }
+
+        // An admin recrawl is an explicit force-restart. Release any held
+        // ShouldBeUnique lock first (e.g. left by a crawl that died/aborted, or
+        // still pending) so the dispatch always takes instead of being silently
+        // de-duplicated. Both key spellings are released defensively.
+        $uid = (new \App\Jobs\CrawlWebsitePagesJob($website->id))->uniqueId();
+        foreach ([
+            'laravel_unique_job:'.\App\Jobs\CrawlWebsitePagesJob::class.':'.$uid,
+            'laravel_unique_job:'.\App\Jobs\CrawlWebsitePagesJob::class.$uid,
+        ] as $lockKey) {
+            \Illuminate\Support\Facades\Cache::lock($lockKey)->forceRelease();
+        }
+
+        \App\Jobs\CrawlWebsitePagesJob::dispatch($website->id, \App\Models\CrawlRun::TRIGGER_MANUAL, true);
+
+        return redirect()->route('admin.clients.index', $request->query())
+            ->with('status', "Crawl restarted for {$website->domain}.");
     }
 }

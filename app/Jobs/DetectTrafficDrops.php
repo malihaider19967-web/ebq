@@ -17,6 +17,7 @@ class DetectTrafficDrops implements ShouldQueue
 
     public function __construct(public int $websiteId)
     {
+        $this->onQueue(\App\Support\Queues::SYNC);
     }
 
     public function handle(TrafficAnomalyDetector $detector): void

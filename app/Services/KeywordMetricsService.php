@@ -4,6 +4,8 @@ namespace App\Services;
 
 use App\Jobs\FetchKeywordMetricsJob;
 use App\Models\KeywordMetric;
+use App\Services\KeywordFinder\KeywordFinderPool;
+use App\Support\KeywordProviderConfig;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
 
@@ -23,8 +25,10 @@ use Illuminate\Support\Facades\Log;
  */
 class KeywordMetricsService
 {
-    public function __construct(private KeywordsEverywhereClient $client)
-    {
+    public function __construct(
+        private KeywordsEverywhereClient $client,
+        private KeywordFinderPool $finderPool,
+    ) {
     }
 
     public function metricsFor(string $keyword, string $country = 'global'): ?KeywordMetric
@@ -91,7 +95,7 @@ class KeywordMetricsService
         }
 
         if ($toFetch !== []) {
-            FetchKeywordMetricsJob::dispatch($toFetch, $country, $websiteId, $ownerUserId);
+            FetchKeywordMetricsJob::dispatch($toFetch, $country, $websiteId, $ownerUserId)->onQueue(\App\Support\Queues::INTERACTIVE);
         }
 
         return $have;
@@ -108,6 +112,27 @@ class KeywordMetricsService
         $cleaned = $this->uniqueCleaned($keywords);
 
         if ($cleaned === []) {
+            return 0;
+        }
+
+        // Self-hosted provider is asynchronous: dispatch the lookup and return
+        // immediately. Rows land in keyword_metrics when the server posts back
+        // to /webhooks/keyword-finder (see KeywordFinderWebhookController), and
+        // the UI's metricsOrQueue polling picks them up on the next tick.
+        //
+        // We run the IDEAS endpoint (seed expansion) rather than a bare volume
+        // lookup: it returns the requested keywords PLUS many related ones, all
+        // with volume data, and the webhook caches every one. So a single call
+        // warms the cache far beyond the asked-for keywords — future searches
+        // for any related term are then free.
+        if (KeywordProviderConfig::usingKeywordFinder()) {
+            $this->finderPool->dispatchIdeas(
+                ['seeds' => $cleaned],
+                userId: $ownerUserId,
+                websiteId: $websiteId,
+                countryKey: $country,
+            );
+
             return 0;
         }
 
@@ -219,6 +244,71 @@ class KeywordMetricsService
             )),
             'credits_remaining' => $response['credits'] ?? null,
         ]);
+
+        return $written;
+    }
+
+    /**
+     * Upsert keyword_metrics rows from a self-hosted Keyword Planner result
+     * set (delivered via the webhook). The provider's shape differs from KE:
+     * bucketed `avgMonthlySearches`, a 0–100 `competitionIndex`, and a
+     * low/high top-of-page bid range instead of a single CPC. We store under
+     * `data_source='gkp'` so reads (which ignore data_source) don't duplicate
+     * rows across providers. Returns the number of rows written.
+     *
+     * @param  list<array<string, mixed>>  $rows
+     */
+    public function ingestFinderResults(array $rows, string $countryKey = 'global'): int
+    {
+        $country = $this->normalizeCountry($countryKey);
+        $freshDays = max(1, (int) config('services.keyword_finder.fresh_days', 30));
+        $fetchedAt = Carbon::now();
+        $expiresAt = $fetchedAt->copy()->addDays($freshDays);
+
+        $written = 0;
+        foreach ($rows as $row) {
+            if (! is_array($row) || empty($row['keyword']) || ! is_string($row['keyword'])) {
+                continue;
+            }
+            $keyword = trim($row['keyword']);
+            if ($keyword === '') {
+                continue;
+            }
+
+            $vol = isset($row['avgMonthlySearches']) && is_numeric($row['avgMonthlySearches'])
+                ? (int) $row['avgMonthlySearches']
+                : null;
+            $competition = isset($row['competitionIndex']) && is_numeric($row['competitionIndex'])
+                ? round(((float) $row['competitionIndex']) / 100, 4)
+                : null;
+            $lowBid = isset($row['lowTopOfPageBid']) && is_numeric($row['lowTopOfPageBid'])
+                ? (float) $row['lowTopOfPageBid']
+                : null;
+            $highBid = isset($row['highTopOfPageBid']) && is_numeric($row['highTopOfPageBid'])
+                ? (float) $row['highTopOfPageBid']
+                : null;
+
+            KeywordMetric::updateOrCreate(
+                [
+                    'keyword_hash' => KeywordMetric::hashKeyword($keyword),
+                    'country' => $country,
+                    'data_source' => 'gkp',
+                ],
+                [
+                    'keyword' => $keyword,
+                    'search_volume' => $vol,
+                    // Representative single CPC for back-compat consumers.
+                    'cpc' => $highBid,
+                    'low_top_of_page_bid' => $lowBid,
+                    'high_top_of_page_bid' => $highBid,
+                    'competition' => $competition,
+                    'trend_12m' => null,
+                    'fetched_at' => $fetchedAt,
+                    'expires_at' => $expiresAt,
+                ]
+            );
+            $written++;
+        }
 
         return $written;
     }

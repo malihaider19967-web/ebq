@@ -76,7 +76,7 @@
     <link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
     <link href="https://fonts.bunny.net/css?family=inter:400,500,600,700,800&display=swap" rel="stylesheet">
     @if (! app()->environment('testing'))
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @vite(['resources/css/app.css', 'resources/js/marketing.js'])
     @endif
 </head>
 <body class="min-h-full bg-white font-sans text-slate-900 antialiased selection:bg-slate-900 selection:text-white">
@@ -122,6 +122,7 @@
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('features') }}">Features</a></li>
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('guide') }}">Guide</a></li>
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('pricing') }}">Pricing</a></li>
+                    <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('website-revamp') }}">Website revamp</a></li>
                     <li><a class="text-slate-600 transition hover:text-slate-900" href="{{ route('wordpress-plugin') }}">WordPress plugin</a></li>
                 </ul>
             </div>

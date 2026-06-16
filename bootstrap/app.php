@@ -25,6 +25,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'auth/google/cap/events',
             'stripe/webhook',
+            // Self-hosted keyword API posts results server-to-server; the body
+            // is HMAC-verified in KeywordFinderWebhookController.
+            'webhooks/keyword-finder',
         ]);
 
         $middleware->alias([

@@ -399,6 +399,32 @@
                                             </div>
                                         </div>
                                     </form>
+
+                                    {{-- Admin site crawl. Separate form (can't nest in the edit form).
+                                         Picks the website when the client has more than one. --}}
+                                    <form method="POST" action="{{ route('admin.clients.crawl', $client) }}"
+                                          class="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-white px-3 py-2">
+                                        @csrf
+                                        <span class="text-xs font-medium text-slate-700">Site crawl</span>
+                                        @php $clientWebsites = $client->websites; @endphp
+                                        @if ($clientWebsites->isEmpty())
+                                            <span class="text-xs text-slate-400">No websites to crawl.</span>
+                                        @elseif ($clientWebsites->count() === 1)
+                                            <input type="hidden" name="website_id" value="{{ $clientWebsites->first()->id }}" />
+                                            <span class="text-xs text-slate-500">{{ $clientWebsites->first()->domain }}</span>
+                                            <button class="rounded-md bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700">Recrawl site</button>
+                                        @else
+                                            <select name="website_id" required
+                                                    class="min-w-[200px] rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500">
+                                                <option value="">Select website…</option>
+                                                @foreach ($clientWebsites as $w)
+                                                    <option value="{{ $w->id }}">{{ $w->domain }}</option>
+                                                @endforeach
+                                            </select>
+                                            <button class="rounded-md bg-slate-800 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-700">Recrawl selected</button>
+                                        @endif
+                                        <span class="text-[11px] text-slate-400">Re-fetches all pages and refreshes Site Health + Link Structure.</span>
+                                    </form>
                                 </td>
                             </tr>
                         @endif

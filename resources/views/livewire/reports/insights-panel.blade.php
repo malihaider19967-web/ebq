@@ -139,6 +139,7 @@
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">Clicks</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold">CTR</th>
                                         <th scope="col" class="py-2 pr-3 text-right font-semibold" title="Estimated monthly value if this keyword reached position 3">Upside/mo</th>
+                                        <th scope="col" class="py-2 pr-3 text-right font-semibold"><span class="sr-only">Fix</span></th>
                                     </tr>
                                 </thead>
                                 <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
@@ -169,6 +170,12 @@
                                                     ${{ number_format($row['upside_value'], 0) }}
                                                 @else
                                                     <span class="text-slate-400">score {{ $row['score'] }}</span>
+                                                @endif
+                                            </td>
+                                            <td class="py-2 pr-3 text-right">
+                                                @if (! empty($row['page']))
+                                                    <a href="{{ route('keywords.fix', ['keyword' => $row['query'], 'page' => $row['page']]) }}" wire:navigate
+                                                        class="inline-flex items-center gap-1 rounded-md bg-indigo-600 px-2 py-1 text-[11px] font-semibold text-white transition hover:bg-indigo-500">Fix →</a>
                                                 @endif
                                             </td>
                                         </tr>

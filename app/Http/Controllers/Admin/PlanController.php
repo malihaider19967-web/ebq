@@ -100,6 +100,8 @@ class PlanController extends Controller
             'trial_days' => 'required|integer|min:0|max:365',
             // null / empty string = unlimited. Stored as null in DB.
             'max_websites' => 'nullable|integer|min:0|max:999',
+            // null / empty = unlimited (global crawler cap applies).
+            'max_crawl_pages' => 'nullable|integer|min:0|max:9999999',
             'features' => 'nullable|string|max:8000',
             'display_order' => 'required|integer|min:0|max:9999',
             'is_active' => 'sometimes|boolean',

@@ -360,7 +360,7 @@ class PluginHqController extends Controller
         );
 
         // Queue an immediate first check so the row populates within minutes.
-        TrackKeywordRankJob::dispatch($keyword->id, true);
+        TrackKeywordRankJob::dispatch($keyword->id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
 
         return response()->json([
             'ok' => true,
@@ -422,7 +422,7 @@ class PluginHqController extends Controller
             ->where('website_id', $website->id)
             ->findOrFail($id);
 
-        TrackKeywordRankJob::dispatch($keyword->id, true);
+        TrackKeywordRankJob::dispatch($keyword->id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
         $keyword->forceFill(['last_status' => 'queued', 'next_check_at' => Carbon::now()])->save();
 
         return response()->json(['ok' => true]);
@@ -897,7 +897,7 @@ class PluginHqController extends Controller
             ], 422);
         }
 
-        $account = $website->user?->googleAccounts()->latest('id')->first();
+        $account = $website->gscAccountResolved();
         if (! $account) {
             return response()->json([
                 'ok' => false,
@@ -990,7 +990,7 @@ class PluginHqController extends Controller
             ], 400);
         }
 
-        $account = $website->user?->googleAccounts()->latest('id')->first();
+        $account = $website->gscAccountResolved();
         if (! $account) {
             return response()->json([
                 'ok' => false,

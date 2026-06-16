@@ -1,3 +1,29 @@
+# ⛔ READ FIRST — DATABASE SAFETY (production server, no backups)
+
+This repo is deployed on a **production server** whose default DB connection is
+**live MySQL `ebq`**. Binary logging is OFF and there are no DB backups, so any
+data loss is **permanent**. On 2026-06-07 a `php artisan test` run wiped the
+production database — `RefreshDatabase` ran `migrate:fresh` on MySQL because a
+**cached config** (`bootstrap/cache/config.php`, written by `php artisan optimize`)
+overrode the `phpunit.xml` sqlite setting. Never again.
+
+**Hard rules — follow before running ANY command or editing test/DB code:**
+
+1. **NEVER run `php artisan test` / `pest` / `phpunit` without first confirming
+   the test DB is safe.** Run `php artisan config:clear`, then verify
+   `config('database.default')` resolves to **sqlite `:memory:`** (NOT mysql).
+   A cached config silently overrides `phpunit.xml` — assume it may be cached.
+   - A code guard now enforces this: `tests/TestCase::setUpTraits()` aborts the
+     suite if the resolved connection isn't sqlite `:memory:` or a `*test*` DB.
+     **Do not remove or weaken that guard.**
+2. **NEVER run destructive DB commands** on this server without explicit,
+   per-command user confirmation: `migrate:fresh`, `migrate:refresh`,
+   `migrate:rollback`, `db:wipe`, `ebq:demo-data seed` ("wipe + regenerate"),
+   `ebq:demo-data clear --force` ("remove everything"), or raw `DROP`/`TRUNCATE`.
+3. **Safe DB writes** are `updateOrCreate`-based seeders (e.g. `PlanSeeder`) and
+   plain `migrate --force` (additive). Prefer those.
+4. When in doubt about whether a command can lose data, **stop and ask first.**
+
 <!-- code-review-graph MCP tools -->
 ## MCP Tools: code-review-graph
 

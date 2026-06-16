@@ -29,10 +29,15 @@
                 $authUser = auth()->user();
                 $navItems = [
                     ['route' => 'dashboard', 'feature' => 'dashboard', 'label' => 'Dashboard', 'icon' => 'M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25'],
+                    ['route' => 'statistics', 'feature' => 'dashboard', 'label' => 'Statistics', 'icon' => 'M10.5 6a7.5 7.5 0 107.5 7.5h-7.5V6zM13.5 3v7.5H21A7.5 7.5 0 0013.5 3z'],
                     ['route' => 'keywords.index', 'feature' => 'keywords', 'label' => 'Keywords', 'icon' => 'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z'],
+                    ['route' => 'keyword-research.index', 'feature' => 'keywords', 'label' => 'Keyword Research', 'icon' => 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z'],
                     ['route' => 'rank-tracking.index', 'feature' => 'rank_tracking', 'label' => 'Rank Tracking', 'icon' => 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z'],
                     ['route' => 'pages.index', 'feature' => 'pages', 'label' => 'Pages', 'icon' => 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z'],
+                    ['route' => 'sitemaps.index', 'feature' => 'sitemaps', 'label' => 'Sitemaps', 'icon' => 'M9 6.75V15m6-6v8.25m.503 3.498l4.875-2.437c.381-.19.622-.58.622-1.006V4.82c0-.836-.88-1.38-1.628-1.006l-3.869 1.934c-.317.159-.69.159-1.006 0L9.503 3.252a1.125 1.125 0 00-1.006 0L3.622 5.689C3.24 5.88 3 6.27 3 6.695V19.18c0 .836.88 1.38 1.628 1.006l3.869-1.934c.317-.159.69-.159 1.006 0l4.994 2.497c.317.158.69.158 1.006 0z'],
+                    ['route' => 'link-structure.index', 'feature' => 'link_structure', 'label' => 'Link Structure', 'icon' => 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244'],
                     ['route' => 'custom-audit.index', 'feature' => 'audits', 'label' => 'Audits', 'icon' => 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z'],
+                    ['route' => 'pagespeed.index', 'feature' => 'audits', 'label' => 'PageSpeed Insights', 'icon' => 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z'],
                     ['route' => 'backlinks.index', 'feature' => 'backlinks', 'label' => 'Backlinks', 'icon' => 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244'],
                     ['route' => 'reports.index', 'feature' => 'reports', 'label' => 'Reports', 'icon' => 'M3 3v1.5M3 21v-6m0 0 2.77-.693a9 9 0 0 1 6.208.682l.108.054a9 9 0 0 0 6.086.71l3.114-.732a48.524 48.524 0 0 1-.005-10.499l-3.11.732a9 9 0 0 1-6.085-.711l-.108-.054a9 9 0 0 0-6.208-.682L3 4.5M3 15V4.5'],
                     ['route' => 'ai-studio.index', 'feature' => 'ai_studio', 'label' => 'AI Studio', 'icon' => 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z'],
@@ -64,8 +69,19 @@
                 $adminItems = [
                     ['route' => 'admin.clients.index', 'label' => 'Clients'],
                     ['route' => 'admin.activities.index', 'label' => 'Activities'],
+                    [
+                        'route' => 'admin.crawler.index',
+                        'label' => 'Crawler',
+                        'match_routes' => ['admin.crawler.'],
+                    ],
+                    [
+                        'route' => 'admin.marketing.index',
+                        'label' => 'Marketing',
+                        'match_routes' => ['admin.marketing.'],
+                    ],
                     ['route' => 'admin.leads.index', 'label' => 'Leads'],
                     ['route' => 'admin.usage.index', 'label' => 'API Usage'],
+                    ['route' => 'admin.proxies.index', 'label' => 'Proxies'],
                     [
                         'route' => 'admin.settings',
                         'label' => 'Settings',
@@ -87,9 +103,19 @@
                         'match_routes' => ['admin.plans.'],
                     ],
                     [
+                        'route' => 'admin.keyword-servers.index',
+                        'label' => 'Keyword Servers',
+                        'match_routes' => ['admin.keyword-servers.'],
+                    ],
+                    [
                         'route' => 'admin.commands.index',
                         'label' => 'Commands',
                         'match_routes' => ['admin.commands.'],
+                    ],
+                    [
+                        'route' => 'admin.docs.crawler',
+                        'label' => 'Site Crawler Docs',
+                        'match_routes' => ['admin.docs.'],
                     ],
                 ];
             @endphp
@@ -228,7 +254,11 @@
                     </div>
                 @endif
                 @include('partials.quota-banner')
+                @include('partials.connect-source-banner')
                 {{ $slot }}
+                @auth
+                    <livewire:connect-sources-modal />
+                @endauth
             </main>
         </div>
     </div>

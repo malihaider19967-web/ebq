@@ -93,8 +93,11 @@ class KeywordsTable extends Component
                 $rows = (clone $base)
                     ->select('date', 'query', 'clicks', 'impressions', 'ctr', 'position')
                     ->orderBy($sortBy, $this->sortDir)
-                    ->paginate(25);
+                    ->simplePaginate(25);
             } else {
+                // simplePaginate (no total COUNT): a COUNT over GROUP BY query is a
+                // full aggregation (~17s on high-volume sites) and would time the
+                // page out — next/prev is enough for a 30k-keyword list.
                 $rows = (clone $base)
                     ->select(
                         'query',
@@ -105,7 +108,7 @@ class KeywordsTable extends Component
                     )
                     ->groupBy('query')
                     ->orderBy($sortBy, $this->sortDir)
-                    ->paginate(25);
+                    ->simplePaginate(25);
             }
         }
 
@@ -115,7 +118,7 @@ class KeywordsTable extends Component
             $cannibalized = array_flip(
                 array_map(
                     fn (array $r) => mb_strtolower((string) $r['query']),
-                    app(ReportDataService::class)->cannibalizationReport($this->websiteId, null, null, 500, $this->country !== '' ? strtoupper($this->country) : null),
+                    app(ReportDataService::class)->cannibalizationReport($this->websiteId, null, null, 500, $this->country !== '' ? strtoupper($this->country) : null, cacheOnly: true),
                 )
             );
             $tracked = array_flip(
@@ -129,7 +132,7 @@ class KeywordsTable extends Component
 
         $keMetrics = [];
         $languages = [];
-        if ($rows instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $rows->isNotEmpty()) {
+        if ($rows instanceof \Illuminate\Contracts\Pagination\Paginator && $rows->isNotEmpty()) {
             $queries = $rows->getCollection()
                 ->pluck('query')
                 ->map(fn ($q) => (string) $q)

@@ -27,6 +27,15 @@ interface AiTool
     public const SIGNAL_PAGE_AUDIT      = 'page_audit';
 
     /**
+     * Crawl-derived knowledge for the page's URL (from the site crawler):
+     * indexability, inbound/outbound internal links, click-depth, orphan
+     * status, per-page score, and the open issues found on it. Lets tools
+     * generate site-aware suggestions (e.g. "this page is orphaned — add
+     * internal links from X").
+     */
+    public const SIGNAL_SITE_INTEL      = 'site_intel';
+
+    /**
      * Lightweight, computed-from-input SEO state. Powers the
      * "writer must honour the SEO analysis" rule: the prompt sees
      * what's missing (focus kw absence, density gap, weak structure,

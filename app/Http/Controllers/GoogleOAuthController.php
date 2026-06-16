@@ -109,13 +109,28 @@ class GoogleOAuthController extends Controller
         return redirect()->intended(route($user->firstAccessibleRoute($websiteId), absolute: false));
     }
 
-    public function redirect(): RedirectResponse
+    public function redirect(Request $request): RedirectResponse
     {
+        // Remember where to send the user back after the round-trip. Used
+        // by the "connect another Google account" buttons so adding a
+        // second source-account from Settings returns to Settings rather
+        // than dropping the user back into onboarding. Whitelisted to
+        // known route names so the param can't be used as an open
+        // redirect. Defaults to onboarding (the historical behavior).
+        $return = (string) $request->query('return', '');
+        $allowed = ['onboarding', 'settings.integrations'];
+        $request->session()->put('google_oauth.return', in_array($return, $allowed, true) ? $return : 'onboarding');
+
         // `access_type=offline` requests a refresh token so EBQ can keep
         // syncing GSC / Analytics in the background without re-prompting.
         // `prompt=consent` ensures the refresh token is actually issued
         // (Google omits it on subsequent OAuth flows when the same scopes
         // are already granted).
+        //
+        // `openid email profile` are included so we capture which Google
+        // login this account belongs to (stored on google_accounts.email)
+        // and can label it in the source pickers when a user connects
+        // several accounts.
         //
         // `include_granted_scopes` is intentionally OFF here: this flow is
         // scoped to the Analytics/GSC connect — surfacing previously
@@ -124,6 +139,9 @@ class GoogleOAuthController extends Controller
         // confuse users who just want to (re)connect their data sources.
         return Socialite::driver('google')
             ->scopes([
+                'openid',
+                'email',
+                'profile',
                 'https://www.googleapis.com/auth/analytics.readonly',
                 'https://www.googleapis.com/auth/webmasters.readonly',
                 'https://www.googleapis.com/auth/indexing',
@@ -180,6 +198,16 @@ class GoogleOAuthController extends Controller
             return redirect()
                 ->route('settings.index')
                 ->with('status', 'Connected to Gmail. You can now send reports from this address.');
+        }
+
+        // Return the user to wherever they kicked off the connect from
+        // (onboarding by default, or the Settings → Integrations sources
+        // manager when adding an extra source-account).
+        $return = (string) $request->session()->pull('google_oauth.return', 'onboarding');
+        if ($return === 'settings.integrations') {
+            return redirect()
+                ->route('settings.index')
+                ->with('status', 'Google account connected. Pick the property or site you want to track.');
         }
 
         return redirect()->route('onboarding');

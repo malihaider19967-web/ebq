@@ -42,6 +42,7 @@ final class ToolContext
         public readonly ?array $networkInsight = null,
         public readonly ?array $pageAudit = null,
         public readonly ?array $seoAnalysis = null,
+        public readonly ?array $siteIntel = null,
         public readonly string $country = 'us',
         public readonly string $language = 'en',
     ) {

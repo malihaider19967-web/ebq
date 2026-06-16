@@ -18,19 +18,21 @@ class SendGrowthReports extends Command
     {
         $mailsQueued = 0;
         $sitesProcessed = 0;
+        $sitesDegraded = 0;
         $sitesSkippedNoData = 0;
         $sitesSkippedNoRecipients = 0;
 
-        Website::query()->with('owner')->chunkById(100, function ($websites) use ($reports, $dispatcher, &$mailsQueued, &$sitesProcessed, &$sitesSkippedNoData, &$sitesSkippedNoRecipients) {
+        Website::query()->with('owner')->chunkById(100, function ($websites) use ($reports, $dispatcher, &$mailsQueued, &$sitesProcessed, &$sitesDegraded, &$sitesSkippedNoData, &$sitesSkippedNoRecipients) {
             foreach ($websites as $website) {
-                // Snap the report to the most recent GSC date that is
-                // both (a) present in our data and (b) at least
-                // config('reports.gsc_lag_days') old. Without this,
-                // the email compared two partial days and misreported
-                // progress as negative even on up-days.
-                $safeDate = $reports->lastSafeReportDate($website->id);
-                if (! $safeDate) {
-                    Log::info('ebq:send-reports: skipped — no usable GSC data', [
+                // Per-source readiness: a site connected to only one of
+                // GA/GSC still gets a (degraded) report anchored to
+                // whichever source has data. We skip only when NEITHER
+                // source has any reportable data. The report is snapped to
+                // the most recent safe day (GSC is lag-aware so partial
+                // days don't read as regressions).
+                $readiness = $reports->reportReadiness($website);
+                if (! $readiness['any']) {
+                    Log::info('ebq:send-reports: skipped — no usable GA or GSC data', [
                         'website_id' => $website->id,
                         'domain' => $website->domain,
                     ]);
@@ -38,7 +40,11 @@ class SendGrowthReports extends Command
                     continue;
                 }
 
-                $date = $safeDate->toDateString();
+                if (! $readiness['ga'] || ! $readiness['gsc']) {
+                    $sitesDegraded++;
+                }
+
+                $date = $readiness['date']->toDateString();
                 $recipients = $website->getReportRecipientUsers();
                 if ($recipients->isEmpty()) {
                     $sitesSkippedNoRecipients++;
@@ -59,9 +65,10 @@ class SendGrowthReports extends Command
         });
 
         $this->info(sprintf(
-            'Growth reports: %d email(s) queued for %d site(s); skipped %d (no GSC data) + %d (no recipients).',
+            'Growth reports: %d email(s) queued for %d site(s) (%d degraded — only one source); skipped %d (no GA/GSC data) + %d (no recipients).',
             $mailsQueued,
             $sitesProcessed,
+            $sitesDegraded,
             $sitesSkippedNoData,
             $sitesSkippedNoRecipients,
         ));

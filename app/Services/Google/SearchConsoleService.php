@@ -33,6 +33,47 @@ class SearchConsoleService
     }
 
     /**
+     * List the sitemaps Google Search Console knows about for a property.
+     *
+     * Read-only (needs only the webmasters.readonly scope the app already
+     * requests). Each entry mirrors the WmxSitemap fields plus the rolled-up
+     * submitted/indexed URL counts from its contents.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function listSitemaps(GoogleAccount $account, string $siteUrl): array
+    {
+        $client = $this->clientFactory->make($account);
+        $sc = new SearchConsole($client);
+
+        $out = [];
+
+        foreach ($sc->sitemaps->listSitemaps($siteUrl)->getSitemap() ?? [] as $sitemap) {
+            $submitted = null;
+            $indexed = null;
+            foreach ($sitemap->getContents() ?? [] as $content) {
+                $submitted = (int) $submitted + (int) $content->getSubmitted();
+                $indexed = (int) $indexed + (int) $content->getIndexed();
+            }
+
+            $out[] = [
+                'path' => (string) $sitemap->getPath(),
+                'type' => $sitemap->getType() ? (string) $sitemap->getType() : null,
+                'is_pending' => (bool) $sitemap->getIsPending(),
+                'is_sitemaps_index' => (bool) $sitemap->getIsSitemapsIndex(),
+                'errors' => (int) $sitemap->getErrors(),
+                'warnings' => (int) $sitemap->getWarnings(),
+                'submitted_urls' => $submitted,
+                'indexed_urls' => $indexed,
+                'last_submitted' => $sitemap->getLastSubmitted(),
+                'last_downloaded' => $sitemap->getLastDownloaded(),
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
      * Fetch a single date window (keep to <=7 days for performance).
      *
      * Requests the full dimension set (date, query, page, country, device) so

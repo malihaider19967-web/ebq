@@ -14,8 +14,6 @@
     $featuresUrl   = route('features');
     $contactUrl    = route('contact');
     $refundUrl     = route('refund-policy');
-    $salesEmail    = 'sales@ebq.io';
-    $salesMailto   = 'mailto:' . $salesEmail . '?subject=Agency%20plan%20enquiry';
 
     $heroEyebrow   = $free ? 'Limited-time promotion' : 'Pricing';
     $heroTitle     = $free
@@ -76,11 +74,23 @@
         return $out;
     };
 
-    $planStyleFor = function (string $slug): array {
+    // CTA label honours each plan's stored `trial_days` so a plan set to
+    // 0 days in /admin/plans no longer advertises a trial it won't grant
+    // at checkout (BillingController passes trial_days straight to Stripe).
+    $trialCtaLabel = function (int $trialDays): string {
+        if ($trialDays <= 0) {
+            return 'Get started';
+        }
+        if ($trialDays % 30 === 0) {
+            $months = intdiv($trialDays, 30);
+            return $months === 1 ? 'Start 1-month trial' : "Start {$months}-month trial";
+        }
+        return "Start {$trialDays}-day trial";
+    };
+    $planStyleFor = function (string $slug, int $trialDays) use ($trialCtaLabel): array {
         return match ($slug) {
-            'free'    => ['cta_label' => 'Start free',           'cta_style' => 'ghost'],
-            'agency'  => ['cta_label' => 'Talk to sales',        'cta_style' => 'ghost'],
-            default   => ['cta_label' => 'Start 1-month trial',  'cta_style' => 'primary'],
+            'free'    => ['cta_label' => 'Start free',                  'cta_style' => 'ghost'],
+            default   => ['cta_label' => $trialCtaLabel($trialDays),    'cta_style' => 'primary'],
         };
     };
 
@@ -88,12 +98,6 @@
     // for the connected-websites entitlement, not "unlimited", regardless of
     // the stored max_websites value.
     $personalSlugs = ['free', 'pro'];
-    $websitesCell = function (\App\Models\Plan $p) use ($personalSlugs) {
-        if (in_array($p->slug, $personalSlugs, true)) {
-            return 'Personal';
-        }
-        return $p->max_websites === null ? '∞' : (string) (int) $p->max_websites;
-    };
     $websitesBullet = function (\App\Models\Plan $p) use ($personalSlugs) {
         if (in_array($p->slug, $personalSlugs, true)) {
             return 'Personal website (single site)';
@@ -106,11 +110,11 @@
             : (int) $p->max_websites . ' connected websites';
     };
 
-    $plans = $planRows->map(function (\App\Models\Plan $p) use ($ctaForPlan, $salesMailto, $registerUrl, $featureCopy, $apiLimitCopy, $planStyleFor, $websitesBullet) {
+    $plans = $planRows->map(function (\App\Models\Plan $p) use ($ctaForPlan, $registerUrl, $featureCopy, $apiLimitCopy, $planStyleFor, $websitesBullet) {
         $slug    = (string) $p->slug;
         $monthly = (int) $p->price_monthly_usd;
         $yearly  = (int) $p->price_yearly_usd;
-        $style   = $planStyleFor($slug);
+        $style   = $planStyleFor($slug, (int) $p->trial_days);
 
         $featureMap = $p->featureMap();
         $autoBullets = [];
@@ -163,28 +167,11 @@
             'cta_label' => $style['cta_label'],
             'cta_url'   => $slug === 'free'
                 ? $registerUrl
-                : ($slug === 'agency' ? $salesMailto : $ctaForPlan($slug)),
+                : $ctaForPlan($slug),
             'cta_style' => $style['cta_style'],
             'highlight' => (bool) $p->is_highlighted,
         ];
     })->all();
-
-    // Auto-build the comparison matrix from the same DB rows so a new
-    // tier added in /admin/plans appears here without a deploy.
-    $compareRows = [];
-    $compareRows[] = array_merge(['Connected websites'], $planRows->map(fn ($p) => $websitesCell($p))->all());
-    $compareRows[] = array_merge(['Tracked keywords'], $planRows->map(fn ($p) => isset($p->api_limits['rank_tracker']['max_active_keywords']) ? number_format((int) $p->api_limits['rank_tracker']['max_active_keywords']) : '—')->all());
-    $compareRows[] = array_merge(['SERP fetches / month'], $planRows->map(fn ($p) => isset($p->api_limits['serper']['monthly_calls']) ? number_format((int) $p->api_limits['serper']['monthly_calls']) : '—')->all());
-    foreach ($featureCopy as $key => $label) {
-        $compareRows[] = array_merge([$label], $planRows->map(fn ($p) => (bool) ($p->featureMap()[$key] ?? false))->all());
-    }
-    $compareColHeaders = $planRows->pluck('name')->all();
-
-    $addOns = [
-        ['Extra website',          '$96 / site / year'],
-        ['Extra 100 keywords',     '$48 / year'],
-        ['Extra 500 audits',       '$144 / year'],
-    ];
 
     $faqs = [
         ['Is there a free trial?',           'Yes — every paid plan starts with a 1-month free trial. Your card is not charged until the trial ends, and you can cancel anytime during the trial without being billed.'],
@@ -372,79 +359,6 @@
                         </li>
                     @endforeach
                 </ul>
-            </div>
-        </section>
-
-        {{-- ── Comparison table ─────────────────────────────────── --}}
-        <section class="bg-white py-16 sm:py-20">
-            <div class="mx-auto max-w-6xl px-6 lg:px-8">
-                <div class="mx-auto max-w-2xl text-center">
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Compare plans</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">All features at a glance.</h2>
-                    <p class="mt-3 text-sm text-slate-600">Same workspace, same plugin, same data quality on every plan.</p>
-                </div>
-
-                <div class="mt-10 overflow-hidden rounded-2xl border border-slate-200 bg-white">
-                    <div class="overflow-x-auto">
-                        <table class="min-w-full text-sm">
-                            <caption class="sr-only">Feature comparison across EBQ plans</caption>
-                            <thead>
-                                <tr class="border-b border-slate-200 bg-slate-50/60 text-left">
-                                    <th scope="col" class="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Feature</th>
-                                    @foreach ($compareColHeaders as $col)
-                                        <th scope="col" class="px-5 py-3 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">{{ $col }}</th>
-                                    @endforeach
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100 text-slate-700">
-                                @foreach ($compareRows as $row)
-                                    <tr>
-                                        <th scope="row" class="px-5 py-3.5 text-left font-medium text-slate-800">{{ $row[0] }}</th>
-                                        @foreach (array_slice($row, 1) as $val)
-                                            <td class="px-5 py-3.5 text-center">
-                                                @if ($val === true)
-                                                    <span class="sr-only">Included</span>
-                                                    <svg class="mx-auto h-4 w-4 text-slate-900" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
-                                                @elseif ($val === false)
-                                                    <span class="sr-only">Not included</span>
-                                                    <svg class="mx-auto h-4 w-4 text-slate-300" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M5 12h14" /></svg>
-                                                @else
-                                                    <span class="font-mono text-[13px] tabular-nums text-slate-700">{{ $val }}</span>
-                                                @endif
-                                            </td>
-                                        @endforeach
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        {{-- ── Add-ons ──────────────────────────────────────────── --}}
-        <section class="bg-slate-50/60 py-16 sm:py-20">
-            <div class="mx-auto max-w-6xl px-6 lg:px-8">
-                <div class="rounded-2xl border border-slate-200 bg-white p-8 sm:p-10">
-                    <div class="flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-                        <div>
-                            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Add-ons</p>
-                            <h3 class="mt-2 text-2xl font-semibold tracking-tight text-slate-900">Need more capacity?</h3>
-                            <p class="mt-2 text-sm text-slate-600">Stack add-ons onto your annual plan. Billed alongside the next renewal.</p>
-                        </div>
-                        <a href="{{ $contactUrl }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">
-                            Custom volume? Talk to us
-                        </a>
-                    </div>
-                    <dl class="mt-8 grid gap-px overflow-hidden rounded-xl border border-slate-200 bg-slate-200 sm:grid-cols-3">
-                        @foreach ($addOns as [$name, $price])
-                            <div class="bg-white p-5">
-                                <dt class="text-sm font-semibold text-slate-900">{{ $name }}</dt>
-                                <dd class="mt-1 text-sm text-slate-600">{{ $price }}</dd>
-                            </div>
-                        @endforeach
-                    </dl>
-                </div>
             </div>
         </section>
 

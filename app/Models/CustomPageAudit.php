@@ -23,6 +23,14 @@ class CustomPageAudit extends Model
     public const SOURCE_HQ_WP = 'hq_wp';
 
     /**
+     * Audit queued from the dashboard striking-distance "Fix this keyword"
+     * playbook. Runs in full mode (needs the Serper benchmark for competitor
+     * titles + content-length comparison). Excluded from portal history so
+     * playbook background runs don't clutter the Custom Audit list.
+     */
+    public const SOURCE_KEYWORD_FIX = 'keyword_fix';
+
+    /**
      * Audit sources shown in EBQ portal history (custom audit page, etc.).
      * Excludes {@see SOURCE_LIVE_SCORE} — editor background runs only.
      *
@@ -86,7 +94,7 @@ class CustomPageAudit extends Model
         return self::query()->create([
             'website_id' => $websiteId,
             'user_id' => $userId,
-            'source' => in_array($source, [self::SOURCE_CUSTOM, self::SOURCE_PAGE_DETAIL, self::SOURCE_LIVE_SCORE, self::SOURCE_HQ_WP], true)
+            'source' => in_array($source, [self::SOURCE_CUSTOM, self::SOURCE_PAGE_DETAIL, self::SOURCE_LIVE_SCORE, self::SOURCE_HQ_WP, self::SOURCE_KEYWORD_FIX], true)
                 ? $source
                 : self::SOURCE_CUSTOM,
             'page_url' => $pageUrl,
@@ -118,7 +126,7 @@ class CustomPageAudit extends Model
         return self::query()->create([
             'website_id' => $websiteId,
             'user_id' => $userId,
-            'source' => in_array($source, [self::SOURCE_CUSTOM, self::SOURCE_PAGE_DETAIL, self::SOURCE_LIVE_SCORE, self::SOURCE_HQ_WP], true)
+            'source' => in_array($source, [self::SOURCE_CUSTOM, self::SOURCE_PAGE_DETAIL, self::SOURCE_LIVE_SCORE, self::SOURCE_HQ_WP, self::SOURCE_KEYWORD_FIX], true)
                 ? $source
                 : self::SOURCE_CUSTOM,
             'page_url' => $pageUrlAsAudited,

@@ -1,0 +1,110 @@
+@php
+    $tones = [
+        'critical' => 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300',
+        'high' => 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
+        'growth' => 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+    ];
+    $tone = $tones[$meta['severity']] ?? $tones['high'];
+@endphp
+
+<div>
+    {{-- Header --}}
+    <div class="mb-5">
+        <a href="{{ route('dashboard') }}" wire:navigate
+            class="inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
+            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
+            Back to dashboard
+        </a>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+            <h1 class="text-xl font-semibold text-slate-900 dark:text-slate-100">{{ $meta['title'] }}</h1>
+            <span class="rounded-full px-2 py-0.5 text-xs font-bold tabular-nums {{ $tone }}">{{ number_format($meta['count']) }}</span>
+        </div>
+        @if ($meta['description'])
+            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">{{ $meta['description'] }}</p>
+        @endif
+    </div>
+
+    {{-- Filter bar --}}
+    <div class="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        @if ($isCrawl && count($typeOptions) > 1)
+            <label class="flex flex-col gap-1">
+                <span class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Type</span>
+                <select wire:model.live="type"
+                    class="rounded-md border-slate-200 bg-white py-1.5 pl-2.5 pr-8 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                    <option value="">All types</option>
+                    @foreach ($typeOptions as $value => $label)
+                        <option value="{{ $value }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </label>
+        @endif
+
+        @if ($isCrawl)
+            <label class="flex flex-col gap-1">
+                <span class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Severity</span>
+                <select wire:model.live="severity"
+                    class="rounded-md border-slate-200 bg-white py-1.5 pl-2.5 pr-8 text-sm text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+                    <option value="">All severities</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </label>
+        @endif
+
+        <label class="flex flex-1 flex-col gap-1" style="min-width: 12rem;">
+            <span class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Search</span>
+            <input type="search" wire:model.live.debounce.400ms="q" placeholder="Filter by URL or text…"
+                class="w-full rounded-md border-slate-200 bg-white py-1.5 px-2.5 text-sm text-slate-700 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
+        </label>
+
+        @if ($type !== '' || $severity !== '' || $q !== '')
+            <button type="button" wire:click="clearFilters"
+                class="rounded-md border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800">
+                Clear
+            </button>
+        @endif
+
+        <span class="ml-auto self-center text-xs text-slate-500 dark:text-slate-400" wire:loading.remove>
+            {{ number_format($rows->total()) }} result{{ $rows->total() === 1 ? '' : 's' }}
+        </span>
+        <span class="ml-auto self-center text-xs text-slate-400" wire:loading>Loading…</span>
+    </div>
+
+    {{-- Rows --}}
+    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+            @forelse ($rows as $row)
+                <li class="flex items-center gap-3 px-5 py-3.5">
+                    <div class="min-w-0 flex-1">
+                        <p class="truncate text-sm font-medium text-slate-900 dark:text-slate-100">{{ $row['title'] }}</p>
+                        <p class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{{ $row['subtitle'] }}</p>
+                        @if (! empty($row['metric']))
+                            <p class="mt-0.5 text-[11px] font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{{ $row['metric'] }}</p>
+                        @endif
+                    </div>
+                    @if (! empty($row['fix_url']) && ! empty($row['fix_allowed']))
+                        <a href="{{ $row['fix_url'] }}"
+                            @if (! empty($row['fix_new_tab'])) target="_blank" rel="noopener" @else wire:navigate @endif
+                            class="inline-flex flex-none items-center gap-1 rounded-md bg-indigo-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-500">
+                            Fix
+                            <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                        </a>
+                    @endif
+                </li>
+            @empty
+                <li class="px-5 py-12 text-center">
+                    <p class="text-sm font-medium text-slate-700 dark:text-slate-200">Nothing to show</p>
+                    <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">No issues match your filters.</p>
+                </li>
+            @endforelse
+        </ul>
+    </div>
+
+    @if ($rows->hasPages())
+        <div class="mt-4">
+            {{ $rows->links() }}
+        </div>
+    @endif
+</div>

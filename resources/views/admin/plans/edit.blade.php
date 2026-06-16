@@ -131,6 +131,16 @@
                         Leave blank for <strong>unlimited</strong>. The user's website count is enforced when they try to add a website; existing sites past the limit are <strong>frozen</strong> (read-only on EBQ and the WP plugin), not deleted, so a downgrade never destroys data.
                     </p>
                 </div>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Max crawl pages</label>
+                    <input type="number" name="max_crawl_pages" value="{{ old('max_crawl_pages', $plan->max_crawl_pages) }}"
+                           min="0" max="9999999"
+                           class="w-full rounded border border-slate-300 px-3 py-2 text-sm font-mono"
+                           placeholder="leave blank for unlimited" />
+                    <p class="text-[11px] text-slate-500 mt-1">
+                        Pages crawled per run, per site. Leave blank for <strong>unlimited</strong>. When capped, the crawler fetches the highest-value pages first (GSC-trafficked → in sitemap → shallow), so the budget covers what matters most.
+                    </p>
+                </div>
             </div>
 
             <div>

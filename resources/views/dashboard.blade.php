@@ -90,7 +90,7 @@
                             <svg class="mt-0.5 h-4 w-4 flex-none text-emerald-500" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
                             </svg>
-                            <span>The "Sync now" button on the dashboard refreshes after the initial pull completes.</span>
+                            <span>Live numbers appear on the <strong class="font-medium text-slate-900 dark:text-white">Statistics</strong> page once the initial pull completes.</span>
                         </li>
                     </ul>
 
@@ -117,30 +117,27 @@
             <div>
                 <div class="flex items-center gap-2">
                     <h1 class="text-2xl font-bold tracking-tight">Dashboard</h1>
-                    <x-guide-link anchor="dashboard" />
                 </div>
-                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Overview of your website performance</p>
-            </div>
-            <livewire:dashboard.sync-and-report-panel />
-        </div>
-        <livewire:dashboard.kpi-cards />
-        <div class="flex items-center justify-between gap-3">
-            <div class="flex items-center gap-2">
-                <h2 class="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{{ __('Action insights') }}</h2>
-                <x-guide-link anchor="insight-cards" label="How these work" />
+                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Your highest-impact SEO actions, ranked</p>
             </div>
             <livewire:dashboard.country-filter />
         </div>
-        <livewire:dashboard.insight-cards />
-        <div class="grid gap-5 lg:grid-cols-3">
-            <div class="lg:col-span-2">
-                <livewire:dashboard.traffic-chart />
-            </div>
-            <div class="lg:col-span-1 space-y-5">
-                <livewire:dashboard.top-countries-card />
-                <livewire:dashboard.seasonality-card />
-                <livewire:dashboard.quick-wins-card />
-            </div>
-        </div>
+
+        {{-- Prominent banner while a crawl is in progress for the current site.
+             Polls and self-dismisses once the CrawlRun finishes; also drives the
+             hide/reappear of the crawl-derived widgets below. --}}
+        <livewire:crawl-banner />
+
+        {{-- Prominent nudge for sourceless sites (no GSC + no sitemap): add a
+             sitemap inline so the dashboard has something to analyse. --}}
+        <livewire:dashboard.sitemap-prompt />
+
+        {{-- Crawl-derived Site Health summary (full per-page detail lives on the
+             Link Structure page; detailed issues drill down in the queue below). --}}
+        <livewire:dashboard.site-health-stats />
+
+        {{-- Actionable widgets stack here. Priority Action Queue is the first;
+             more widgets will be added below it over time. --}}
+        <livewire:dashboard.priority-action-queue />
     </div>
 </x-layouts.app>

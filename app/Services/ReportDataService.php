@@ -7,6 +7,7 @@ use App\Models\Backlink;
 use App\Models\KeywordMetric;
 use App\Models\PageIndexingStatus;
 use App\Models\SearchConsoleData;
+use App\Models\Website;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 
@@ -48,8 +49,79 @@ class ReportDataService
         return $lastSynced ? Carbon::parse($lastSynced, $tz)->startOfDay() : null;
     }
 
+    /**
+     * Most recent date with Analytics data for this website. Unlike GSC,
+     * GA4 finalises within hours, so there's no multi-day lag floor —
+     * the latest stored day is reportable. Returns null when there are
+     * no GA rows yet (fresh / GA-not-connected site).
+     */
+    public function lastSafeAnalyticsDate(int $websiteId, ?string $timezone = null): ?Carbon
+    {
+        $tz = $timezone ?? config('app.timezone');
+
+        $last = AnalyticsData::query()
+            ->where('website_id', $websiteId)
+            ->max('date');
+
+        return $last ? Carbon::parse($last, $tz)->startOfDay() : null;
+    }
+
+    /**
+     * Per-source report readiness for a website, driven by which data is
+     * actually present (not merely which source is "connected"). Lets
+     * degraded sites (GA-only or GSC-only) still receive a report anchored
+     * to whichever source has usable data. `any` is false only when
+     * neither source has reportable data — the one case where we skip the
+     * send entirely (matching the historical GSC-only behavior, now
+     * widened to GA).
+     *
+     * @return array{ga: bool, gsc: bool, any: bool, date: ?Carbon}
+     */
+    public function reportReadiness(Website $website, ?string $timezone = null): array
+    {
+        $gscDate = $this->lastSafeReportDate($website->id, null, $timezone);
+        $gaDate = $this->lastSafeAnalyticsDate($website->id, $timezone);
+
+        // Prefer the GSC date (the historical anchor + lag-aware) when
+        // present; otherwise fall back to the latest GA day.
+        $date = $gscDate ?? $gaDate;
+
+        return [
+            'ga' => $gaDate !== null,
+            'gsc' => $gscDate !== null,
+            'any' => $date !== null,
+            'date' => $date,
+        ];
+    }
+
+    /**
+     * Technical-SEO / Site-Health section for growth reports, sourced from the
+     * latest crawl. Returns an empty array when the site hasn't been crawled.
+     *
+     * @return array<string,mixed>
+     */
+    public function siteHealthSection(int $websiteId): array
+    {
+        $crawl = app(\App\Services\Crawler\CrawlReportService::class);
+        $summary = $crawl->summary($websiteId);
+        if (! $summary['has_crawl']) {
+            return [];
+        }
+
+        return [
+            'health_score' => $summary['health_score'],
+            'last_crawled_at' => $summary['last_crawled_at'],
+            'blocked' => $summary['blocked'],
+            'pages_total' => $summary['pages_total'],
+            'orphan_count' => $summary['orphan_count'],
+            'findings' => $summary['findings'],
+            'groups' => $crawl->actionGroups($websiteId),
+        ];
+    }
+
     public function generate(int $websiteId, string $startDate, string $endDate, ?string $country = null): array
     {
+        $website = Website::query()->find($websiteId);
         $start = Carbon::parse($startDate)->startOfDay();
         $end = Carbon::parse($endDate)->endOfDay();
         $days = $start->diffInDays($end) + 1;
@@ -73,6 +145,12 @@ class ReportDataService
                 'current_label' => $currentLabel,
                 'previous_label' => $previousLabel,
                 'country' => $country,
+            ],
+            // Which data sources are connected, so views can render real
+            // sections vs "connect this source to unlock" placeholders.
+            'sources' => [
+                'ga' => $website?->hasGa() ?? false,
+                'gsc' => $website?->hasGsc() ?? false,
             ],
             'analytics' => $this->buildAnalytics($websiteId, $start, $end, $prevStart, $prevEnd),
             'search_console' => $this->buildSearchConsole($websiteId, $start, $end, $prevStart, $prevEnd, $country),
@@ -652,20 +730,30 @@ class ReportDataService
      *
      * @return array<int, array{query: string, primary_page: string, total_clicks: int, total_impressions: int, competing_pages: list<array{page: string, clicks: int, impressions: int, share: float, position: float}>}>
      */
-    public function cannibalizationReport(int $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50, ?string $country = null): array
+    public function cannibalizationReport(int $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50, ?string $country = null, bool $cacheOnly = false): array
     {
         [$start, $end] = $this->resolveRange($startDate, $endDate, 28);
 
+        $key = sprintf(
+            'report:cannibalization:v1:%d:%s:%s:%d:%s:%d',
+            $websiteId,
+            $start->toDateString(),
+            $end->toDateString(),
+            $limit,
+            $country ?? 'all',
+            ReportCache::version($websiteId),
+        );
+
+        // $cacheOnly: callers that only show a secondary badge (e.g. the Keywords
+        // table on high-volume sites) must not block on the heavy GROUP BY query —
+        // use the cached value if present, otherwise nothing. The dashboard /
+        // Insights report compute and warm it.
+        if ($cacheOnly) {
+            return Cache::get($key, []);
+        }
+
         return Cache::remember(
-            sprintf(
-                'report:cannibalization:v1:%d:%s:%s:%d:%s:%d',
-                $websiteId,
-                $start->toDateString(),
-                $end->toDateString(),
-                $limit,
-                $country ?? 'all',
-                ReportCache::version($websiteId),
-            ),
+            $key,
             now()->addHours(24),
             fn () => $this->buildCannibalizationReport($websiteId, $start, $end, $limit, $country),
         );

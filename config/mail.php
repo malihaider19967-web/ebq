@@ -49,6 +49,22 @@ return [
             'local_domain' => env('MAIL_EHLO_DOMAIN', parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST)),
         ],
 
+        // Postal relay — self-hosted outbound transport (shared Postal instance,
+        // server "EBQ", domain ebq.io verified SPF+DKIM). The connection is local
+        // (127.0.0.1) so it is unaffected by the host's outbound port-25 blocking;
+        // Postal handles external delivery, DKIM signing, and bounce tracking.
+        'postal' => [
+            'transport' => 'smtp',
+            'scheme' => env('POSTAL_SMTP_ENCRYPTION') === 'ssl' ? 'smtps' : 'smtp',
+            'host' => env('POSTAL_SMTP_HOST', '127.0.0.1'),
+            'port' => (int) env('POSTAL_SMTP_PORT', 25),
+            'encryption' => env('POSTAL_SMTP_ENCRYPTION') ?: null,
+            'username' => env('POSTAL_SMTP_USERNAME'),
+            'password' => env('POSTAL_SMTP_PASSWORD'),
+            'timeout' => (int) env('MAIL_TIMEOUT', 15),
+            'local_domain' => parse_url((string) env('APP_URL', 'http://localhost'), PHP_URL_HOST) ?: null,
+        ],
+
         'ses' => [
             'transport' => 'ses',
         ],

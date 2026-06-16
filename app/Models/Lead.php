@@ -17,6 +17,10 @@ class Lead extends Model
 {
     public const SOURCE_GUEST_AUDIT = 'guest_audit';
 
+    public const SOURCE_GUEST_RANK = 'guest_rank_tracker';
+
+    public const SOURCE_GUEST_VOLUME = 'guest_keyword_volume';
+
     protected $fillable = [
         'email',
         'name',

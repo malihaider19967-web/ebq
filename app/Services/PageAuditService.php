@@ -249,6 +249,10 @@ class PageAuditService
         $content = $auditor->content();
         $bodyText = $content['body_text'];
         unset($content['body_text']);
+        // Persist a truncated excerpt so downstream consumers (e.g. the
+        // striking-distance AI snippet rewriter) have page copy to work from
+        // without re-fetching the HTML. Additive to the stored result JSON.
+        $content['body_excerpt'] = mb_substr($bodyText, 0, 4000);
         $images = $auditor->images();
         $links = $auditor->links();
         $schema = $auditor->schema();

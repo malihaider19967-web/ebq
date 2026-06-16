@@ -84,6 +84,23 @@
                 </label>
             </section>
 
+            {{-- ── Keyword volume provider ──────────────────────────── --}}
+            <section class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <h2 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Keyword volume provider</h2>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                    Which backend powers search-volume lookups across the app. The self-hosted option uses your own server fleet (managed on
+                    <a href="{{ route('admin.keyword-servers.index') }}" class="text-indigo-600 hover:underline dark:text-indigo-400">Keyword Servers</a>)
+                    and is asynchronous — results stream in via webhook.
+                </p>
+                <label for="keyword_volume_provider" class="mt-4 block text-xs font-semibold text-slate-700 dark:text-slate-300">Provider</label>
+                <select id="keyword_volume_provider" name="keyword_volume_provider"
+                    class="mt-1 w-full max-w-md rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-800 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100">
+                    @foreach ($keywordProviders as $value => $label)
+                        <option value="{{ $value }}" @selected(old('keyword_volume_provider', $keywordProvider) === $value)>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </section>
+
             {{-- ── WordPress HQ banner ──────────────────────────────── --}}
             <section x-data="{ type: '{{ old('banner_type', $banner['type']) }}' }"
                 class="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900">

@@ -125,9 +125,56 @@ return [
         'backlinks_ttl_days' => (int) env('KE_BACKLINKS_TTL_DAYS', 30),
     ],
 
+    // Self-hosted keyword-data API (our own fleet driving Google Keyword
+    // Planner). Per-server credentials live in the DB (keyword_api_servers);
+    // these are global knobs. The service is asynchronous — see
+    // App\Services\KeywordFinder\KeywordFinderPool.
+    'keyword_finder' => [
+        // Public path the API servers POST results back to. Must match the
+        // route in routes/web.php and the CSRF exemption in bootstrap/app.php.
+        'webhook_path' => env('KEYWORD_FINDER_WEBHOOK_PATH', '/webhooks/keyword-finder'),
+        // Header the server signs the webhook body with (HMAC-SHA256).
+        'signature_header' => env('KEYWORD_FINDER_SIGNATURE_HEADER', 'x-webhook-signature'),
+        // Freshness window (days) for volume rows written from this provider.
+        'fresh_days' => (int) env('KEYWORD_FINDER_FRESH_DAYS', 30),
+        // Short timeout for the *ack* POST — the server replies instantly and
+        // does the slow work out-of-band, so we never hold a long connection.
+        'request_timeout_s' => (int) env('KEYWORD_FINDER_REQUEST_TIMEOUT_S', 15),
+        // How long the UI keeps polling a pending request before giving up.
+        'poll_ttl_minutes' => (int) env('KEYWORD_FINDER_POLL_TTL_MINUTES', 5),
+        'default_location' => env('KEYWORD_FINDER_DEFAULT_LOCATION', 'United States'),
+        'default_language' => env('KEYWORD_FINDER_DEFAULT_LANGUAGE', 'English'),
+    ],
+
     'competitor_backlinks' => [
         'limit_per_competitor' => (int) env('COMPETITOR_BACKLINKS_LIMIT', 50),
         'fresh_days' => (int) env('COMPETITOR_BACKLINKS_FRESH_DAYS', 30),
+    ],
+
+    // Competitive Keyword Intelligence module (gap analysis, competitor
+    // auto-discovery, opportunity scoring). All knobs are cost controls for
+    // the SERP (Serper) + keyword-finder fan-out — keep the caps conservative.
+    'competitive' => [
+        // Max keywords whose SERP we scan in one competitor-discovery run.
+        'discovery_max_keywords' => (int) env('COMPETITIVE_DISCOVERY_MAX_KEYWORDS', 25),
+        // Don't re-run discovery (re-bill SERP) within this window.
+        'discovery_refresh_days' => (int) env('COMPETITIVE_DISCOVERY_REFRESH_DAYS', 14),
+        // Max live SERP fetches per gap analysis for opportunity scoring.
+        'opportunity_live_max' => (int) env('COMPETITIVE_OPPORTUNITY_LIVE_MAX', 20),
+        // How many competitor URLs a single gap analysis accepts.
+        'gap_max_competitors' => (int) env('COMPETITIVE_GAP_MAX_COMPETITORS', 3),
+        // Cap on persisted gap rows (top-by-volume) to bound table growth.
+        'gap_row_cap' => (int) env('COMPETITIVE_GAP_ROW_CAP', 1000),
+        // How long a gap run may sit in `collecting` before the poller fails it.
+        'gap_collect_timeout_minutes' => (int) env('COMPETITIVE_GAP_COLLECT_TIMEOUT_MINUTES', 5),
+        // Max keywords verified against the live SERP per gap analysis.
+        'gap_verify_max' => (int) env('COMPETITIVE_GAP_VERIFY_MAX', 25),
+        // Also verify Shared/Weak rows (not just Missing) when true.
+        'gap_verify_include_shared' => (bool) env('COMPETITIVE_GAP_VERIFY_INCLUDE_SHARED', false),
+        // TTL (days) for the shared, cross-client SERP cache (serp_results).
+        // Rankings shift faster than search volume, so shorter than the 30-day
+        // keyword cache. One client's lookup is free for every other until this lapses.
+        'serp_cache_days' => (int) env('COMPETITIVE_SERP_CACHE_DAYS', 7),
     ],
 
     'language_detection' => [

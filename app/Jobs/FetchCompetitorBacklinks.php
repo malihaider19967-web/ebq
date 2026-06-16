@@ -37,6 +37,7 @@ class FetchCompetitorBacklinks implements ShouldQueue
         public ?int $websiteId = null,
         public ?int $ownerUserId = null,
     ) {
+        $this->onQueue(\App\Support\Queues::SYNC);
     }
 
     public function handle(CompetitorBacklinkService $service): void

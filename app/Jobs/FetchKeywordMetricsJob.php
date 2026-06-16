@@ -30,7 +30,9 @@ class FetchKeywordMetricsJob implements ShouldQueue
         public string $country = 'global',
         public ?int $websiteId = null,
         public ?int $ownerUserId = null,
-    ) {}
+    ) {
+        $this->onQueue(\App\Support\Queues::SYNC);
+    }
 
     public function handle(KeywordMetricsService $service): void
     {

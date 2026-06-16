@@ -42,7 +42,9 @@ class SyncOwnBacklinksFromKeywordsEverywhere implements ShouldBeUnique, ShouldQu
     public function __construct(
         public readonly int $websiteId,
         public readonly ?int $ownerUserId = null,
-    ) {}
+    ) {
+        $this->onQueue(\App\Support\Queues::SYNC);
+    }
 
     public function uniqueId(): string
     {

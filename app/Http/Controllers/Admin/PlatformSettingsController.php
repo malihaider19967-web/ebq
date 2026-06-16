@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use App\Support\AiModelConfig;
 use App\Support\AuditConfig;
+use App\Support\KeywordProviderConfig;
 use App\Support\RankTrackerConfig;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -33,6 +34,8 @@ class PlatformSettingsController extends Controller
             'checkIntervalHours'           => RankTrackerConfig::checkIntervalHours(),
             'defaultDepth'                 => RankTrackerConfig::DEFAULT_DEPTH,
             'competitorKeywordsEverywhere' => AuditConfig::competitorKeywordsEverywhereEnabled(),
+            'keywordProvider'              => KeywordProviderConfig::currentProvider(),
+            'keywordProviders'             => KeywordProviderConfig::options(),
             'banner' => [
                 'enabled'     => ((string) Setting::get('plugin.banner.enabled', '0')) === '1',
                 'type'        => (string) Setting::get('plugin.banner.type', 'image'),
@@ -52,6 +55,7 @@ class PlatformSettingsController extends Controller
             'model' => ['required', 'string', Rule::in($availableIds)],
             'default_check_interval_hours' => ['required', 'integer', 'min:1', 'max:168'],
             'competitor_keywords_everywhere' => ['nullable', 'boolean'],
+            'keyword_volume_provider' => ['required', 'string', Rule::in(KeywordProviderConfig::PROVIDERS)],
             'banner_enabled' => ['nullable', 'boolean'],
             'banner_type' => ['required', 'string', Rule::in(['image', 'youtube'])],
             'banner_title' => ['nullable', 'string', 'max:120'],
@@ -66,6 +70,8 @@ class PlatformSettingsController extends Controller
             AuditConfig::SETTING_COMPETITOR_KEYWORDS_EVERYWHERE,
             $request->boolean('competitor_keywords_everywhere'),
         );
+
+        KeywordProviderConfig::setProvider((string) $data['keyword_volume_provider']);
 
         Setting::set('plugin.banner.enabled', $request->boolean('banner_enabled') ? '1' : '0');
         Setting::set('plugin.banner.type', (string) $data['banner_type']);

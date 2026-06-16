@@ -93,7 +93,7 @@ class KeywordDetail extends Component
         );
 
         if ($row->wasRecentlyCreated) {
-            TrackKeywordRankJob::dispatch($row->id, true);
+            TrackKeywordRankJob::dispatch($row->id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
             session()->flash('keyword_detail_status', 'Added to rank tracker — first SERP check queued.');
         } else {
             session()->flash('keyword_detail_status', 'Already tracking this keyword.');

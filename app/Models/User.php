@@ -432,6 +432,16 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
+     * Max pages a single crawl run may fetch for this user's sites, from the
+     * effective plan. null = unlimited (the global crawler.max_pages_per_run
+     * applies). See Website::crawlPageCap() for the resolved integer.
+     */
+    public function crawlPageLimit(): ?int
+    {
+        return $this->effectivePlan()?->max_crawl_pages;
+    }
+
+    /**
      * IDs of websites past the user's current limit, ordered by
      * created_at — i.e. the oldest sites stay active, newer ones are
      * frozen on a downgrade. Computed live (no stored column) so plan

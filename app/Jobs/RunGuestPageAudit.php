@@ -37,7 +37,10 @@ class RunGuestPageAudit implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 1800;
 
-    public function __construct(public readonly int $auditId) {}
+    public function __construct(public readonly int $auditId)
+    {
+        $this->onQueue(\App\Support\Queues::INTERACTIVE);
+    }
 
     public function uniqueId(): string
     {

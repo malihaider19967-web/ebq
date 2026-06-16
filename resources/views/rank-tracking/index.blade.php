@@ -9,6 +9,7 @@
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Track keyword positions on search engines. Auto-refreshes every 12 hours.</p>
             </div>
         </div>
+        <livewire:crawl-banner />
         <livewire:rank-tracking.rank-tracking-manager />
     </div>
 </x-layouts.app>

@@ -296,7 +296,7 @@ class RankTrackingManager extends Component
             );
 
             if ($row->wasRecentlyCreated) {
-                TrackKeywordRankJob::dispatch($row->id, true);
+                TrackKeywordRankJob::dispatch($row->id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
                 $created++;
             } else {
                 $skipped++;
@@ -431,7 +431,7 @@ class RankTrackingManager extends Component
             ]
         );
 
-        TrackKeywordRankJob::dispatch($keyword->id, true);
+        TrackKeywordRankJob::dispatch($keyword->id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
 
         $this->reset([
             'newKeyword',
@@ -451,7 +451,7 @@ class RankTrackingManager extends Component
             return;
         }
 
-        TrackKeywordRankJob::dispatch($keyword->id, true);
+        TrackKeywordRankJob::dispatch($keyword->id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
 
         $keyword->forceFill([
             'last_status' => 'queued',

@@ -1,0 +1,61 @@
+# Known issues & gaps
+
+Verified against the current code (2026-06-16, shared-crawl deep-dive). These are real
+behaviours to be aware of — some are bugs to fix, some are accepted trade-offs.
+
+## Bugs / inconsistencies
+
+### Cap-window leak — `LinkStructurePanel::render` (~lines 68-72)
+The Link Structure panel's "example pages" picker reads the top-8 pages by
+`inbound_link_count` **across the whole crawl_site**, via a raw `WebsitePage` query, with
+**no `value_rank <= cap` filter**:
+
+```php
+\App\Models\WebsitePage::where('crawl_site_id', $website->crawl_site_id)
+    ->whereNotNull('last_crawled_at')->whereNull('removed_at')
+    ->orderByDesc('inbound_link_count')->limit(8)->pluck('url');
+```
+
+Every other read path enforces the cap window; this one doesn't, so a small-cap user can be
+shown example URLs outside their window. **Severity: low** (only suggestion URLs in an input
+helper, not data/metrics). **Fix:** source the examples through `CrawlReportService`
+(cap-filtered) or add `->where('value_rank', '<=', $cap)`.
+
+## Accepted trade-offs (intentional, documented so they're not "discovered" as bugs)
+
+### Unbounded-by-cap link reads
+`CrawlReportService::bfsParents` (homepage→page BFS for orphan/path detection) and
+`pageLinkStructure` (a page's inbound + outbound, ≤500 each) read the **full** link graph
+without the cap window. The *page* in question is cap-checked; its neighbours are not.
+Accepted because correct structure/orphan detection needs the whole graph. Revisit only if
+it ever surfaces cross-cap URLs directly to a user.
+
+### Sitemap-delta dispatch is per-website
+`CrawlSitemapDeltaJob` dedupes per crawl_site (its `uniqueId`), but then triggers
+`CrawlWebsitePagesJob($website->id)` for the subscriber that saw the delta. If several
+subscribers' deltas fire, several dispatches occur — but the `crawl-site-{id}`
+`ShouldBeUnique` lock + the start-lock collapse them to **one** crawl. Safe, just slightly
+redundant dispatch.
+
+### Analysis is best-effort
+If `AnalyzeSiteJob` throws partway, its `failed()` handler still marks the run `completed`
+(so it isn't stuck `running`), but findings / score / link graph may be partial. The run's
+`notes` records the failure. Chosen over leaving runs wedged on huge sites.
+
+## Large-site pressure points
+
+- **In-memory graph BFS** — `SiteGraphAnalyzer` loads the adjacency list into memory for
+  inbound-count + click-depth BFS (O(V+E)). Assumes the link graph fits in RAM.
+- **`AnalyzeSiteJob` 1200s timeout** — repeated analyze timeouts on very large sites are the
+  known "crawls not finishing" failure mode. `retry_after` (1320s) sits just above it.
+- **Referrer / external-link sampling** — broken-referrer sampling (5/target, ~50k edge cap)
+  and external-link checking (≤25/page, ≤500 total) are bounded, so on pathological fan-in or
+  link-heavy pages the coverage is partial by design.
+
+## Transitional cruft
+
+- The four crawl tables still carry a **nullable, FK-dropped, unused `website_id`** column
+  (safe-rollback leftover from the re-key). Nothing reads/writes it. A future migration can
+  `dropColumn('website_id')` once we're confident — not urgent.
+- `websites` keeps legacy `sitemap_lastmod_true/false` + `crawl_protection*` columns; the
+  canonical copies now live on `crawl_sites`. The `Website` helpers delegate to the crawl_site.

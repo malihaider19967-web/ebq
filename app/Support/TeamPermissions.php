@@ -36,6 +36,16 @@ class TeamPermissions
             'description' => 'Per-page traffic and indexing status.',
             'route' => 'pages.index',
         ],
+        'sitemaps' => [
+            'label' => 'Sitemaps',
+            'description' => 'Manage and track XML sitemaps.',
+            'route' => 'sitemaps.index',
+        ],
+        'link_structure' => [
+            'label' => 'Link Structure',
+            'description' => 'Per-page internal link structure from the site crawl (inbound/outbound links, orphans).',
+            'route' => 'link-structure.index',
+        ],
         'audits' => [
             'label' => 'Audits',
             'description' => 'On-demand page audits and reports.',

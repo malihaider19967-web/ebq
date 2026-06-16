@@ -24,7 +24,9 @@ class SyncSearchConsoleData implements ShouldQueue
     public function __construct(
         public int $websiteId,
         public int $days = 30,
-    ) {}
+    ) {
+        $this->onQueue(\App\Support\Queues::SYNC);
+    }
 
     public function handle(SearchConsoleService $service): void
     {
@@ -36,7 +38,11 @@ class SyncSearchConsoleData implements ShouldQueue
             Log::info("SyncSearchConsoleData: skipping frozen website {$this->websiteId}");
             return;
         }
-        $account = $website->user->googleAccounts()->latest()->first();
+        // No GSC source configured (GA-only or PageSpeed-only site): nothing to sync.
+        if ($website->gsc_site_url === null || $website->gsc_site_url === '') {
+            return;
+        }
+        $account = $website->gscAccountResolved();
 
         if (! $account) {
             Log::warning("SyncSearchConsoleData: No Google account for website {$this->websiteId}");

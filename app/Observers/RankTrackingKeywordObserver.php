@@ -58,7 +58,7 @@ class RankTrackingKeywordObserver
             return;
         }
 
-        FetchKeywordMetricsJob::dispatch([$text], 'global');
+        FetchKeywordMetricsJob::dispatch([$text], 'global')->onQueue(\App\Support\Queues::INTERACTIVE);
     }
 
     private function resolveBilledUser(RankTrackingKeyword $keyword): ?User

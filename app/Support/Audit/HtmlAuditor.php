@@ -100,6 +100,29 @@ class HtmlAuditor
         ];
     }
 
+    /**
+     * Robots directives from <meta name="robots"> and <meta name="googlebot">.
+     * (X-Robots-Tag response header is checked separately by the caller.)
+     *
+     * @return array{raw: string, noindex: bool, nofollow: bool}
+     */
+    public function robots(): array
+    {
+        $robots = strtolower(trim((string) $this->xpath->evaluate(
+            'string(//meta[translate(@name, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")="robots"]/@content)'
+        )));
+        $googlebot = strtolower(trim((string) $this->xpath->evaluate(
+            'string(//meta[translate(@name, "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz")="googlebot"]/@content)'
+        )));
+        $combined = trim($robots.' '.$googlebot);
+
+        return [
+            'raw' => $combined,
+            'noindex' => str_contains($combined, 'noindex') || str_contains($combined, 'none'),
+            'nofollow' => str_contains($combined, 'nofollow') || str_contains($combined, 'none'),
+        ];
+    }
+
     public function headings(): array
     {
         $nodes = $this->xpath->query('//h1|//h2|//h3|//h4|//h5|//h6');

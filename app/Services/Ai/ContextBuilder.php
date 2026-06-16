@@ -33,6 +33,7 @@ class ContextBuilder
         private readonly TopicalGapService $gapService,
         private readonly EntityCoverageService $entityService,
         private readonly NetworkInsightService $networkInsight,
+        private readonly \App\Services\Crawler\CrawlReportService $crawlReport,
     ) {
     }
 
@@ -84,6 +85,9 @@ class ContextBuilder
                 : null,
             seoAnalysis: in_array(AiTool::SIGNAL_SEO_ANALYSIS, $signals, true)
                 ? $this->loadSeoAnalysis($website, $url, $input, $focusKw)
+                : null,
+            siteIntel: in_array(AiTool::SIGNAL_SITE_INTEL, $signals, true) && $url !== ''
+                ? $this->crawlReport->pageIntel($website->id, $url)
                 : null,
             country: $country,
             language: $language,

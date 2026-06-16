@@ -1,0 +1,85 @@
+<?php
+
+return [
+    // Pages per CrawlPageBatchJob chunk.
+    'batch_size' => (int) env('CRAWLER_BATCH_SIZE', 25),
+
+    // Significant-term extraction (language-agnostic; feeds the internal-link
+    // suggester instead of raw body_text). prune_body_text trims body_text to an
+    // excerpt AFTER analysis to reclaim storage — OFF by default because it's
+    // irreversible (no DB backups); enable once terms are validated in production.
+    'terms_df_sample' => (int) env('CRAWLER_TERMS_DF_SAMPLE', 3000),
+    'prune_body_text' => (bool) env('CRAWLER_PRUNE_BODY_TEXT', false),
+    'body_excerpt_chars' => (int) env('CRAWLER_BODY_EXCERPT_CHARS', 500),
+
+    // Multi-pass crawling. A run crawls due pages, then re-selects pages newly
+    // discovered mid-run (e.g. category pages linked from the homepage that began
+    // as stubs) and crawls those too, repeating until no new pages are found or
+    // these bounds are hit. Without this the homepage's nav targets stay uncrawled
+    // and the internal-link graph is disconnected (orphan/click-depth false flags).
+    'max_passes' => (int) env('CRAWLER_MAX_PASSES', 6),
+    'max_pages_per_run' => (int) env('CRAWLER_MAX_PAGES_PER_RUN', 200000),
+
+    // Politeness delay between same-host fetches inside a batch (milliseconds).
+    'delay_ms' => (int) env('CRAWLER_DELAY_MS', 250),
+
+    // Per-page fetch timeout (seconds).
+    'timeout' => (int) env('CRAWLER_TIMEOUT', 20),
+
+    // Incremental crawling — adaptive recrawl interval (days). A page's interval
+    // backs off geometrically from min→max while it keeps coming back unchanged,
+    // and snaps back to min the moment it significantly changes.
+    'recrawl_min_days' => (int) env('CRAWLER_RECRAWL_MIN_DAYS', 3),
+    'recrawl_base_days' => (int) env('CRAWLER_RECRAWL_BASE_DAYS', 7),
+    'recrawl_max_days' => (int) env('CRAWLER_RECRAWL_MAX_DAYS', 30),
+
+    // SimHash Hamming-distance above which a content change counts as "significant"
+    // (lower = stricter; higher tolerates more ad/timestamp noise). 0–64.
+    'simhash_threshold' => (int) env('CRAWLER_SIMHASH_THRESHOLD', 3),
+
+    // Sitemap <lastmod> trust: only treat a lastmod bump as a recrawl trigger once
+    // we have at least N observations for the site AND the share of bumps that led
+    // to a real change is at least the ratio (else the sitemap is "always-bumping").
+    'sitemap_trust_min_sample' => (int) env('CRAWLER_SITEMAP_TRUST_MIN_SAMPLE', 20),
+    'sitemap_trust_ratio' => (float) env('CRAWLER_SITEMAP_TRUST_RATIO', 0.3),
+
+    // Cap external links checked per site per run (broken-external pass).
+    'max_external_checks' => (int) env('CRAWLER_MAX_EXTERNAL_CHECKS', 500),
+
+    // Click-depth at/above which an indexable page is flagged "deep".
+    'deep_page_threshold' => (int) env('CRAWLER_DEEP_PAGE_THRESHOLD', 3),
+
+    // Min GSC clicks (28d) for a noindex/orphan page to count as "important".
+    'important_clicks' => (int) env('CRAWLER_IMPORTANT_CLICKS', 1),
+
+    // Parameter canonicalization. When true, query-string params are stripped
+    // from discovered URLs (frontier + internal-link targets) so noisy variants
+    // like ?name=…/?nick=…/?utm_… collapse into one clean inventory row instead
+    // of thousands. Params in keep_query_params are preserved (e.g. pagination).
+    'strip_query_params' => (bool) env('CRAWLER_STRIP_QUERY_PARAMS', true),
+    'keep_query_params' => ['page', 'p', 'paged'],
+
+    // Public egress IP + User-Agent of the crawler, shown to clients as the
+    // address to allowlist when their firewall/WAF blocks us. Crawls run on the
+    // dedicated worker box, so this is that box's public IP.
+    'egress_ip' => env('CRAWLER_EGRESS_IP'),
+
+    // Adaptive anti-blocking via a proxy pool. Proxies come from the `proxies`
+    // table (admin panel) + proxylist.txt in the project root, merged at runtime.
+    'proxy' => [
+        'enabled' => (bool) env('CRAWLER_PROXY_ENABLED', false),
+
+        // When a proxy is used:
+        //   off       — never (pool disabled)
+        //   on_block  — only after a direct fetch is blocked, then retry via proxy
+        //               (and preemptively for sites already flagged cloudflare/blocked)
+        //   always    — route every fetch through a proxy
+        'mode' => env('CRAWLER_PROXY_MODE', 'on_block'),
+
+        // Path to the flat-file proxy list (one proxy per line; see the file).
+        'list_file' => env('CRAWLER_PROXY_FILE', base_path('proxylist.txt')),
+
+        // Disable a proxy after this many consecutive failures (0 = never).
+        'max_failures' => (int) env('CRAWLER_PROXY_MAX_FAILURES', 5),
+    ],
+];

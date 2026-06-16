@@ -22,16 +22,18 @@ class SyncPageIndexingStatus implements ShouldQueue
     public function __construct(
         public int $websiteId,
         public int $maxPages = 25,
-    ) {}
+    ) {
+        $this->onQueue(\App\Support\Queues::SYNC);
+    }
 
     public function handle(GoogleClientFactory $googleClientFactory): void
     {
         $website = Website::query()->find($this->websiteId);
-        if (! $website || $website->gsc_site_url === '') {
+        if (! $website || $website->gsc_site_url === null || $website->gsc_site_url === '') {
             return;
         }
 
-        $account = $website->user->googleAccounts()->latest()->first();
+        $account = $website->gscAccountResolved();
         if (! $account) {
             Log::warning("SyncPageIndexingStatus: No Google account for website {$this->websiteId}");
 

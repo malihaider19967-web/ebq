@@ -20,7 +20,9 @@ class SyncAnalyticsData implements ShouldQueue
     public function __construct(
         public int $websiteId,
         public int $days = 30,
-    ) {}
+    ) {
+        $this->onQueue(\App\Support\Queues::SYNC);
+    }
 
     public function handle(GoogleAnalyticsService $service): void
     {
@@ -32,7 +34,11 @@ class SyncAnalyticsData implements ShouldQueue
             Log::info("SyncAnalyticsData: skipping frozen website {$this->websiteId}");
             return;
         }
-        $account = $website->user->googleAccounts()->latest()->first();
+        // No GA source configured (GSC-only or PageSpeed-only site): nothing to sync.
+        if ($website->ga_property_id === null || $website->ga_property_id === '') {
+            return;
+        }
+        $account = $website->gaAccountResolved();
 
         if (! $account) {
             Log::warning("SyncAnalyticsData: No Google account for website {$this->websiteId}");

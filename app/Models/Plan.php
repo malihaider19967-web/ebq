@@ -55,6 +55,9 @@ class Plan extends Model
         'stripe_price_id_yearly',
         'trial_days',
         'max_websites',
+        // Max pages fetched per crawl run for sites on this plan (highest-value
+        // pages first). null = unlimited (global crawler.max_pages_per_run).
+        'max_crawl_pages',
         'features',
         // Sparse map of bullet-index => YouTube URL for the optional
         // explainer video shown next to a marketing bullet. Kept separate
@@ -87,6 +90,7 @@ class Plan extends Model
             'price_yearly_usd' => 'integer',
             'trial_days' => 'integer',
             'max_websites' => 'integer',
+            'max_crawl_pages' => 'integer',
             'display_order' => 'integer',
             'is_active' => 'boolean',
             'is_highlighted' => 'boolean',

@@ -21,7 +21,9 @@ class TrackKeywordRankJob implements ShouldQueue
     public function __construct(
         public int $keywordId,
         public bool $forced = false,
-    ) {}
+    ) {
+        $this->onQueue(\App\Support\Queues::SYNC);
+    }
 
     public function handle(RankTrackingService $service): void
     {
