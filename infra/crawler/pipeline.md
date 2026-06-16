@@ -50,8 +50,15 @@ links to category pages that aren't in the frontier; without crawling them the l
 graph is disconnected and everything looks like a false orphan / "too deep". So
 each page's `rebuildEdges` creates **stub** `website_pages` rows for discovered
 links (due immediately), and the **next pass** crawls those. The loop ends when a
-pass finds nothing new, the pass cap is hit, or the per-run page budget
-(`effective_cap`) is reached.
+pass finds nothing new or the per-run page budget (`effective_cap`) is reached.
+
+**Fairness — `crawler.pages_per_pass` (default 1000).** Each pass crawls at most this
+many pages, then dispatches the next pass to the **back** of the queue. This stops one
+large site from enqueuing its whole frontier in a single `Bus::batch` and starving every
+other site on the shared `crawl` queue — concurrent crawls interleave (round-robin). The
+old `crawler.max_passes` count is deprecated; `CrawlPassJob` derives its own runaway
+ceiling from `ceil(maxPages / pages_per_pass) * 2 + 50`, so total pages are bounded only
+by the cap, not the pass count.
 
 ## The value ordering (capped crawls buy what matters)
 
@@ -85,13 +92,23 @@ homepage (`https://{normalized_domain}`) so a domain-only site still gets crawle
 - `--sitemap-deltas`: daily, dispatch `CrawlSitemapDeltaJob`.
 It dispatches `CrawlWebsitePagesJob` via a representative subscriber website.
 
+`ebq:crawl-supervisor` (cron, **every 5 min**) is the watchdog — see Reliability.
+
 ## Reliability notes
 
 - `CrawlWebsitePagesJob` / `CrawlPassJob`: `tries = 1` (no blind retries of a whole
   crawl). `AnalyzeSiteJob`: `timeout = 1200s`, and its `failed()` finalizes the run
   (`completed`) instead of leaving it stuck "running" — important on very large
-  sites where analysis can exceed the limit. **Repeated AnalyzeSiteJob timeouts on
-  huge sites are a known reliability area** (observed as "crawls not finishing").
+  sites where analysis can exceed the limit.
+- **The wedge (important).** The multi-pass loop continues *only* via the `Bus::batch`
+  `->finally()` callback. If a worker is recycled mid-batch (`queue:work --max-time=3600`,
+  or any container restart) that callback can be lost, so the next pass / `AnalyzeSiteJob`
+  is never dispatched and the run sits in `running` forever (observed: several domains
+  wedged for hours). **`ebq:crawl-supervisor`** (every 5 min) recovers them: a `running`
+  run whose row hasn't been touched in `crawler.stall_minutes` (default 10) with work
+  still due is **resumed** (dispatch next pass) or **finalized** (`AnalyzeSiteJob`); past
+  `crawler.max_run_hours` (default 6) it's force-finalized. Active runs touch their row
+  every batch, so they're never falsely flagged.
 - `retry_after` (`REDIS_QUEUE_RETRY_AFTER=1320`) must exceed the longest job
   timeout, or a long crawl is re-dispatched while still running.
 

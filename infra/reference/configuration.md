@@ -128,7 +128,10 @@ knobs:
 | Knob | Default | Why |
 |---|---|---|
 | `CRAWLER_BATCH_SIZE` | 25 | pages per `CrawlPageBatchJob` |
-| `CRAWLER_MAX_PASSES` / `_MAX_PAGES_PER_RUN` | 6 / 200000 | multi-pass discovery bounds (else nav targets stay uncrawled → false orphan flags) |
+| `CRAWLER_PAGES_PER_PASS` | 1000 | **fairness** — max pages a single pass enqueues before yielding the queue (stops one big site monopolising the shared crawl queue). Does NOT cap total pages |
+| `CRAWLER_MAX_PASSES` | 6 | **deprecated** — superseded by `pages_per_pass`; `CrawlPassJob` derives its own runaway ceiling |
+| `CRAWLER_MAX_PAGES_PER_RUN` | 200000 | per-run page budget (fallback when `effective_cap` is 0) |
+| `CRAWLER_STALL_MINUTES` / `CRAWLER_MAX_RUN_HOURS` | 10 / 6 | `ebq:crawl-supervisor` watchdog: resume a run idle this long; force-finalize past this age |
 | `CRAWLER_DELAY_MS` / `CRAWLER_TIMEOUT` | 250 / 20 | politeness delay / per-page fetch timeout (s) |
 | `CRAWLER_RECRAWL_MIN/BASE/MAX_DAYS` | 3 / 7 / 30 | adaptive recrawl backoff window |
 | `CRAWLER_SIMHASH_THRESHOLD` | 3 | Hamming distance = "significant change" (memory `incremental-crawling`) |

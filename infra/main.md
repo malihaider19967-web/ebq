@@ -70,6 +70,8 @@ application is documented** — keep it that way (see the protocol). Each area l
 ### Crawler — the heaviest subsystem ✅
 [crawler/](./crawler/README.md) → architecture · data-model · pipeline · read-path ·
 findings-and-scoring · adjacent-systems · operations · known-issues
+— **fairness** (`pages_per_pass`) interleaves sites so no big domain monopolises the queue;
+the **`ebq:crawl-supervisor`** watchdog (every 5 min) recovers wedged multi-pass chains.
 
 ### Data sources — Google & Microsoft ✅
 [data-sources/](./data-sources/README.md) → google-oauth · sync-jobs · data-model
@@ -226,6 +228,17 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-06-16 (dashboard + crawl fixes)** — Fixed & deployed: IDOR gate on the Competitive
+  components (Livewire actions skip route middleware), `summary()` stale-health (use last
+  *completed* run), `KpiCards`/`TrafficChart` cache-version, and the `CrawlBanner` poll
+  (10s/30s) + display. **Crawl fairness** (`crawler.pages_per_pass`) so a big site can't
+  starve the shared queue, and a **`ebq:crawl-supervisor`** watchdog (every 5 min,
+  `stall_minutes` 10) that recovers wedged multi-pass chains. Admin `/admin/crawler` now shows
+  the client per crawl + a legend, and progress as crawled / total-discovered. Banner + admin
+  progress are inventory-based (not the per-pass counter). 8 tests pass. Docs updated across
+  `crawler/{pipeline,known-issues,operations,read-path}`, `reference/{jobs-and-scheduler,
+  configuration}`, and `deployment-and-queues` (⛔ never `rsync --delete` to the worker — it
+  wiped the worker-only compose/Dockerfile this session; recovered from image history).
 - **2026-06-16 (wp plugin source)** — Documented the **client-side WordPress plugin** (the
   EBQ SEO plugin, a separate git repo at `/var/www/ebq/ebq-wordpress-plugin/`) in
   `wordpress-plugin/plugin-source.md` + `plugin-features.md`. Added `/ebq-wordpress-plugin`

@@ -42,6 +42,20 @@ If `AnalyzeSiteJob` throws partway, its `failed()` handler still marks the run `
 (so it isn't stuck `running`), but findings / score / link graph may be partial. The run's
 `notes` records the failure. Chosen over leaving runs wedged on huge sites.
 
+## Reliability
+
+- **Wedge (mitigated, not eliminated).** The multi-pass loop continues only via the
+  `Bus::batch` `->finally()` callback; a worker recycle/restart mid-batch can drop it, leaving
+  a run stuck `running`. **`ebq:crawl-supervisor`** (every 5 min, `stall_minutes` default 10)
+  resumes/finalizes such runs — so a wedge self-heals within ~10 min rather than never, but the
+  pipeline now *depends on* the watchdog. The supervisor is time-based, so a run whose next
+  pass is merely queued behind a slow backlog can be re-dispatched (a harmless duplicate
+  upsert). See [pipeline.md](./pipeline.md) §Reliability.
+- **Slow fetch throughput.** Observed ~1.5 pages/sec under load (≈90s per 25-page batch),
+  dominated by per-page fetch latency (proxy `on_block` retries + politeness delay + target
+  speed), not the pipeline. It's the biggest lever on "big sites take a long time" and is
+  un-investigated.
+
 ## Large-site pressure points
 
 - **In-memory graph BFS** — `SiteGraphAnalyzer` loads the adjacency list into memory for

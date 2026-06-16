@@ -7,9 +7,11 @@ see [../deployment-and-queues.md](../deployment-and-queues.md).
 ## Watching crawls
 
 - **Admin UI:** `/admin/crawler` — the fleet panel (`Livewire/Admin/CrawlerProgress`), live
-  (5s poll). Shows, per crawl_site: status, cap-relative progress, crawled pages, errors, open
-  issues, health, subscribers/cap, last activity — plus summary cards incl. the **crawl-queue
-  backlog**. The backlog card is the first thing to check when crawls feel slow.
+  (5s poll). Per crawl_site: **which website(s)/client(s)** it serves, status, **progress as
+  crawled / total-discovered** (inventory-based, matching the client banner — *not* the
+  internal per-pass counter), errors, open issues, health, subscribers/cap, last activity —
+  plus summary cards incl. the **crawl-queue backlog**, and a built-in "How to read this
+  screen" legend. The backlog card is the first thing to check when crawls feel slow.
 - **Queue depth (CLI):** `Queue::connection('redis')->size('crawl')`.
 - **Throughput sanity check:** count `website_pages.last_crawled_at >= now()-Ninterval`. A
   healthy fleet sustains ~**5–7 pages/sec** across the 5 crawl workers.
@@ -40,15 +42,23 @@ full detail + the incident that proves why in [../deployment-and-queues.md](../d
 
 ## Failure modes & fixes
 
-### Congestion / "a domain looks stuck"
-**Symptom:** one domain's run hasn't advanced for many minutes while other domains crawl;
-queue backlog in the thousands. **Cause:** the single FIFO `crawl` queue + a large domain (or
-a full `--backfill`) monopolising all 5 workers; the parked domain's continuation jobs are
-behind the flood. **Not a crash** — `pages_fetched` would move if its pass had run.
-**Diagnose:** compare each run's `updated_at`; check which crawl_site the recent
-`last_crawled_at` writes belong to. **Fix options:** wait it out (it will surface), or do a
-focused reset — abort the other runs + clear the `crawl` queue (NOT `sync`) + re-dispatch the
-target domain alone. Aborting other in-flight crawls means they re-crawl later.
+### A domain looks stuck (congestion or wedge)
+**Symptom:** one domain's run hasn't advanced for many minutes while others crawl. **Two
+causes:**
+- **Congestion** — too many sites crawling at once on the single FIFO `crawl` queue. Largely
+  fixed by per-pass fairness (`crawler.pages_per_pass`): a big site now yields after each
+  1,000-page pass instead of enqueuing its whole frontier. A genuinely slow fetch rate
+  (~1.5 pages/sec) can still make big sites take a long time.
+- **Wedge** — the multi-pass `Bus::batch` callback was lost on a worker recycle, so the chain
+  died (`updated_at` stale, `job_batches` row stuck unfinished). **`ebq:crawl-supervisor`**
+  auto-recovers it within `stall_minutes` (10). **Don't panic-reset** — give the watchdog
+  ~10 min first.
+
+**Diagnose:** compare each run's `updated_at` (stale = wedged or queued); count
+`job_batches WHERE finished_at IS NULL`; confirm workers are alive + `failed_jobs` ≈ 0.
+**Force recovery now:** `php artisan ebq:crawl-supervisor` (lower the window for a one-off with
+`CRAWLER_STALL_MINUTES=5 php artisan ebq:crawl-supervisor`). Clean leftover orphan batch rows
+with `DB::table('job_batches')->where('created_at','<',now()->subMinutes(30)->timestamp)->delete()`.
 
 ### "Crawls not starting" / empty queue + held lock
 **Cause:** a leaked `ShouldBeUnique` lock — classically a **two-box code mismatch** (old-code

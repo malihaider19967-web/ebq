@@ -76,7 +76,7 @@ All tries=1 (paid external calls; never auto-retry), all `ShouldBeUnique`.
 | Job (`file:line`) | timeout | tries | U / uniqueId | Dispatched by | Role |
 |---|---|---|---|---|---|
 | `CrawlWebsitePagesJob.php:23` | 600 | 1 | **U** `crawl-site-{crawlSiteId\|wID}`, `uniqueFor=6h` | `CrawlSiteBootstrapper`, `SitemapPrompt`, `SiteHealthStats`, `ClientController`, `ebq:crawl-websites`, `CrawlSitemapDeltaJob` | Entry point: resolve crawl_site, create run, seed frontier, dispatch pass 1. |
-| `CrawlPassJob.php:28` | 600 | 1 | — | `CrawlWebsitePagesJob` (and self, pass+1) | Multi-pass loop driver; selects due pages and **`Bus::batch(CrawlPageBatchJob…)`** with `.finally → CrawlPassJob(pass+1)`; stops → `AnalyzeSiteJob`. |
+| `CrawlPassJob.php:28` | 600 | 1 | — | `CrawlWebsitePagesJob` (and self, pass+1), `CrawlSupervisor` | Multi-pass loop driver; selects ≤`crawler.pages_per_pass` (1000) due pages for **fairness** and **`Bus::batch(CrawlPageBatchJob…)`** with `.finally → CrawlPassJob(pass+1)`; stops → `AnalyzeSiteJob`. (A lost `.finally` = wedge → recovered by `ebq:crawl-supervisor`.) |
 | `CrawlPageBatchJob.php:18` | 300 | 2 | — | `CrawlPassJob` (batched) | Crawl one page batch (conditional GET, classify, SimHash, adaptive next_crawl_at). No-ops if `batch()?->cancelled()`. |
 | `AnalyzeSiteJob.php:25` | **1200** | 1 | — | `CrawlPassJob` (terminal) | Post-crawl site analysis/scoring; dispatches `MatchRedirectFor404Job` per impactful 404. **Longest timeout — sets the retry_after floor.** |
 | `CrawlSitemapDeltaJob.php:22` | 180 | 2 | **U** `sitemap-delta-{crawlSiteId\|wID}`, `uniqueFor=3h` | `ebq:crawl-websites --sitemap-deltas` | Daily: detect brand-new sitemap URLs and dispatch a crawl for just those. |
@@ -96,6 +96,7 @@ All tries=1 (paid external calls; never auto-retry), all `ShouldBeUnique`.
 | `ebq:auto-discover-prospects {--days=30}` (`AutoDiscoverProspects.php`) | Discover backlink prospects from recent audits; idempotent + freshness-gated | **daily 03:30** | no |
 | `ebq:publish-scheduled-plugin-releases` (`PublishScheduledPluginReleases.php`) | Publish WP plugin releases whose scheduled time has passed | **every minute** | no |
 | `ebq:crawl-websites {--website=} {--force} {--backfill} {--sitemap-deltas} {--reanalyze}` (`CrawlWebsites.php`) | Dispatch crawls (full / backfill / sitemap-delta) | **weekly Mon 02:00** + **daily 04:30** (`--sitemap-deltas`) | no (`--reanalyze` only clears conditional-GET validators, not data) |
+| `ebq:crawl-supervisor` (`CrawlSupervisor.php`) | Watchdog: resume/finalize crawl runs whose multi-pass `Bus::batch` chain died (worker recycle). Time-based on `crawler.stall_minutes` (10) / `max_run_hours` (6) | **every 5 min** (`withoutOverlapping`) | no (dispatches `CrawlPassJob`/`AnalyzeSiteJob`) |
 | `ebq:check-keyword-servers {--id=}` (`CheckKeywordServers.php`) | Refresh health/queue snapshot for self-hosted keyword API fleet | **every 5 min** | no |
 | `ebq:fetch-keyword-metrics {--website=}{--country=}{--min-impressions=100}{--days=28}{--limit=500}{--force}{--sync}{--dry-run}` (`FetchKeywordMetrics.php`) | Queue KE lookups for GSC queries above an impression threshold | manual | no |
 | `ebq:import-historical {--days=480}{--website=}` (`ImportHistoricalData.php`) | Dispatch full GA4+GSC history import (upsert) | manual | no (additive upsert) |
@@ -136,6 +137,7 @@ scheduled commands are destructive.
 |---|---|
 | every minute | `ebq:publish-scheduled-plugin-releases` |
 | every 5 min | `ebq:check-keyword-servers` |
+| every 5 min | `ebq:crawl-supervisor` (`withoutOverlapping`) — crawl watchdog |
 | hourly | `ebq:track-rankings` |
 | daily (midnight) | `ebq:sync-daily-data` |
 | daily 03:30 | `ebq:auto-discover-prospects` |
