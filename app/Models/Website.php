@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Jobs\ReprocessCompetitiveData;
 use App\Jobs\SyncAnalyticsData;
 use App\Jobs\SyncSearchConsoleData;
 use Illuminate\Database\Eloquent\Collection;
@@ -24,6 +25,14 @@ class Website extends Model
 
     protected static function booted(): void
     {
+        // Keep the normalized-domain key in sync from `domain` on every write so
+        // the shared-crawl lookup (crawl_sites.normalized_domain) is consistent
+        // across onboarding, WebsitesList, admin, and factories.
+        static::saving(function (Website $website): void {
+            $domain = (string) $website->domain;
+            $website->normalized_domain = $domain !== '' ? CrawlSite::normalizeDomain($domain) : null;
+        });
+
         static::created(function (Website $website): void {
             // Skip the 365-day backfill for websites that boot up
             // already over the user's plan limit (would happen in
@@ -44,6 +53,20 @@ class Website extends Model
                 SyncSearchConsoleData::dispatch($website->id, 365);
             }
         });
+
+        // When Search Console connects AFTER the fact (a client who skipped
+        // Google on signup, then connected later), upgrade any competitive
+        // artifacts to the higher-fidelity tier. Fires only on the genuine
+        // hasGsc() false → true edge; the job is unique/debounced so a
+        // back-to-back GSC + GA connect reprocesses just once.
+        static::updated(function (Website $website): void {
+            if ($website->wasChanged('gsc_google_account_id')
+                && $website->getOriginal('gsc_google_account_id') === null
+                && $website->gsc_google_account_id !== null
+                && $website->hasGsc()) {
+                ReprocessCompetitiveData::dispatch($website->id);
+            }
+        });
     }
 
     /** Subscription tier constants — kept for API-response back-compat */
@@ -52,7 +75,9 @@ class Website extends Model
 
     protected $fillable = [
         'user_id',
+        'crawl_site_id',
         'domain',
+        'normalized_domain',
         'feature_flags',
         'ga_property_id',
         'ga_google_account_id',
@@ -64,6 +89,10 @@ class Website extends Model
         'last_search_console_sync_at',
         'last_traffic_drop_alert_at',
         'last_rank_drop_alert_at',
+        'crawl_protection',
+        'crawl_protection_at',
+        'sitemap_lastmod_true',
+        'sitemap_lastmod_false',
     ];
 
     /**
@@ -365,7 +394,45 @@ class Website extends Model
             'last_search_console_sync_at' => 'datetime',
             'last_traffic_drop_alert_at' => 'datetime',
             'last_rank_drop_alert_at' => 'datetime',
+            'crawl_protection_at' => 'datetime',
+            'sitemap_lastmod_true' => 'integer',
+            'sitemap_lastmod_false' => 'integer',
         ];
+    }
+
+    /** Has the crawler detected this site is behind Cloudflare/a WAF, or blocking us? */
+    public function isCrawlProtected(): bool
+    {
+        return in_array($this->crawl_protection, ['cloudflare', 'blocked'], true);
+    }
+
+    /**
+     * Whether this site's sitemap <lastmod> is a trustworthy freshness signal.
+     * Learned from how often a lastmod bump actually led to a content change
+     * (sitemap_lastmod_true) vs not (…_false). Always-bumping sitemaps accumulate
+     * mostly false and stay untrusted, so we fall back to adaptive scheduling.
+     */
+    public function sitemapLastmodTrusted(): bool
+    {
+        $total = (int) $this->sitemap_lastmod_true + (int) $this->sitemap_lastmod_false;
+        if ($total < (int) config('crawler.sitemap_trust_min_sample', 20)) {
+            return false;
+        }
+
+        return ((int) $this->sitemap_lastmod_true / $total) >= (float) config('crawler.sitemap_trust_ratio', 0.3);
+    }
+
+    /**
+     * Enough evidence to conclude this site's sitemap <lastmod> is NOT meaningful
+     * (an always-bumping sitemap). Once confirmed, we stop spending effort tracking
+     * its per-page lastmod and lean entirely on adaptive content-frequency scheduling.
+     */
+    public function sitemapLastmodConfirmedUntrusted(): bool
+    {
+        $total = (int) $this->sitemap_lastmod_true + (int) $this->sitemap_lastmod_false;
+
+        return $total >= (int) config('crawler.sitemap_trust_min_sample', 20)
+            && ((int) $this->sitemap_lastmod_true / $total) < (float) config('crawler.sitemap_trust_ratio', 0.3);
     }
 
     /**
@@ -531,9 +598,68 @@ class Website extends Model
         return $this->hasMany(CrawlFinding::class);
     }
 
+    /** The shared crawl this website subscribes to (one per normalized domain). */
+    public function crawlSite(): BelongsTo
+    {
+        return $this->belongsTo(CrawlSite::class);
+    }
+
     public function latestCrawlRun(): ?CrawlRun
     {
         return $this->crawlRuns()->latest('started_at')->first();
+    }
+
+    /**
+     * The in-progress crawl for this site, if any. Recency-guarded: a job that
+     * dies (timeout / worker crash) can leave a run stuck at `running`, so we
+     * only trust runs started within a generous window — far longer than any
+     * normal crawl, so a real crawl is never missed.
+     */
+    public function runningCrawl(): ?CrawlRun
+    {
+        return $this->crawlRuns()
+            ->where('status', CrawlRun::STATUS_RUNNING)
+            ->where('started_at', '>=', now()->subHours(6))
+            ->latest('started_at')
+            ->first();
+    }
+
+    public function isCrawling(): bool
+    {
+        return $this->runningCrawl() !== null;
+    }
+
+    /** Has this site ever produced a finished crawl (i.e. real data exists)? */
+    public function hasCompletedCrawl(): bool
+    {
+        return $this->crawlRuns()->where('status', CrawlRun::STATUS_COMPLETED)->exists();
+    }
+
+    /**
+     * First-ever crawl is in progress: a crawl is running and nothing has
+     * finished yet. While true, crawl-derived dashboard widgets (Site Health,
+     * action queue) are hidden behind the crawl-in-progress banner because they
+     * have no data to show. On re-crawls of an established site this is false,
+     * so existing data keeps showing.
+     */
+    public function isInitialCrawl(): bool
+    {
+        return $this->isCrawling() && ! $this->hasCompletedCrawl();
+    }
+
+    /**
+     * Resolved max pages a crawl run may fetch for this site: the owner's plan
+     * cap (max_crawl_pages) when set, otherwise the global crawler budget. Always
+     * a positive integer, so the crawler can use it directly as the run budget.
+     */
+    public function crawlPageCap(): int
+    {
+        $planLimit = $this->owner?->crawlPageLimit();
+        if ($planLimit !== null && $planLimit > 0) {
+            return (int) $planLimit;
+        }
+
+        return max(1, (int) config('crawler.max_pages_per_run', 200000));
     }
 
     public function backlinks(): HasMany
