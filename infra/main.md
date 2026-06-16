@@ -71,7 +71,9 @@ application is documented** — keep it that way (see the protocol). Each area l
 [crawler/](./crawler/README.md) → architecture · data-model · pipeline · read-path ·
 findings-and-scoring · adjacent-systems · operations · known-issues
 — **fairness** (`pages_per_pass`) interleaves sites so no big domain monopolises the queue;
-the **`ebq:crawl-supervisor`** watchdog (every 5 min) recovers wedged multi-pass chains.
+the **`ebq:crawl-supervisor`** watchdog (every 5 min) recovers wedged multi-pass chains;
+[autoscaling.md](./crawler/autoscaling.md) — elastic worker fleet on Hetzner (Phase 1 shipped:
+`worker_nodes` + `ebq:fleet-worker`; the queue is central so new boxes just pull, no rebalance).
 
 ### Data sources — Google & Microsoft ✅
 [data-sources/](./data-sources/README.md) → google-oauth · sync-jobs · data-model

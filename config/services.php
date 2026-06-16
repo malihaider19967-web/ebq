@@ -200,4 +200,22 @@ return [
         'cost_per_million_output_usd' => (float) env('MISTRAL_OUTPUT_USD_PER_M', 0.30),
     ],
 
+    /*
+     * Hetzner Cloud — the crawl-worker fleet autoscaler provisions/destroys
+     * worker boxes via the API. The token lives ONLY on the web box (the only
+     * host that calls the API). network_id/ssh_key_id/firewall_id/location are
+     * the fixed infra new boxes attach to; the tunable scaling knobs live in the
+     * `Setting` store (see App\Support\AutoscalerConfig), not here.
+     */
+    'hetzner' => [
+        'token' => env('HCLOUD_TOKEN'),
+        'location' => env('HCLOUD_LOCATION', 'fsn1'), // must match the private network's zone
+        'network_id' => env('HCLOUD_NETWORK_ID'),     // the 10.0.0.0/24 private network
+        'ssh_key_id' => env('HCLOUD_SSH_KEY_ID'),     // id_ed25519_worker public key registered in Hetzner
+        'firewall_id' => env('HCLOUD_FIREWALL_ID'),   // blocks public 6379/3306, allows the subnet
+        'image' => env('HCLOUD_WORKER_IMAGE'),        // fallback snapshot id; overridden by the autoscaler.snapshot_id setting
+        'web_box_ip' => env('HCLOUD_WEB_BOX_IP', '10.0.0.2'), // rsync source for boot-time code/.env pull
+        'request_timeout_s' => (int) env('HCLOUD_TIMEOUT_S', 30),
+    ],
+
 ];

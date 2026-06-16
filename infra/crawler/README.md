@@ -15,6 +15,7 @@ reads that one crawl through a **cap-limited, privacy-scoped per-user view**.
 | [findings-and-scoring.md](./findings-and-scoring.md) | The finding catalog (categories, types, severity rules, 404 referrers) and the 0–100 health-score formula. |
 | [adjacent-systems.md](./adjacent-systems.md) | Sitemaps, incremental recrawl, redirect/404 bridging, term extraction, plugin API, AI — and which are per-website vs per-crawl_site. |
 | [operations.md](./operations.md) | Runbook: watching crawls (`/admin/crawler`), triggering, deploying, and the failure modes (congestion, stuck crawls, leaked locks, orphans) with fixes. |
+| [autoscaling.md](./autoscaling.md) | Elastic worker fleet on Hetzner: fleet model, provisioning, the autoscaler roadmap. |
 | [known-issues.md](./known-issues.md) | Verified gaps and accepted trade-offs (incl. the `LinkStructurePanel` cap-window leak). |
 
 Infra-wide topology (2 boxes, queues, deploy, the rollout postmortem) lives one level up:
