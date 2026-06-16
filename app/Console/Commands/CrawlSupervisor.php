@@ -49,7 +49,7 @@ class CrawlSupervisor extends Command
         foreach ($runs as $run) {
             // A finalizing run that stalled = AnalyzeSiteJob died; re-dispatch it.
             if ($run->status === CrawlRun::STATUS_FINALIZING) {
-                AnalyzeSiteJob::dispatch($run->id)->onQueue(Queues::CRAWL);
+                AnalyzeSiteJob::dispatch($run->id)->onQueue(Queues::CRAWL_FINALIZE);
                 $finalized++;
 
                 continue;
@@ -80,7 +80,7 @@ class CrawlSupervisor extends Command
                 $resumed++;
                 Log::warning("CrawlSupervisor: resumed wedged run {$run->id} (crawl_site {$crawlSite->id}, idle since {$run->updated_at}).");
             } else {
-                AnalyzeSiteJob::dispatch($run->id)->onQueue(Queues::CRAWL);
+                AnalyzeSiteJob::dispatch($run->id)->onQueue(Queues::CRAWL_FINALIZE);
                 $finalized++;
                 Log::warning("CrawlSupervisor: finalizing stalled run {$run->id} (crawl_site {$crawlSite->id}; exhausted=".($tooOld ? 'aged-out' : 'no-due-pages').').');
             }

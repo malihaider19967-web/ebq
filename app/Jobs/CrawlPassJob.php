@@ -72,7 +72,7 @@ class CrawlPassJob implements ShouldQueue
             if ($this->pass > $passCeiling) {
                 Log::warning("CrawlPassJob: pass ceiling ({$passCeiling}) reached for run {$run->id}; finalizing.");
             }
-            AnalyzeSiteJob::dispatch($run->id)->onQueue(\App\Support\Queues::CRAWL);
+            AnalyzeSiteJob::dispatch($run->id)->onQueue(\App\Support\Queues::CRAWL_FINALIZE);
 
             return;
         }
@@ -103,7 +103,7 @@ class CrawlPassJob implements ShouldQueue
 
         if ($pageIds === []) {
             // Nothing new to crawl — the graph is as complete as it gets. Analyze.
-            AnalyzeSiteJob::dispatch($run->id)->onQueue(\App\Support\Queues::CRAWL);
+            AnalyzeSiteJob::dispatch($run->id)->onQueue(\App\Support\Queues::CRAWL_FINALIZE);
 
             return;
         }

@@ -34,7 +34,10 @@ class AnalyzeSiteJob implements ShouldQueue
 
     public function __construct(public int $crawlRunId)
     {
-        $this->onQueue(\App\Support\Queues::CRAWL);
+        // The long finalize runs on the dedicated crawl-finalize queue (pinned box
+        // only), so an autoscale scale-down draining an ephemeral box can never kill
+        // a 1200s analysis mid-flight. See infra/crawler/autoscaling.md.
+        $this->onQueue(\App\Support\Queues::CRAWL_FINALIZE);
     }
 
     /**
