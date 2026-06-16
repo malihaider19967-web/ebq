@@ -122,6 +122,22 @@ website selection, teams via `website_user` + `TeamPermissions` (null = full acc
 marketing crawl-report sends, proxies, keyword servers, platform settings. (Crawler panel →
 crawler/operations; Plugin/Plan/Billing panels → their own subsystem docs.)
 
+### Frontend / UI ✅
+[frontend/](./frontend/README.md) → livewire-patterns — Livewire 3 + Alpine + Tailwind 4 +
+Vite 7. **No full-page Livewire routes** (Blade `Route::view` embeds `<livewire:…>`); the
+**active website is session state** (`current_website_id`, propagated via `website-changed`).
+
+### Cross-cutting reference ✅ (the horizontal layer — `infra/reference/`)
+| Doc | Covers |
+|---|---|
+| [reference/database.md](./reference/database.md) | All **83 tables** grouped by domain + the 49-model index, FK semantics, migration conventions, hash/encrypt patterns |
+| [reference/routing.md](./reference/routing.md) | Consolidated **endpoint map** across web/api/auth/channels + `bootstrap/app.php` |
+| [reference/http-and-auth.md](./reference/http-and-auth.md) | Middleware, the two guards (session vs **Sanctum per-Website**), authorization, request lifecycle |
+| [reference/jobs-and-scheduler.md](./reference/jobs-and-scheduler.md) | All **25 jobs** + **17 commands** + schedule, with a **destructive-commands safety** section |
+| [reference/configuration.md](./reference/configuration.md) | All **16 `config/*.php`** + consolidated `.env` knobs (secrets marked) |
+| [reference/mail-and-wiring.md](./reference/mail-and-wiring.md) | The 9 mailables + Postal transport, providers, observers/listeners, container bindings |
+| [reference/testing.md](./reference/testing.md) | The test suite + **⛔ safe-test-running** (the sqlite guard / prod-wipe story) |
+
 > Co-located non-EBQ apps share Box A: **Postal** (mail), **Jitsi/Prosody** (meet.ebq.io
 > video; booking app in `/var/www/marketing` — memory `meet-video-bookings`). Detail in
 > server-deployment.md.
@@ -194,13 +210,27 @@ known gaps were flagged during the sweep:
   crawler `known-issues.md` (cap-window leak), billing `usage.md` (non-atomic `assertCanSpend`),
   guest-tools (cookie friction bypass; PageSpeed leads mis-tagged), audits (no content-hash
   re-audit gate), data-sources (null-vs-empty `gsc_site_url`).
-- **Config reference** — `config/*.php` + `.env` knobs are referenced per-subsystem, not in one
-  table; add a consolidated one if it becomes painful.
+- **Latent bugs surfaced by the reference sweep (worth fixing):**
+  - `bootstrap/app.php` registers middleware alias **`research.rollout` → a class that doesn't
+    exist** (`EnsureResearchRolloutAccess`) — harmless until a route uses it, then 500. (routing)
+  - **`EnsureFeatureAccess` fails open** on unknown feature keys — a typo in a `feature:` arg
+    silently bypasses gating. (http-and-auth)
+  - **CI (`tests.yml`) triggers on `master`/`*.x`, but the default branch is `main`** — pushes
+    to `main` get no push-event CI (only PR/nightly). (testing)
+  - Orphaned **`content_briefs`** table (no longer referenced); `prod APP_DEBUG=true`. (database / server-deployment)
 
 ---
 
 ## Knowledge changelog
 
+- **2026-06-16 (cross-cutting sweep)** — Added the **horizontal reference layer**
+  (`infra/reference/`): database (83 tables / 49 models), routing (endpoint map),
+  http-and-auth (middleware/guards/authz), jobs-and-scheduler (25 jobs + 17 commands +
+  destructive-command safety), configuration (16 config files + env), mail-and-wiring, and
+  testing (the sqlite-guard / safe-test-running). Plus **`infra/frontend/`** (Livewire/Alpine/
+  Tailwind/Vite UI architecture). **55 docs total.** Surfaced latent bugs (dangling
+  `research.rollout` alias, fail-open `EnsureFeatureAccess`, CI-on-`master`-not-`main`, orphaned
+  `content_briefs`) — logged under "Where the docs are still thin".
 - **2026-06-16 (later)** — **Full-application documentation sweep.** Documented every
   subsystem under `infra/<area>/` (data-sources, keywords, competitive, reports, ai, audits,
   wordpress-plugin, guest-tools, billing, accounts, admin) and added

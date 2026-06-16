@@ -21,6 +21,9 @@ This `README.md` is just a directory landing — the authoritative index lives i
 - [billing/](./billing/README.md) — Stripe, plans, feature gating, usage
 - [accounts/](./accounts/README.md) — auth, onboarding, teams
 - [admin/](./admin/README.md) — the admin panel
+- [frontend/](./frontend/README.md) — UI architecture (Livewire/Alpine/Tailwind/Vite)
+- **[reference/](./reference/database.md)** — cross-cutting reference: database, routing,
+  http-and-auth, jobs-and-scheduler, configuration, mail-and-wiring, testing
 - [deployment-and-queues.md](./deployment-and-queues.md) — topology, queues, deploy procedure
 - [server-deployment.md](./server-deployment.md) — live inventory of both production boxes
 
