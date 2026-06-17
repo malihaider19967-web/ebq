@@ -83,7 +83,7 @@ class StrikingDistanceFixService
             source: CustomPageAudit::SOURCE_KEYWORD_FIX,
         );
 
-        RunCustomPageAudit::dispatch($audit->id);
+        RunCustomPageAudit::dispatch($audit->id, $audit->website_id);
 
         return $audit;
     }

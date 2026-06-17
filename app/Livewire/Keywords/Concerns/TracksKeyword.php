@@ -65,7 +65,7 @@ trait TracksKeyword
         );
 
         if ($row->wasRecentlyCreated) {
-            TrackKeywordRankJob::dispatch($row->id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
+            TrackKeywordRankJob::dispatch($row->id, $row->website_id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
             $this->trackNotice = 'Added “'.$keyword.'” to rank tracker — first check queued.';
         } else {
             $this->trackNotice = 'Already tracking “'.$keyword.'”.';

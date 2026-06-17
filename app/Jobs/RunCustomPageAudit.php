@@ -38,7 +38,7 @@ class RunCustomPageAudit implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 1800;
 
-    public function __construct(public readonly string $auditId)
+    public function __construct(public readonly string $auditId, public readonly ?string $websiteId = null)
     {
         $this->onQueue(\App\Support\Queues::INTERACTIVE);
     }
@@ -50,6 +50,15 @@ class RunCustomPageAudit implements ShouldBeUnique, ShouldQueue
 
     public function handle(PageAuditService $service): void
     {
+        if ($this->websiteId !== null) {
+            if (\App\Support\ShardLock::websiteLocked($this->websiteId)) {
+                $this->release(30);
+
+                return;
+            }
+            app(\App\Support\ShardContext::class)->forWebsite($this->websiteId);
+        }
+
         $audit = CustomPageAudit::query()->find($this->auditId);
         if (! $audit instanceof CustomPageAudit) {
             return; // row was deleted before we got to it — nothing to do.

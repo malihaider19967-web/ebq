@@ -360,7 +360,7 @@ class PluginHqController extends Controller
         );
 
         // Queue an immediate first check so the row populates within minutes.
-        TrackKeywordRankJob::dispatch($keyword->id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
+        TrackKeywordRankJob::dispatch($keyword->id, $keyword->website_id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
 
         return response()->json([
             'ok' => true,
@@ -422,7 +422,7 @@ class PluginHqController extends Controller
             ->where('website_id', $website->id)
             ->findOrFail($id);
 
-        TrackKeywordRankJob::dispatch($keyword->id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
+        TrackKeywordRankJob::dispatch($keyword->id, $keyword->website_id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
         $keyword->forceFill(['last_status' => 'queued', 'next_check_at' => Carbon::now()])->save();
 
         return response()->json(['ok' => true]);
@@ -1376,7 +1376,7 @@ class PluginHqController extends Controller
             source: CustomPageAudit::SOURCE_HQ_WP,
         );
 
-        RunCustomPageAudit::dispatch($audit->id);
+        RunCustomPageAudit::dispatch($audit->id, $audit->website_id);
 
         return response()->json([
             'ok' => true,

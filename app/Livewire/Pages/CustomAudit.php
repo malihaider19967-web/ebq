@@ -178,7 +178,7 @@ class CustomAudit extends Component
             source: CustomPageAudit::SOURCE_CUSTOM,
         );
 
-        RunCustomPageAudit::dispatch($audit->id);
+        RunCustomPageAudit::dispatch($audit->id, $audit->website_id);
 
         $this->resetForm();
         $this->setMessage(
@@ -232,7 +232,7 @@ class CustomAudit extends Component
             'error_message' => null,
         ])->save();
 
-        RunCustomPageAudit::dispatch($audit->id);
+        RunCustomPageAudit::dispatch($audit->id, $audit->website_id);
 
         $this->setMessage('Audit re-queued.', 'info');
     }

@@ -20,6 +20,7 @@ class TrackKeywordRankJob implements ShouldQueue
 
     public function __construct(
         public string $keywordId,
+        public ?string $websiteId = null,
         public bool $forced = false,
     ) {
         $this->onQueue(\App\Support\Queues::SYNC);
@@ -27,6 +28,15 @@ class TrackKeywordRankJob implements ShouldQueue
 
     public function handle(RankTrackingService $service): void
     {
+        if ($this->websiteId !== null) {
+            if (\App\Support\ShardLock::websiteLocked($this->websiteId)) {
+                $this->release(30);
+
+                return;
+            }
+            app(\App\Support\ShardContext::class)->forWebsite($this->websiteId);
+        }
+
         $keyword = RankTrackingKeyword::find($this->keywordId);
         if (! $keyword) {
             return;

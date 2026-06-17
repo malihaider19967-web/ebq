@@ -31,7 +31,7 @@ class RankTrackingDetail extends Component
             return;
         }
 
-        TrackKeywordRankJob::dispatch($keyword->id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
+        TrackKeywordRankJob::dispatch($keyword->id, $keyword->website_id, true)->onQueue(\App\Support\Queues::INTERACTIVE);
 
         $keyword->forceFill([
             'last_status' => 'queued',

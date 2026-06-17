@@ -542,7 +542,7 @@ class LiveSeoScoreService
                 serpSampleGl: null,
                 source: CustomPageAudit::SOURCE_LIVE_SCORE,
             );
-            RunCustomPageAudit::dispatch($queued->id);
+            RunCustomPageAudit::dispatch($queued->id, $queued->website_id);
 
             // Stale-and-no-prior-in-flight: surface as `refreshing` so the
             // client keeps showing the prior audit's factor data while the
