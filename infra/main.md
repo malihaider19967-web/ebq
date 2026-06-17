@@ -67,6 +67,15 @@ application is documented** — keep it that way (see the protocol). Each area l
   integrations, risks) → [server-deployment.md](./server-deployment.md)
 - **DB safety rules** (prod, no backups) → repo-root `CLAUDE.md`; memory `never-destructive-db-data`
 
+### Database sharding — full-ULID, multi-node 🟡 (built on a branch, not merged)
+[sharding/](./sharding/README.md) — three tiers behind one routing layer: central (identity/billing/
+catalogs) + **tenant shards by owner** (`websites.db_node_id`) + **crawl shards by domain**
+(`crawl_sites.crawl_node_id`). Whole schema re-keyed to **ULID**; cross-tier FKs dropped (app-enforced
+via `ShardCleanup`); admin-managed `db_nodes` fleet (`ebq:db-node` + `/admin/db-fleet`, clones the crawl
+fleet) + a tenant/crawl **mover** (`ebq:shard`, validated on MariaDB). On branch
+`feature/db-sharding-ulid`; single-node behaviour is unchanged until a node anchor is set. Plan:
+repo-root `SHARDING_PLAN.md`.
+
 ### Crawler — the heaviest subsystem ✅
 [crawler/](./crawler/README.md) → architecture · data-model · pipeline · read-path ·
 findings-and-scoring · adjacent-systems · operations · known-issues
@@ -229,6 +238,18 @@ known gaps were flagged during the sweep:
 ---
 
 ## Knowledge changelog
+
+- **2026-06-17 (full-ULID + multi-node sharding — on branch `feature/db-sharding-ulid`)** — Re-keyed the
+  whole schema to **ULID** (`char(26)`; framework/Sanctum/pivot surrogate ids stay bigint) and built
+  **two-dimensional sharding**: tenant-by-owner + crawl-by-domain, behind one routing layer
+  (`DbNode`/`db_nodes`, `ShardManager`, `ShardContext`, tier model traits, `ResolveShardContext`
+  middleware + `WebsiteApiAuth` + job wiring). Cross-tier FKs dropped (MySQL-only migration; integrity
+  app-enforced via `ShardCleanup` + `ShardTables`). Admin-managed DB-node fleet (`DbFleetService` reusing
+  `HetznerClient`, `ebq:db-node`, `/admin/db-fleet`) + tenant/crawl **mover** (`ShardMover`, `ebq:shard`).
+  Validated: full suite 0 new failures vs baseline (sqlite), schema + FK-drop + an end-to-end tenant move
+  on a throwaway docker MariaDB. NOT merged/deployed: prod re-derive cutover + Hetzner node provisioning +
+  Phase 0 backups are operator-gated. New doc [sharding/](./sharding/README.md); full plan
+  `SHARDING_PLAN.md`.
 
 - **2026-06-17 (fleet autoscaling — live-tested)** — Completed the Hetzner setup (token, network
   `12332718`, ssh key, firewall, worker **snapshot**, `.env.worker`) and ran a full live
