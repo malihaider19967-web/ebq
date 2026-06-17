@@ -172,7 +172,7 @@ class WebsiteTeam extends Component
         $website = Website::findOrFail($this->websiteId);
         Gate::authorize('update', $website);
 
-        if ($userId === (int) $website->user_id) {
+        if ($userId === (string) $website->user_id) {
             return;
         }
 
@@ -190,7 +190,7 @@ class WebsiteTeam extends Component
         $invitation = WebsiteInvitation::findOrFail($invitationId);
         Gate::authorize('update', $invitation->website);
 
-        if ((int) $invitation->website_id !== $this->websiteId) {
+        if ((string) $invitation->website_id !== $this->websiteId) {
             return;
         }
 
@@ -228,7 +228,7 @@ class WebsiteTeam extends Component
         $invitation = WebsiteInvitation::findOrFail($invitationId);
         Gate::authorize('update', $invitation->website);
 
-        if ((int) $invitation->website_id !== $this->websiteId) {
+        if ((string) $invitation->website_id !== $this->websiteId) {
             return;
         }
 
@@ -246,7 +246,7 @@ class WebsiteTeam extends Component
         $website = Website::findOrFail($this->websiteId);
         Gate::authorize('update', $website);
 
-        if ($userId === (int) $website->user_id) {
+        if ($userId === (string) $website->user_id) {
             return; // owner can't be edited
         }
 
@@ -276,7 +276,7 @@ class WebsiteTeam extends Component
         $invitation = WebsiteInvitation::findOrFail($invitationId);
         Gate::authorize('update', $invitation->website);
 
-        if ((int) $invitation->website_id !== $this->websiteId) {
+        if ((string) $invitation->website_id !== $this->websiteId) {
             return;
         }
 
@@ -312,7 +312,7 @@ class WebsiteTeam extends Component
             : TeamPermissions::normalize(array_keys(array_filter($this->editPermissions)));
 
         if ($this->editTargetType === 'member') {
-            if ((int) $this->editTargetId === (int) $website->user_id) {
+            if ((string) $this->editTargetId === (string) $website->user_id) {
                 return;
             }
 
@@ -328,7 +328,7 @@ class WebsiteTeam extends Component
             session()->flash('team_status', 'Member access updated.');
         } elseif ($this->editTargetType === 'invitation') {
             $invitation = WebsiteInvitation::find($this->editTargetId);
-            if ($invitation && (int) $invitation->website_id === $this->websiteId) {
+            if ($invitation && (string) $invitation->website_id === $this->websiteId) {
                 $invitation->forceFill([
                     'role' => $this->editRole,
                     'permissions' => $permissions,

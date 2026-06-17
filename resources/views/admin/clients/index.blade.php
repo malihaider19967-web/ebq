@@ -4,7 +4,7 @@
          * @var \Illuminate\Pagination\LengthAwarePaginator $clients
          * @var array $summary
          * @var array $rates
-         * @var int $editId
+         * @var string $editId
          * @var bool $showCreate
          */
         $fmtN = fn ($n) => number_format((int) $n);
@@ -24,7 +24,7 @@
             try { return \Illuminate\Support\Carbon::parse($when)->diffForHumans(); }
             catch (\Throwable) { return '—'; }
         };
-        $avatarBg = function (int $id): string {
+        $avatarBg = function (string $id): string {
             $palette = ['bg-indigo-100 text-indigo-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700',
                         'bg-rose-100 text-rose-700', 'bg-sky-100 text-sky-700', 'bg-violet-100 text-violet-700',
                         'bg-teal-100 text-teal-700', 'bg-fuchsia-100 text-fuchsia-700'];
@@ -164,7 +164,7 @@
             $selectableIds = $clients->getCollection()
                 ->pluck('id')
                 ->map(fn ($id) => (int) $id)
-                ->filter(fn (int $id) => $id !== $selfId)
+                ->filter(fn (string $id) => $id !== $selfId)
                 ->values()
                 ->all();
         @endphp

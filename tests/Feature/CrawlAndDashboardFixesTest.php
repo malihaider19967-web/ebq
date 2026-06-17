@@ -36,10 +36,10 @@ class CrawlAndDashboardFixesTest extends TestCase
         $w = Website::factory()->create(['user_id' => User::factory()->create()->id, 'domain' => $domain]);
         $w->refresh();
 
-        return [$w, (int) $w->crawl_site_id];
+        return [$w, (string) $w->crawl_site_id];
     }
 
-    private function duePage(int $cs, string $url): WebsitePage
+    private function duePage(string $cs, string $url): WebsitePage
     {
         return WebsitePage::create([
             'crawl_site_id' => $cs, 'url' => $url, 'url_hash' => WebsitePage::hashUrl($url),
@@ -148,7 +148,7 @@ class CrawlAndDashboardFixesTest extends TestCase
         $owner = User::factory()->create();
         $w = Website::factory()->create(['user_id' => $owner->id, 'domain' => 'banner.com']);
         $w->refresh();
-        $cs = (int) $w->crawl_site_id;
+        $cs = (string) $w->crawl_site_id;
         // Per-pass counter (pages_seen) sits at 1000 after one fairness-capped pass...
         CrawlRun::create(['crawl_site_id' => $cs, 'trigger' => 'manual', 'status' => 'running',
             'started_at' => now()->subMinute(), 'pages_seen' => 1000, 'pages_fetched' => 1000]);

@@ -101,7 +101,7 @@ class CrawlWebsites extends Command
     }
 
     /** Pick a subscriber website to carry the crawl dispatch (prefer a sourced one). */
-    private function triggerWebsiteId(CrawlSite $site): ?int
+    private function triggerWebsiteId(CrawlSite $site): ?string
     {
         $id = $site->websites()->where(fn (Builder $q) => $this->hasSource($q))->value('id')
             ?? $site->websites()->value('id');

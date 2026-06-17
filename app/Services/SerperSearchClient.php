@@ -135,8 +135,8 @@ class SerperSearchClient
         }
 
         $billedUser = $this->resolveBilledUser(
-            isset($params['__website_id']) ? (int) $params['__website_id'] : null,
-            isset($params['__owner_user_id']) ? (int) $params['__owner_user_id'] : null,
+            isset($params['__website_id']) ? (string) $params['__website_id'] : null,
+            isset($params['__owner_user_id']) ? (string) $params['__owner_user_id'] : null,
         );
         if ($billedUser !== null) {
             app(UsageMeter::class)->assertCanSpend($billedUser, 'serp_api', 1);
@@ -170,8 +170,8 @@ class SerperSearchClient
             return null;
         }
 
-        $websiteId = isset($params['__website_id']) ? (int) $params['__website_id'] : null;
-        $ownerUserId = isset($params['__owner_user_id']) ? (int) $params['__owner_user_id'] : null;
+        $websiteId = isset($params['__website_id']) ? (string) $params['__website_id'] : null;
+        $ownerUserId = isset($params['__owner_user_id']) ? (string) $params['__owner_user_id'] : null;
 
         $meta = [
             'query' => mb_substr($q, 0, 120),

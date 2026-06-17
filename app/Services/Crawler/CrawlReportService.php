@@ -431,7 +431,7 @@ class CrawlReportService
             ->whereIn('from_page_id', $ids)->whereIn('to_page_id', $ids)
             ->limit(600)
             ->get(['from_page_id', 'to_page_id'])
-            ->map(fn ($e) => ['from' => (int) $e->from_page_id, 'to' => (int) $e->to_page_id])
+            ->map(fn ($e) => ['from' => (string) $e->from_page_id, 'to' => (string) $e->to_page_id])
             ->all();
 
         return ['nodes' => $nodes, 'edges' => $edges];
@@ -589,7 +589,7 @@ class CrawlReportService
         );
     }
 
-    private function homepageId(string $crawlSiteId): ?int
+    private function homepageId(string $crawlSiteId): ?string
     {
         $site = \App\Models\CrawlSite::find($crawlSiteId);
         if ($site) {

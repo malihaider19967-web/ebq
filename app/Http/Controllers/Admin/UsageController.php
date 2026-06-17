@@ -76,7 +76,7 @@ class UsageController extends Controller
         // Pivot to one row per user with both providers as columns + cost.
         $byClient = [];
         foreach ($topClients as $row) {
-            $uid = (int) $row->user_id;
+            $uid = (string) $row->user_id;
             $byClient[$uid] ??= ['user_id' => $uid, 'units' => 0, 'cost' => 0.0, 'providers' => []];
             $units = (int) $row->units;
             $cost = $units * ($rates[$row->provider] ?? 0);
@@ -114,7 +114,7 @@ class UsageController extends Controller
 
         $websitesAgg = [];
         foreach ($byWebsite as $row) {
-            $wid = (int) $row->website_id;
+            $wid = (string) $row->website_id;
             $websitesAgg[$wid] ??= ['website_id' => $wid, 'units' => 0, 'cost' => 0.0, 'providers' => []];
             $units = (int) $row->units;
             $cost = $units * ($rates[$row->provider] ?? 0);

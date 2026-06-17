@@ -66,13 +66,13 @@ class WordPressConnectController extends Controller
         ]);
 
         $user = Auth::user();
-        abort_unless($user && $user->canViewWebsiteId((int) $validated['website_id']), 403);
+        abort_unless($user && $user->canViewWebsiteId((string) $validated['website_id']), 403);
 
         $siteHost = parse_url($validated['site_url'], PHP_URL_HOST);
         $redirectHost = parse_url($validated['redirect'], PHP_URL_HOST);
         abort_unless($siteHost && $redirectHost && strcasecmp($siteHost, $redirectHost) === 0, 400);
 
-        $website = Website::findOrFail((int) $validated['website_id']);
+        $website = Website::findOrFail((string) $validated['website_id']);
         $tokenName = 'WordPress — '.$siteHost;
         $plainToken = $website->createToken($tokenName, ['read:insights'])->plainTextToken;
 

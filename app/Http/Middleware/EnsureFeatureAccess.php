@@ -29,7 +29,7 @@ class EnsureFeatureAccess
             : false;
         if (! $accessible) {
             $first = $user->accessibleWebsitesQuery()->select('id')->orderBy('domain')->first();
-            $websiteId = $first ? (int) $first->id : 0;
+            $websiteId = $first ? (string) $first->id : 0;
             if ($websiteId > 0) {
                 session(['current_website_id' => $websiteId]);
             }

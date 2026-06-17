@@ -21,7 +21,7 @@ class SharedCrawlTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function page(int $cs, string $url, int $rank, array $extra = []): WebsitePage
+    private function page(string $cs, string $url, int $rank, array $extra = []): WebsitePage
     {
         return WebsitePage::create(array_merge([
             'crawl_site_id' => $cs, 'url' => $url, 'url_hash' => WebsitePage::hashUrl($url),

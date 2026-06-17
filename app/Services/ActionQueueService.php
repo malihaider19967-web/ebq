@@ -182,7 +182,7 @@ class ActionQueueService
             ->orderBy('position_change') // most negative (biggest drop) first
             ->get(['id', 'keyword', 'current_position', 'best_position', 'position_change'])
             ->map(fn (RankTrackingKeyword $k): array => [
-                'id' => (int) $k->id,
+                'id' => (string) $k->id,
                 'keyword' => (string) $k->keyword,
                 'current_position' => $k->current_position !== null ? (int) $k->current_position : null,
                 'best_position' => $k->best_position !== null ? (int) $k->best_position : null,

@@ -424,7 +424,7 @@ class BacklinkProspectingService
         // — drafts are only persisted for prospects already in the table.
         if (! empty($context['website_id'])) {
             $prospect = OutreachProspect::query()
-                ->where('website_id', (int) $context['website_id'])
+                ->where('website_id', (string) $context['website_id'])
                 ->where('referring_domain', $domain)
                 ->first();
             if ($prospect) {

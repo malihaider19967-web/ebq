@@ -485,7 +485,7 @@ class RankTrackingManager extends Component
     {
         $user = Auth::user();
 
-        return $user !== null && $user->canViewWebsiteId((int) $keyword->website_id);
+        return $user !== null && $user->canViewWebsiteId((string) $keyword->website_id);
     }
 
     public function render()

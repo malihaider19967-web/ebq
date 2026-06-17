@@ -46,7 +46,7 @@ class Website extends Model
                 return;
             }
             $site = CrawlSite::firstOrCreate(['normalized_domain' => $website->normalized_domain]);
-            if ((int) $website->crawl_site_id !== (int) $site->id) {
+            if ((string) $website->crawl_site_id !== (string) $site->id) {
                 $website->crawl_site_id = $site->id;
                 $website->saveQuietly();
             }

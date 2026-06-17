@@ -130,7 +130,7 @@ class KeywordFixPlaybook extends Component
 
         $audit = $fix->queueAudit(
             $this->websiteId,
-            (int) $user->id,
+            (string) $user->id,
             $this->pageUrl,
             $this->keyword,
             $this->country !== '' ? $this->country : null,

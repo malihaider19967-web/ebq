@@ -58,7 +58,7 @@ class TrafficChart extends Component
             $cacheKey = sprintf(
                 'traffic_chart:v3:%d:%d:%s:%s:%s:%d',
                 $this->websiteId,
-                (int) $user->id,
+                (string) $user->id,
                 str_replace('/', '_', $tz),
                 $start->toDateString(),
                 $end->toDateString(),

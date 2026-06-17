@@ -28,7 +28,7 @@ class AuthenticatedSessionController extends Controller
         if ($user && $websiteId <= 0) {
             $first = $user->accessibleWebsitesQuery()->select('id')->orderBy('domain')->first();
             if ($first) {
-                $websiteId = (int) $first->id;
+                $websiteId = (string) $first->id;
                 session(['current_website_id' => $websiteId]);
             }
         }

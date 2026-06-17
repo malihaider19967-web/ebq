@@ -1448,7 +1448,7 @@ class PluginHqController extends Controller
                 Carbon::now()->addMinutes(20),
                 [
                     'website' => $website->id,
-                    'report' => (int) $audit->page_audit_report_id,
+                    'report' => (string) $audit->page_audit_report_id,
                 ],
             );
         } finally {

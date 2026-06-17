@@ -222,7 +222,7 @@ class SiteIssueDetector
                         $detail['referrers'] = $samples;
                     }
                     $this->pending[$key] = $this->row(
-                        $website->id, $run->id, (int) $r->id,
+                        $website->id, $run->id, (string) $r->id,
                         CrawlFinding::CATEGORY_BROKEN_LINK, 'broken_internal',
                         ($this->clicks[$r->url_hash] ?? 0) > 0 ? 'critical' : 'high',
                         0.0, // per-user impact computed read-time
@@ -256,7 +256,7 @@ class SiteIssueDetector
                         if ($href === '' || isset($links[$href])) {
                             continue;
                         }
-                        $links[$href] = ['href' => $href, 'anchor' => (string) ($l['anchor'] ?? ''), 'from' => (int) $page->id];
+                        $links[$href] = ['href' => $href, 'anchor' => (string) ($l['anchor'] ?? ''), 'from' => (string) $page->id];
                     }
                 }
             });

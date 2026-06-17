@@ -9,7 +9,7 @@ class WebsitePolicy
 {
     public function view(User $user, Website $website): bool
     {
-        if ((int) $website->user_id === (int) $user->id) {
+        if ((string) $website->user_id === (string) $user->id) {
             return true;
         }
 
@@ -18,11 +18,11 @@ class WebsitePolicy
 
     public function update(User $user, Website $website): bool
     {
-        return (int) $website->user_id === (int) $user->id;
+        return (string) $website->user_id === (string) $user->id;
     }
 
     public function delete(User $user, Website $website): bool
     {
-        return (int) $website->user_id === (int) $user->id;
+        return (string) $website->user_id === (string) $user->id;
     }
 }

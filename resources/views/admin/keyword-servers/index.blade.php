@@ -2,7 +2,7 @@
     @php
         /**
          * @var \Illuminate\Support\Collection<\App\Models\KeywordApiServer> $servers
-         * @var int $editId
+         * @var string $editId
          * @var bool $showCreate
          */
         $relTime = function ($when): string {

@@ -94,7 +94,7 @@ class SerpFeatureRiskService
         }
         $seen = [];
         foreach ($snapshots as $snap) {
-            $kid = (int) $snap->rank_tracking_keyword_id;
+            $kid = (string) $snap->rank_tracking_keyword_id;
             $seen[$kid] = ($seen[$kid] ?? 0) + 1;
             if ($seen[$kid] === 1) {
                 $present = array_values(array_intersect(self::RISK_FEATURES, (array) $snap->serp_features));

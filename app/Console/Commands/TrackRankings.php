@@ -28,7 +28,7 @@ class TrackRankings extends Command
         $count = 0;
         $query->select('id')->chunkById(200, function ($rows) use (&$count, $force) {
             foreach ($rows as $row) {
-                TrackKeywordRankJob::dispatch((int) $row->id, $force);
+                TrackKeywordRankJob::dispatch((string) $row->id, $force);
                 $count++;
             }
         });

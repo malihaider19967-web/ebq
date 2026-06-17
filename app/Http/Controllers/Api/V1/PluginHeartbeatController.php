@@ -34,8 +34,8 @@ class PluginHeartbeatController extends Controller
 
         $logger->log(
             'plugin.heartbeat',
-            userId: (int) $website->user_id,
-            websiteId: (int) $website->id,
+            userId: (string) $website->user_id,
+            websiteId: (string) $website->id,
             provider: 'wordpress',
             meta: ['installed_version' => $install->installed_version, 'channel' => $install->channel]
         );

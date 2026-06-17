@@ -141,7 +141,7 @@ final class MistralClient implements LlmClient
             app(ClientActivityLogger::class)->log(
                 'api_usage.mistral',
                 userId: $billedUser->id,
-                websiteId: isset($options['__website_id']) ? (int) $options['__website_id'] : null,
+                websiteId: isset($options['__website_id']) ? (string) $options['__website_id'] : null,
                 provider: 'mistral',
                 meta: $meta,
                 unitsConsumed: $totalTokens,
@@ -367,7 +367,7 @@ final class MistralClient implements LlmClient
      */
     private function resolveBilledUser(array $options): ?User
     {
-        $userId = isset($options['__user_id']) ? (int) $options['__user_id'] : (int) (Auth::id() ?? 0);
+        $userId = isset($options['__user_id']) ? (string) $options['__user_id'] : Auth::id();
         if ($userId <= 0) {
             return null;
         }

@@ -36,7 +36,7 @@ class GscKeywordWindow extends Component
         $user = Auth::user();
         $website = $this->getWebsite();
 
-        if (! $website || (int) $website->user_id !== (int) $user?->id) {
+        if (! $website || (string) $website->user_id !== (int) $user?->id) {
             return;
         }
 
@@ -53,7 +53,7 @@ class GscKeywordWindow extends Component
     {
         $website = $this->getWebsite();
         $user = Auth::user();
-        $isOwner = $website && $user && (int) $website->user_id === (int) $user->id;
+        $isOwner = $website && $user && (string) $website->user_id === (string) $user->id;
 
         return view('livewire.settings.gsc-keyword-window', [
             'website' => $website,

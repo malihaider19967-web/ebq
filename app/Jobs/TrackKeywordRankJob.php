@@ -37,7 +37,7 @@ class TrackKeywordRankJob implements ShouldQueue
             // A successful check writes current_position on the keyword,
             // which feeds Overview's tracker_distribution + tracked_keywords.
             // Bump the website's data version so the next read rebuilds.
-            ReportCache::flushWebsite((int) $keyword->website_id);
+            ReportCache::flushWebsite((string) $keyword->website_id);
         } catch (\Throwable $e) {
             Log::error('TrackKeywordRankJob failed: '.$e->getMessage(), [
                 'keyword_id' => $this->keywordId,

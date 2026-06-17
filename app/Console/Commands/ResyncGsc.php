@@ -40,7 +40,7 @@ class ResyncGsc extends Command
         $query->chunkById(100, function ($websites) use ($days, &$count): void {
             foreach ($websites as $website) {
                 SyncSearchConsoleData::dispatch($website->id, $days);
-                $this->line(sprintf('queued → %s (id=%d, %d days)', (string) $website->domain, (int) $website->id, $days));
+                $this->line(sprintf('queued → %s (id=%d, %d days)', (string) $website->domain, (string) $website->id, $days));
                 $count++;
             }
         });

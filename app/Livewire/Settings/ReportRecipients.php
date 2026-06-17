@@ -37,7 +37,7 @@ class ReportRecipients extends Component
         $user = Auth::user();
         $website = $this->getWebsite();
 
-        if (! $website || (int) $website->user_id !== $user->id) {
+        if (! $website || (string) $website->user_id !== $user->id) {
             return;
         }
 
@@ -60,7 +60,7 @@ class ReportRecipients extends Component
         $isOwner = false;
 
         if ($website) {
-            $isOwner = (int) $website->user_id === $user->id;
+            $isOwner = (string) $website->user_id === $user->id;
 
             $owner = $website->owner;
             $members = $website->members()->get();

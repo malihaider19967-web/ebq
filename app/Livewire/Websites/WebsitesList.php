@@ -143,7 +143,7 @@ class WebsitesList extends Component
             return [null, $selection];
         }
 
-        $accountId = (int) substr($selection, 0, $pos);
+        $accountId = substr($selection, 0, $pos);
 
         return [$accountId > 0 ? $accountId : null, substr($selection, $pos + 1)];
     }

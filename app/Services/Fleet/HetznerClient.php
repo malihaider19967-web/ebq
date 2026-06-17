@@ -43,8 +43,8 @@ class HetznerClient
             'location' => $cfg['location'] ?? null,
             'start_after_create' => true,
             'ssh_keys' => array_filter([$cfg['ssh_key_id'] ?? null]),
-            'networks' => array_filter([$cfg['network_id'] ? (int) $cfg['network_id'] : null]),
-            'firewalls' => $cfg['firewall_id'] ? [['firewall' => (int) $cfg['firewall_id']]] : [],
+            'networks' => array_filter([$cfg['network_id'] ? (string) $cfg['network_id'] : null]),
+            'firewalls' => $cfg['firewall_id'] ? [['firewall' => (string) $cfg['firewall_id']]] : [],
             'labels' => array_merge(['role' => 'ebq-crawl-worker', 'managed-by' => 'ebq-autoscaler'], $opts['labels'] ?? []),
             'user_data' => $opts['user_data'] ?? null,
         ], static fn ($v) => $v !== null && $v !== []);

@@ -48,13 +48,13 @@ class GoogleSourcePool
         $gscError = false;
 
         foreach ($accounts as $account) {
-            $accountList[] = ['id' => (int) $account->id, 'label' => $account->label()];
+            $accountList[] = ['id' => (string) $account->id, 'label' => $account->label()];
 
             foreach ($this->propertiesFor($account, $gaError) as $prop) {
                 $ga[] = [
                     'id' => (string) $prop['id'],
                     'name' => (string) $prop['name'],
-                    'account_id' => (int) $account->id,
+                    'account_id' => (string) $account->id,
                     'account_label' => $account->label(),
                 ];
             }
@@ -62,7 +62,7 @@ class GoogleSourcePool
             foreach ($this->sitesFor($account, $gscError) as $site) {
                 $gsc[] = [
                     'siteUrl' => (string) $site['siteUrl'],
-                    'account_id' => (int) $account->id,
+                    'account_id' => (string) $account->id,
                     'account_label' => $account->label(),
                 ];
             }

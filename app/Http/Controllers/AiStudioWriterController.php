@@ -256,7 +256,7 @@ class AiStudioWriterController extends Controller
             $project->brief = $data['brief'];
         }
         if (array_key_exists('wp_post_id', $data) && $data['wp_post_id'] !== null) {
-            $project->wp_post_id = (int) $data['wp_post_id'];
+            $project->wp_post_id = (string) $data['wp_post_id'];
         }
         $project->save();
 

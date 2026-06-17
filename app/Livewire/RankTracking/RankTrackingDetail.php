@@ -55,7 +55,7 @@ class RankTrackingDetail extends Component
             return null;
         }
         $user = Auth::user();
-        if (! $user || ! $user->canViewWebsiteId((int) $keyword->website_id)) {
+        if (! $user || ! $user->canViewWebsiteId((string) $keyword->website_id)) {
             return null;
         }
 

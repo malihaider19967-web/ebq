@@ -258,7 +258,7 @@ class ClientController extends Controller
         // Detect it up front and tell the admin why. Checked via the loaded owner's
         // frozen list because $website was selected with id+domain only (no user_id,
         // so calling isFrozen() on it would wrongly read as not-frozen).
-        if (in_array((int) $website->id, $user->frozenWebsiteIds(), true)) {
+        if (in_array((string) $website->id, $user->frozenWebsiteIds(), true)) {
             return redirect()->route('admin.clients.index', $request->query())
                 ->with('status', "{$website->domain} is frozen — {$user->email} is over their plan's website limit. Raise the limit or remove another site to enable crawling.");
         }

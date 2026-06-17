@@ -51,8 +51,8 @@ class WebsiteApiAuth
         $request->attributes->set('api_token', $accessToken);
         app(ClientActivityLogger::class)->log(
             'plugin.api_request',
-            userId: (int) $tokenable->user_id,
-            websiteId: (int) $tokenable->id,
+            userId: (string) $tokenable->user_id,
+            websiteId: (string) $tokenable->id,
             provider: 'wordpress',
             meta: ['path' => $request->path(), 'ability' => $ability]
         );
