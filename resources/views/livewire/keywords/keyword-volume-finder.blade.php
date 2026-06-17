@@ -146,7 +146,7 @@
                                 <div class="inline-flex items-center gap-2 text-[11px]">
                                     <button type="button" wire:click="sendToIdeas(@js($r['keyword']))" class="text-indigo-600 hover:underline dark:text-indigo-400">Ideas</button>
                                     <button type="button" wire:click="track(@js($r['keyword']))" class="text-slate-600 hover:underline dark:text-slate-300">Track</button>
-                                    @if (auth()->user()?->hasFeatureAccess('audits', (int) session('current_website_id', 0)))
+                                    @if (auth()->user()?->hasFeatureAccess('audits', (string) session('current_website_id', '')))
                                         <a href="{{ route('keywords.fix', ['keyword' => $r['keyword']]) }}" class="text-slate-600 hover:underline dark:text-slate-300">Brief</a>
                                     @endif
                                 </div>
