@@ -78,7 +78,12 @@ These are infra one-time setup, not code:
 Until the token/snapshot/network are set, `ebq:fleet-worker provision` returns a clear error
 (e.g. "No worker image configured…") — the code is in place; provisioning activates once they're set.
 
-## Status — all phases shipped (code); autoscaler disabled until the Hetzner setup is done
+## Status — fully built + live-tested; Hetzner setup done; autoscaler off pending an operator enable
+
+> Setup complete as of 2026-06-17: `HCLOUD_TOKEN`, network (`12332718`), ssh key, firewall,
+> the worker **snapshot**, and `.env.worker` are all configured, and the web box `ufw` allows
+> the private subnet. A live provision→drain→destroy cycle passed. The **only** remaining step
+> to start burst scaling is flipping `autoscaler.enabled` on at `/admin/fleet`.
 
 - **Phase 1 ✅** fleet model, Hetzner client, fleet service, `ebq:fleet-worker`, config, pinned box.
 - **Phase 2 ✅** `crawl-finalize` queue split — `AnalyzeSiteJob` (1200s) now runs ONLY on the

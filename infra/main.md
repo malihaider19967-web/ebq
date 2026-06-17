@@ -230,6 +230,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-06-17 (fleet autoscaling — live-tested)** — Completed the Hetzner setup (token, network
+  `12332718`, ssh key, firewall, worker **snapshot**, `.env.worker`) and ran a full live
+  `provision → bootstrap → drain → destroy` cycle successfully (Redis `CLIENT LIST` confirmed the
+  new box's workers polling the crawl queue). Fixes from the test: server type `cx23` (not AMD
+  `cpx*`), wait-for-SSH on bootstrap, ephemeral boxes forced crawl-only, and **the web box `ufw`
+  must allow the private subnet `10.0.0.0/24` to Redis 6379 + MariaDB 3306** (added) — otherwise
+  ephemeral workers crash-loop. Autoscaler remains **off** pending an operator `enable`. See
+  [crawler/autoscaling.md](./crawler/autoscaling.md).
 - **2026-06-16 (fleet autoscaling P1–P4)** — Built elastic crawl-worker scaling on Hetzner
   ([crawler/autoscaling.md](./crawler/autoscaling.md)): `worker_nodes` fleet model +
   `HetznerClient`/`WorkerFleetService`, the `ebq:fleet-worker` manual command, the
