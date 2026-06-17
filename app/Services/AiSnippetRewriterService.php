@@ -287,7 +287,7 @@ RULES;
      *   error?: string,
      * }
      */
-    public function rewrite(int $postId, array $input): array
+    public function rewrite(string $postId, array $input): array
     {
         if (! $this->llm->isAvailable()) {
             return ['ok' => false, 'error' => 'llm_not_configured'];
@@ -771,7 +771,7 @@ FEEDBACK;
      * @param  list<string>  $competitorTitles
      * @param  list<string>  $additionalKeywords
      */
-    private function cacheKey(int $postId, string $keyword, string $title, string $meta, string $excerpt, array $competitorTitles, string $intent, array $additionalKeywords = []): string
+    private function cacheKey(string $postId, string $keyword, string $title, string $meta, string $excerpt, array $competitorTitles, string $intent, array $additionalKeywords = []): string
     {
         $contentHash = hash('xxh3', $title . "\n" . $meta . "\n" . $excerpt);
         $compHash = hash('xxh3', implode('|', $competitorTitles));

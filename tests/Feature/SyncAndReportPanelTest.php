@@ -76,7 +76,7 @@ class SyncAndReportPanelTest extends TestCase
             ->assertSee('Too many attempts');
     }
 
-    private function seedSafeGscRow(int $websiteId): void
+    private function seedSafeGscRow(string $websiteId): void
     {
         SearchConsoleData::create([
             'website_id' => $websiteId,

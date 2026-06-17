@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('guest_page_audits', function (Blueprint $table) {
-            $table->id();
+            $table->ulid('id')->primary();
             // Unguessable public handle used in the status/results URLs. No
             // website_id / user_id — these are anonymous landing-page audits.
             $table->char('token', 36)->unique();

@@ -4,13 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * One row per crawl-issue summary report emailed from the admin Marketing panel.
  * Keeps the record of what was sent and to whom (the `summary` JSON is the exact
  * numbers + example errors that were in the email at send time).
  *
- * @property int $id
+ * @property string $id
  * @property int|null $website_id
  * @property int|null $recipient_user_id
  * @property int|null $sent_by_user_id
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class CrawlReportSend extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'website_id', 'recipient_user_id', 'sent_by_user_id',
         'to_email', 'subject', 'summary', 'status',

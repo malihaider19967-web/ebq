@@ -14,12 +14,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('crawl_report_sends', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('website_id')->nullable()->constrained()->nullOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->nullable()->constrained()->nullOnDelete();
             // The client this report concerns (website owner), if known.
-            $table->foreignId('recipient_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUlid('recipient_user_id')->nullable()->constrained('users')->nullOnDelete();
             // The admin who pressed "Send".
-            $table->foreignId('sent_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUlid('sent_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('to_email');            // actual address the email went to
             $table->string('subject', 512);
             $table->json('summary');               // snapshot: counts + health + 3 examples

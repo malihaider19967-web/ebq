@@ -106,6 +106,6 @@ class CrawlWebsites extends Command
         $id = $site->websites()->where(fn (Builder $q) => $this->hasSource($q))->value('id')
             ?? $site->websites()->value('id');
 
-        return $id ? (int) $id : null;
+        return $id ? $id : null;
     }
 }

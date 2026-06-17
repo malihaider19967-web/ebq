@@ -33,7 +33,7 @@ class ResyncGsc extends Command
 
         $query = Website::query()->select('id', 'domain');
         if ($websiteId !== null && $websiteId !== '') {
-            $query->whereKey((int) $websiteId);
+            $query->whereKey($websiteId);
         }
 
         $count = 0;

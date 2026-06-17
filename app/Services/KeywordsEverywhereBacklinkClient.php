@@ -44,8 +44,8 @@ class KeywordsEverywhereBacklinkClient
     public function backlinksForDomain(
         string $domain,
         int $limit = 50,
-        ?int $websiteId = null,
-        ?int $ownerUserId = null,
+        ?string $websiteId = null,
+        ?string $ownerUserId = null,
         ?string $source = null,
     ): ?array {
         $key = config('services.keywords_everywhere.key');
@@ -175,7 +175,7 @@ class KeywordsEverywhereBacklinkClient
         }
     }
 
-    private function resolveBilledUser(?int $websiteId, ?int $ownerUserId): ?User
+    private function resolveBilledUser(?string $websiteId, ?string $ownerUserId): ?User
     {
         if ($websiteId !== null) {
             $ownerId = DB::table('website_user')
@@ -186,7 +186,7 @@ class KeywordsEverywhereBacklinkClient
                 $ownerId = DB::table('websites')->where('id', $websiteId)->value('user_id');
             }
             if ($ownerId !== null) {
-                return User::find((int) $ownerId);
+                return User::find($ownerId);
             }
         }
         $id = $ownerUserId ?? Auth::id();

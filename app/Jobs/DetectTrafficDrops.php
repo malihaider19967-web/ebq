@@ -15,7 +15,7 @@ class DetectTrafficDrops implements ShouldQueue
 
     public const DEDUPE_HOURS = 24;
 
-    public function __construct(public int $websiteId)
+    public function __construct(public string $websiteId)
     {
         $this->onQueue(\App\Support\Queues::SYNC);
     }

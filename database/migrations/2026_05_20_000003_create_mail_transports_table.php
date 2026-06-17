@@ -25,9 +25,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('mail_transports', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('website_id')->nullable()->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('user_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('website_id')->nullable()->constrained()->cascadeOnDelete();
             $table->enum('provider', ['gmail', 'outlook', 'smtp']);
             $table->string('display_name', 120)->nullable();
             // The `From:` address shown to the recipient. For OAuth
@@ -37,8 +37,9 @@ return new class extends Migration
 
             // OAuth row pointer. Polymorphic-ish — the `provider` column
             // selects which table this id lives in. Not a real FK because
-            // it points to one of two tables.
-            $table->unsignedBigInteger('oauth_account_id')->nullable();
+            // it points to one of two tables (so it stays a plain ULID
+            // column — CHAR(26) to match google/microsoft account ids).
+            $table->ulid('oauth_account_id')->nullable();
 
             // SMTP inline credentials (provider = 'smtp' only).
             $table->string('smtp_host', 191)->nullable();

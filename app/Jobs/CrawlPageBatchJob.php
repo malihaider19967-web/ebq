@@ -27,7 +27,7 @@ class CrawlPageBatchJob implements ShouldQueue
      */
     public function __construct(
         public array $pageIds,
-        public int $crawlRunId,
+        public string $crawlRunId,
     ) {}
 
     public function handle(PageCrawlProcessor $processor): void

@@ -36,11 +36,11 @@ class KeywordFixPlaybook extends Component
     #[Url(as: 'country')]
     public string $country = '';
 
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
-    public ?int $auditId = null;
+    public ?string $auditId = null;
 
-    public ?int $reportId = null;
+    public ?string $reportId = null;
 
     /** idle|queued|running|ready|failed */
     public string $status = 'idle';
@@ -72,7 +72,7 @@ class KeywordFixPlaybook extends Component
     {
         $this->keyword = trim($this->keyword);
         $this->pageUrl = trim($this->pageUrl);
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
 
         $user = Auth::user();
         if ($this->keyword === '' || $this->pageUrl === '') {

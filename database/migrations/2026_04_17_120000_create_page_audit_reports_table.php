@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('page_audit_reports', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
             $table->string('page', 700);
             $table->string('status')->default('completed');
             $table->timestamp('audited_at')->nullable();

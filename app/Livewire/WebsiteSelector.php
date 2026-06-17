@@ -7,7 +7,7 @@ use Livewire\Component;
 
 class WebsiteSelector extends Component
 {
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     /** @var array<int, array{id: int, domain: string}> */
     public array $websites = [];
@@ -22,7 +22,7 @@ class WebsiteSelector extends Component
             ->map(fn ($w) => ['id' => $w->id, 'domain' => $w->domain])
             ->toArray();
 
-        $sessionId = (int) session('current_website_id', 0);
+        $sessionId = session('current_website_id');
         $ids = array_column($this->websites, 'id');
 
         $this->websiteId = in_array($sessionId, $ids, true) ? $sessionId : ($ids[0] ?? 0);

@@ -36,7 +36,7 @@ class DeleteWebsiteData extends Command
         return $all ? $this->handleAll() : $this->handleOne((int) $websiteArg);
     }
 
-    private function handleOne(int $websiteId): int
+    private function handleOne(string $websiteId): int
     {
         if ($websiteId <= 0) {
             $this->error('Website ID must be a positive integer.');
@@ -190,7 +190,7 @@ class DeleteWebsiteData extends Command
     /**
      * @return array<int, array{label: string, count: int}>
      */
-    private function buildPlan(int $websiteId): array
+    private function buildPlan(string $websiteId): array
     {
         return [
             ['label' => 'website', 'count' => DB::table('websites')->where('id', $websiteId)->count()],

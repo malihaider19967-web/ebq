@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('rank_tracking_snapshots', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('rank_tracking_keyword_id')
+            $table->ulid('id')->primary();
+            $table->foreignUlid('rank_tracking_keyword_id')
                 ->constrained('rank_tracking_keywords')
                 ->cascadeOnDelete();
 

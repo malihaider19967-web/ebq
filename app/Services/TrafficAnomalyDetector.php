@@ -31,7 +31,7 @@ class TrafficAnomalyDetector
      *     date: string,
      * }
      */
-    public function detect(int $websiteId): array
+    public function detect(string $websiteId): array
     {
         $tz = config('app.timezone');
         $target = Carbon::yesterday($tz);
@@ -58,7 +58,7 @@ class TrafficAnomalyDetector
     }
 
     /** @return array<string, mixed> */
-    private function analyzeClicks(int $websiteId, Carbon $target, Carbon $baselineStart, Carbon $baselineEnd): array
+    private function analyzeClicks(string $websiteId, Carbon $target, Carbon $baselineStart, Carbon $baselineEnd): array
     {
         $series = DB::table('search_console_data')
             ->where('website_id', $websiteId)
@@ -72,7 +72,7 @@ class TrafficAnomalyDetector
     }
 
     /** @return array<string, mixed> */
-    private function analyzeSessions(int $websiteId, Carbon $target, Carbon $baselineStart, Carbon $baselineEnd): array
+    private function analyzeSessions(string $websiteId, Carbon $target, Carbon $baselineStart, Carbon $baselineEnd): array
     {
         $series = DB::table('analytics_data')
             ->where('website_id', $websiteId)
@@ -86,7 +86,7 @@ class TrafficAnomalyDetector
     }
 
     /** @return array<string, mixed> */
-    private function analyzeRank(int $websiteId, Carbon $target, Carbon $baselineStart, Carbon $baselineEnd): array
+    private function analyzeRank(string $websiteId, Carbon $target, Carbon $baselineStart, Carbon $baselineEnd): array
     {
         $keywords = RankTrackingKeyword::query()
             ->where('website_id', $websiteId)

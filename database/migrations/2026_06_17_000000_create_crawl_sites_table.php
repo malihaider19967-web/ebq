@@ -15,7 +15,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('crawl_sites', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('normalized_domain')->unique();
             $table->unsignedInteger('effective_cap')->default(0);
             $table->unsignedSmallInteger('health_score')->nullable();

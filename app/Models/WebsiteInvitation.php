@@ -5,9 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 class WebsiteInvitation extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'website_id',
         'email',
@@ -64,7 +66,7 @@ class WebsiteInvitation extends Model
     public static function issue(
         Website $website,
         string $email,
-        int $invitedByUserId,
+        string $invitedByUserId,
         int $expiresInDays = 14,
         string $role = 'member',
         ?array $permissions = null,

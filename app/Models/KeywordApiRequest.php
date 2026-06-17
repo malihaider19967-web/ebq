@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * Lifecycle + result record for one asynchronous call to the self-hosted
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class KeywordApiRequest extends Model
 {
+    use HasUlids;
     public const STATUS_QUEUED = 'queued';
     public const STATUS_RUNNING = 'running';
     public const STATUS_COMPLETED = 'completed';

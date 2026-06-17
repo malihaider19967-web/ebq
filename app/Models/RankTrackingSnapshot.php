@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 class RankTrackingSnapshot extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'rank_tracking_keyword_id',
         'checked_at',

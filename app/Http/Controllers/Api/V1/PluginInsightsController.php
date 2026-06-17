@@ -387,7 +387,7 @@ class PluginInsightsController extends Controller
             'intent' => 'nullable|string|in:' . implode(',', $intentKeys),
         ]);
 
-        $payload = $service->rewrite((int) $externalPostId, [
+        $payload = $service->rewrite($externalPostId, [
             'focus_keyword' => $data['focus_keyword'],
             'additional_keywords' => $data['additional_keywords'] ?? [],
             'current_title' => $data['current_title'] ?? '',
@@ -448,7 +448,7 @@ class PluginInsightsController extends Controller
             'language' => 'nullable|string|min:2|max:10',
         ]);
 
-        $payload = $service->brief($website, (int) $externalPostId, [
+        $payload = $service->brief($website, $externalPostId, [
             'focus_keyword' => $data['focus_keyword'],
             'country' => $data['country'] ?? null,
             'language' => $data['language'] ?? null,
@@ -509,7 +509,7 @@ class PluginInsightsController extends Controller
 
         $brief = null;
         try {
-            $briefRes = $briefService->brief($website, (int) $externalPostId, [
+            $briefRes = $briefService->brief($website, $externalPostId, [
                 'focus_keyword' => $keyword,
                 'country' => $country,
                 'language' => $language,
@@ -653,7 +653,7 @@ class PluginInsightsController extends Controller
         // Gaps tabs in this drafting session.
         $brief = null;
         try {
-            $briefRes = $briefService->brief($website, (int) $externalPostId, [
+            $briefRes = $briefService->brief($website, $externalPostId, [
                 'focus_keyword' => $keyword,
                 'country' => $country,
                 'language' => $language,
@@ -678,7 +678,7 @@ class PluginInsightsController extends Controller
             // Silent.
         }
 
-        $payload = $writer->draft($website, (int) $externalPostId, [
+        $payload = $writer->draft($website, $externalPostId, [
             'focus_keyword' => $keyword,
             'current_html' => $currentHtml,
             'exclude_url' => (string) ($data['url'] ?? ''),
@@ -862,7 +862,7 @@ class PluginInsightsController extends Controller
      *   POST /api/v1/redirect-suggestions/{id}/decide
      *   body: { action: "apply"|"reject" }
      */
-    public function decideRedirectSuggestion(Request $request, int $id): JsonResponse
+    public function decideRedirectSuggestion(Request $request, string $id): JsonResponse
     {
         $website = $this->resolveWebsite($request);
         $data = $request->validate([

@@ -24,7 +24,7 @@ class AuditPerformanceService
      *     position: ?float,
      * }>
      */
-    public function underperformingPages(int $websiteId, int $windowDays = 28, int $limit = 25, ?string $country = null): array
+    public function underperformingPages(string $websiteId, int $windowDays = 28, int $limit = 25, ?string $country = null): array
     {
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz)->endOfDay();

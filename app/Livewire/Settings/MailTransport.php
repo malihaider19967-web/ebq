@@ -24,7 +24,7 @@ use Symfony\Component\Mime\Email as SymfonyEmail;
  */
 class MailTransport extends Component
 {
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     public string $scope = 'user';
     public string $provider = ''; // '' = no transport, fall back to EBQ default
@@ -46,12 +46,12 @@ class MailTransport extends Component
 
     public function mount(): void
     {
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
         $this->load();
     }
 
     #[On('website-changed')]
-    public function switchWebsite(int $websiteId): void
+    public function switchWebsite(string $websiteId): void
     {
         $this->websiteId = $websiteId;
         $this->saved = false;
@@ -154,7 +154,7 @@ class MailTransport extends Component
 
     public function render()
     {
-        $userId = (int) Auth::id();
+        $userId = Auth::id();
         $row = $this->findRow();
         return view('livewire.settings.mail-transport', [
             'allowed' => $this->planAllowsWhitelabel(),
@@ -195,7 +195,7 @@ class MailTransport extends Component
 
     private function findRow(): ?MailTransportModel
     {
-        $userId = (int) Auth::id();
+        $userId = Auth::id();
         if ($this->scope === 'website' && $this->websiteId > 0) {
             return MailTransportModel::query()
                 ->where('user_id', $userId)
@@ -214,7 +214,7 @@ class MailTransport extends Component
         if ($row) {
             return $row;
         }
-        $userId = (int) Auth::id();
+        $userId = Auth::id();
         return new MailTransportModel([
             'user_id' => $userId,
             'website_id' => $this->scope === 'website' && $this->websiteId > 0 ? $this->websiteId : null,

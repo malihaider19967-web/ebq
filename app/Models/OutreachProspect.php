@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
- * @property int $id
- * @property int $website_id
+ * @property string $id
+ * @property string $website_id
  * @property string $referring_domain
  * @property int|null $domain_authority
  * @property list<string>|null $linked_to_competitors
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class OutreachProspect extends Model
 {
+    use HasUlids;
     /**
      * Workflow states. The full kanban: new → drafted → contacted →
      * replied → converted (success) OR declined (no thanks) OR snoozed

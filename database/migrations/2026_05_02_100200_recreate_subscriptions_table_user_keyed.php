@@ -26,13 +26,13 @@ return new class extends Migration
         Schema::dropIfExists('subscriptions');
 
         Schema::create('subscriptions', function (Blueprint $table) {
-            $table->id();
+            $table->ulid('id')->primary();
             // Cashier's Billable trait derives the FK from the model
             // class name (User → user_id). Keeping the FK constrained
             // is fine here because users are never hard-deleted; if
             // they ever are, Stripe still owns the source of truth
             // and we'd rebuild from webhooks.
-            $table->foreignId('user_id');
+            $table->foreignUlid('user_id');
             $table->string('type');
             $table->string('stripe_id')->unique();
             $table->string('stripe_status');
@@ -46,8 +46,8 @@ return new class extends Migration
         });
 
         Schema::create('subscription_items', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('subscription_id');
+            $table->ulid('id')->primary();
+            $table->foreignUlid('subscription_id');
             $table->string('stripe_id')->unique();
             $table->string('stripe_product');
             $table->string('stripe_price');

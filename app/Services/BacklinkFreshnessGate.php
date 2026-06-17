@@ -160,7 +160,7 @@ class BacklinkFreshnessGate
      * (Cache::forget always returns true; we report attempts not actual
      * "had a key" because the gate is best-effort by design).
      */
-    public function forgetAll(?int $websiteId = null): int
+    public function forgetAll(?string $websiteId = null): int
     {
         $domains = [];
 

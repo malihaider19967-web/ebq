@@ -67,7 +67,7 @@ class CompetitorBacklinkService
      *
      * @param  list<string>  $domains
      */
-    public function queueRefresh(array $domains, ?int $websiteId = null, ?int $ownerUserId = null): void
+    public function queueRefresh(array $domains, ?string $websiteId = null, ?string $ownerUserId = null): void
     {
         $toFetch = [];
         foreach ($domains as $d) {
@@ -88,7 +88,7 @@ class CompetitorBacklinkService
      * Synchronous fetch + upsert for a single domain. Returns the number of
      * rows written. Called by the job and by any CLI-driven refresh.
      */
-    public function refresh(string $domain, ?int $websiteId = null, ?int $ownerUserId = null): int
+    public function refresh(string $domain, ?string $websiteId = null, ?string $ownerUserId = null): int
     {
         $domain = CompetitorBacklink::extractDomain($domain);
         if ($domain === '') {

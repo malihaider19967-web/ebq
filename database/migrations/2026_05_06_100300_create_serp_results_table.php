@@ -14,8 +14,8 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('serp_results', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('snapshot_id')->constrained('serp_snapshots')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('snapshot_id')->constrained('serp_snapshots')->cascadeOnDelete();
             $table->unsignedSmallInteger('rank');
             $table->string('url', 2048);
             $table->string('domain', 255);

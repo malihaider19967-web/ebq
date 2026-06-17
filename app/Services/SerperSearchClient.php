@@ -38,8 +38,8 @@ class SerperSearchClient
         int $num = 10,
         ?string $gl = null,
         ?string $hl = null,
-        ?int $websiteId = null,
-        ?int $ownerUserId = null,
+        ?string $websiteId = null,
+        ?string $ownerUserId = null,
         ?string $source = null,
     ): ?array {
         return $this->query([
@@ -197,7 +197,7 @@ class SerperSearchClient
         return is_array($json) ? $json : null;
     }
 
-    private function resolveBilledUser(?int $websiteId, ?int $ownerUserId): ?User
+    private function resolveBilledUser(?string $websiteId, ?string $ownerUserId): ?User
     {
         if ($websiteId !== null && $websiteId > 0) {
             $ownerId = DB::table('website_user')
@@ -208,7 +208,7 @@ class SerperSearchClient
                 $ownerId = DB::table('websites')->where('id', $websiteId)->value('user_id');
             }
             if ($ownerId !== null) {
-                return User::find((int) $ownerId);
+                return User::find($ownerId);
             }
         }
         $id = $ownerUserId ?: Auth::id();

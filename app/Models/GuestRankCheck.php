@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * Anonymous, no-signup keyword rank check launched from the public marketing
@@ -13,6 +14,7 @@ use Illuminate\Support\Str;
  */
 class GuestRankCheck extends Model
 {
+    use HasUlids;
     public const STATUS_QUEUED = 'queued';
     public const STATUS_RUNNING = 'running';
     public const STATUS_COMPLETED = 'completed';

@@ -26,7 +26,7 @@ class SiteIssues extends Component
 
     public string $issueKey = '';
 
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     /** Filters (crawl groups only). `type`/`severity` are no-ops for other groups. */
     #[Url(as: 'type')]
@@ -48,7 +48,7 @@ class SiteIssues extends Component
     public function mount(string $issueKey): void
     {
         $this->issueKey = $issueKey;
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
 
         abort_unless($this->isAllowedKey($issueKey), 404);
         abort_unless($this->websiteId > 0 && Auth::user()?->canViewWebsiteId($this->websiteId), 403);

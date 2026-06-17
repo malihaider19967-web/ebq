@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('page_indexing_statuses', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
             $table->string('page', 700);
             $table->timestamp('last_reindex_requested_at')->nullable();
             $table->timestamp('last_google_status_checked_at')->nullable();

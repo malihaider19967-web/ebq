@@ -28,7 +28,7 @@ class KeywordGapAnalysis extends Component
 
     public string $country = 'us';
 
-    public ?int $analysisId = null;
+    public ?string $analysisId = null;
 
     public string $status = '';
 
@@ -69,7 +69,7 @@ class KeywordGapAnalysis extends Component
 
     private function website(): ?Website
     {
-        $id = (int) session('current_website_id', 0);
+        $id = session('current_website_id');
 
         // Gate on access — Livewire actions don't re-run the route middleware that
         // validates current_website_id, so trust the session id only if the current
@@ -164,7 +164,7 @@ class KeywordGapAnalysis extends Component
     }
 
     /** Refine one row's opportunity score with a live SERP lookup (cost-gated). */
-    public function computeLive(int $rowId, OpportunityScoreService $opportunity): void
+    public function computeLive(string $rowId, OpportunityScoreService $opportunity): void
     {
         $this->errorMessage = null;
         $this->upgradeUrl = null;
@@ -206,18 +206,18 @@ class KeywordGapAnalysis extends Component
     }
 
     /** Send a gap-row keyword to the Volume tab (research hub). */
-    public function sendToVolume(int $rowId): void
+    public function sendToVolume(string $rowId): void
     {
         $this->handoffRow($rowId, 'volume');
     }
 
     /** Send a gap-row keyword to the Ideas tab as a seed (research hub). */
-    public function sendToIdeas(int $rowId): void
+    public function sendToIdeas(string $rowId): void
     {
         $this->handoffRow($rowId, 'ideas');
     }
 
-    private function handoffRow(int $rowId, string $target): void
+    private function handoffRow(string $rowId, string $target): void
     {
         $row = KeywordGapRow::find($rowId);
         if ($row === null || $row->keyword_gap_analysis_id !== $this->analysisId) {

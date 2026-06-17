@@ -65,13 +65,13 @@ class HetznerClient
         ];
     }
 
-    public function deleteServer(int $serverId): array
+    public function deleteServer(string $serverId): array
     {
         return $this->request('delete', "/servers/{$serverId}");
     }
 
     /** @return array{ok:bool, status:?string, private_ip:?string, error:?string} */
-    public function getServer(int $serverId): array
+    public function getServer(string $serverId): array
     {
         $out = $this->request('get', "/servers/{$serverId}");
         if (! $out['ok']) {

@@ -18,9 +18,9 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('keyword_api_requests', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->uuid('request_id')->unique();
-            $table->foreignId('keyword_api_server_id')->nullable()
+            $table->foreignUlid('keyword_api_server_id')->nullable()
                 ->constrained('keyword_api_servers')->nullOnDelete();
 
             // 'ideas' (discovery) | 'volume' (metrics lookup).
@@ -35,8 +35,8 @@ return new class extends Migration {
             $table->json('result')->nullable();
             $table->string('error')->nullable();
 
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('website_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignUlid('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignUlid('website_id')->nullable()->constrained()->nullOnDelete();
 
             $table->timestamp('dispatched_at')->nullable();
             $table->timestamp('completed_at')->nullable();

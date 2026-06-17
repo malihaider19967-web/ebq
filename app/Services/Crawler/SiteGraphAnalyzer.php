@@ -25,7 +25,7 @@ class SiteGraphAnalyzer
         CrawlValueRank::assign($crawlSiteId);
     }
 
-    private function recomputeInboundCounts(int $crawlSiteId): void
+    private function recomputeInboundCounts(string $crawlSiteId): void
     {
         // Reset, then set from aggregated discovered edges in a SINGLE join-update
         // (one query instead of one UPDATE per linked page).
@@ -100,7 +100,7 @@ class SiteGraphAnalyzer
         $rootHash = WebsitePage::hashUrl($crawlSite->homepageUrl());
         $id = WebsitePage::where('crawl_site_id', $crawlSite->id)->where('url_hash', $rootHash)->value('id');
         if ($id) {
-            return (int) $id;
+            return $id;
         }
 
         // Fallback: the indexable page with the shortest URL (closest to root).

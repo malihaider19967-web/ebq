@@ -14,7 +14,7 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::table('search_console_data', function (Blueprint $table): void {
-            $table->foreignId('keyword_id')
+            $table->foreignUlid('keyword_id')
                 ->nullable()
                 ->after('country')
                 ->constrained('keywords')

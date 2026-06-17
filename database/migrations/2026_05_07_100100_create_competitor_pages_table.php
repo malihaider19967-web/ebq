@@ -13,8 +13,8 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('competitor_pages', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('competitor_scan_id')->constrained('competitor_scans')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('competitor_scan_id')->constrained('competitor_scans')->cascadeOnDelete();
             $table->string('url', 2048);
             $table->string('url_hash', 64);
             $table->string('domain', 255);

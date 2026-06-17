@@ -115,13 +115,13 @@ class AiWriterPromptController extends Controller
         ];
     }
 
-    private function userId(Request $request): int
+    private function userId(Request $request): string
     {
         $website = $request->attributes->get('api_website');
         abort_unless($website instanceof Website, 500, 'Website context missing');
         abort_unless($website->user_id !== null, 403, 'Website has no owner');
 
-        return (int) $website->user_id;
+        return (string) $website->user_id;
     }
 
     /**

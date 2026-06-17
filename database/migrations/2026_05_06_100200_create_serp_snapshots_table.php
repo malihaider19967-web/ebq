@@ -13,8 +13,8 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('serp_snapshots', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('keyword_id')->constrained('keywords')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('keyword_id')->constrained('keywords')->cascadeOnDelete();
             $table->string('device', 16)->default('desktop');
             $table->string('country', 16)->default('us');
             $table->string('location', 128)->nullable();

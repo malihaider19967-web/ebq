@@ -7,13 +7,14 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * One row per crawled URL on a website (distinct from page_audit_reports,
  * which is one row per audit run). Populated + refreshed by CrawlWebsitePagesJob.
  *
- * @property int $id
- * @property int $website_id
+ * @property string $id
+ * @property string $website_id
  * @property string $url
  * @property string $url_hash
  * @property string|null $title
@@ -38,6 +39,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class WebsitePage extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'website_id', 'crawl_site_id', 'value_rank',
         'url', 'url_hash', 'title', 'http_status', 'meta_description',

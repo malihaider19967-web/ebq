@@ -17,9 +17,9 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('competitor_scans', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('website_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('triggered_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignUlid('triggered_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->string('seed_domain', 255);
             $table->string('seed_url', 2048);
             $table->json('seed_keywords')->nullable();

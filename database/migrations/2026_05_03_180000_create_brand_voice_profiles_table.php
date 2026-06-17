@@ -21,8 +21,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('brand_voice_profiles', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('website_id')->unique()->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->unique()->constrained()->cascadeOnDelete();
 
             $table->unsignedSmallInteger('samples_count')->default(0);
 

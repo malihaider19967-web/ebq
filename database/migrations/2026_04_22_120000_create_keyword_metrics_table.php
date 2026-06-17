@@ -17,7 +17,7 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('keyword_metrics', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('keyword');
             $table->string('keyword_hash', 64);
             $table->string('country', 16)->default('global');

@@ -17,7 +17,7 @@ class ConnectSourceBannerTest extends TestCase
      * route is gated by verified/feature middleware that isn't wired up in
      * this minimal test environment).
      */
-    private function renderBanner(User $user, int $websiteId): string
+    private function renderBanner(User $user, string $websiteId): string
     {
         $this->actingAs($user);
         session(['current_website_id' => $websiteId]);

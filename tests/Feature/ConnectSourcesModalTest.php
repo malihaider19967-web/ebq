@@ -25,7 +25,7 @@ class ConnectSourcesModalTest extends TestCase
         parent::tearDown();
     }
 
-    private function fakePool(int $accountId): void
+    private function fakePool(string $accountId): void
     {
         $pool = Mockery::mock(GoogleSourcePool::class);
         $pool->shouldReceive('forUser')->andReturn([

@@ -25,14 +25,14 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('research_targets', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('domain', 255);
             $table->string('root_url', 2048)->nullable();
             $table->string('source', 32)->default('manual');
             $table->unsignedTinyInteger('priority')->default(50);
             $table->string('status', 16)->default('queued');
-            $table->foreignId('attached_website_id')->nullable()->constrained('websites')->nullOnDelete();
-            $table->foreignId('last_scan_id')->nullable()->constrained('competitor_scans')->nullOnDelete();
+            $table->foreignUlid('attached_website_id')->nullable()->constrained('websites')->nullOnDelete();
+            $table->foreignUlid('last_scan_id')->nullable()->constrained('competitor_scans')->nullOnDelete();
             $table->timestamp('last_scanned_at')->nullable();
             $table->timestamp('next_scan_at')->nullable();
             $table->unsignedInteger('total_scans')->default(0);

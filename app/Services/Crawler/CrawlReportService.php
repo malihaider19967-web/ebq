@@ -45,7 +45,7 @@ class CrawlReportService
      *
      * @return array{cs:?int,cap:int,clicks:array<string,int>}
      */
-    private function context(int $websiteId): array
+    private function context(string $websiteId): array
     {
         return $this->ctx[$websiteId] ??= (function () use ($websiteId): array {
             $website = Website::find($websiteId);
@@ -59,7 +59,7 @@ class CrawlReportService
     }
 
     /** This website's own 28d GSC clicks, keyed by url_hash (per-user impact). */
-    private function loadUserClicks(int $websiteId): array
+    private function loadUserClicks(string $websiteId): array
     {
         $since = Carbon::now()->subDays(28)->toDateString();
         $clicks = [];
@@ -79,13 +79,13 @@ class CrawlReportService
     }
 
     /** Per-user impact (clicks-at-risk) for a finding's URL. */
-    private function impactFor(int $websiteId, string $urlHash): int
+    private function impactFor(string $websiteId, string $urlHash): int
     {
         return (int) ($this->context($websiteId)['clicks'][$urlHash] ?? 0);
     }
 
     /** Window a website_pages query to this user's cap (value_rank <= cap; nulls visible). */
-    private function windowPages(int $websiteId, ?Builder $q = null): Builder
+    private function windowPages(string $websiteId, ?Builder $q = null): Builder
     {
         $ctx = $this->context($websiteId);
         $q ??= WebsitePage::query();
@@ -99,7 +99,7 @@ class CrawlReportService
      * limited to pages inside the user's cap window (or site-level page-null
      * findings), excluding the ones this user has ignored/resolved.
      */
-    private function findingsBase(int $websiteId, ?string $category = null): Builder
+    private function findingsBase(string $websiteId, ?string $category = null): Builder
     {
         $ctx = $this->context($websiteId);
         $cap = $ctx['cap'];
@@ -132,7 +132,7 @@ class CrawlReportService
      *
      * @return array<string,mixed>
      */
-    public function summary(int $websiteId): array
+    public function summary(string $websiteId): array
     {
         $ctx = $this->context($websiteId);
         // Health + last-crawled come from the last COMPLETED run, so a later failed/
@@ -179,7 +179,7 @@ class CrawlReportService
      *
      * @return array<int,array<string,mixed>>
      */
-    public function actionGroups(int $websiteId): array
+    public function actionGroups(string $websiteId): array
     {
         $rows = $this->findingsBase($websiteId)
             ->select('category', DB::raw('COUNT(*) as c'),
@@ -226,7 +226,7 @@ class CrawlReportService
      *
      * @return array<int,array<string,mixed>>
      */
-    public function issueRows(string $category, int $websiteId): array
+    public function issueRows(string $category, string $websiteId): array
     {
         return $this->issuesQuery($category, $websiteId)
             ->limit(100)
@@ -239,7 +239,7 @@ class CrawlReportService
      * Base query for the open findings in one crawl category for this user
      * (cap-windowed, overlay-filtered). Returns the builder so callers paginate.
      */
-    public function issuesQuery(string $category, int $websiteId, array $filters = []): Builder
+    public function issuesQuery(string $category, string $websiteId, array $filters = []): Builder
     {
         $q = $this->findingsBase($websiteId, $category)->with('page:id,url');
 
@@ -260,7 +260,7 @@ class CrawlReportService
     }
 
     /** Open-finding counts per type within a category for this user. */
-    public function typeCounts(string $category, int $websiteId): array
+    public function typeCounts(string $category, string $websiteId): array
     {
         return $this->findingsBase($websiteId, $category)
             ->select('type', DB::raw('COUNT(*) as c'))
@@ -275,7 +275,7 @@ class CrawlReportService
     }
 
     /** Normalize one finding into the uniform detail-row shape used by the UI. */
-    public function mapFinding(CrawlFinding $f, int $websiteId): array
+    public function mapFinding(CrawlFinding $f, string $websiteId): array
     {
         $impact = $this->impactFor($websiteId, $f->affected_url_hash);
 
@@ -306,7 +306,7 @@ class CrawlReportService
      *
      * @return array<int,array<string,mixed>>
      */
-    public function categoryFindings(string $category, int $websiteId, int $limit = 200): array
+    public function categoryFindings(string $category, string $websiteId, int $limit = 200): array
     {
         $rows = $this->findingsBase($websiteId, $category)
             ->orderByRaw("CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END")
@@ -333,7 +333,7 @@ class CrawlReportService
      *
      * @return array<int,array<string,mixed>>
      */
-    public function reportBreakdown(int $websiteId, int $perCategory = 5): array
+    public function reportBreakdown(string $websiteId, int $perCategory = 5): array
     {
         $rank = ['critical' => 0, 'high' => 1, 'growth' => 2, 'medium' => 2, 'low' => 3];
         $groups = $this->actionGroups($websiteId);
@@ -388,7 +388,7 @@ class CrawlReportService
     }
 
     /** Paginated page inventory (cap-windowed) for the Site Health page. */
-    public function inventory(int $websiteId, string $filter = 'all')
+    public function inventory(string $websiteId, string $filter = 'all')
     {
         $q = $this->windowPages($websiteId)->whereNull('removed_at')->whereNotNull('last_crawled_at');
 
@@ -408,7 +408,7 @@ class CrawlReportService
      *
      * @return array{nodes:array<int,array<string,mixed>>,edges:array<int,array<string,int>>}
      */
-    public function linkGraph(int $websiteId, int $cap = 120): array
+    public function linkGraph(string $websiteId, int $cap = 120): array
     {
         $ctx = $this->context($websiteId);
         $pages = $this->windowPages($websiteId)
@@ -442,7 +442,7 @@ class CrawlReportService
      *
      * @return array<string,mixed>|null  null when the URL isn't in the inventory
      */
-    public function pageLinkStructure(int $websiteId, string $url): ?array
+    public function pageLinkStructure(string $websiteId, string $url): ?array
     {
         $ctx = $this->context($websiteId);
         $page = WebsitePage::where('crawl_site_id', $ctx['cs'])
@@ -505,7 +505,7 @@ class CrawlReportService
     /**
      * @return array<int,array{url:string,title:?string,is_current:bool}>
      */
-    private function pathFromHome(int $websiteId, WebsitePage $page): array
+    private function pathFromHome(string $websiteId, WebsitePage $page): array
     {
         $parents = $this->bfsParents($websiteId);
         if (! array_key_exists($page->id, $parents)) {
@@ -545,7 +545,7 @@ class CrawlReportService
      *
      * @return array<int,int|null>
      */
-    private function bfsParents(int $websiteId): array
+    private function bfsParents(string $websiteId): array
     {
         $ctx = $this->context($websiteId);
         $crawlSiteId = $ctx['cs'];
@@ -589,14 +589,14 @@ class CrawlReportService
         );
     }
 
-    private function homepageId(int $crawlSiteId): ?int
+    private function homepageId(string $crawlSiteId): ?int
     {
         $site = \App\Models\CrawlSite::find($crawlSiteId);
         if ($site) {
             $id = WebsitePage::where('crawl_site_id', $crawlSiteId)
                 ->where('url_hash', WebsitePage::hashUrl($site->homepageUrl()))->value('id');
             if ($id) {
-                return (int) $id;
+                return $id;
             }
         }
 
@@ -609,7 +609,7 @@ class CrawlReportService
      *
      * @return array<string,mixed>|null
      */
-    public function pageIntel(int $websiteId, string $url): ?array
+    public function pageIntel(string $websiteId, string $url): ?array
     {
         $ctx = $this->context($websiteId);
         $page = WebsitePage::where('crawl_site_id', $ctx['cs'])

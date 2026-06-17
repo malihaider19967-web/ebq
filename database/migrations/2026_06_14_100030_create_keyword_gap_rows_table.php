@@ -14,8 +14,8 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('keyword_gap_rows', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('keyword_gap_analysis_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('keyword_gap_analysis_id')->constrained()->cascadeOnDelete();
 
             $table->string('keyword');
             $table->string('keyword_hash', 64);

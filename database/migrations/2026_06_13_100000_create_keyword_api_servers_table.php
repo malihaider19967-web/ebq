@@ -20,7 +20,7 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('keyword_api_servers', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('name');
             $table->string('base_url');
             $table->text('api_key');

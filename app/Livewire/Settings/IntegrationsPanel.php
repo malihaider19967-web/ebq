@@ -11,7 +11,7 @@ use Livewire\Component;
 
 class IntegrationsPanel extends Component
 {
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     /** "accountId|value" picker values, mirroring onboarding. */
     public string $gaSelection = '';
@@ -32,7 +32,7 @@ class IntegrationsPanel extends Component
 
     public function mount(): void
     {
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
         $this->loadPool();
         $this->loadCurrentSelections();
     }

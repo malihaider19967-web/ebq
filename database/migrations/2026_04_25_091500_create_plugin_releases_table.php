@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('plugin_releases', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('slug', 80)->default('ebq-seo');
             $table->string('version', 40);
             $table->string('channel', 20)->default('stable');
@@ -19,8 +19,8 @@ return new class extends Migration
             $table->timestamp('publish_at')->nullable();
             $table->timestamp('published_at')->nullable();
             $table->timestamp('rolled_back_at')->nullable();
-            $table->foreignId('rollback_of_id')->nullable()->constrained('plugin_releases')->nullOnDelete();
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUlid('rollback_of_id')->nullable()->constrained('plugin_releases')->nullOnDelete();
+            $table->foreignUlid('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
             $table->unique(['slug', 'version', 'channel']);

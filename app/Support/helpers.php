@@ -5,6 +5,35 @@ declare(strict_types=1);
 use App\Models\User;
 use Carbon\CarbonInterface;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
+
+if (! function_exists('ulid_rows')) {
+    /**
+     * Stamp a ULID `id` on rows about to be bulk-written via the query builder
+     * (DB::table()->insert()/upsert()), which bypasses Eloquent's HasUlids key
+     * generation. Accepts either a single associative row or a list of rows.
+     * Rows that already carry an `id` are left untouched.
+     *
+     * Needed because the whole schema is ULID-keyed (no DB auto-increment), so a
+     * bulk insert without an explicit id violates the NOT NULL primary key.
+     */
+    function ulid_rows(array $rows): array
+    {
+        $isList = array_is_list($rows) && isset($rows[0]) && is_array($rows[0]);
+
+        if (! $isList) {
+            return array_key_exists('id', $rows) ? $rows : ['id' => (string) Str::ulid()] + $rows;
+        }
+
+        foreach ($rows as &$row) {
+            if (is_array($row) && ! array_key_exists('id', $row)) {
+                $row['id'] = (string) Str::ulid();
+            }
+        }
+
+        return $rows;
+    }
+}
 
 if (! function_exists('display_timezone')) {
     /**

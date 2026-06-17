@@ -34,8 +34,8 @@ class FetchCompetitorBacklinks implements ShouldQueue
      */
     public function __construct(
         public array $domains,
-        public ?int $websiteId = null,
-        public ?int $ownerUserId = null,
+        public ?string $websiteId = null,
+        public ?string $ownerUserId = null,
     ) {
         $this->onQueue(\App\Support\Queues::SYNC);
     }

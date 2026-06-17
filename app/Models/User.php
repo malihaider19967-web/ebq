@@ -13,9 +13,11 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\DB;
 use Laravel\Cashier\Billable;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 class User extends Authenticatable implements MustVerifyEmail
 {
+    use HasUlids;
     /** @use HasFactory<UserFactory> */
     use Billable, HasFactory, Notifiable;
 
@@ -139,7 +141,7 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * Role for this user on the given website ('owner', 'admin', 'member') or null.
      */
-    public function roleForWebsite(int $websiteId): ?string
+    public function roleForWebsite(string $websiteId): ?string
     {
         if ($websiteId <= 0) {
             return null;
@@ -165,7 +167,7 @@ class User extends Authenticatable implements MustVerifyEmail
     /**
      * @return list<string>|null
      */
-    public function permissionsForWebsite(int $websiteId): ?array
+    public function permissionsForWebsite(string $websiteId): ?array
     {
         $role = $this->roleForWebsite($websiteId);
         if ($role === null) {
@@ -189,7 +191,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return is_array($decoded) ? array_values(array_filter($decoded, 'is_string')) : null;
     }
 
-    public function hasFeatureAccess(string $feature, int $websiteId): bool
+    public function hasFeatureAccess(string $feature, string $websiteId): bool
     {
         $role = $this->roleForWebsite($websiteId);
         if ($role === null) {
@@ -203,7 +205,7 @@ class User extends Authenticatable implements MustVerifyEmail
      * Route name of the first feature this user can access on the given website.
      * Falls back to websites.index (accessible to anyone with ≥1 website).
      */
-    public function firstAccessibleRoute(int $websiteId): string
+    public function firstAccessibleRoute(string $websiteId): string
     {
         if ($websiteId > 0) {
             foreach (TeamPermissions::FEATURES as $key => $meta) {
@@ -216,7 +218,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return 'websites.index';
     }
 
-    public function canManageTeamFor(int $websiteId): bool
+    public function canManageTeamFor(string $websiteId): bool
     {
         $role = $this->roleForWebsite($websiteId);
 
@@ -257,7 +259,7 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->accessibleWebsitesQuery()->exists();
     }
 
-    public function canViewWebsiteId(int $websiteId): bool
+    public function canViewWebsiteId(string $websiteId): bool
     {
         if ($websiteId <= 0) {
             return false;

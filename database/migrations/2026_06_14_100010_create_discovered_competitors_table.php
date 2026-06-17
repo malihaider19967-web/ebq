@@ -14,8 +14,8 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('discovered_competitors', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
 
             // Normalized bare host (no scheme/www) — see CompetitorBacklink::extractDomain.
             $table->string('competitor_domain');

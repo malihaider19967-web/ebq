@@ -28,8 +28,8 @@ class FetchKeywordMetricsJob implements ShouldQueue
     public function __construct(
         public array $keywords,
         public string $country = 'global',
-        public ?int $websiteId = null,
-        public ?int $ownerUserId = null,
+        public ?string $websiteId = null,
+        public ?string $ownerUserId = null,
     ) {
         $this->onQueue(\App\Support\Queues::SYNC);
     }

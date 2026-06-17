@@ -32,7 +32,7 @@ class ResearchAggregateService
         private readonly ContextBuilder $contextBuilder,
     ) {}
 
-    public function cacheKey(int $websiteId, string $keyword, string $country): string
+    public function cacheKey(string $websiteId, string $keyword, string $country): string
     {
         return sprintf(
             '%s:%d:%s:%s',

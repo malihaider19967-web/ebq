@@ -867,7 +867,7 @@ class PluginInsightResolver
     /**
      * @param  Collection<int, PageIndexingStatus>  $rows
      */
-    private function deleteDuplicateIndexingStatuses(int $websiteId, Collection $rows, PageIndexingStatus $keeper): void
+    private function deleteDuplicateIndexingStatuses(string $websiteId, Collection $rows, PageIndexingStatus $keeper): void
     {
         $duplicateIds = $rows->where('id', '!=', $keeper->id)->pluck('id');
         if ($duplicateIds->isEmpty()) {

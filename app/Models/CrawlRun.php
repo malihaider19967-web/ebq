@@ -5,10 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
- * @property int $id
- * @property int $website_id
+ * @property string $id
+ * @property string $website_id
  * @property string $trigger
  * @property string $status
  * @property string|null $blocked_reason
@@ -17,6 +18,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class CrawlRun extends Model
 {
+    use HasUlids;
     public const STATUS_RUNNING = 'running';
     // Crawl fetching is done; AnalyzeSiteJob is computing the graph/findings/score.
     public const STATUS_FINALIZING = 'finalizing';

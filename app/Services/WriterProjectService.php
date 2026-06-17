@@ -270,7 +270,7 @@ class WriterProjectService
     /**
      * @param  array{title?: string, focus_keyword: string, additional_keywords?: list<string>, country?: string, language?: string, tone?: string, audience?: string}  $input
      */
-    public function create(Website $website, ?int $userId, array $input): WriterProject
+    public function create(Website $website, ?string $userId, array $input): WriterProject
     {
         $kw = trim((string) $input['focus_keyword']);
         $title = trim((string) ($input['title'] ?? ''));

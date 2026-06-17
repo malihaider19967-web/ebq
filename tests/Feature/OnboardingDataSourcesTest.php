@@ -28,7 +28,7 @@ class OnboardingDataSourcesTest extends TestCase
     /**
      * Stub GoogleSourcePool so mount()/fetchGoogleData() never hits Google.
      */
-    private function fakePool(int $accountId): void
+    private function fakePool(string $accountId): void
     {
         $pool = Mockery::mock(GoogleSourcePool::class);
         $pool->shouldReceive('forUser')->andReturn([

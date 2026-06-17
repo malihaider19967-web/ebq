@@ -145,8 +145,8 @@ class ClientController extends Controller
 
         $selfId = (int) ($request->user()?->id ?? 0);
         $ids = collect($data['ids'])
-            ->map(fn ($id) => (int) $id)
-            ->filter(fn (int $id) => $id > 0 && $id !== $selfId)
+            ->map(fn ($id) => $id)
+            ->filter(fn (string $id) => $id > 0 && $id !== $selfId)
             ->unique()
             ->values()
             ->all();

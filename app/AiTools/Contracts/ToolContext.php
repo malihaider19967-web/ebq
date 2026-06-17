@@ -30,7 +30,7 @@ final class ToolContext
      */
     public function __construct(
         public readonly Website $website,
-        public readonly ?int $userId = null,
+        public readonly ?string $userId = null,
         public readonly ?BrandVoiceProfile $brandVoice = null,
         public readonly ?array $gscTopQueries = null,
         public readonly ?array $gscClustersForKeyword = null,

@@ -28,7 +28,7 @@ class ReprocessCompetitiveData implements ShouldBeUnique, ShouldQueue
     /** Debounce window — collapses near-simultaneous GSC+GA connects. */
     public int $uniqueFor = 120;
 
-    public function __construct(public readonly int $websiteId)
+    public function __construct(public readonly string $websiteId)
     {
         $this->onQueue(\App\Support\Queues::SYNC);
     }

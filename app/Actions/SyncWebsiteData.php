@@ -7,7 +7,7 @@ use App\Jobs\SyncSearchConsoleData;
 
 class SyncWebsiteData
 {
-    public function execute(int $websiteId): void
+    public function execute(string $websiteId): void
     {
         SyncAnalyticsData::dispatch($websiteId);
         SyncSearchConsoleData::dispatch($websiteId);

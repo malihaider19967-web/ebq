@@ -56,7 +56,7 @@ class AiWriterService
      * }  $input
      * @return array<string, mixed>
      */
-    public function draft(Website $website, int $postId, array $input): array
+    public function draft(Website $website, string $postId, array $input): array
     {
         if (! $this->llm->isAvailable()) {
             return ['ok' => false, 'error' => 'llm_not_configured'];

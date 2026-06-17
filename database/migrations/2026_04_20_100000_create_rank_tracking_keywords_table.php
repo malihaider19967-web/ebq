@@ -9,9 +9,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('rank_tracking_keywords', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('user_id')->constrained()->cascadeOnDelete();
 
             $table->string('keyword', 500);
             $table->char('keyword_hash', 64);

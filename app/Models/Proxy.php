@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * An admin-managed outbound proxy for the crawler's anti-blocking pool.
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Proxy extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'label', 'url', 'url_hash', 'active', 'fail_count', 'success_count',
         'last_used_at', 'last_ok_at',

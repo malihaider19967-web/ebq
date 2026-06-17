@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * Branding overlay applied to outbound report emails + PDFs when the
@@ -18,6 +19,7 @@ use Illuminate\Support\Facades\Storage;
  */
 class ReportBranding extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'user_id',
         'website_id',

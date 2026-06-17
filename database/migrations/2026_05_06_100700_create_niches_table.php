@@ -14,10 +14,10 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('niches', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('slug', 128);
             $table->string('name', 255);
-            $table->foreignId('parent_id')->nullable()->constrained('niches')->nullOnDelete();
+            $table->foreignUlid('parent_id')->nullable()->constrained('niches')->nullOnDelete();
             $table->boolean('is_dynamic')->default(false);
             $table->boolean('is_approved')->default(true);
             $table->binary('embedding')->nullable();

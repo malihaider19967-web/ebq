@@ -167,7 +167,7 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
     // Competitor auto-discovery — reachable from the Gap tab.
     Route::view('/competitive/competitors', 'competitive.competitors')->middleware('feature:keywords')->name('competitive.competitors');
     Route::view('/rank-tracking', 'rank-tracking.index')->middleware('feature:rank_tracking')->name('rank-tracking.index');
-    Route::get('/rank-tracking/{keywordId}', fn (int $keywordId) => view('rank-tracking.show', ['keywordId' => $keywordId]))
+    Route::get('/rank-tracking/{keywordId}', fn (string $keywordId) => view('rank-tracking.show', ['keywordId' => $keywordId]))
         ->whereNumber('keywordId')
         ->middleware('feature:rank_tracking')
         ->name('rank-tracking.show');

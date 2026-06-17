@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * An anonymous, no-signup SEO audit run from the marketing landing page.
@@ -16,6 +17,7 @@ use Illuminate\Support\Str;
  */
 class GuestPageAudit extends Model
 {
+    use HasUlids;
     public const STATUS_QUEUED = 'queued';
 
     public const STATUS_RUNNING = 'running';

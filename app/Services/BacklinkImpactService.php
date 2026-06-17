@@ -24,7 +24,7 @@ class BacklinkImpactService
      *     avg_da: ?float,
      * }>
      */
-    public function impactByTargetPage(int $websiteId, int $windowDays = 28, int $limit = 25): array
+    public function impactByTargetPage(string $websiteId, int $windowDays = 28, int $limit = 25): array
     {
         $backlinks = Backlink::query()
             ->where('website_id', $websiteId)

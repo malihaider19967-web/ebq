@@ -33,8 +33,8 @@ class CrawlPassJob implements ShouldQueue
     public int $tries = 1;
 
     public function __construct(
-        public int $crawlRunId,
-        public int $crawlSiteId,
+        public string $crawlRunId,
+        public string $crawlSiteId,
         public int $pass = 1,
         public bool $force = false,
     ) {

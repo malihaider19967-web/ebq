@@ -16,7 +16,7 @@ use Livewire\Component;
  */
 class LinkStructurePanel extends Component
 {
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     /** Bound to the ?url= query param so action-queue fix links deep-link here. */
     #[Url(as: 'url')]
@@ -26,12 +26,12 @@ class LinkStructurePanel extends Component
 
     public function mount(): void
     {
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
         $this->pageUrl = trim($this->pageUrl);
     }
 
     #[On('website-changed')]
-    public function onWebsiteChanged(int $websiteId): void
+    public function onWebsiteChanged(string $websiteId): void
     {
         $this->websiteId = $websiteId;
         $this->reset(['pageUrl', 'notFound']);

@@ -15,9 +15,11 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 use Laravel\Sanctum\HasApiTokens;
 use App\Models\Setting;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 class Website extends Model
 {
+    use HasUlids;
     // Billing has moved to the User model — Cashier's Billable trait
     // now lives on App\Models\User. Tier and freeze state are derived
     // from the owning user's plan (see effectiveTier / isFrozen below).

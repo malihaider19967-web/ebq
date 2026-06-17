@@ -38,7 +38,7 @@ class RunGuestPageSpeedStrategy implements ShouldBeUnique, ShouldQueue
     public int $uniqueFor = 1800;
 
     public function __construct(
-        public readonly int $id,
+        public readonly string $id,
         public readonly string $strategy,
     ) {
         $this->onQueue(\App\Support\Queues::INTERACTIVE);

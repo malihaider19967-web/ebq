@@ -41,11 +41,11 @@ class ClientActivityLogger
      */
     public function log(
         string $type,
-        ?int $userId = null,
-        ?int $websiteId = null,
+        ?string $userId = null,
+        ?string $websiteId = null,
         ?string $provider = null,
         ?array $meta = null,
-        ?int $actorUserId = null,
+        ?string $actorUserId = null,
         ?int $unitsConsumed = null
     ): void {
         $billedUserId = $websiteId !== null
@@ -68,12 +68,12 @@ class ClientActivityLogger
      * `Auth::id()` returns the *impersonated* client, so we prefer the
      * admin's id from the impersonation session if present.
      */
-    private function resolveActor(): ?int
+    private function resolveActor(): ?string
     {
         try {
-            $impersonatorId = (int) session('impersonator_id', 0);
-            if ($impersonatorId > 0) {
-                return $impersonatorId;
+            $impersonatorId = session('impersonator_id');
+            if (! empty($impersonatorId)) {
+                return (string) $impersonatorId;
             }
         } catch (\Throwable) {
             // No session (queue worker, CLI) — fall through.
@@ -91,7 +91,7 @@ class ClientActivityLogger
      *   2. `websites.user_id` (the legacy "creator" field — fallback for
      *      older rows where the pivot Owner was never written).
      */
-    private function resolveWebsiteOwner(int $websiteId): ?int
+    private function resolveWebsiteOwner(string $websiteId): ?string
     {
         if (array_key_exists($websiteId, $this->websiteOwnerCache)) {
             return $this->websiteOwnerCache[$websiteId];
@@ -108,6 +108,6 @@ class ClientActivityLogger
                 ->value('user_id');
         }
 
-        return $this->websiteOwnerCache[$websiteId] = $ownerId !== null ? (int) $ownerId : null;
+        return $this->websiteOwnerCache[$websiteId] = $ownerId !== null ? $ownerId : null;
     }
 }

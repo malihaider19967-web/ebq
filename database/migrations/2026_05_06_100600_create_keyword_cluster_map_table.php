@@ -12,8 +12,8 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('keyword_cluster_map', function (Blueprint $table): void {
-            $table->foreignId('keyword_id')->constrained('keywords')->cascadeOnDelete();
-            $table->foreignId('cluster_id')->constrained('keyword_clusters')->cascadeOnDelete();
+            $table->foreignUlid('keyword_id')->constrained('keywords')->cascadeOnDelete();
+            $table->foreignUlid('cluster_id')->constrained('keyword_clusters')->cascadeOnDelete();
             $table->decimal('confidence', 5, 4)->default(1);
             $table->timestamps();
 

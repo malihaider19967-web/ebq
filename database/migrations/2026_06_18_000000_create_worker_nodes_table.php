@@ -21,7 +21,7 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('worker_nodes', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('name');
             // Null while a create call is in flight; set on success. Unique so a
             // server is tracked exactly once. (MySQL allows multiple NULLs.)

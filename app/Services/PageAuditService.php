@@ -40,7 +40,7 @@ class PageAuditService
      * editor's live-score endpoint, where users are watching a spinner.
      * Typical wall-time: full ≈ 60–120s; lite ≈ 15–30s.
      */
-    public function audit(int $websiteId, string $pageUrl, ?string $serpTargetKeyword = null, bool $enforceUrlBelongsToWebsite = false, ?string $serpGlUserOverride = null, bool $lite = false): PageAuditReport
+    public function audit(string $websiteId, string $pageUrl, ?string $serpTargetKeyword = null, bool $enforceUrlBelongsToWebsite = false, ?string $serpGlUserOverride = null, bool $lite = false): PageAuditReport
     {
         $startedAt = microtime(true);
 
@@ -417,7 +417,7 @@ class PageAuditService
      *
      * @return array{ok: bool, recommended_gl?: string, recommendation_hint?: string, detected_hl?: ?string, detected_html_gl?: ?string, error?: string}
      */
-    public function peekSerpCountryChoiceNeeded(int $websiteId, string $pageUrl, bool $enforceUrlBelongsToWebsite = false): array
+    public function peekSerpCountryChoiceNeeded(string $websiteId, string $pageUrl, bool $enforceUrlBelongsToWebsite = false): array
     {
         $guardCheck = $this->guard->check($pageUrl);
         if (! $guardCheck['ok']) {
@@ -461,7 +461,7 @@ class PageAuditService
      * @param  array<string, mixed>  $keywordsPayload
      * @return array<string, mixed>|null null when Serper is not configured
      */
-    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch, int $yourWordCount, int $yourImageCount, ?array $yourStack = null, ?string $serpKeywordOverride = null, ?string $serpGl = null, ?string $serpHl = null, ?string $serpBcp47 = null, ?int $websiteId = null, ?int $ownerUserId = null): ?array
+    private function buildSerperReadabilityBenchmark(string $pageUrl, array $keywordsPayload, ?float $yourFlesch, int $yourWordCount, int $yourImageCount, ?array $yourStack = null, ?string $serpKeywordOverride = null, ?string $serpGl = null, ?string $serpHl = null, ?string $serpBcp47 = null, ?string $websiteId = null, ?string $ownerUserId = null): ?array
     {
         $apiKey = config('services.serper.key');
         if (! is_string($apiKey) || trim($apiKey) === '') {
@@ -1270,7 +1270,7 @@ class PageAuditService
     }
 
     private function persistFailure(
-        int $websiteId,
+        string $websiteId,
         string $pageUrl,
         string $error,
         ?int $httpStatus,

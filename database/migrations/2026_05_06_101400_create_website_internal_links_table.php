@@ -13,10 +13,10 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('website_internal_links', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('website_id')->constrained('websites')->cascadeOnDelete();
-            $table->foreignId('from_page_id')->constrained('website_pages')->cascadeOnDelete();
-            $table->foreignId('to_page_id')->constrained('website_pages')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained('websites')->cascadeOnDelete();
+            $table->foreignUlid('from_page_id')->constrained('website_pages')->cascadeOnDelete();
+            $table->foreignUlid('to_page_id')->constrained('website_pages')->cascadeOnDelete();
             $table->string('anchor_text', 512)->nullable();
             $table->string('status', 16)->default('discovered');
             $table->timestamp('discovered_at')->nullable();

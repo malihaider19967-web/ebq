@@ -19,7 +19,7 @@ class CompetitiveReprocessService
     ) {
     }
 
-    public function reprocess(int $websiteId): void
+    public function reprocess(string $websiteId): void
     {
         $website = Website::query()->find($websiteId);
         if (! $website instanceof Website || ! $website->hasGsc()) {

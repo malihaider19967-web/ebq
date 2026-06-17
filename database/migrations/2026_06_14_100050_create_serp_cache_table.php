@@ -20,7 +20,7 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('serp_cache', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('query_hash', 64);
             $table->string('query');
             $table->string('gl', 2);

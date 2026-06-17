@@ -38,7 +38,7 @@ class RunCustomPageAudit implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 1800;
 
-    public function __construct(public readonly int $auditId)
+    public function __construct(public readonly string $auditId)
     {
         $this->onQueue(\App\Support\Queues::INTERACTIVE);
     }

@@ -17,7 +17,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('guest_keyword_volumes', function (Blueprint $table) {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->char('token', 36)->unique();
             $table->string('keyword', 200);
             $table->string('country', 8)->default('global');

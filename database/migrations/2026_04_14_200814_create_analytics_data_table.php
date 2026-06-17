@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('analytics_data', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
             $table->date('date');
             $table->unsignedInteger('users')->default(0);
             $table->unsignedInteger('sessions')->default(0);

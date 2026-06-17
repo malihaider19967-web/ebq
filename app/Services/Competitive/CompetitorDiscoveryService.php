@@ -50,7 +50,7 @@ class CompetitorDiscoveryService
      *
      * @return Collection<int, DiscoveredCompetitor>
      */
-    public function resultsFor(int $websiteId): Collection
+    public function resultsFor(string $websiteId): Collection
     {
         return DiscoveredCompetitor::query()
             ->forWebsite($websiteId)
@@ -58,7 +58,7 @@ class CompetitorDiscoveryService
             ->get();
     }
 
-    public function latestRun(int $websiteId): ?CompetitorDiscoveryRun
+    public function latestRun(string $websiteId): ?CompetitorDiscoveryRun
     {
         return CompetitorDiscoveryRun::query()
             ->where('website_id', $websiteId)
@@ -70,7 +70,7 @@ class CompetitorDiscoveryService
      * True when there is no completed run inside the refresh window — i.e. it's
      * worth (re-)running discovery.
      */
-    public function isStale(int $websiteId): bool
+    public function isStale(string $websiteId): bool
     {
         $days = max(1, (int) config('services.competitive.discovery_refresh_days', 14));
         $fresh = CompetitorDiscoveryRun::query()
@@ -89,7 +89,7 @@ class CompetitorDiscoveryService
      *
      * @param  list<string>  $manualSeeds
      */
-    public function queueRunIfStale(Website $website, ?int $userId = null, array $manualSeeds = [], bool $force = false): ?CompetitorDiscoveryRun
+    public function queueRunIfStale(Website $website, ?string $userId = null, array $manualSeeds = [], bool $force = false): ?CompetitorDiscoveryRun
     {
         if (! $force && ! $this->isStale($website->id)) {
             return null;
@@ -113,7 +113,7 @@ class CompetitorDiscoveryService
      *
      * @param  list<string>  $manualSeeds
      */
-    public function startRun(Website $website, ?int $userId = null, array $manualSeeds = []): ?CompetitorDiscoveryRun
+    public function startRun(Website $website, ?string $userId = null, array $manualSeeds = []): ?CompetitorDiscoveryRun
     {
         $cap = $this->keywordCap();
 
@@ -316,7 +316,7 @@ class CompetitorDiscoveryService
      *
      * @return list<string>
      */
-    private function gscSeedKeywords(int $websiteId, int $cap): array
+    private function gscSeedKeywords(string $websiteId, int $cap): array
     {
         $rows = SearchConsoleData::query()
             ->where('website_id', $websiteId)

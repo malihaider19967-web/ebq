@@ -13,9 +13,9 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('keyword_alerts', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('website_id')->constrained('websites')->cascadeOnDelete();
-            $table->foreignId('keyword_id')->nullable()->constrained('keywords')->nullOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained('websites')->cascadeOnDelete();
+            $table->foreignUlid('keyword_id')->nullable()->constrained('keywords')->nullOnDelete();
             $table->string('type', 32);
             $table->string('severity', 16)->default('info');
             $table->json('payload')->nullable();

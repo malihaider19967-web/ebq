@@ -14,13 +14,13 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('keyword_clusters', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('cluster_name', 255);
-            $table->foreignId('parent_cluster_id')
+            $table->foreignUlid('parent_cluster_id')
                 ->nullable()
                 ->constrained('keyword_clusters')
                 ->nullOnDelete();
-            $table->foreignId('centroid_keyword_id')
+            $table->foreignUlid('centroid_keyword_id')
                 ->nullable()
                 ->constrained('keywords')
                 ->nullOnDelete();

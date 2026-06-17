@@ -47,8 +47,8 @@ class KeywordsEverywhereClient
         string $country = 'global',
         string $currency = 'usd',
         string $dataSource = 'gkp',
-        ?int $websiteId = null,
-        ?int $ownerUserId = null,
+        ?string $websiteId = null,
+        ?string $ownerUserId = null,
         ?string $source = null,
     ): ?array {
         $key = config('services.keywords_everywhere.key');
@@ -170,7 +170,7 @@ class KeywordsEverywhereClient
      * ClientActivityLogger's attribution: prefer the website owner, fall
      * back to the explicit owner id, finally the authenticated user.
      */
-    private function resolveBilledUser(?int $websiteId, ?int $ownerUserId): ?User
+    private function resolveBilledUser(?string $websiteId, ?string $ownerUserId): ?User
     {
         if ($websiteId !== null) {
             $ownerId = \Illuminate\Support\Facades\DB::table('website_user')
@@ -183,7 +183,7 @@ class KeywordsEverywhereClient
                     ->value('user_id');
             }
             if ($ownerId !== null) {
-                return User::find((int) $ownerId);
+                return User::find($ownerId);
             }
         }
         $id = $ownerUserId ?? Auth::id();

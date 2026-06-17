@@ -12,8 +12,12 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('personal_access_tokens', function (Blueprint $table) {
+            // Sanctum's own PersonalAccessToken model is vendor code (no HasUlids)
+            // and is never FK-referenced or moved between shards, so its surrogate
+            // PK stays an auto-increment bigint. The tokenable morph DOES point at
+            // ULID models (Website), so it is ulidMorphs.
             $table->id();
-            $table->morphs('tokenable');
+            $table->ulidMorphs('tokenable');
             $table->text('name');
             $table->string('token', 64)->unique();
             $table->text('abilities')->nullable();

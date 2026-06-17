@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Carbon;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * A single crawl-worker box in the fleet. Created by the autoscaler (or the
@@ -33,6 +34,7 @@ use Illuminate\Support\Carbon;
  */
 class WorkerNode extends Model
 {
+    use HasUlids;
     public const STATUS_PROVISIONING = 'provisioning';
     public const STATUS_ACTIVE = 'active';
     public const STATUS_DRAINING = 'draining';

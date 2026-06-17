@@ -74,7 +74,7 @@ class KeywordMetricsService
      * @param  list<string>  $keywords
      * @return array<string, KeywordMetric>
      */
-    public function metricsOrQueue(array $keywords, string $country = 'global', ?int $websiteId = null, ?int $ownerUserId = null): array
+    public function metricsOrQueue(array $keywords, string $country = 'global', ?string $websiteId = null, ?string $ownerUserId = null): array
     {
         $country = $this->normalizeCountry($country);
         $cleaned = $this->uniqueCleaned($keywords);
@@ -106,7 +106,7 @@ class KeywordMetricsService
      *
      * @param  list<string>  $keywords
      */
-    public function refresh(array $keywords, string $country = 'global', ?int $websiteId = null, ?int $ownerUserId = null, ?string $source = null): int
+    public function refresh(array $keywords, string $country = 'global', ?string $websiteId = null, ?string $ownerUserId = null, ?string $source = null): int
     {
         $country = $this->normalizeCountry($country);
         $cleaned = $this->uniqueCleaned($keywords);

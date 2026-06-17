@@ -13,8 +13,8 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('website_niche_map', function (Blueprint $table): void {
-            $table->foreignId('website_id')->constrained('websites')->cascadeOnDelete();
-            $table->foreignId('niche_id')->constrained('niches')->cascadeOnDelete();
+            $table->foreignUlid('website_id')->constrained('websites')->cascadeOnDelete();
+            $table->foreignUlid('niche_id')->constrained('niches')->cascadeOnDelete();
             $table->decimal('weight', 5, 4)->default(0);
             $table->boolean('is_primary')->default(false);
             $table->string('source', 16)->default('auto');

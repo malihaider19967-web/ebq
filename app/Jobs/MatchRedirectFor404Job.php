@@ -38,7 +38,7 @@ class MatchRedirectFor404Job implements ShouldBeUnique, ShouldQueue
     public int $uniqueFor = 3600;
 
     public function __construct(
-        public readonly int $websiteId,
+        public readonly string $websiteId,
         public readonly string $sourcePath,
         public readonly int $hits = 1,
     ) {

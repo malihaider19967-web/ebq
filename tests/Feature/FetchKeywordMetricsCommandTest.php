@@ -16,7 +16,7 @@ class FetchKeywordMetricsCommandTest extends TestCase
 {
     use RefreshDatabase;
 
-    private function seedQuery(int $websiteId, string $query, int $impressions, int $daysAgo = 1): void
+    private function seedQuery(string $websiteId, string $query, int $impressions, int $daysAgo = 1): void
     {
         SearchConsoleData::create([
             'website_id' => $websiteId,

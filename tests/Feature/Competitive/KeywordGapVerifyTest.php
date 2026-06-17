@@ -29,7 +29,7 @@ class KeywordGapVerifyTest extends TestCase
         ]);
     }
 
-    private function row(int $analysisId, string $keyword, int $vol): KeywordGapRow
+    private function row(string $analysisId, string $keyword, int $vol): KeywordGapRow
     {
         return KeywordGapRow::create([
             'keyword_gap_analysis_id' => $analysisId, 'keyword' => $keyword,

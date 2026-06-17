@@ -85,8 +85,8 @@ class GuestRankCheckTest extends TestCase
                 int $num = 10,
                 ?string $gl = null,
                 ?string $hl = null,
-                ?int $websiteId = null,
-                ?int $ownerUserId = null,
+                ?string $websiteId = null,
+                ?string $ownerUserId = null,
                 ?string $source = null,
             ): ?array {
                 return [
@@ -121,8 +121,8 @@ class GuestRankCheckTest extends TestCase
                 int $num = 10,
                 ?string $gl = null,
                 ?string $hl = null,
-                ?int $websiteId = null,
-                ?int $ownerUserId = null,
+                ?string $websiteId = null,
+                ?string $ownerUserId = null,
                 ?string $source = null,
             ): ?array {
                 return ['organic' => [['position' => 1, 'title' => 'Other', 'link' => 'https://other.com/']]];

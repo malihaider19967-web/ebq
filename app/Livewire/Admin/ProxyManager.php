@@ -62,7 +62,7 @@ class ProxyManager extends Component
         $this->notice = "Added/updated {$added} proxies".($skipped ? ", skipped {$skipped} unparseable line(s)." : '.');
     }
 
-    public function toggle(int $id): void
+    public function toggle(string $id): void
     {
         abort_unless((bool) Auth::user()?->is_admin, 403);
         $p = Proxy::find($id);
@@ -72,7 +72,7 @@ class ProxyManager extends Component
         }
     }
 
-    public function delete(int $id): void
+    public function delete(string $id): void
     {
         abort_unless((bool) Auth::user()?->is_admin, 403);
         Proxy::where('id', $id)->delete();
@@ -80,7 +80,7 @@ class ProxyManager extends Component
         $this->notice = 'Proxy deleted.';
     }
 
-    public function test(int $id): void
+    public function test(string $id): void
     {
         abort_unless((bool) Auth::user()?->is_admin, 403);
         $p = Proxy::find($id);

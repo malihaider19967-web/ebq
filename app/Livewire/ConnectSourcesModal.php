@@ -21,7 +21,7 @@ use Livewire\Component;
  */
 class ConnectSourcesModal extends Component
 {
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     /** "accountId|value" picker values, mirroring onboarding. */
     public string $gaSelection = '';
@@ -52,10 +52,10 @@ class ConnectSourcesModal extends Component
      * current website otherwise. Ownership is still enforced in
      * {@see editableWebsite()}.
      */
-    public function open(int $websiteId = 0): void
+    public function open(?string $websiteId = null): void
     {
         $this->reset(['saved', 'fetchError', 'gaSelection', 'gscSelection', 'gaOptions', 'gscOptions', 'accounts', 'loaded']);
-        $this->websiteId = $websiteId > 0 ? $websiteId : (int) session('current_website_id', 0);
+        $this->websiteId = $websiteId > 0 ? $websiteId : session('current_website_id');
         $this->loadPool();
         $this->loadCurrentSelections();
     }

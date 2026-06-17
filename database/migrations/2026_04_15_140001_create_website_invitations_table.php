@@ -9,11 +9,11 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('website_invitations', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
             $table->string('email');
             $table->string('token', 128);
-            $table->foreignId('invited_by_user_id')->constrained('users')->cascadeOnDelete();
+            $table->foreignUlid('invited_by_user_id')->constrained('users')->cascadeOnDelete();
             $table->timestamp('expires_at');
             $table->timestamps();
 

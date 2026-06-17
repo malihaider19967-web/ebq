@@ -1242,7 +1242,7 @@ class LiveSeoScoreService
      * "extract host from URL" expression — the row volumes here are tiny
      * (one website, one page).
      */
-    private function countReferringDomains(int $websiteId, array $variants): int
+    private function countReferringDomains(string $websiteId, array $variants): int
     {
         $refUrls = Backlink::query()
             ->where('website_id', $websiteId)

@@ -49,7 +49,7 @@ class AiToolRunner
      *
      * @param  array<string, mixed>  $input
      */
-    public function run(string $toolId, Website $website, ?int $userId, array $input): AiToolResult
+    public function run(string $toolId, Website $website, ?string $userId, array $input): AiToolResult
     {
         $tool = $this->registry->find($toolId);
         if (! $tool) {
@@ -210,7 +210,7 @@ class AiToolRunner
         return sprintf('ai_tool:%s:%d:%s', $toolId, $website->id, $hash);
     }
 
-    private function logCredits(Website $website, ?int $userId, string $toolId, AiToolResult $result, bool $cached): void
+    private function logCredits(Website $website, ?string $userId, string $toolId, AiToolResult $result, bool $cached): void
     {
         if (! $result->ok) {
             return;

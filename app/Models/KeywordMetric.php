@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * @property string $keyword
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class KeywordMetric extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'keyword',
         'keyword_hash',

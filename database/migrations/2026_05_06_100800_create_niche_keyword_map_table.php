@@ -8,8 +8,8 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('niche_keyword_map', function (Blueprint $table): void {
-            $table->foreignId('niche_id')->constrained('niches')->cascadeOnDelete();
-            $table->foreignId('keyword_id')->constrained('keywords')->cascadeOnDelete();
+            $table->foreignUlid('niche_id')->constrained('niches')->cascadeOnDelete();
+            $table->foreignUlid('keyword_id')->constrained('keywords')->cascadeOnDelete();
             $table->decimal('relevance_score', 5, 4)->default(0);
             $table->timestamps();
 

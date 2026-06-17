@@ -17,7 +17,7 @@ class BacklinksManager extends Component
 {
     use WithPagination;
 
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     public ?string $tracked_date = null;
 
@@ -67,7 +67,7 @@ class BacklinksManager extends Component
 
     public string $sortDir = 'desc';
 
-    public ?int $expandedAuditId = null;
+    public ?string $expandedAuditId = null;
 
     /** @var list<int> */
     public array $auditingIds = [];
@@ -80,14 +80,14 @@ class BacklinksManager extends Component
 
     public function mount(): void
     {
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
         $this->tracked_date = now()->toDateString();
         $this->sheetDate = now()->toDateString();
         $this->type = BacklinkType::Other->value;
     }
 
     #[On('website-changed')]
-    public function switchWebsite(int $websiteId): void
+    public function switchWebsite(string $websiteId): void
     {
         $this->websiteId = $websiteId;
         $this->resetPage();
@@ -353,7 +353,7 @@ class BacklinksManager extends Component
         $this->resetPage();
     }
 
-    public function auditBacklink(int $id, BacklinkAuditService $auditor): void
+    public function auditBacklink(string $id, BacklinkAuditService $auditor): void
     {
         if (! $this->userCanAccessWebsite()) {
             return;
@@ -398,12 +398,12 @@ class BacklinksManager extends Component
         }
     }
 
-    public function toggleAuditDetails(int $id): void
+    public function toggleAuditDetails(string $id): void
     {
         $this->expandedAuditId = $this->expandedAuditId === $id ? null : $id;
     }
 
-    public function deleteBacklink(int $id): void
+    public function deleteBacklink(string $id): void
     {
         if (! $this->userCanAccessWebsite()) {
             return;
@@ -446,7 +446,7 @@ class BacklinksManager extends Component
         $this->sheetMessageKind = in_array($kind, ['success', 'info', 'error'], true) ? $kind : 'success';
     }
 
-    private function safeAudit(int $id): void
+    private function safeAudit(string $id): void
     {
         $backlink = Backlink::query()
             ->where('website_id', $this->websiteId)

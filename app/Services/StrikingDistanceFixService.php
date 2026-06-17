@@ -22,7 +22,7 @@ use Illuminate\Support\Carbon;
  *   3. Content brief / topical gaps — {@see AiContentBriefService}.
  *   4. Internal-link suggestions — {@see AiContentBriefService::internalLinkTargets()}.
  *
- * The AI services were built for the WordPress editor and take an int $postId
+ * The AI services were built for the WordPress editor and take an string $postId
  * purely as a cache key; they never load a Post. Striking-distance keywords are
  * GSC page URLs with no WP Post, so we pass a deterministic synthetic id derived
  * from (website, url) — see {@see syntheticPostId()}.
@@ -40,7 +40,7 @@ class StrikingDistanceFixService
      * masked to 31 bits so it can never collide with a real WP post id used by
      * the plugin's snippet cache. Same URL → same id.
      */
-    public function syntheticPostId(int $websiteId, string $pageUrl): int
+    public function syntheticPostId(string $websiteId, string $pageUrl): int
     {
         $hex = substr(hash('xxh3', $websiteId.'|'.$pageUrl), 0, 8);
 
@@ -51,7 +51,7 @@ class StrikingDistanceFixService
      * A recent completed audit we can reuse instead of paying for a new one.
      * Returns null when nothing fresh (< $maxAgeHours) exists.
      */
-    public function findFreshReport(int $websiteId, string $pageUrl, int $maxAgeHours = 24): ?PageAuditReport
+    public function findFreshReport(string $websiteId, string $pageUrl, int $maxAgeHours = 24): ?PageAuditReport
     {
         return PageAuditReport::query()
             ->where('website_id', $websiteId)
@@ -67,7 +67,7 @@ class StrikingDistanceFixService
      * Deduped: if one is already queued/running for this (website, url, user)
      * we attach to it rather than paying twice. Returns the audit row to poll.
      */
-    public function queueAudit(int $websiteId, int $userId, string $pageUrl, string $keyword, ?string $gl): CustomPageAudit
+    public function queueAudit(string $websiteId, string $userId, string $pageUrl, string $keyword, ?string $gl): CustomPageAudit
     {
         $active = CustomPageAudit::findActiveFor($websiteId, $pageUrl, $userId);
         if ($active instanceof CustomPageAudit) {
@@ -153,7 +153,7 @@ class StrikingDistanceFixService
      *
      * @return array{ok: bool, intent?: string, rewrites?: list<array<string, mixed>>, model?: string, cached?: bool, error?: string}
      */
-    public function snippetRewrites(int $websiteId, string $pageUrl, string $keyword, PageAuditReport $report, string $intent): array
+    public function snippetRewrites(string $websiteId, string $pageUrl, string $keyword, PageAuditReport $report, string $intent): array
     {
         $result = is_array($report->result) ? $report->result : [];
         $meta = is_array($result['metadata'] ?? null) ? $result['metadata'] : [];

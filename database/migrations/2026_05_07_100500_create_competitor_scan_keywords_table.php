@@ -13,9 +13,9 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('competitor_scan_keywords', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('competitor_scan_id')->constrained('competitor_scans')->cascadeOnDelete();
-            $table->foreignId('keyword_id')->constrained('keywords')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('competitor_scan_id')->constrained('competitor_scans')->cascadeOnDelete();
+            $table->foreignUlid('keyword_id')->constrained('keywords')->cascadeOnDelete();
             $table->unsignedInteger('total_occurrences')->default(0);
             $table->json('top_pages_json')->nullable();
             $table->timestamps();

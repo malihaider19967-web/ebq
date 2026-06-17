@@ -24,7 +24,7 @@ class AuthenticatedSessionController extends Controller
         $request->session()->regenerate();
 
         $user = Auth::user();
-        $websiteId = (int) session('current_website_id', 0);
+        $websiteId = session('current_website_id');
         if ($user && $websiteId <= 0) {
             $first = $user->accessibleWebsitesQuery()->select('id')->orderBy('domain')->first();
             if ($first) {

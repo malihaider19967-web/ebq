@@ -26,7 +26,7 @@ class CrawlSitemapDeltaJob implements ShouldQueue, ShouldBeUnique
     public int $timeout = 180;
     public int $tries = 2;
 
-    public function __construct(public int $websiteId)
+    public function __construct(public string $websiteId)
     {
         $this->onQueue(\App\Support\Queues::CRAWL);
     }
@@ -101,7 +101,7 @@ class CrawlSitemapDeltaJob implements ShouldQueue, ShouldBeUnique
                     'updated_at' => $now,
                 ];
             }
-            DB::table('website_pages')->insertOrIgnore($rows);
+            DB::table('website_pages')->insertOrIgnore(ulid_rows($rows));
         }
 
         // (2) Refresh sitemap_lastmod on existing pages, and on TRUSTED sites pull

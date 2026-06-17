@@ -15,7 +15,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('guest_rank_checks', function (Blueprint $table) {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->char('token', 36)->unique();
             $table->string('keyword', 200);
             $table->string('domain', 255);

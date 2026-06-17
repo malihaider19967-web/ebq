@@ -9,8 +9,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('website_sitemaps', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
             $table->string('path', 700);                 // The sitemap URL
             // Where this row came from: 'gsc' (pulled from Search Console)
             // or 'manual' (a client added it on the Sitemaps page).

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * Microsoft OAuth tokens. Mirrors `GoogleAccount` so the resolver and
@@ -13,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class MicrosoftAccount extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'user_id',
         'access_token',

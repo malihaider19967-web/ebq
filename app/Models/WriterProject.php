@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
- * @property int $id
+ * @property string $id
  * @property string $external_id
- * @property int $website_id
+ * @property string $website_id
  * @property int|null $user_id
  * @property string $title
  * @property string $focus_keyword
@@ -26,6 +27,7 @@ use Illuminate\Support\Str;
  */
 class WriterProject extends Model
 {
+    use HasUlids;
     use HasFactory;
     use SoftDeletes;
 

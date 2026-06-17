@@ -44,7 +44,7 @@ class KeywordGapService
      *
      * @param  list<string>  $competitorUrls
      */
-    public function start(Website $website, array $competitorUrls, string $country, ?int $userId = null): KeywordGapAnalysis
+    public function start(Website $website, array $competitorUrls, string $country, ?string $userId = null): KeywordGapAnalysis
     {
         $country = $this->normalizeCountry($country);
         $ourUrl = (string) $website->domain;
@@ -304,7 +304,7 @@ class KeywordGapService
             ]);
         }
         foreach (array_chunk($insert, 500) as $chunk) {
-            KeywordGapRow::query()->insert($chunk);
+            KeywordGapRow::query()->insert(ulid_rows($chunk));
         }
 
         $analysis->forceFill(['summary' => $summary])->save();
@@ -411,7 +411,7 @@ class KeywordGapService
      * recompute the opportunity score from the SAME response. Quota-safe: a
      * plan-cap hit stops the batch, persists what's done, and records a message.
      */
-    public function verify(int $analysisId): void
+    public function verify(string $analysisId): void
     {
         $analysis = KeywordGapAnalysis::find($analysisId);
         if ($analysis === null || $analysis->verify_status !== KeywordGapAnalysis::VERIFY_STATUS_VERIFYING) {
@@ -544,7 +544,7 @@ class KeywordGapService
      *
      * @param  list<string>  $competitorUrls
      */
-    public function latestFresh(int $websiteId, array $competitorUrls, string $country): ?KeywordGapAnalysis
+    public function latestFresh(string $websiteId, array $competitorUrls, string $country): ?KeywordGapAnalysis
     {
         $want = $this->cleanUrls($competitorUrls);
         sort($want);
@@ -615,7 +615,7 @@ class KeywordGapService
      *
      * @return array<string, float>
      */
-    private function gscPositions(int $websiteId): array
+    private function gscPositions(string $websiteId): array
     {
         return SearchConsoleData::query()
             ->where('website_id', $websiteId)

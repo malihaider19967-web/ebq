@@ -40,7 +40,7 @@ class ContextBuilder
     /**
      * @param  array<string, mixed>  $input  raw user input — used to extract focus_keyword / url etc.
      */
-    public function build(AiToolMeta $meta, Website $website, ?int $userId, array $input): ToolContext
+    public function build(AiToolMeta $meta, Website $website, ?string $userId, array $input): ToolContext
     {
         $signals = $meta->contextSignals;
         $focusKw = $this->extractFocusKeyword($input);

@@ -302,7 +302,7 @@ class SiteIssueDetector
     /**
      * @return array<string,mixed>
      */
-    private function row(int $crawlSiteId, int $runId, ?int $pageId, string $category, string $type, string $severity, float $impact, string $url, array $detail): array
+    private function row(string $crawlSiteId, string $runId, ?string $pageId, string $category, string $type, string $severity, float $impact, string $url, array $detail): array
     {
         $now = now();
 
@@ -326,7 +326,7 @@ class SiteIssueDetector
         ];
     }
 
-    private function flush(int $crawlSiteId, int $runId): int
+    private function flush(string $crawlSiteId, string $runId): int
     {
         if ($this->pending === []) {
             return 0;
@@ -339,8 +339,7 @@ class SiteIssueDetector
         }, array_values($this->pending));
 
         foreach (array_chunk($rows, 500) as $chunk) {
-            DB::table('crawl_findings')->upsert(
-                $chunk,
+            DB::table('crawl_findings')->upsert(ulid_rows($chunk),
                 ['crawl_site_id', 'type', 'affected_url_hash'],
                 ['page_id', 'crawl_run_id', 'category', 'severity', 'impact', 'affected_url', 'detail', 'status', 'last_seen_at', 'resolved_at', 'updated_at'],
             );

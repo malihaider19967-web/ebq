@@ -54,8 +54,8 @@ class KeywordFinderPool
         array $keywords,
         string $countryKey = 'global',
         ?string $language = null,
-        ?int $userId = null,
-        ?int $websiteId = null,
+        ?string $userId = null,
+        ?string $websiteId = null,
         ?KeywordApiServer $only = null,
     ): KeywordApiRequest {
         $keywords = array_values(array_filter(array_map(
@@ -84,7 +84,7 @@ class KeywordFinderPool
      *
      * @param  array{seeds?: list<string>, url?: string, scope?: string, location?: string, language?: string}  $opts
      */
-    public function dispatchIdeas(array $opts, ?int $userId = null, ?int $websiteId = null, ?KeywordApiServer $only = null, ?string $countryKey = null): KeywordApiRequest
+    public function dispatchIdeas(array $opts, ?string $userId = null, ?string $websiteId = null, ?KeywordApiServer $only = null, ?string $countryKey = null): KeywordApiRequest
     {
         $location = KeywordFinderLocations::resolveLocation($opts['location'] ?? $countryKey);
         $language = KeywordFinderLocations::resolveLanguage($opts['language'] ?? null);
@@ -126,7 +126,7 @@ class KeywordFinderPool
      *
      * @param  array<string, mixed>  $payload
      */
-    private function dispatch(string $type, ?string $mode, array $payload, ?int $userId, ?int $websiteId, ?KeywordApiServer $only = null): KeywordApiRequest
+    private function dispatch(string $type, ?string $mode, array $payload, ?string $userId, ?string $websiteId, ?KeywordApiServer $only = null): KeywordApiRequest
     {
         $request = KeywordApiRequest::create([
             'request_id' => (string) Str::uuid(),

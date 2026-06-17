@@ -15,10 +15,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('crawl_findings', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('page_id')->nullable()->constrained('website_pages')->nullOnDelete();
-            $table->foreignId('crawl_run_id')->nullable()->constrained('crawl_runs')->nullOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('page_id')->nullable()->constrained('website_pages')->nullOnDelete();
+            $table->foreignUlid('crawl_run_id')->nullable()->constrained('crawl_runs')->nullOnDelete();
             $table->string('category', 32);   // broken_link|redirect|onpage|indexability|internal_links|sitemap|schema|performance|security|crawlability
             $table->string('type', 48);       // broken_internal|dup_title|missing_h1|noindex_important|orphan_page|...
             $table->string('severity', 12)->default('low'); // critical|high|medium|low

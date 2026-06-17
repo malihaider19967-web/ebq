@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('search_console_data', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
             $table->date('date');
             $table->string('query');
             $table->string('page');

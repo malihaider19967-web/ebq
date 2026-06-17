@@ -67,7 +67,7 @@ class GoogleCapController extends Controller
                 ]);
             }
 
-            if (Auth::check() && in_array((int) Auth::id(), $affectedUserIds->all(), true)) {
+            if (Auth::check() && in_array(Auth::id(), $affectedUserIds->all(), true)) {
                 Auth::logout();
             }
         }

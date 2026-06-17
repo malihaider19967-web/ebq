@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 class WebsiteSitemap extends Model
 {
+    use HasUlids;
     public const SOURCE_GSC = 'gsc';
     public const SOURCE_MANUAL = 'manual';
 

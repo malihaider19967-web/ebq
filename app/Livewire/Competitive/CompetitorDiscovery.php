@@ -32,7 +32,7 @@ class CompetitorDiscovery extends Component
 
     private function website(): ?Website
     {
-        $id = (int) session('current_website_id', 0);
+        $id = session('current_website_id');
 
         // Gate on access — Livewire actions don't re-run the route middleware that
         // validates current_website_id, so trust the session id only if the current

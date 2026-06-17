@@ -9,10 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('client_activities', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
-            $table->foreignId('actor_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('website_id')->nullable()->constrained()->nullOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignUlid('actor_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignUlid('website_id')->nullable()->constrained()->nullOnDelete();
             $table->string('type', 80);
             $table->string('provider', 80)->nullable();
             $table->json('meta')->nullable();

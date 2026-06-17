@@ -24,7 +24,7 @@ class PerCountryInsightsTest extends TestCase
         parent::tearDown();
     }
 
-    private function seedQuery(int $websiteId, string $url, string $country, int $impressions, float $position, int $clicks = 1, string $query = 'striking distance'): void
+    private function seedQuery(string $websiteId, string $url, string $country, int $impressions, float $position, int $clicks = 1, string $query = 'striking distance'): void
     {
         for ($i = 0; $i < 20; $i++) {
             SearchConsoleData::create([

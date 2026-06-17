@@ -24,7 +24,7 @@ trait TracksKeyword
         $this->trackNotice = null;
         $keyword = trim($keyword);
         $user = Auth::user();
-        $websiteId = (int) session('current_website_id', 0);
+        $websiteId = session('current_website_id');
 
         if ($keyword === '' || $user === null || $websiteId <= 0 || ! $user->canViewWebsiteId($websiteId)) {
             $this->trackNotice = 'Could not add to rank tracker.';

@@ -18,9 +18,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('websites', function (Blueprint $table) {
-            $table->foreignId('ga_google_account_id')->nullable()->after('ga_property_id')
+            $table->foreignUlid('ga_google_account_id')->nullable()->after('ga_property_id')
                 ->constrained('google_accounts')->nullOnDelete();
-            $table->foreignId('gsc_google_account_id')->nullable()->after('gsc_site_url')
+            $table->foreignUlid('gsc_google_account_id')->nullable()->after('gsc_site_url')
                 ->constrained('google_accounts')->nullOnDelete();
         });
     }

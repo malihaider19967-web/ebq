@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * One keyword in a gap analysis, bucketed and enriched.
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class KeywordGapRow extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'keyword_gap_analysis_id',
         'keyword',

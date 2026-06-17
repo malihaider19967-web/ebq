@@ -21,7 +21,7 @@ class RankTrackingManager extends Component
 {
     use WithPagination;
 
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     public bool $showForm = false;
     public string $search = '';
@@ -62,12 +62,12 @@ class RankTrackingManager extends Component
 
     public function mount(): void
     {
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
         $this->prefillTargetDomain();
     }
 
     #[On('website-changed')]
-    public function switchWebsite(int $websiteId): void
+    public function switchWebsite(string $websiteId): void
     {
         $this->websiteId = $websiteId;
         $this->prefillTargetDomain();
@@ -444,7 +444,7 @@ class RankTrackingManager extends Component
         session()->flash('rank_tracking_status', 'Keyword added and initial check queued.');
     }
 
-    public function recheck(int $keywordId): void
+    public function recheck(string $keywordId): void
     {
         $keyword = RankTrackingKeyword::find($keywordId);
         if (! $keyword || ! $this->authorizes($keyword)) {
@@ -461,7 +461,7 @@ class RankTrackingManager extends Component
         session()->flash('rank_tracking_status', 'Re-check queued for "'.$keyword->keyword.'".');
     }
 
-    public function togglePause(int $keywordId): void
+    public function togglePause(string $keywordId): void
     {
         $keyword = RankTrackingKeyword::find($keywordId);
         if (! $keyword || ! $this->authorizes($keyword)) {
@@ -472,7 +472,7 @@ class RankTrackingManager extends Component
         $keyword->save();
     }
 
-    public function delete(int $keywordId): void
+    public function delete(string $keywordId): void
     {
         $keyword = RankTrackingKeyword::find($keywordId);
         if (! $keyword || ! $this->authorizes($keyword)) {

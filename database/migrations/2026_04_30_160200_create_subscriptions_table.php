@@ -12,13 +12,13 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('subscriptions', function (Blueprint $table) {
-            $table->id();
+            $table->ulid('id')->primary();
             // Cashier's published default is `user_id`. We bill Website,
             // so the FK is `website_id` — Cashier's Billable trait derives
             // the FK from the model class name. The follow-on rename
             // migration handles installs that already ran the original
             // unmodified Cashier migration.
-            $table->foreignId('website_id');
+            $table->foreignUlid('website_id');
             $table->string('type');
             $table->string('stripe_id')->unique();
             $table->string('stripe_status');

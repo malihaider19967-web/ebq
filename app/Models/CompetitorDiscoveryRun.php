@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * Lifecycle + cost ledger for one competitor auto-discovery run.
@@ -11,8 +12,8 @@ use Illuminate\Database\Eloquent\Model;
  * trackers in the app ({@see KeywordApiRequest}, {@see GuestRankCheck}).
  *
  * @property string $run_id
- * @property int $website_id
- * @property ?int $user_id
+ * @property string $website_id
+ * @property ?string $user_id
  * @property string $status
  * @property int $keywords_planned
  * @property int $serp_calls_made
@@ -21,6 +22,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class CompetitorDiscoveryRun extends Model
 {
+    use HasUlids;
     public const STATUS_QUEUED = 'queued';
     public const STATUS_RUNNING = 'running';
     public const STATUS_COMPLETED = 'completed';

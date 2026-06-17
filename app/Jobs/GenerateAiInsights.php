@@ -12,7 +12,7 @@ class GenerateAiInsights implements ShouldQueue
 {
     use Queueable;
 
-    public function __construct(public int $websiteId)
+    public function __construct(public string $websiteId)
     {
         $this->onQueue(\App\Support\Queues::DEFAULT);
     }

@@ -20,7 +20,7 @@ return new class extends Migration
         });
 
         Schema::create('proxies', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('label')->nullable();
             // Normalised Guzzle proxy URL: scheme://[user:pass@]host:port
             $table->string('url', 512);

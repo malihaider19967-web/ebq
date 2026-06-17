@@ -14,9 +14,9 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('website_page_keyword_map', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('page_id')->constrained('website_pages')->cascadeOnDelete();
-            $table->foreignId('keyword_id')->constrained('keywords')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('page_id')->constrained('website_pages')->cascadeOnDelete();
+            $table->foreignUlid('keyword_id')->constrained('keywords')->cascadeOnDelete();
             $table->string('source', 16)->default('gsc');
             $table->decimal('position_avg', 6, 2)->nullable();
             $table->unsignedInteger('clicks_30d')->nullable();

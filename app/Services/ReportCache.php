@@ -28,7 +28,7 @@ class ReportCache
 {
     private const KEY_PREFIX = 'ws:dataver:';
 
-    public static function version(int $websiteId): int
+    public static function version(string $websiteId): int
     {
         return (int) Cache::rememberForever(
             self::KEY_PREFIX.$websiteId,
@@ -36,7 +36,7 @@ class ReportCache
         );
     }
 
-    public static function flushWebsite(int $websiteId): void
+    public static function flushWebsite(string $websiteId): void
     {
         $key = self::KEY_PREFIX.$websiteId;
         if (! Cache::has($key)) {

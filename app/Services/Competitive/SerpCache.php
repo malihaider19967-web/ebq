@@ -34,7 +34,7 @@ class SerpCache
      *
      * @return array<string, mixed>|null
      */
-    public function organic(string $keyword, string $gl, ?int $websiteId = null, ?int $ownerUserId = null, string $source = 'serp_cache'): ?array
+    public function organic(string $keyword, string $gl, ?string $websiteId = null, ?string $ownerUserId = null, string $source = 'serp_cache'): ?array
     {
         $kw = trim($keyword);
         if ($kw === '') {

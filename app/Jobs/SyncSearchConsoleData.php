@@ -22,7 +22,7 @@ class SyncSearchConsoleData implements ShouldQueue
     public int $tries = 2;
 
     public function __construct(
-        public int $websiteId,
+        public string $websiteId,
         public int $days = 30,
     ) {
         $this->onQueue(\App\Support\Queues::SYNC);
@@ -140,8 +140,7 @@ class SyncSearchConsoleData implements ShouldQueue
                 return $row;
             }, $chunk);
 
-            DB::table('search_console_data')->upsert(
-                $prepared,
+            DB::table('search_console_data')->upsert(ulid_rows($prepared),
                 ['website_id', 'date', 'query', 'page', 'country', 'device'],
                 ['clicks', 'impressions', 'position', 'ctr', 'updated_at']
             );

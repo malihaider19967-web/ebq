@@ -23,9 +23,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('report_brandings', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete();
-            $table->foreignId('website_id')->nullable()->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('user_id')->nullable()->constrained()->cascadeOnDelete();
+            $table->foreignUlid('website_id')->nullable()->constrained()->cascadeOnDelete();
             $table->string('company_name', 120);
             // Path on the `public` disk, NOT a full URL. Resolved via
             // Storage::disk('public')->url($logo_path) at render time so

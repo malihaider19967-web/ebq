@@ -104,7 +104,7 @@ class DemoData extends Command
         return self::SUCCESS;
     }
 
-    private function count(string $table, int $websiteId): int
+    private function count(string $table, string $websiteId): int
     {
         return DB::table($table)->where('website_id', $websiteId)->count();
     }

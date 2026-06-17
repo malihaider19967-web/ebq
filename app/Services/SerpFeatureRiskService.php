@@ -68,7 +68,7 @@ class SerpFeatureRiskService
      *
      * @return array<int, array{at_risk: bool, lost_feature: bool, features_present: list<string>, features_lost: list<string>}>
      */
-    public function riskMapForWebsite(int $websiteId): array
+    public function riskMapForWebsite(string $websiteId): array
     {
         $keywordIds = RankTrackingKeyword::query()
             ->where('website_id', $websiteId)

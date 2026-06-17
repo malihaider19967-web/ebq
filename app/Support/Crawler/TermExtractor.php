@@ -122,7 +122,7 @@ class TermExtractor
      *
      * @return array{0: array<string,int>, 1: int}  [df, docCount]
      */
-    public function buildDf(int $crawlSiteId, int $sample = 3000): array
+    public function buildDf(string $crawlSiteId, int $sample = 3000): array
     {
         $df = [];
         $docs = 0;

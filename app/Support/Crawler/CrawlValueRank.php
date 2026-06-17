@@ -28,7 +28,7 @@ class CrawlValueRank
      * Assign a dense 1..N value_rank over a crawl_site's live pages in value
      * order. Done in chunks so it scales to large sites without per-row updates.
      */
-    public static function assign(int $crawlSiteId): void
+    public static function assign(string $crawlSiteId): void
     {
         $rank = 0;
         $ids = self::order(

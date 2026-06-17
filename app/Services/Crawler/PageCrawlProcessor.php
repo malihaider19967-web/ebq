@@ -321,7 +321,7 @@ class PageCrawlProcessor
                 'updated_at' => $now,
             ];
         }
-        DB::table('website_pages')->insertOrIgnore($stubRows);
+        DB::table('website_pages')->insertOrIgnore(ulid_rows($stubRows));
 
         $idByHash = WebsitePage::where('crawl_site_id', $crawlSiteId)
             ->whereIn('url_hash', array_keys($targets))
@@ -345,7 +345,7 @@ class PageCrawlProcessor
             ];
         }
         foreach (array_chunk($edges, 500) as $chunk) {
-            DB::table('website_internal_links')->insert($chunk);
+            DB::table('website_internal_links')->insert(ulid_rows($chunk));
         }
     }
 

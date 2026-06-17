@@ -381,7 +381,7 @@ class PluginHqController extends Controller
      *
      *   PATCH /api/v1/hq/keywords/{id}
      */
-    public function updateKeyword(Request $request, int $id): JsonResponse
+    public function updateKeyword(Request $request, string $id): JsonResponse
     {
         $website = $this->website($request);
         $keyword = RankTrackingKeyword::query()
@@ -415,7 +415,7 @@ class PluginHqController extends Controller
      * Force an immediate re-check. Same job the EBQ Livewire UI dispatches.
      *   POST /api/v1/hq/keywords/{id}/recheck
      */
-    public function recheckKeyword(Request $request, int $id): JsonResponse
+    public function recheckKeyword(Request $request, string $id): JsonResponse
     {
         $website = $this->website($request);
         $keyword = RankTrackingKeyword::query()
@@ -431,7 +431,7 @@ class PluginHqController extends Controller
     /**
      *   DELETE /api/v1/hq/keywords/{id}
      */
-    public function deleteKeyword(Request $request, int $id): JsonResponse
+    public function deleteKeyword(Request $request, string $id): JsonResponse
     {
         $website = $this->website($request);
         $keyword = RankTrackingKeyword::query()
@@ -492,7 +492,7 @@ class PluginHqController extends Controller
      * 30-day position history for a single tracked keyword.
      *   GET /api/v1/hq/keywords/{id}/history
      */
-    public function keywordHistory(Request $request, int $id): JsonResponse
+    public function keywordHistory(Request $request, string $id): JsonResponse
     {
         $website = $this->website($request);
         $keyword = RankTrackingKeyword::query()
@@ -1415,7 +1415,7 @@ class PluginHqController extends Controller
      * Signed URL to view a completed audit on EBQ.io (full report UI — MOAT).
      *   GET /api/v1/hq/page-audits/{id}/report-url
      */
-    public function pageAuditReportUrl(Request $request, int $id): JsonResponse
+    public function pageAuditReportUrl(Request $request, string $id): JsonResponse
     {
         $website = $this->website($request);
 
@@ -1551,7 +1551,7 @@ class PluginHqController extends Controller
      *   POST /api/v1/hq/outreach-prospects/{id}
      *   body: { status?, notes? }
      */
-    public function outreachProspectsUpdate(Request $request, int $id, BacklinkProspectingService $service): JsonResponse
+    public function outreachProspectsUpdate(Request $request, string $id, BacklinkProspectingService $service): JsonResponse
     {
         $website = $this->website($request);
         $data = $request->validate([
@@ -1731,7 +1731,7 @@ class PluginHqController extends Controller
     /**
      * @return array{clicks:int, impressions:int, ctr:float, avg_position:float|null}
      */
-    private function aggregateGsc(int $websiteId, string $start, string $end): array
+    private function aggregateGsc(string $websiteId, string $start, string $end): array
     {
         $row = SearchConsoleData::query()
             ->where('website_id', $websiteId)
@@ -1781,7 +1781,7 @@ class PluginHqController extends Controller
      *
      * @return array{top_3:int, top_10:int, top_50:int, top_100:int}
      */
-    private function positionDistribution(int $websiteId, string $start, string $end): array
+    private function positionDistribution(string $websiteId, string $start, string $end): array
     {
         $row = SearchConsoleData::query()
             ->fromSub(
@@ -1818,7 +1818,7 @@ class PluginHqController extends Controller
      *
      * @return array{top_3:int, top_10:int, top_50:int, top_100:int, deep:int, pending:int}
      */
-    private function trackerPositionDistribution(int $websiteId): array
+    private function trackerPositionDistribution(string $websiteId): array
     {
         $rows = RankTrackingKeyword::query()
             ->where('website_id', $websiteId)
@@ -1847,7 +1847,7 @@ class PluginHqController extends Controller
      *
      * @return list<array{date:string, clicks:int}>
      */
-    private function dailyClicks(int $websiteId, string $start, string $end): array
+    private function dailyClicks(string $websiteId, string $start, string $end): array
     {
         $rows = SearchConsoleData::query()
             ->where('website_id', $websiteId)
@@ -1881,7 +1881,7 @@ class PluginHqController extends Controller
      *
      * @return array{gainers: list<array<string, mixed>>, losers: list<array<string, mixed>>}
      */
-    private function topMoversBoth(int $websiteId, string $start, string $end, int $limit): array
+    private function topMoversBoth(string $websiteId, string $start, string $end, int $limit): array
     {
         $days = Carbon::parse($start)->diffInDays(Carbon::parse($end)) + 1;
         $prevEnd = Carbon::parse($start)->subDay()->toDateString();

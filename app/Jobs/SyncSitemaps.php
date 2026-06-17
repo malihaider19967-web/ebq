@@ -23,7 +23,7 @@ class SyncSitemaps implements ShouldQueue
     public int $tries = 2;
 
     public function __construct(
-        public int $websiteId,
+        public string $websiteId,
     ) {
         $this->onQueue(\App\Support\Queues::SYNC);
     }

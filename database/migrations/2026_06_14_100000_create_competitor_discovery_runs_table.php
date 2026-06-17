@@ -15,10 +15,10 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('competitor_discovery_runs', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->uuid('run_id')->unique();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('user_id')->nullable()->constrained()->nullOnDelete();
 
             // queued | running | completed | failed
             $table->string('status', 16)->default('queued');

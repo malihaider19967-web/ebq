@@ -10,23 +10,23 @@ use Livewire\Component;
 
 class WordPressPlugin extends Component
 {
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     public ?string $statusMessage = null;
 
     public function mount(): void
     {
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
     }
 
     #[On('website-changed')]
-    public function switchWebsite(int $websiteId): void
+    public function switchWebsite(string $websiteId): void
     {
         $this->websiteId = $websiteId;
         $this->statusMessage = null;
     }
 
-    public function revokeToken(int $tokenId): void
+    public function revokeToken(string $tokenId): void
     {
         $user = Auth::user();
         if (! $user || ! $user->canViewWebsiteId($this->websiteId)) {

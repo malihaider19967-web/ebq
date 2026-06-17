@@ -46,7 +46,7 @@ class ActionQueueService
      *
      * @return array<int, array{key: string, title: string, description: string, count: int, severity: string, impact: float, impact_label: ?string, action_label: string}>
      */
-    public function groupedActions(int $websiteId, ?string $country = null): array
+    public function groupedActions(string $websiteId, ?string $country = null): array
     {
         $cannibalization = $this->reports->cannibalizationReport($websiteId, null, null, self::COUNT_LIMIT, $country);
         $striking = $this->reports->strikingDistance($websiteId, null, null, self::COUNT_LIMIT, $country);
@@ -100,7 +100,7 @@ class ActionQueueService
      *
      * @return array<int, array{title: string, subtitle: string, metric: ?string, fix_url: ?string, fix_feature: string}>
      */
-    public function issueRows(string $key, int $websiteId, ?string $country = null): array
+    public function issueRows(string $key, string $websiteId, ?string $country = null): array
     {
         return match ($key) {
             'indexing_fails' => array_map(fn (array $r): array => [
@@ -172,7 +172,7 @@ class ActionQueueService
     /**
      * @return array<int, array{id: int, keyword: string, current_position: ?int, best_position: ?int, position_change: int}>
      */
-    private function rankDropRows(int $websiteId): array
+    private function rankDropRows(string $websiteId): array
     {
         return RankTrackingKeyword::query()
             ->where('website_id', $websiteId)

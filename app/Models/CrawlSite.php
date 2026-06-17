@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * One shared crawl per normalized domain. Many users' Website rows
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * Domain-level crawl signals that used to live on `websites` move here:
  * crawl_protection / crawl_protection_at and the sitemap-lastmod trust counters.
  *
- * @property int $id
+ * @property string $id
  * @property string $normalized_domain
  * @property int $effective_cap
  * @property int|null $health_score
@@ -27,6 +28,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class CrawlSite extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'normalized_domain', 'effective_cap', 'health_score', 'status',
         'crawl_protection', 'crawl_protection_at',

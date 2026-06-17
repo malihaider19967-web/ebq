@@ -21,7 +21,7 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('competitor_backlinks', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('competitor_domain', 255);
             // URL can be long; keep the full value for display, index by hash.
             $table->text('referring_page_url');

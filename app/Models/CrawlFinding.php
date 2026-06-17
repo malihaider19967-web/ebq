@@ -4,13 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * A single SEO issue surfaced by the crawler. See CrawlFinding catalog in
  * SiteIssueDetector. Severity + impact let every surface rank consistently.
  *
- * @property int $id
- * @property int $website_id
+ * @property string $id
+ * @property string $website_id
  * @property int|null $page_id
  * @property int|null $crawl_run_id
  * @property string $category
@@ -24,6 +25,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class CrawlFinding extends Model
 {
+    use HasUlids;
     public const SEVERITY_CRITICAL = 'critical';
     public const SEVERITY_HIGH = 'high';
     public const SEVERITY_MEDIUM = 'medium';

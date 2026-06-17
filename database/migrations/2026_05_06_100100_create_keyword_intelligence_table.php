@@ -13,8 +13,8 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('keyword_intelligence', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('keyword_id')->constrained('keywords')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('keyword_id')->constrained('keywords')->cascadeOnDelete();
 
             $table->unsignedInteger('search_volume')->nullable();
             $table->decimal('cpc', 10, 4)->nullable();

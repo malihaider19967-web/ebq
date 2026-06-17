@@ -16,7 +16,7 @@ use Livewire\Component;
 
 class CustomAudit extends Component
 {
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     #[Url(as: 'pageUrl')]
     public string $pageUrl = '';
@@ -36,11 +36,11 @@ class CustomAudit extends Component
 
     public function mount(): void
     {
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
     }
 
     #[On('website-changed')]
-    public function switchWebsite(int $websiteId): void
+    public function switchWebsite(string $websiteId): void
     {
         $this->websiteId = $websiteId;
         $this->awaitingSerpCountryChoice = false;
@@ -190,7 +190,7 @@ class CustomAudit extends Component
     /**
      * Re-queue a failed audit. Resets status + drops the previous error message.
      */
-    public function retryAudit(int $auditId): void
+    public function retryAudit(string $auditId): void
     {
         $user = Auth::user();
         if (! $user) {

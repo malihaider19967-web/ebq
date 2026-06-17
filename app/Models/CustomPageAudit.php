@@ -5,9 +5,11 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 class CustomPageAudit extends Model
 {
+    use HasUlids;
     public const SOURCE_CUSTOM = 'custom';
 
     public const SOURCE_PAGE_DETAIL = 'page_detail';
@@ -78,8 +80,8 @@ class CustomPageAudit extends Model
      * Enqueue a new audit. Called from the UI; the job runs the actual work.
      */
     public static function queue(
-        int $websiteId,
-        int $userId,
+        string $websiteId,
+        string $userId,
         string $pageUrl,
         string $targetKeyword,
         ?string $serpSampleGl,
@@ -113,8 +115,8 @@ class CustomPageAudit extends Model
      * uses queue() + markCompleted() instead — do not call both.
      */
     public static function recordRun(
-        int $websiteId,
-        int $userId,
+        string $websiteId,
+        string $userId,
         string $pageUrlAsAudited,
         PageAuditReport $report,
         ?string $targetKeyword,
@@ -147,7 +149,7 @@ class CustomPageAudit extends Model
      * Look for an already-queued-or-running audit for the same (website, url, user).
      * Returning a row means we should *not* queue a duplicate and paid-API-spend twice.
      */
-    public static function findActiveFor(int $websiteId, string $pageUrl, int $userId): ?self
+    public static function findActiveFor(string $websiteId, string $pageUrl, string $userId): ?self
     {
         return self::query()
             ->where('website_id', $websiteId)

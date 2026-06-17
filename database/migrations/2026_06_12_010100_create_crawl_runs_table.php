@@ -14,8 +14,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('crawl_runs', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
             $table->string('trigger', 16)->default('scheduled'); // scheduled|on_create|manual|backfill
             $table->string('status', 16)->default('running');    // running|completed|failed|aborted
             $table->timestamp('started_at')->nullable();

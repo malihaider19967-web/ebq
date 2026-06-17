@@ -13,9 +13,9 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('niche_topic_clusters', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('niche_id')->constrained('niches')->cascadeOnDelete();
-            $table->foreignId('cluster_id')->constrained('keyword_clusters')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('niche_id')->constrained('niches')->cascadeOnDelete();
+            $table->foreignUlid('cluster_id')->constrained('keyword_clusters')->cascadeOnDelete();
             $table->string('topic_name', 255);
             $table->unsignedBigInteger('total_search_volume')->nullable();
             $table->decimal('avg_difficulty', 6, 2)->nullable();

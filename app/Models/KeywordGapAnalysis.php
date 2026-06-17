@@ -5,12 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * Header for one Keyword Gap Analysis run. See the migration for the lifecycle.
  *
- * @property int $website_id
- * @property ?int $user_id
+ * @property string $website_id
+ * @property ?string $user_id
  * @property string $our_url
  * @property ?array $competitor_urls
  * @property string $country
@@ -25,6 +26,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class KeywordGapAnalysis extends Model
 {
+    use HasUlids;
     public const STATUS_QUEUED = 'queued';
     public const STATUS_COLLECTING = 'collecting';
     public const STATUS_COMPLETED = 'completed';

@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * Per-tenant outbound mail transport.
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class MailTransport extends Model
 {
+    use HasUlids;
     public const PROVIDER_GMAIL = 'gmail';
     public const PROVIDER_OUTLOOK = 'outlook';
     public const PROVIDER_SMTP = 'smtp';

@@ -22,7 +22,7 @@ class PageAuditController extends Controller
         ]);
     }
 
-    public function download(Request $request, int $id): Response
+    public function download(Request $request, string $id): Response
     {
         $report = PageAuditReport::query()->findOrFail($id);
 

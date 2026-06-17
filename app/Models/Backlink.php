@@ -6,9 +6,11 @@ use App\Enums\BacklinkType;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 class Backlink extends Model
 {
+    use HasUlids;
     /** @use HasFactory<\Database\Factories\BacklinkFactory> */
     use HasFactory;
 

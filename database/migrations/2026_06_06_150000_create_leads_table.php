@@ -9,14 +9,14 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('leads', function (Blueprint $table) {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('email')->unique();
             $table->string('name')->nullable();
             $table->string('source', 32)->default('guest_audit');
             // First guest audit that produced this lead (nullable; audits can be pruned).
-            $table->foreignId('guest_page_audit_id')->nullable()->nullOnDelete();
+            $table->foreignUlid('guest_page_audit_id')->nullable()->nullOnDelete();
             // Set when a user signs up with this email.
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignUlid('user_id')->nullable()->constrained()->nullOnDelete();
             $table->timestamp('converted_at')->nullable();
             $table->timestamps();
 

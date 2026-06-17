@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('google_accounts', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('user_id')->constrained()->cascadeOnDelete();
             $table->text('access_token');
             $table->text('refresh_token')->nullable();
             $table->timestamp('expires_at')->nullable();

@@ -22,7 +22,7 @@ class ReportBranding extends Component
 {
     use WithFileUploads;
 
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     public string $scope = 'user'; // 'user' = default, 'website' = override
     public string $company_name = '';
@@ -41,12 +41,12 @@ class ReportBranding extends Component
 
     public function mount(): void
     {
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
         $this->load();
     }
 
     #[On('website-changed')]
-    public function switchWebsite(int $websiteId): void
+    public function switchWebsite(string $websiteId): void
     {
         $this->websiteId = $websiteId;
         $this->saved = false;
@@ -148,7 +148,7 @@ class ReportBranding extends Component
 
     private function findRow(): ?ReportBrandingModel
     {
-        $userId = (int) Auth::id();
+        $userId = Auth::id();
         if ($this->scope === 'website' && $this->websiteId > 0) {
             return ReportBrandingModel::query()
                 ->where('website_id', $this->websiteId)
@@ -166,7 +166,7 @@ class ReportBranding extends Component
         if ($row) {
             return $row;
         }
-        $userId = (int) Auth::id();
+        $userId = Auth::id();
         if ($this->scope === 'website' && $this->websiteId > 0) {
             return new ReportBrandingModel(['website_id' => $this->websiteId]);
         }

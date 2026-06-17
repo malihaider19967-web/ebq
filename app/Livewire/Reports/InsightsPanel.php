@@ -11,7 +11,7 @@ use Livewire\Component;
 
 class InsightsPanel extends Component
 {
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     #[Url(as: 'insight', history: true)]
     public string $tab = 'cannibalization';
@@ -23,7 +23,7 @@ class InsightsPanel extends Component
 
     public function mount(): void
     {
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
         // Normalize legacy/hyphenated slugs (e.g. ?insight=striking-distance from
         // the WP plugin's iframe links) so the match() in render() can never
         // hit an unhandled case from external input.
@@ -37,7 +37,7 @@ class InsightsPanel extends Component
     }
 
     #[On('website-changed')]
-    public function switchWebsite(int $websiteId): void
+    public function switchWebsite(string $websiteId): void
     {
         $this->websiteId = $websiteId;
         $this->country = '';

@@ -16,10 +16,10 @@ class RankTrackingDetail extends Component
 {
     use WithPagination;
 
-    public int $keywordId = 0;
-    public ?int $selectedSnapshotId = null;
+    public ?string $keywordId = null;
+    public ?string $selectedSnapshotId = null;
 
-    public function mount(int $keywordId): void
+    public function mount(string $keywordId): void
     {
         $this->keywordId = $keywordId;
     }
@@ -41,7 +41,7 @@ class RankTrackingDetail extends Component
         session()->flash('rank_tracking_status', 'Re-check queued.');
     }
 
-    public function selectSnapshot(int $id): void
+    public function selectSnapshot(string $id): void
     {
         $snapshot = RankTrackingSnapshot::where('rank_tracking_keyword_id', $this->keywordId)
             ->find($id);

@@ -140,7 +140,7 @@ class KeywordVolumeFinder extends Component
             return;
         }
 
-        $website = ($wid = (int) session('current_website_id', 0)) ? Website::find($wid) : null;
+        $website = ($wid = session('current_website_id')) ? Website::find($wid) : null;
 
         $request = $pool->dispatchIdeas(
             ['seeds' => $missing, 'location' => $this->location, 'language' => $this->language],
@@ -175,7 +175,7 @@ class KeywordVolumeFinder extends Component
         }
 
         $user = Auth::user();
-        $website = ($wid = (int) session('current_website_id', 0)) ? Website::find($wid) : null;
+        $website = ($wid = session('current_website_id')) ? Website::find($wid) : null;
         $billedUser = $website?->owner ?? $user;
 
         // Cache-first: figure out which keywords actually need a paid fetch.
@@ -330,7 +330,7 @@ class KeywordVolumeFinder extends Component
     public function render()
     {
         $user = Auth::user();
-        $website = ($wid = (int) session('current_website_id', 0)) ? Website::find($wid) : null;
+        $website = ($wid = session('current_website_id')) ? Website::find($wid) : null;
         $billedUser = $website?->owner ?? $user;
         $meter = app(UsageMeter::class);
         $usingFinder = KeywordProviderConfig::usingKeywordFinder();

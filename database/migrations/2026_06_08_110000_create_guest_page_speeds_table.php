@@ -14,7 +14,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('guest_page_speeds', function (Blueprint $table) {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->char('token', 36)->unique();
             $table->string('url', 700);
             $table->string('status', 16)->default('queued');

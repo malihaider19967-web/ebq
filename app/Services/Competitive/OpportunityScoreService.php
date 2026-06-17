@@ -101,7 +101,7 @@ class OpportunityScoreService
      *
      * @return array{score: int, components: array<string, mixed>}|null
      */
-    public function liveScore(string $keyword, string $gl, ?int $volume, ?float $ourPosition, ?int $websiteId = null, ?int $ownerUserId = null): ?array
+    public function liveScore(string $keyword, string $gl, ?int $volume, ?float $ourPosition, ?string $websiteId = null, ?string $ownerUserId = null): ?array
     {
         try {
             $payload = $this->serp->organic($keyword, $gl, $websiteId, $ownerUserId, 'opportunity_score');
@@ -128,7 +128,7 @@ class OpportunityScoreService
      * @param  array<string, mixed>  $json
      * @return array{score: int, components: array<string, mixed>}
      */
-    public function scoreFromSerp(array $json, ?int $volume, ?float $ourPosition, ?int $websiteId = null, ?int $ownerUserId = null): array
+    public function scoreFromSerp(array $json, ?int $volume, ?float $ourPosition, ?string $websiteId = null, ?string $ownerUserId = null): array
     {
         $organic = is_array($json['organic'] ?? null) ? $json['organic'] : [];
         $domains = [];

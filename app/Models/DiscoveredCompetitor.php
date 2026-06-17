@@ -5,12 +5,13 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * One auto-discovered competitor domain for a website, ranked by `score`.
  * Produced + pruned by {@see \App\Services\Competitive\CompetitorDiscoveryService}.
  *
- * @property int $website_id
+ * @property string $website_id
  * @property string $competitor_domain
  * @property int $appearances
  * @property int $keywords_sampled
@@ -23,6 +24,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class DiscoveredCompetitor extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'website_id',
         'competitor_domain',
@@ -56,7 +58,7 @@ class DiscoveredCompetitor extends Model
         return $this->belongsTo(Website::class);
     }
 
-    public function scopeForWebsite(Builder $q, int $websiteId): Builder
+    public function scopeForWebsite(Builder $q, string $websiteId): Builder
     {
         return $q->where('website_id', $websiteId);
     }

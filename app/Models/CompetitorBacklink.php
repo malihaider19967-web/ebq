@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * @property string $competitor_domain
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class CompetitorBacklink extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'competitor_domain',
         'referring_page_url',

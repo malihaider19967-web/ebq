@@ -12,8 +12,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('backlinks', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
             $table->date('tracked_date');
             $table->text('referring_page_url');
             $table->text('target_page_url');

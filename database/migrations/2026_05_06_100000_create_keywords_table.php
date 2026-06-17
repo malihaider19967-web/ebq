@@ -13,7 +13,7 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('keywords', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('query', 512);
             $table->string('normalized_query', 512);
             $table->string('query_hash', 64);

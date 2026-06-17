@@ -124,7 +124,7 @@ class PurgeSyncData extends Command
     /**
      * @return array<int, array{label: string, count: int}>
      */
-    private function buildPlan(?int $websiteId): array
+    private function buildPlan(?string $websiteId): array
     {
         return [
             ['label' => 'search_console_data', 'count' => $this->scope(SearchConsoleData::query(), $websiteId)->count()],
@@ -140,12 +140,12 @@ class PurgeSyncData extends Command
         ];
     }
 
-    private function scope($query, ?int $websiteId)
+    private function scope($query, ?string $websiteId)
     {
         return $query->when($websiteId, fn ($q, $id) => $q->where('website_id', $id));
     }
 
-    private function clearCaches(?int $websiteId): void
+    private function clearCaches(?string $websiteId): void
     {
         if ($websiteId) {
             Cache::forget("top_countries:{$websiteId}");

@@ -32,7 +32,7 @@ class ReportDataServiceQuickWinsTest extends TestCase
         ]);
     }
 
-    private function seedGsc(int $websiteId, string $query, string $page, float $position, int $impressions = 100): void
+    private function seedGsc(string $websiteId, string $query, string $page, float $position, int $impressions = 100): void
     {
         SearchConsoleData::create([
             'website_id' => $websiteId,

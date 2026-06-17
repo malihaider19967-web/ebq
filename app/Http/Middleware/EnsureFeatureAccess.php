@@ -23,7 +23,7 @@ class EnsureFeatureAccess
             return $next($request);
         }
 
-        $websiteId = (int) session('current_website_id', 0);
+        $websiteId = session('current_website_id');
         $accessible = $websiteId > 0
             ? $user->accessibleWebsitesQuery()->whereKey($websiteId)->exists()
             : false;

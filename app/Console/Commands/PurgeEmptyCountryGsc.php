@@ -40,7 +40,7 @@ class PurgeEmptyCountryGsc extends Command
             ->whereDate('date', '<', $cutoff);
 
         if ($websiteId !== null && $websiteId !== '') {
-            $query->where('website_id', (int) $websiteId);
+            $query->where('website_id', $websiteId);
         }
 
         $count = (clone $query)->count();

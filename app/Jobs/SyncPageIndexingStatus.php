@@ -20,7 +20,7 @@ class SyncPageIndexingStatus implements ShouldQueue
     public int $tries = 1;
 
     public function __construct(
-        public int $websiteId,
+        public string $websiteId,
         public int $maxPages = 25,
     ) {
         $this->onQueue(\App\Support\Queues::SYNC);

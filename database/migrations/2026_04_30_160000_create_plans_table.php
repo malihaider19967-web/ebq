@@ -24,7 +24,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('plans', function (Blueprint $table): void {
-            $table->id();
+            $table->ulid('id')->primary();
             $table->string('slug', 32)->unique();
             $table->string('name', 64);
             $table->string('tagline', 191)->nullable();

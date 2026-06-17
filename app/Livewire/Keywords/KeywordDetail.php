@@ -33,17 +33,17 @@ use Livewire\Component;
  */
 class KeywordDetail extends Component
 {
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
     public string $query = '';
 
     public function mount(string $query): void
     {
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
         $this->query = trim($query);
     }
 
     #[On('website-changed')]
-    public function switchWebsite(int $websiteId): void
+    public function switchWebsite(string $websiteId): void
     {
         $this->websiteId = $websiteId;
     }
@@ -286,7 +286,7 @@ class KeywordDetail extends Component
             ->first();
     }
 
-    private function latestSnapshot(int $keywordId): ?RankTrackingSnapshot
+    private function latestSnapshot(string $keywordId): ?RankTrackingSnapshot
     {
         return RankTrackingSnapshot::query()
             ->where('rank_tracking_keyword_id', $keywordId)

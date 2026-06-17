@@ -19,7 +19,7 @@ class TrackKeywordRankJob implements ShouldQueue
     public int $backoff = 30;
 
     public function __construct(
-        public int $keywordId,
+        public string $keywordId,
         public bool $forced = false,
     ) {
         $this->onQueue(\App\Support\Queues::SYNC);

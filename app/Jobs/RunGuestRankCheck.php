@@ -41,7 +41,7 @@ class RunGuestRankCheck implements ShouldBeUnique, ShouldQueue
 
     public int $uniqueFor = 1800;
 
-    public function __construct(public readonly int $id)
+    public function __construct(public readonly string $id)
     {
         $this->onQueue(\App\Support\Queues::INTERACTIVE);
     }

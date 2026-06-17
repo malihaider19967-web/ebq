@@ -13,10 +13,10 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('content_briefs', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('website_id')->constrained('websites')->cascadeOnDelete();
-            $table->foreignId('keyword_id')->constrained('keywords')->cascadeOnDelete();
-            $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained('websites')->cascadeOnDelete();
+            $table->foreignUlid('keyword_id')->constrained('keywords')->cascadeOnDelete();
+            $table->foreignUlid('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->json('payload');
             $table->timestamps();
 

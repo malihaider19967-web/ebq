@@ -23,8 +23,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('redirect_suggestions', function (Blueprint $table) {
-            $table->id();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
             $table->string('source_path', 700);
             $table->char('source_path_hash', 64)->index();
             $table->string('suggested_destination', 700);

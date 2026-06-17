@@ -9,7 +9,7 @@ class ReportPreview extends Component
 {
     public array $report = [];
 
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     public string $reportType = 'weekly';
 

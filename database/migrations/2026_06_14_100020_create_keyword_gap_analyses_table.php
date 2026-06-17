@@ -14,9 +14,9 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('keyword_gap_analyses', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('website_id')->constrained()->cascadeOnDelete();
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained()->cascadeOnDelete();
+            $table->foreignUlid('user_id')->nullable()->constrained()->nullOnDelete();
 
             $table->string('our_url');
             // 1–N normalized competitor domains/URLs.

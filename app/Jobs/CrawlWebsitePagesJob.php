@@ -28,7 +28,7 @@ class CrawlWebsitePagesJob implements ShouldQueue, ShouldBeUnique
     public int $tries = 1;
 
     public function __construct(
-        public int $websiteId,
+        public string $websiteId,
         public string $trigger = CrawlRun::TRIGGER_SCHEDULED,
         public bool $force = false,
     ) {

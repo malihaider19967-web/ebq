@@ -18,7 +18,7 @@ class SyncAnalyticsData implements ShouldQueue
     public int $tries = 2;
 
     public function __construct(
-        public int $websiteId,
+        public string $websiteId,
         public int $days = 30,
     ) {
         $this->onQueue(\App\Support\Queues::SYNC);
@@ -62,8 +62,7 @@ class SyncAnalyticsData implements ShouldQueue
             $row['website_id'] = $this->websiteId;
         }
 
-        DB::table('analytics_data')->upsert(
-            $rows,
+        DB::table('analytics_data')->upsert(ulid_rows($rows),
             ['website_id', 'date', 'source'],
             ['users', 'sessions', 'bounce_rate', 'updated_at']
         );

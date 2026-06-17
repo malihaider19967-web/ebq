@@ -85,7 +85,7 @@ class WebsitesList extends Component
         $this->reset(['domain', 'gaSelection', 'gscSelection', 'showForm', 'fetchError']);
     }
 
-    public function removeWebsite(int $id): void
+    public function removeWebsite(string $id): void
     {
         $website = Website::find($id);
         if (! $website || ! Gate::forUser(Auth::user())->allows('delete', $website)) {
@@ -94,7 +94,7 @@ class WebsitesList extends Component
 
         $website->delete();
 
-        if ((int) session('current_website_id') === $id) {
+        if (session('current_website_id') === $id) {
             $next = Auth::user()->accessibleWebsitesQuery()->first();
             session(['current_website_id' => $next?->id ?? 0]);
         }

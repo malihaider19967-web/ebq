@@ -20,7 +20,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('websites', function (Blueprint $table): void {
-            $table->foreignId('crawl_site_id')->nullable()->after('id')->constrained('crawl_sites')->nullOnDelete();
+            $table->foreignUlid('crawl_site_id')->nullable()->after('id')->constrained('crawl_sites')->nullOnDelete();
             $table->string('normalized_domain')->nullable()->after('domain');
             $table->index('normalized_domain', 'websites_normalized_domain_idx');
         });
@@ -31,10 +31,10 @@ return new class extends Migration
         }
 
         Schema::table('website_pages', function (Blueprint $table): void {
-            $table->foreignId('crawl_site_id')->nullable()->after('website_id')->constrained('crawl_sites')->nullOnDelete();
+            $table->foreignUlid('crawl_site_id')->nullable()->after('website_id')->constrained('crawl_sites')->nullOnDelete();
             $table->unsignedInteger('value_rank')->nullable()->after('page_score');
             $table->dropForeign(['website_id']);
-            $table->unsignedBigInteger('website_id')->nullable()->change();
+            $table->ulid('website_id')->nullable()->change();
             $table->unique(['crawl_site_id', 'url_hash'], 'website_pages_crawlsite_url_unique');
             $table->index(['crawl_site_id', 'last_crawled_at'], 'website_pages_cs_crawled_idx');
             $table->index(['crawl_site_id', 'next_crawl_at'], 'website_pages_cs_next_crawl_idx');
@@ -44,24 +44,24 @@ return new class extends Migration
         });
 
         Schema::table('website_internal_links', function (Blueprint $table): void {
-            $table->foreignId('crawl_site_id')->nullable()->after('website_id')->constrained('crawl_sites')->nullOnDelete();
+            $table->foreignUlid('crawl_site_id')->nullable()->after('website_id')->constrained('crawl_sites')->nullOnDelete();
             $table->dropForeign(['website_id']);
-            $table->unsignedBigInteger('website_id')->nullable()->change();
+            $table->ulid('website_id')->nullable()->change();
             $table->index(['crawl_site_id', 'status'], 'wil_cs_status_idx');
         });
 
         Schema::table('crawl_runs', function (Blueprint $table): void {
-            $table->foreignId('crawl_site_id')->nullable()->after('website_id')->constrained('crawl_sites')->nullOnDelete();
+            $table->foreignUlid('crawl_site_id')->nullable()->after('website_id')->constrained('crawl_sites')->nullOnDelete();
             $table->dropForeign(['website_id']);
-            $table->unsignedBigInteger('website_id')->nullable()->change();
+            $table->ulid('website_id')->nullable()->change();
             $table->index(['crawl_site_id', 'started_at'], 'crawl_runs_cs_started_idx');
             $table->index(['crawl_site_id', 'status'], 'crawl_runs_cs_status_idx');
         });
 
         Schema::table('crawl_findings', function (Blueprint $table): void {
-            $table->foreignId('crawl_site_id')->nullable()->after('website_id')->constrained('crawl_sites')->nullOnDelete();
+            $table->foreignUlid('crawl_site_id')->nullable()->after('website_id')->constrained('crawl_sites')->nullOnDelete();
             $table->dropForeign(['website_id']);
-            $table->unsignedBigInteger('website_id')->nullable()->change();
+            $table->ulid('website_id')->nullable()->change();
             $table->unique(['crawl_site_id', 'type', 'affected_url_hash'], 'crawl_findings_cs_uniq');
             $table->index(['crawl_site_id', 'category', 'status', 'impact'], 'cf_cs_issue_default_idx');
             $table->index(['crawl_site_id', 'category', 'status', 'type', 'impact'], 'cf_cs_issue_type_idx');

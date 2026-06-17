@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * Subscription plan — one row per public price tier.
@@ -22,6 +23,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Plan extends Model
 {
+    use HasUlids;
     /**
      * Canonical list of plugin feature keys. Mirrors
      * `App\Models\Website::FEATURE_KEYS` and the WordPress plugin's

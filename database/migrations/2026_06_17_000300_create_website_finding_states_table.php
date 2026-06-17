@@ -16,9 +16,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('website_finding_states', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('website_id')->constrained('websites')->cascadeOnDelete();
-            $table->foreignId('finding_id')->constrained('crawl_findings')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('website_id')->constrained('websites')->cascadeOnDelete();
+            $table->foreignUlid('finding_id')->constrained('crawl_findings')->cascadeOnDelete();
             $table->string('status', 12)->default('open'); // open|ignored|resolved
             $table->timestamp('resolved_at')->nullable();
             $table->timestamps();

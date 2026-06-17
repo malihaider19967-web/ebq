@@ -24,7 +24,7 @@ class PageDetail extends Component
 {
     use WithPagination;
 
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     public string $pageUrl = '';
 
@@ -66,7 +66,7 @@ class PageDetail extends Component
 
     public function mount(string $pageUrl): void
     {
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
         $this->pageUrl = urldecode($pageUrl);
     }
 

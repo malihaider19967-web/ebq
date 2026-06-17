@@ -19,7 +19,7 @@ use Livewire\Component;
 
 class WebsiteTeam extends Component
 {
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     public bool $useSessionWebsite = false;
 
@@ -33,17 +33,17 @@ class WebsiteTeam extends Component
 
     // Edit access modal (works for both members and pending invitations)
     public ?string $editTargetType = null; // 'member' | 'invitation'
-    public ?int $editTargetId = null;
+    public ?string $editTargetId = null;
     public string $editRole = TeamPermissions::ROLE_MEMBER;
     /** @var array<string, bool> */
     public array $editPermissions = [];
 
-    public function mount(int $websiteId = 0, bool $useSessionWebsite = false): void
+    public function mount(?string $websiteId = null, bool $useSessionWebsite = false): void
     {
         $this->useSessionWebsite = $useSessionWebsite;
 
         if ($useSessionWebsite) {
-            $this->websiteId = (int) session('current_website_id', 0);
+            $this->websiteId = session('current_website_id');
             $this->applySessionModeFlags();
         } else {
             $this->websiteId = $websiteId;
@@ -66,7 +66,7 @@ class WebsiteTeam extends Component
     }
 
     #[On('website-changed')]
-    public function onWebsiteChanged(int $websiteId): void
+    public function onWebsiteChanged(string $websiteId): void
     {
         if (! $this->useSessionWebsite) {
             return;
@@ -148,7 +148,7 @@ class WebsiteTeam extends Component
             [$invitation, $plain] = WebsiteInvitation::issue(
                 $website,
                 $email,
-                (int) Auth::id(),
+                Auth::id(),
                 14,
                 $this->inviteRole,
                 $permissions,
@@ -163,7 +163,7 @@ class WebsiteTeam extends Component
         $this->dispatch('website-team-updated');
     }
 
-    public function revokeMember(int $userId): void
+    public function revokeMember(string $userId): void
     {
         if ($this->readonly || $this->websiteId <= 0) {
             return;
@@ -181,7 +181,7 @@ class WebsiteTeam extends Component
         $this->dispatch('website-team-updated');
     }
 
-    public function resendInvitation(int $invitationId): void
+    public function resendInvitation(string $invitationId): void
     {
         if ($this->readonly || $this->websiteId <= 0) {
             return;
@@ -219,7 +219,7 @@ class WebsiteTeam extends Component
         $this->dispatch('website-team-updated');
     }
 
-    public function cancelInvitation(int $invitationId): void
+    public function cancelInvitation(string $invitationId): void
     {
         if ($this->readonly || $this->websiteId <= 0) {
             return;
@@ -237,7 +237,7 @@ class WebsiteTeam extends Component
         $this->dispatch('website-team-updated');
     }
 
-    public function startEditMember(int $userId): void
+    public function startEditMember(string $userId): void
     {
         if ($this->readonly || $this->websiteId <= 0) {
             return;
@@ -267,7 +267,7 @@ class WebsiteTeam extends Component
         $this->editPermissions = $this->permissionsToMap(is_array($decoded) ? $decoded : null);
     }
 
-    public function startEditInvitation(int $invitationId): void
+    public function startEditInvitation(string $invitationId): void
     {
         if ($this->readonly || $this->websiteId <= 0) {
             return;

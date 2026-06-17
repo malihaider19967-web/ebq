@@ -184,7 +184,7 @@ class DemoDataSeeder
 
     /* ───────────────────────── generators ───────────────────────── */
 
-    private function seedSearchConsole(int $websiteId): void
+    private function seedSearchConsole(string $websiteId): void
     {
         $end = Carbon::yesterday(config('app.timezone'));
         $days = 90;
@@ -228,7 +228,7 @@ class DemoDataSeeder
                                 'updated_at' => $now,
                             ];
                             if (count($rows) >= 500) {
-                                DB::table('search_console_data')->insert($rows);
+                                DB::table('search_console_data')->insert(ulid_rows($rows));
                                 $rows = [];
                             }
                         }
@@ -238,7 +238,7 @@ class DemoDataSeeder
         }
 
         if ($rows !== []) {
-            DB::table('search_console_data')->insert($rows);
+            DB::table('search_console_data')->insert(ulid_rows($rows));
         }
     }
 
@@ -316,7 +316,7 @@ class DemoDataSeeder
         return [$clicks, $impr, $posF];
     }
 
-    private function seedAnalytics(int $websiteId): void
+    private function seedAnalytics(string $websiteId): void
     {
         $end = Carbon::yesterday(config('app.timezone'));
         $days = 90;
@@ -352,7 +352,7 @@ class DemoDataSeeder
         }
 
         foreach (array_chunk($rows, 500) as $chunk) {
-            DB::table('analytics_data')->insert($chunk);
+            DB::table('analytics_data')->insert(ulid_rows($chunk));
         }
     }
 
@@ -391,7 +391,7 @@ class DemoDataSeeder
         return $out;
     }
 
-    private function seedRankTracking(int $websiteId): void
+    private function seedRankTracking(string $websiteId): void
     {
         $now = Carbon::now();
         // Track the first 15 demo queries.
@@ -474,12 +474,12 @@ class DemoDataSeeder
                 ];
             }
             foreach (array_chunk($snapRows, 500) as $chunk) {
-                DB::table('rank_tracking_snapshots')->insert($chunk);
+                DB::table('rank_tracking_snapshots')->insert(ulid_rows($chunk));
             }
         }
     }
 
-    private function seedIndexingStatuses(int $websiteId): void
+    private function seedIndexingStatuses(string $websiteId): void
     {
         $now = Carbon::now();
         foreach (self::PAGES as $i => $page) {
@@ -499,7 +499,7 @@ class DemoDataSeeder
         }
     }
 
-    private function seedBacklinks(int $websiteId): void
+    private function seedBacklinks(string $websiteId): void
     {
         $types = BacklinkType::cases();
         $referrers = [
@@ -531,7 +531,7 @@ class DemoDataSeeder
         }
     }
 
-    private function seedPageAudits(int $websiteId): void
+    private function seedPageAudits(string $websiteId): void
     {
         $auditPages = array_slice(self::PAGES, 0, 8);
         foreach ($auditPages as $i => $page) {
@@ -927,7 +927,7 @@ class DemoDataSeeder
         ];
     }
 
-    private function seedWriterProjects(int $websiteId): void
+    private function seedWriterProjects(string $websiteId): void
     {
         $specs = [
             ['title' => 'The Complete SEO Audit Checklist for 2026', 'kw' => 'seo audit checklist', 'step' => 'completed'],
@@ -957,7 +957,7 @@ class DemoDataSeeder
         }
     }
 
-    private function seedBrandVoice(int $websiteId): void
+    private function seedBrandVoice(string $websiteId): void
     {
         BrandVoiceProfile::create([
             'website_id' => $websiteId,
@@ -975,7 +975,7 @@ class DemoDataSeeder
         ]);
     }
 
-    private function seedClientActivities(int $websiteId): void
+    private function seedClientActivities(string $websiteId): void
     {
         $providers = [
             'keywords_everywhere' => ['rank_check', 1],
@@ -1001,7 +1001,7 @@ class DemoDataSeeder
         }
     }
 
-    private function seedRedirectSuggestions(int $websiteId): void
+    private function seedRedirectSuggestions(string $websiteId): void
     {
         $pairs = [
             ['/old-seo-audit-post', '/blog/seo-audit-checklist'],
@@ -1026,7 +1026,7 @@ class DemoDataSeeder
         }
     }
 
-    private function seedAiInsights(int $websiteId): void
+    private function seedAiInsights(string $websiteId): void
     {
         $pages = array_slice(self::PAGES, 3, 6);
         foreach ($pages as $i => $page) {
@@ -1043,7 +1043,7 @@ class DemoDataSeeder
         }
     }
 
-    private function seedReportBranding(int $websiteId): void
+    private function seedReportBranding(string $websiteId): void
     {
         ReportBranding::create([
             'user_id' => null,

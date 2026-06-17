@@ -100,7 +100,7 @@ class CrawlFrontierBuilder
             }
             // Insert new pages only; never clobber existing crawl data. We OR the
             // source flags for existing rows in a follow-up update.
-            $discovered += DB::table('website_pages')->insertOrIgnore($rows);
+            $discovered += DB::table('website_pages')->insertOrIgnore(ulid_rows($rows));
         }
 
         // OR the discovery-source flags onto pre-existing rows.

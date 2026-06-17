@@ -4,14 +4,15 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * A directed internal-link edge for a website's link graph.
  * status='discovered' = a real edge found in the page HTML.
  * status='suggested'  = an AI-proposed new internal link (InternalLinkSuggester).
  *
- * @property int $id
- * @property int $website_id
+ * @property string $id
+ * @property string $website_id
  * @property int $from_page_id
  * @property int $to_page_id
  * @property string|null $anchor_text
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class WebsiteInternalLink extends Model
 {
+    use HasUlids;
     public const STATUS_DISCOVERED = 'discovered';
     public const STATUS_SUGGESTED = 'suggested';
 

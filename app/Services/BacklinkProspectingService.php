@@ -268,7 +268,7 @@ class BacklinkProspectingService
     /**
      * Update one persisted prospect's status / notes from the HQ tab.
      */
-    public function updateProspect(Website $website, int $id, array $patch): ?OutreachProspect
+    public function updateProspect(Website $website, string $id, array $patch): ?OutreachProspect
     {
         $prospect = OutreachProspect::query()
             ->where('website_id', $website->id)
@@ -450,7 +450,7 @@ class BacklinkProspectingService
      *
      * @return array<string, true>
      */
-    private function ownedReferringDomains(int $websiteId): array
+    private function ownedReferringDomains(string $websiteId): array
     {
         $urls = Backlink::query()
             ->where('website_id', $websiteId)

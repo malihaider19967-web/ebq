@@ -15,7 +15,7 @@ use Livewire\Component;
 #[Lazy]
 class KpiCards extends Component
 {
-    public int $websiteId = 0;
+    public ?string $websiteId = null;
 
     public function placeholder(): string
     {
@@ -43,11 +43,11 @@ class KpiCards extends Component
 
     public function mount(): void
     {
-        $this->websiteId = (int) session('current_website_id', 0);
+        $this->websiteId = session('current_website_id');
     }
 
     #[On('website-changed')]
-    public function switchWebsite(int $websiteId): void
+    public function switchWebsite(string $websiteId): void
     {
         $this->websiteId = $websiteId;
     }

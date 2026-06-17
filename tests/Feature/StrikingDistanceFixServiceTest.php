@@ -163,7 +163,7 @@ class StrikingDistanceFixServiceTest extends TestCase
         $this->assertContains($ranking, $without, 'without exclusion the ranking page is still returned (brief flow unchanged)');
     }
 
-    private function makeReport(int $websiteId, string $url, Carbon $auditedAt): PageAuditReport
+    private function makeReport(string $websiteId, string $url, Carbon $auditedAt): PageAuditReport
     {
         return PageAuditReport::create([
             'website_id' => $websiteId,

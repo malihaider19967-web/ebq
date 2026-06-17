@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Support\KeywordsEverywhereCountries;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * Anonymous, no-signup keyword search-volume check launched from the public
@@ -15,6 +16,7 @@ use Illuminate\Support\Str;
  */
 class GuestKeywordVolume extends Model
 {
+    use HasUlids;
     public const STATUS_QUEUED = 'queued';
     public const STATUS_RUNNING = 'running';
     public const STATUS_COMPLETED = 'completed';

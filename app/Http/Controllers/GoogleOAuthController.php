@@ -93,7 +93,7 @@ class GoogleOAuthController extends Controller
         $oauthService->persistAccount($user, $googleUser);
         $logger->log($isNewUser ? 'auth.register_google' : 'auth.login_google', userId: $user->id, meta: ['ip' => $request->ip()]);
 
-        $websiteId = (int) session('current_website_id', 0);
+        $websiteId = session('current_website_id');
         if ($websiteId <= 0) {
             $first = $user->accessibleWebsitesQuery()->select('id')->orderBy('domain')->first();
             if ($first) {

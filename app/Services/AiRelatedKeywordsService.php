@@ -37,7 +37,7 @@ class AiRelatedKeywordsService
     /**
      * @return list<array{keyword:string, source:string, volume:?int, impressions:?int}>
      */
-    public function suggest(int $websiteId, string $keyword): array
+    public function suggest(string $websiteId, string $keyword): array
     {
         $keyword = trim($keyword);
         if ($keyword === '' || mb_strlen($keyword) < 3) {

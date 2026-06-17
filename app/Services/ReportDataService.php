@@ -35,7 +35,7 @@ class ReportDataService
      *
      * Returns null when no usable date exists.
      */
-    public function lastSafeReportDate(int $websiteId, ?int $minLagDays = null, ?string $timezone = null): ?Carbon
+    public function lastSafeReportDate(string $websiteId, ?int $minLagDays = null, ?string $timezone = null): ?Carbon
     {
         $lag = $minLagDays ?? (int) config('reports.gsc_lag_days', 3);
         $tz = $timezone ?? config('app.timezone');
@@ -55,7 +55,7 @@ class ReportDataService
      * the latest stored day is reportable. Returns null when there are
      * no GA rows yet (fresh / GA-not-connected site).
      */
-    public function lastSafeAnalyticsDate(int $websiteId, ?string $timezone = null): ?Carbon
+    public function lastSafeAnalyticsDate(string $websiteId, ?string $timezone = null): ?Carbon
     {
         $tz = $timezone ?? config('app.timezone');
 
@@ -100,7 +100,7 @@ class ReportDataService
      *
      * @return array<string,mixed>
      */
-    public function siteHealthSection(int $websiteId): array
+    public function siteHealthSection(string $websiteId): array
     {
         $crawl = app(\App\Services\Crawler\CrawlReportService::class);
         $summary = $crawl->summary($websiteId);
@@ -119,7 +119,7 @@ class ReportDataService
         ];
     }
 
-    public function generate(int $websiteId, string $startDate, string $endDate, ?string $country = null): array
+    public function generate(string $websiteId, string $startDate, string $endDate, ?string $country = null): array
     {
         $website = Website::query()->find($websiteId);
         $start = Carbon::parse($startDate)->startOfDay();
@@ -168,7 +168,7 @@ class ReportDataService
      *
      * @return array{value: float, keywords: int}|null
      */
-    private function buildPpcEquivalent(int $websiteId, Carbon $start, Carbon $end, ?string $country): ?array
+    private function buildPpcEquivalent(string $websiteId, Carbon $start, Carbon $end, ?string $country): ?array
     {
         $rows = SearchConsoleData::query()
             ->where('website_id', $websiteId)
@@ -218,7 +218,7 @@ class ReportDataService
         return ['value' => round($sum, 2), 'keywords' => $count];
     }
 
-    private function buildAnalytics(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
+    private function buildAnalytics(string $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
     {
         $current = AnalyticsData::where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()]);
@@ -283,7 +283,7 @@ class ReportDataService
         ];
     }
 
-    private function buildSearchConsole(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd, ?string $country = null): array
+    private function buildSearchConsole(string $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd, ?string $country = null): array
     {
         $current = SearchConsoleData::where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
@@ -441,7 +441,7 @@ class ReportDataService
         ];
     }
 
-    private function buildBacklinks(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
+    private function buildBacklinks(string $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
     {
         $current = Backlink::where('website_id', $websiteId)
             ->whereBetween('tracked_date', [$start->toDateString(), $end->toDateString()]);
@@ -487,7 +487,7 @@ class ReportDataService
         ];
     }
 
-    private function buildIndexing(int $websiteId): array
+    private function buildIndexing(string $websiteId): array
     {
         $rows = PageIndexingStatus::query()
             ->where('website_id', $websiteId)
@@ -596,7 +596,7 @@ class ReportDataService
         };
     }
 
-    private function buildSourceMovers(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
+    private function buildSourceMovers(string $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd): array
     {
         $current = AnalyticsData::where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
@@ -625,7 +625,7 @@ class ReportDataService
         ];
     }
 
-    private function buildQueryMovers(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd, ?string $country = null): array
+    private function buildQueryMovers(string $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd, ?string $country = null): array
     {
         $current = SearchConsoleData::where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
@@ -656,7 +656,7 @@ class ReportDataService
         ];
     }
 
-    private function buildPageMovers(int $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd, ?string $country = null): array
+    private function buildPageMovers(string $websiteId, Carbon $start, Carbon $end, Carbon $prevStart, Carbon $prevEnd, ?string $country = null): array
     {
         $current = SearchConsoleData::where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
@@ -687,7 +687,7 @@ class ReportDataService
         ];
     }
 
-    private function buildPositionBuckets(int $websiteId, Carbon $start, Carbon $end, ?string $country = null): array
+    private function buildPositionBuckets(string $websiteId, Carbon $start, Carbon $end, ?string $country = null): array
     {
         $rows = SearchConsoleData::where('website_id', $websiteId)
             ->whereBetween('date', [$start->toDateString(), $end->toDateString()])
@@ -719,7 +719,7 @@ class ReportDataService
         return $buckets;
     }
 
-    private function buildOpportunities(int $websiteId, Carbon $start, Carbon $end, ?string $country = null): array
+    private function buildOpportunities(string $websiteId, Carbon $start, Carbon $end, ?string $country = null): array
     {
         return $this->strikingDistance($websiteId, $start->toDateString(), $end->toDateString(), 8, $country);
     }
@@ -730,7 +730,7 @@ class ReportDataService
      *
      * @return array<int, array{query: string, primary_page: string, total_clicks: int, total_impressions: int, competing_pages: list<array{page: string, clicks: int, impressions: int, share: float, position: float}>}>
      */
-    public function cannibalizationReport(int $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50, ?string $country = null, bool $cacheOnly = false): array
+    public function cannibalizationReport(string $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50, ?string $country = null, bool $cacheOnly = false): array
     {
         [$start, $end] = $this->resolveRange($startDate, $endDate, 28);
 
@@ -762,7 +762,7 @@ class ReportDataService
     /**
      * @return array<int, mixed>
      */
-    private function buildCannibalizationReport(int $websiteId, Carbon $start, Carbon $end, int $limit, ?string $country): array
+    private function buildCannibalizationReport(string $websiteId, Carbon $start, Carbon $end, int $limit, ?string $country): array
     {
         $rows = SearchConsoleData::query()
             ->where('website_id', $websiteId)
@@ -833,7 +833,7 @@ class ReportDataService
      *
      * @return array<int, array{query: string, impressions: int, clicks: int, ctr: float, position: float, score: float}>
      */
-    public function strikingDistance(int $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50, ?string $country = null): array
+    public function strikingDistance(string $websiteId, ?string $startDate = null, ?string $endDate = null, int $limit = 50, ?string $country = null): array
     {
         [$start, $end] = $this->resolveRange($startDate, $endDate, 28);
         $country = $this->normalizeCountry($country);
@@ -857,7 +857,7 @@ class ReportDataService
     /**
      * @return array<int, mixed>
      */
-    private function buildStrikingDistance(int $websiteId, Carbon $start, Carbon $end, int $limit, ?string $country): array
+    private function buildStrikingDistance(string $websiteId, Carbon $start, Carbon $end, int $limit, ?string $country): array
     {
         // Group by (query, page) so we can surface the ranking URL for each
         // query, then aggregate the per-page rows up to one row per query.
@@ -1001,7 +1001,7 @@ class ReportDataService
      *
      * @return array{pages: array<int, array<string, mixed>>, has_yoy_history: bool}
      */
-    public function contentDecay(int $websiteId, int $limit = 25, ?string $country = null): array
+    public function contentDecay(string $websiteId, int $limit = 25, ?string $country = null): array
     {
         $country = $this->normalizeCountry($country);
 
@@ -1022,7 +1022,7 @@ class ReportDataService
     /**
      * @return array<string, mixed>
      */
-    private function buildContentDecay(int $websiteId, int $limit, ?string $country): array
+    private function buildContentDecay(string $websiteId, int $limit, ?string $country): array
     {
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz)->endOfDay();
@@ -1131,7 +1131,7 @@ class ReportDataService
      * @param  array<int, array<string, mixed>>  $pages
      * @return array<int, array<string, mixed>>
      */
-    private function tagDecayReasons(int $websiteId, Carbon $start, Carbon $end, array $pages, ?string $country): array
+    private function tagDecayReasons(string $websiteId, Carbon $start, Carbon $end, array $pages, ?string $country): array
     {
         if ($pages === []) {
             return $pages;
@@ -1200,7 +1200,7 @@ class ReportDataService
      *
      * @return array<int, array{page: string, verdict: string, coverage_state: string, indexing_state: string, last_crawl_at: ?string, recent_clicks: int, recent_impressions: int}>
      */
-    public function indexingFailsWithTraffic(int $websiteId, int $windowDays = 14, int $limit = 50, ?string $country = null): array
+    public function indexingFailsWithTraffic(string $websiteId, int $windowDays = 14, int $limit = 50, ?string $country = null): array
     {
         $country = $this->normalizeCountry($country);
 
@@ -1222,7 +1222,7 @@ class ReportDataService
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function buildIndexingFailsWithTraffic(int $websiteId, int $windowDays, int $limit, ?string $country): array
+    private function buildIndexingFailsWithTraffic(string $websiteId, int $windowDays, int $limit, ?string $country): array
     {
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz)->endOfDay();
@@ -1277,7 +1277,7 @@ class ReportDataService
      *
      * @return array{cannibalizations: int, striking_distance: int, indexing_fails_with_traffic: int, content_decay: int}
      */
-    public function insightCounts(int $websiteId, ?string $country = null): array
+    public function insightCounts(string $websiteId, ?string $country = null): array
     {
         $country = $this->normalizeCountry($country);
 
@@ -1304,7 +1304,7 @@ class ReportDataService
      *
      * @return array<int, array{keyword: string, search_volume: int, cpc: ?float, competition: ?float, current_position: ?float, current_page: ?string, projected_value: ?float, upside_value: ?float, impressions: int}>
      */
-    public function quickWins(int $websiteId, int $limit = 20): array
+    public function quickWins(string $websiteId, int $limit = 20): array
     {
         return Cache::remember(
             sprintf(
@@ -1322,7 +1322,7 @@ class ReportDataService
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function buildQuickWins(int $websiteId, int $limit): array
+    private function buildQuickWins(string $websiteId, int $limit): array
     {
         $minVolume = 500;
         $maxCompetition = 0.4;
@@ -1428,7 +1428,7 @@ class ReportDataService
      *
      * @return array<int, array{country: string, clicks: int, prev_clicks: int, change: array<string, mixed>}>
      */
-    public function topCountriesTrend(int $websiteId, int $limit = 10): array
+    public function topCountriesTrend(string $websiteId, int $limit = 10): array
     {
         return Cache::remember(
             sprintf(
@@ -1446,7 +1446,7 @@ class ReportDataService
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function buildTopCountriesTrend(int $websiteId, int $limit): array
+    private function buildTopCountriesTrend(string $websiteId, int $limit): array
     {
         $tz = config('app.timezone');
         $end = Carbon::yesterday($tz)->endOfDay();

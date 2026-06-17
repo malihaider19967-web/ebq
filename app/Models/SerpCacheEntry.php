@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * One cached organic SERP for a (keyword, country) pair — the shared,
@@ -18,6 +19,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class SerpCacheEntry extends Model
 {
+    use HasUlids;
     protected $table = 'serp_cache';
 
     protected $fillable = [

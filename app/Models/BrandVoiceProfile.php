@@ -4,10 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
- * @property int $id
- * @property int $website_id
+ * @property string $id
+ * @property string $website_id
  * @property int $samples_count
  * @property array<string, mixed>|null $fingerprint
  * @property string|null $sample_excerpt
@@ -15,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  */
 class BrandVoiceProfile extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'website_id',
         'samples_count',

@@ -14,9 +14,9 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('niche_aggregates', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('niche_id')->constrained('niches')->cascadeOnDelete();
-            $table->foreignId('keyword_id')->nullable()->constrained('keywords')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('niche_id')->constrained('niches')->cascadeOnDelete();
+            $table->foreignUlid('keyword_id')->nullable()->constrained('keywords')->cascadeOnDelete();
 
             $table->json('avg_ctr_by_position')->nullable();
             $table->unsignedInteger('avg_content_length')->nullable();

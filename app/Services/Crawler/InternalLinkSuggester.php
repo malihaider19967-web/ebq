@@ -29,7 +29,7 @@ class InternalLinkSuggester
      *                                          in AnalyzeSiteJob); rebuilt here if null.
      * @param  int|null  $docs  sample doc count paired with $df.
      */
-    public function suggest(int $crawlSiteId, ?array $df = null, ?int $docs = null): int
+    public function suggest(string $crawlSiteId, ?array $df = null, ?int $docs = null): int
     {
         WebsiteInternalLink::where('crawl_site_id', $crawlSiteId)
             ->where('status', WebsiteInternalLink::STATUS_SUGGESTED)->delete();
@@ -107,7 +107,7 @@ class InternalLinkSuggester
         }
 
         foreach (array_chunk($edges, 500) as $chunk) {
-            DB::table('website_internal_links')->insert($chunk);
+            DB::table('website_internal_links')->insert(ulid_rows($chunk));
         }
 
         return count($edges);

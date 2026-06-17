@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * A single self-hosted keyword-data API server. `api_key` and `webhook_secret`
@@ -29,6 +30,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class KeywordApiServer extends Model
 {
+    use HasUlids;
     protected $fillable = [
         'name',
         'base_url',

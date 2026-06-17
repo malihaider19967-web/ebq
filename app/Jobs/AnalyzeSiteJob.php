@@ -32,7 +32,7 @@ class AnalyzeSiteJob implements ShouldQueue
     /** Severity → page-score penalty. */
     private const PENALTY = ['critical' => 40, 'high' => 25, 'medium' => 12, 'low' => 5];
 
-    public function __construct(public int $crawlRunId)
+    public function __construct(public string $crawlRunId)
     {
         // The long finalize runs on the dedicated crawl-finalize queue (pinned box
         // only), so an autoscale scale-down draining an ephemeral box can never kill
@@ -150,7 +150,7 @@ class AnalyzeSiteJob implements ShouldQueue
     /**
      * @return array{blocked:bool,reason:?string}
      */
-    private function blockRollup(int $crawlSiteId, int $fetched, BlockDetector $detector): array
+    private function blockRollup(string $crawlSiteId, int $fetched, BlockDetector $detector): array
     {
         $reasonCounts = [];
         WebsitePage::where('crawl_site_id', $crawlSiteId)
@@ -186,7 +186,7 @@ class AnalyzeSiteJob implements ShouldQueue
         );
     }
 
-    private function scorePages(int $crawlSiteId): int
+    private function scorePages(string $crawlSiteId): int
     {
         $penaltyByPage = [];
         CrawlFinding::where('crawl_site_id', $crawlSiteId)
@@ -222,7 +222,7 @@ class AnalyzeSiteJob implements ShouldQueue
         return $avg !== null ? (int) round((float) $avg) : 100;
     }
 
-    private function pruneBodyText(int $crawlSiteId): void
+    private function pruneBodyText(string $crawlSiteId): void
     {
         $chars = max(0, (int) config('crawler.body_excerpt_chars', 500));
         WebsitePage::where('crawl_site_id', $crawlSiteId)
@@ -232,7 +232,7 @@ class AnalyzeSiteJob implements ShouldQueue
             ->update(['body_text' => DB::raw("LEFT(body_text, {$chars})")]);
     }
 
-    private function resolveStale(int $crawlSiteId, CrawlRun $run): void
+    private function resolveStale(string $crawlSiteId, CrawlRun $run): void
     {
         CrawlFinding::where('crawl_site_id', $crawlSiteId)
             ->where('status', CrawlFinding::STATUS_OPEN)

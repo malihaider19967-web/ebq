@@ -8,9 +8,9 @@ return new class extends Migration {
     public function up(): void
     {
         Schema::create('competitor_outlinks', function (Blueprint $table): void {
-            $table->id();
-            $table->foreignId('competitor_scan_id')->constrained('competitor_scans')->cascadeOnDelete();
-            $table->foreignId('from_page_id')->constrained('competitor_pages')->cascadeOnDelete();
+            $table->ulid('id')->primary();
+            $table->foreignUlid('competitor_scan_id')->constrained('competitor_scans')->cascadeOnDelete();
+            $table->foreignUlid('from_page_id')->constrained('competitor_pages')->cascadeOnDelete();
             $table->string('to_url', 2048);
             $table->string('to_url_hash', 64);
             $table->string('to_domain', 255);

@@ -455,7 +455,7 @@ class AiStudioWriterController extends Controller
         if (! $user) {
             return null;
         }
-        $id = (int) session('current_website_id', 0);
+        $id = session('current_website_id');
         if ($id <= 0) {
             return null;
         }

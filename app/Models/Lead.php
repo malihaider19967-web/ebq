@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Concerns\HasUlids;
 
 /**
  * A marketing lead captured when a guest supplies their name + email on the
@@ -15,6 +16,7 @@ use Illuminate\Support\Str;
  */
 class Lead extends Model
 {
+    use HasUlids;
     public const SOURCE_GUEST_AUDIT = 'guest_audit';
 
     public const SOURCE_GUEST_RANK = 'guest_rank_tracker';
@@ -38,7 +40,7 @@ class Lead extends Model
      * Record (or update) a lead by email. If an account already exists for the
      * email, the lead is marked converted immediately.
      */
-    public static function capture(string $email, ?string $name = null, ?int $guestPageAuditId = null, string $source = self::SOURCE_GUEST_AUDIT): self
+    public static function capture(string $email, ?string $name = null, ?string $guestPageAuditId = null, string $source = self::SOURCE_GUEST_AUDIT): self
     {
         $email = Str::lower(trim($email));
         $name = $name !== null && trim($name) !== '' ? mb_substr(trim($name), 0, 255) : null;

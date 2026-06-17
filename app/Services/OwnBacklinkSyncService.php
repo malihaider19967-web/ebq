@@ -32,7 +32,7 @@ class OwnBacklinkSyncService
      * Runs the KE → Backlink upsert. No-op when the gate says the domain
      * was fetched within the TTL window. Returns the number of rows written.
      */
-    public function syncForWebsite(Website $website, ?int $ownerUserId = null): int
+    public function syncForWebsite(Website $website, ?string $ownerUserId = null): int
     {
         $domain = $this->extractDomain((string) $website->domain);
         if ($domain === '') {
