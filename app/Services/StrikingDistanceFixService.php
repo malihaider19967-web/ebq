@@ -22,7 +22,7 @@ use Illuminate\Support\Carbon;
  *   3. Content brief / topical gaps — {@see AiContentBriefService}.
  *   4. Internal-link suggestions — {@see AiContentBriefService::internalLinkTargets()}.
  *
- * The AI services were built for the WordPress editor and take an string $postId
+ * The AI services were built for the WordPress editor and take an int $postId
  * purely as a cache key; they never load a Post. Striking-distance keywords are
  * GSC page URLs with no WP Post, so we pass a deterministic synthetic id derived
  * from (website, url) — see {@see syntheticPostId()}.

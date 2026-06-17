@@ -78,7 +78,7 @@ class AiContentBriefService
         return is_array($cached) ? $cached : null;
     }
 
-    public function brief(Website $website, string $postId, array $input): array
+    public function brief(Website $website, int $postId, array $input): array
     {
         if (! $this->llm->isAvailable()) {
             return ['ok' => false, 'error' => 'llm_not_configured'];

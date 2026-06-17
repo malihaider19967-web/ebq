@@ -383,6 +383,7 @@ class PageCrawlProcessor
     private function scheduleNext(WebsitePage $page, int $days): \Illuminate\Support\Carbon
     {
         // Deterministic per-page jitter (0–23h) spreads load without randomness.
-        return now()->addDays($days)->addHours((int) ($page->id % 24));
+        // ULID ids aren't numeric, so derive the jitter from a stable hash.
+        return now()->addDays($days)->addHours(crc32((string) $page->id) % 24);
     }
 }

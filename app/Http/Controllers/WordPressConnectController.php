@@ -94,7 +94,7 @@ class WordPressConnectController extends Controller
         return redirect()->away($callback);
     }
 
-    private function suggestWebsiteForHost($user, string $host): ?int
+    private function suggestWebsiteForHost($user, string $host): ?string
     {
         $normalizedHost = strtolower(ltrim(str_replace('www.', '', $host), '.'));
         $match = $user->accessibleWebsitesQuery()
