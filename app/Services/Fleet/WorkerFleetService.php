@@ -114,7 +114,15 @@ class WorkerFleetService
         $ip = $node->private_ip;
         $excludes = implode(' ', array_map(fn ($e) => "--exclude='{$e}'", self::RSYNC_EXCLUDES));
         $sshKey = '/root/.ssh/id_ed25519_worker';
-        $ssh = "ssh -i {$sshKey} -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=15";
+        $ssh = "ssh -i {$sshKey} -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10";
+
+        // A fresh box needs ~30-60s to boot before it accepts SSH — wait for it.
+        if (! $this->waitForSsh($ip, $ssh)) {
+            $node->update(['last_error' => 'box not SSH-reachable within timeout']);
+            Log::warning('WorkerFleet: bootstrap aborted — box not reachable', ['node' => $node->id, 'ip' => $ip]);
+
+            return false;
+        }
 
         // 1) push code (NO --delete — that wipes the worker-only compose/Dockerfile)
         $r1 = $this->run("rsync -az {$excludes} -e \"{$ssh}\" /var/www/ebq/ root@{$ip}:/var/www/ebq/");
@@ -190,6 +198,19 @@ class WorkerFleetService
         }
 
         return ['orphans' => $orphans, 'vanished' => (int) $vanished];
+    }
+
+    /** Poll until the box accepts SSH (boot + cloud-init), up to ~2.5 min. */
+    private function waitForSsh(string $ip, string $ssh): bool
+    {
+        for ($i = 0; $i < 30; $i++) {
+            if ($this->run("{$ssh} root@{$ip} 'true'")) {
+                return true;
+            }
+            sleep(5);
+        }
+
+        return false;
     }
 
     private function run(string $cmd): bool

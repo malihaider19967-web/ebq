@@ -19,12 +19,14 @@ use Illuminate\View\View;
  */
 class FleetController extends Controller
 {
-    /** Hetzner server types the admin can pick (label => human). */
+    /** Hetzner server types the admin can pick (label => human). cx = shared Intel. */
     private const SERVER_TYPES = [
-        'cpx21' => 'cpx21 — 3 vCPU / 4 GB',
-        'cpx31' => 'cpx31 — 4 vCPU / 8 GB',
-        'cpx41' => 'cpx41 — 8 vCPU / 16 GB',
-        'cpx51' => 'cpx51 — 16 vCPU / 32 GB',
+        'cx22' => 'cx22 — 2 vCPU / 4 GB',
+        'cx23' => 'cx23 — 4 vCPU / 8 GB',
+        'cx32' => 'cx32 — 4 vCPU / 8 GB',
+        'cx33' => 'cx33 — 8 vCPU / 16 GB',
+        'cpx31' => 'cpx31 — 4 vCPU / 8 GB (AMD)',
+        'cpx41' => 'cpx41 — 8 vCPU / 16 GB (AMD)',
     ];
 
     public function index(): View

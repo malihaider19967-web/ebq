@@ -59,9 +59,24 @@ These are infra one-time setup, not code:
 5. **`/var/www/ebq/.env.worker`** on the web box — the worker `.env` template (DB_HOST/REDIS_HOST
    = 10.0.0.2, `REDIS_PASSWORD`, `APP_KEY` (must match for queue payload decryption),
    `REDIS_QUEUE_RETRY_AFTER=1320`). Pushed as each new box's `.env`.
+6. **Web box `ufw` must allow the private SUBNET to Redis + MariaDB** — not just the one existing
+   worker IP. Ephemeral workers get fresh IPs (10.0.0.4, .5, …), so:
+   ```
+   ufw allow from 10.0.0.0/24 to 10.0.0.2 port 6379 proto tcp   # Redis
+   ufw allow from 10.0.0.0/24 to 10.0.0.2 port 3306 proto tcp   # MariaDB
+   ```
+   Without this a new box's workers crash-loop on "Connection timed out" (the firewall drops
+   them) and can't pull jobs. (Found during the first live provision test, 2026-06-17.)
+7. **`server_type` must be a line your account/location offers** — these boxes use `cx` (shared
+   Intel, e.g. `cx23` in fsn1); `cpx*` (AMD) returned "unsupported location for server type".
+   The default is `cx23`; pick at `/admin/fleet`.
 
-Until these exist, `ebq:fleet-worker provision` returns a clear "HCLOUD_TOKEN not configured"
-error — the code is in place; provisioning activates once the token/snapshot are set.
+> **Verified end-to-end (2026-06-17):** a live `provision → bootstrap → (Redis CLIENT LIST
+> confirmed the 5 workers polling the crawl queue) → drain → destroy` cycle succeeded against
+> the real Hetzner API, from a snapshot of the existing worker box, never touching the pinned box.
+
+Until the token/snapshot/network are set, `ebq:fleet-worker provision` returns a clear error
+(e.g. "No worker image configured…") — the code is in place; provisioning activates once they're set.
 
 ## Status — all phases shipped (code); autoscaler disabled until the Hetzner setup is done
 

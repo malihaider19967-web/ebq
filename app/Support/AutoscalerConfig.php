@@ -23,7 +23,7 @@ class AutoscalerConfig
         'min_boxes' => 1,              // floor (includes the pinned permanent box)
         'max_boxes' => 2,              // ceiling — keep below the DB write knee
         'target_backlog_per_box' => 400, // desired = ceil(crawl-queue depth / this)
-        'server_type' => 'cpx31',      // Hetzner server type for new boxes
+        'server_type' => 'cx23',       // Hetzner server type for new boxes (matches the existing worker)
         'snapshot_id' => null,         // the worker snapshot image id (set after building it)
         'scale_up_cooldown_s' => 180,  // wait this long after a provision before another
         'scale_down_idle_s' => 900,    // backlog must stay low this long before draining a box
