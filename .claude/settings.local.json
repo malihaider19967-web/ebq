@@ -319,7 +319,9 @@
       "Bash(git check-ignore *)",
       "Bash(echo \"exit:$?\")",
       "Bash(cp .claude/settings.local.json /tmp/slj.new)",
-      "Bash(cp /tmp/slj.new .claude/settings.local.json)"
+      "Bash(cp /tmp/slj.new .claude/settings.local.json)",
+      "Bash(sort -t: -k1,1 -k2)",
+      "Bash(awk -F'[/\\(]' '{print $1}')"
     ]
   },
   "enableAllProjectMcpServers": true,

@@ -27,6 +27,9 @@ class AppServiceProvider extends ServiceProvider
 
         $this->app->singleton(\App\Services\LanguageDetectorService::class);
 
+        // Sharding: per-request/job routing state for the tenant/crawl tiers.
+        $this->app->singleton(\App\Support\ShardContext::class);
+
         // Cashier 16+ does NOT auto-load its own migrations — they're
         // only made available via `vendor:publish --tag=cashier-migrations`.
         // We've manually copied the subscription / subscription-item /
@@ -56,6 +59,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Sharding: turn every active db_nodes row into a live `node:{id}`
+        // connection. Degrades to a no-op before the table exists (install /
+        // migrate) or if the DB is unreachable, so it never blocks boot.
+        $this->app->make(\App\Support\ShardManager::class)->register();
+
         Gate::policy(Website::class, WebsitePolicy::class);
 
         RankTrackingKeyword::observe(RankTrackingKeywordObserver::class);
