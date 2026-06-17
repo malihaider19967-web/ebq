@@ -49,25 +49,29 @@ class ShardManager
             if (empty($node['private_ip']) || empty($node['db_name'])) {
                 continue;
             }
+            $labels = $node['labels'] ?? [];
+            $port = is_array($labels) && isset($labels['port']) ? (int) $labels['port'] : null;
             $out[DbNode::connectionNameFor($node['id'])] = $this->buildConfig(
                 (string) $node['private_ip'],
                 (string) $node['db_name'],
+                $port,
             );
         }
 
         return $out;
     }
 
-    /** Connection config for a node: the central template + host/database override. */
-    public function buildConfig(string $host, string $database): array
+    /** Connection config for a node: the central template + host/database/port override. */
+    public function buildConfig(string $host, string $database, ?int $port = null): array
     {
         $base = Config::get('database.connections.global')
             ?? Config::get('database.connections.'.Config::get('database.default'));
 
-        return array_merge($base, [
+        return array_merge($base, array_filter([
             'host' => $host,
             'database' => $database,
-        ]);
+            'port' => $port,
+        ], fn ($v) => $v !== null));
     }
 
     /**
@@ -86,11 +90,12 @@ class ShardManager
 
                 return DbNode::query()
                     ->whereIn('status', DbNode::REGISTERABLE_STATUSES)
-                    ->get(['id', 'private_ip', 'db_name'])
+                    ->get(['id', 'private_ip', 'db_name', 'labels'])
                     ->map(fn (DbNode $n): array => [
                         'id' => $n->id,
                         'private_ip' => $n->private_ip,
                         'db_name' => $n->db_name,
+                        'labels' => $n->labels,
                     ])
                     ->all();
             });

@@ -216,6 +216,10 @@ return [
         'image' => env('HCLOUD_WORKER_IMAGE'),        // fallback snapshot id; overridden by the autoscaler.snapshot_id setting
         'web_box_ip' => env('HCLOUD_WEB_BOX_IP', '10.0.0.2'), // rsync source for boot-time code/.env pull
         'request_timeout_s' => (int) env('HCLOUD_TIMEOUT_S', 30),
+        // DB-node fleet (App\Services\Fleet\DbFleetService): a MariaDB-preinstalled
+        // snapshot + a firewall that blocks public 3306 and allows the subnet.
+        'db_image' => env('HCLOUD_DB_IMAGE'),         // fallback DB snapshot id; overridden by db_fleet.snapshot_id
+        'db_firewall_id' => env('HCLOUD_DB_FIREWALL_ID'),
     ],
 
 ];
