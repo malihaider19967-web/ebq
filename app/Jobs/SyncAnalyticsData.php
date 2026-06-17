@@ -26,6 +26,11 @@ class SyncAnalyticsData implements ShouldQueue
 
     public function handle(GoogleAnalyticsService $service): void
     {
+        if (\App\Support\ShardLock::websiteLocked((string) $this->websiteId)) {
+            $this->release(30);
+
+            return;
+        }
         app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::findOrFail($this->websiteId);
         // Plan-limit freeze: when the website is past the owning user's

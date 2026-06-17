@@ -45,6 +45,11 @@ class CrawlSitemapDeltaJob implements ShouldQueue, ShouldBeUnique
 
     public function handle(SitemapUrlExtractor $extractor): void
     {
+        if (\App\Support\ShardLock::websiteLocked((string) $this->websiteId)) {
+            $this->release(30);
+
+            return;
+        }
         app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::find($this->websiteId);
         if (! $website || $website->isFrozen() || ! $website->crawl_site_id) {

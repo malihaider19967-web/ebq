@@ -52,6 +52,11 @@ class MatchRedirectFor404Job implements ShouldBeUnique, ShouldQueue
 
     public function handle(AiRedirectMatcherService $service): void
     {
+        if (\App\Support\ShardLock::websiteLocked((string) $this->websiteId)) {
+            $this->release(30);
+
+            return;
+        }
         app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::query()->find($this->websiteId);
         if (! $website instanceof Website) {

@@ -73,9 +73,10 @@ until the purge. CLI: `ebq:shard move tenant|crawl <id> --to=<node>`; admin: the
 `/admin/db-fleet`. **Validated** end-to-end on docker MariaDB (3 dbs): seed tenant on node_a → move →
 node_b has the rows, node_a purged, anchors flipped.
 
-> Caveat: in-flight writes to the source between copy and anchor-flip aren't captured — move during low
-> activity (a per-tenant migrating lock is future hardening). Mover copy is chunked (bounded memory);
-> for very large tenants a `mariabackup`/`mysqldump` streaming path is the next optimization.
+> In-flight safety: a per-tenant **migrating lock** ({@see App\Support\ShardLock}) is held for the whole
+> move, so tenant/crawl write jobs (GSC sync, audits, rank, crawl) re-queue themselves (`release(30)`)
+> instead of writing to the source during the window — no lost writes. Mover copy is chunked (bounded
+> memory); for very large tenants a `mariabackup`/`mysqldump` streaming path is the next optimization.
 
 ## Known follow-ups (deferred)
 - Boundary-join CI test (run read paths with each tier on a separate sqlite connection).
@@ -83,7 +84,6 @@ node_b has the rows, node_a purged, anchors flipped.
   (today nodes run the full set; cross-tier FKs are dropped so the unused central tables are harmless).
 - Entity-keyed job routing (`TrackKeywordRankJob`, `RunCustomPageAudit`, `RunCompetitorDiscovery` resolve
   their website then set `ShardContext`).
-- Phase 0 backups (binlog + `mariabackup` → Hetzner Storage Box) — prod-gated.
 - Production re-derive cutover + real Hetzner node provisioning (xplate.com acceptance) — operator-gated.
 
 ## Key files

@@ -65,6 +65,26 @@ class ShardScaffoldTest extends TestCase
         $this->assertNull(config('database.connections.'.$pending->connectionName()));
     }
 
+    public function test_shard_lock_marks_tenant_and_crawl_site_migrating(): void
+    {
+        $lock = \App\Support\ShardLock::class;
+
+        $this->assertFalse($lock::websiteLocked('w1'));
+        $this->assertFalse($lock::websiteLocked(null));
+        $this->assertFalse($lock::websiteLocked(''));
+
+        $lock::lockWebsite('w1');
+        $this->assertTrue($lock::websiteLocked('w1'));
+        $this->assertFalse($lock::websiteLocked('w2'));
+        $lock::unlockWebsite('w1');
+        $this->assertFalse($lock::websiteLocked('w1'));
+
+        $lock::lockCrawlSite('cs1');
+        $this->assertTrue($lock::crawlSiteLocked('cs1'));
+        $lock::unlockCrawlSite('cs1');
+        $this->assertFalse($lock::crawlSiteLocked('cs1'));
+    }
+
     public function test_shard_context_defaults_to_eloquent_default_connection(): void
     {
         $ctx = app(ShardContext::class);

@@ -5,6 +5,7 @@ namespace App\Services\Sharding;
 use App\Models\DbNode;
 use App\Models\User;
 use App\Models\Website;
+use App\Support\ShardLock;
 use App\Support\ShardManager;
 use App\Support\ShardTables;
 use Illuminate\Support\Facades\DB;
@@ -12,13 +13,13 @@ use Illuminate\Support\Facades\DB;
 /**
  * Moves a tenant (a user + all their websites' fact data) or a crawl-site's crawl
  * data between shard nodes. ULIDs are globally unique, so a move is a clean copy
- * (no id remapping). Sequence: copy → verify row counts → flip the central anchor
- * → purge the source. Reversible until the purge.
+ * (no id remapping). Sequence: lock → copy → verify row counts → flip the central
+ * anchor → purge the source → unlock. Reversible until the purge.
  *
- * Copies are chunked per table (bounded memory) over the source/target node
- * connections. Run during low tenant activity: in-flight writes to the source
- * between copy and anchor-flip are not captured (a per-tenant migrating lock is a
- * future hardening — see SHARDING_PLAN.md).
+ * Copies are chunked per table (bounded memory). A {@see ShardLock} marks the
+ * tenant/crawl-site "migrating" for the whole move, so in-flight write jobs (GSC
+ * sync, audits, rank, crawl) re-queue themselves instead of writing to the source
+ * during the window — no lost writes. The lock has a safety TTL.
  */
 class ShardMover
 {
@@ -45,28 +46,40 @@ class ShardMover
             throw new \RuntimeException("target connection {$dest} is not registered");
         }
 
-        $counts = [];
-        // Parent-before-child (ShardTables order) so within-tier FKs resolve on insert.
-        foreach (array_keys(ShardTables::TENANT) as $table) {
-            $where = ShardTables::tenantWhere($table, $websiteIds);
-            $counts[$table] = $this->copyTable($table, $where, $source, $dest);
-        }
-
-        $this->verify(array_keys(ShardTables::TENANT), fn ($t) => ShardTables::tenantWhere($t, $websiteIds), $source, $dest);
-
-        // Cutover: flip the central anchors, then purge the source.
-        DB::transaction(function () use ($user, $websiteIds, $target): void {
-            $user->update(['db_node_id' => $target->id]);
-            Website::whereIn('id', $websiteIds)->update(['db_node_id' => $target->id]);
-        });
+        // Lock the tenant for the whole move so write jobs defer (no source
+        // writes between copy and purge). Always released, even on failure.
         foreach ($websiteIds as $wid) {
-            $this->cleanup->purgeWebsiteTenantData($wid, $source);
+            ShardLock::lockWebsite($wid);
         }
 
-        $target->increment('tenant_count');
-        ShardManager::flush();
+        try {
+            $counts = [];
+            // Parent-before-child (ShardTables order) so within-tier FKs resolve on insert.
+            foreach (array_keys(ShardTables::TENANT) as $table) {
+                $where = ShardTables::tenantWhere($table, $websiteIds);
+                $counts[$table] = $this->copyTable($table, $where, $source, $dest);
+            }
 
-        return $counts;
+            $this->verify(array_keys(ShardTables::TENANT), fn ($t) => ShardTables::tenantWhere($t, $websiteIds), $source, $dest);
+
+            // Cutover: flip the central anchors, then purge the source.
+            DB::transaction(function () use ($user, $websiteIds, $target): void {
+                $user->update(['db_node_id' => $target->id]);
+                Website::whereIn('id', $websiteIds)->update(['db_node_id' => $target->id]);
+            });
+            foreach ($websiteIds as $wid) {
+                $this->cleanup->purgeWebsiteTenantData($wid, $source);
+            }
+
+            $target->increment('tenant_count');
+            ShardManager::flush();
+
+            return $counts;
+        } finally {
+            foreach ($websiteIds as $wid) {
+                ShardLock::unlockWebsite($wid);
+            }
+        }
     }
 
     /**
@@ -83,16 +96,21 @@ class ShardMover
             throw new \RuntimeException("target connection {$dest} is not registered");
         }
 
-        $counts = [];
-        foreach (array_keys(ShardTables::CRAWL) as $table) {
-            $counts[$table] = $this->copyTable($table, ShardTables::crawlWhere($table, $crawlSiteId), $source, $dest);
-        }
-        $this->verify(array_keys(ShardTables::CRAWL), fn ($t) => ShardTables::crawlWhere($t, $crawlSiteId), $source, $dest);
+        ShardLock::lockCrawlSite($crawlSiteId);
+        try {
+            $counts = [];
+            foreach (array_keys(ShardTables::CRAWL) as $table) {
+                $counts[$table] = $this->copyTable($table, ShardTables::crawlWhere($table, $crawlSiteId), $source, $dest);
+            }
+            $this->verify(array_keys(ShardTables::CRAWL), fn ($t) => ShardTables::crawlWhere($t, $crawlSiteId), $source, $dest);
 
-        $site->update(['crawl_node_id' => $target->id]);
-        $this->cleanup->purgeCrawlSiteData($crawlSiteId, $source);
-        $target->increment('site_count');
-        ShardManager::flush();
+            $site->update(['crawl_node_id' => $target->id]);
+            $this->cleanup->purgeCrawlSiteData($crawlSiteId, $source);
+            $target->increment('site_count');
+            ShardManager::flush();
+        } finally {
+            ShardLock::unlockCrawlSite($crawlSiteId);
+        }
 
         return $counts;
     }

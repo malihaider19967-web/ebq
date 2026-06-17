@@ -30,6 +30,11 @@ class SyncSitemaps implements ShouldQueue
 
     public function handle(SearchConsoleService $service): void
     {
+        if (\App\Support\ShardLock::websiteLocked((string) $this->websiteId)) {
+            $this->release(30);
+
+            return;
+        }
         app(\App\Support\ShardContext::class)->forWebsite((string) $this->websiteId);
         $website = Website::findOrFail($this->websiteId);
 
