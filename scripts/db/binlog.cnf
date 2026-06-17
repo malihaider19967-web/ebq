@@ -1,0 +1,21 @@
+# EBQ — MariaDB binary logging (point-in-time recovery + replica readiness).
+#
+# Install as a drop-in and restart MariaDB ONCE to activate:
+#   sudo cp scripts/db/binlog.cnf /etc/mysql/mariadb.conf.d/99-ebq-binlog.cnf
+#   sudo systemctl restart mariadb      # brief blip; master log starts fresh
+#   mysql -e "SHOW VARIABLES LIKE 'log_bin';"   # -> ON
+#
+# Disk: a few GB for the retention window (75 GB box at ~19% used — fine).
+# This is the single biggest risk reduction on a no-backup DB AND the prerequisite
+# for the Phase-D tenant-move backups + a future read replica.
+
+[mariadbd]
+log_bin = /var/log/mysql/ebq-bin
+binlog_format = ROW
+# ~3 days of PITR window; raise once a dedicated DB box / bigger disk is in place.
+binlog_expire_logs_seconds = 259200
+# A stable server-id (required for binlog/replication); distinct per box if you
+# later add a replica (e.g. primary=1, replica=2).
+server_id = 1
+# Crash-safety for the binlog (small perf cost, worth it on a no-backup DB).
+sync_binlog = 1
