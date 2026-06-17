@@ -80,6 +80,11 @@
                         'match_routes' => ['admin.fleet.'],
                     ],
                     [
+                        'route' => 'admin.db-fleet.index',
+                        'label' => 'DB Fleet',
+                        'match_routes' => ['admin.db-fleet.'],
+                    ],
+                    [
                         'route' => 'admin.marketing.index',
                         'label' => 'Marketing',
                         'match_routes' => ['admin.marketing.'],
