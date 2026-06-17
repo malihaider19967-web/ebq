@@ -13,10 +13,12 @@
 ## Operator setup (one-time, ~15 min)
 1. **Enable binlog** (one restart; brief blip — box is shared with Postal/Jitsi, do it off-peak):
    ```
+   sudo mkdir -p /var/log/mysql && sudo chown mysql:mysql /var/log/mysql   # REQUIRED — else startup aborts
    sudo cp scripts/db/binlog.cnf /etc/mysql/mariadb.conf.d/99-ebq-binlog.cnf
    sudo systemctl restart mariadb
-   mysql -e "SHOW VARIABLES LIKE 'log_bin';"   # ON
+   sudo mysql -uroot -e "SHOW VARIABLES LIKE 'log_bin';"   # ON
    ```
+   (Done on the live box 2026-06-17: binlog active as `ebq-bin.000001`.)
    Then soften the `CLAUDE.md` "no backups, binlog off" warning to point here.
 2. **Storage Box**: order a Hetzner **BX11**, accept its host key once, then write `/etc/ebq-backup.env`:
    ```

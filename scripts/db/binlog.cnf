@@ -1,6 +1,7 @@
 # EBQ — MariaDB binary logging (point-in-time recovery + replica readiness).
 #
 # Install as a drop-in and restart MariaDB ONCE to activate:
+#   sudo mkdir -p /var/log/mysql && sudo chown mysql:mysql /var/log/mysql  # REQUIRED — startup aborts without it
 #   sudo cp scripts/db/binlog.cnf /etc/mysql/mariadb.conf.d/99-ebq-binlog.cnf
 #   sudo systemctl restart mariadb      # brief blip; master log starts fresh
 #   mysql -e "SHOW VARIABLES LIKE 'log_bin';"   # -> ON
