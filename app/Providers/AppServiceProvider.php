@@ -12,6 +12,7 @@ use Illuminate\Http\Request;
 use Illuminate\Mail\Events\MessageSent;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Cashier\Cashier;
@@ -93,5 +94,18 @@ class AppServiceProvider extends ServiceProvider
         // explicit `useCustomerModel()` call is needed. Calling it
         // with Website would point relationship lookups at the wrong
         // table and break $subscription->owner.
+
+        // Per-box fleet queue metrics: only worker boxes carry a FLEET_NODE_ID
+        // (config/fleet.php), so the web box no-ops. Each box maintains its own
+        // in-flight / finished / failed counters in the shared Redis, which the
+        // crawler fleet page reads back per node. See App\Support\FleetMetrics.
+        if ($nodeId = config('fleet.node_id')) {
+            Queue::before(fn (\Illuminate\Queue\Events\JobProcessing $e) => \App\Support\FleetMetrics::onProcessing($nodeId));
+            Queue::after(fn (\Illuminate\Queue\Events\JobProcessed $e) => \App\Support\FleetMetrics::onProcessed($nodeId));
+            // Fires when an attempt throws (before a retry-release OR a permanent fail) —
+            // decrements the in-flight gauge so retries don't leak it.
+            Queue::exceptionOccurred(fn (\Illuminate\Queue\Events\JobExceptionOccurred $e) => \App\Support\FleetMetrics::onException($nodeId));
+            Queue::failing(fn (\Illuminate\Queue\Events\JobFailed $e) => \App\Support\FleetMetrics::onFailed($nodeId));
+        }
     }
 }

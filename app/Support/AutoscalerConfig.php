@@ -25,19 +25,27 @@ class AutoscalerConfig
         'target_backlog_per_box' => 400, // desired = ceil(crawl-queue depth / this)
         'server_type' => 'cx23',       // Hetzner server type for new boxes (matches the existing worker)
         'snapshot_id' => null,         // the worker snapshot image id (set after building it)
+        'auto_snapshot' => true,       // auto-rebuild the worker snapshot when git HEAD changes (kill-switch: turn OFF while working on the server so it doesn't rebuild repeatedly)
+        'snapshot_head' => null,       // git HEAD the current snapshot was built from (drift detection; managed by ebq:refresh-worker-snapshot)
         'scale_up_cooldown_s' => 180,  // wait this long after a provision before another
         'scale_down_idle_s' => 900,    // backlog must stay low this long before draining a box
         'min_box_lifetime_s' => 3300,  // never drain a box younger than ~55 min (hourly billing)
         'per_domain_rate' => 2,        // distributed fetch rate ceiling, req/sec/domain
     ];
 
-    /** @var array<string,array{0:int,1:int}> [min,max] clamps for the integer knobs. */
+    /**
+     * @var array<string,array{0:int,1:int}> [min,max] clamps for the integer knobs.
+     * Minimum floors relaxed (2026-06-17) so an operator can tune aggressively for
+     * testing/small backlogs — e.g. a low target_backlog_per_box to force scale-up.
+     * The UPPER caps stay (esp. max_boxes ≤ 50) so a bad value still can't provision
+     * a runaway number of boxes. target min is 1 (desiredFromBacklog also guards /0).
+     */
     private const CLAMPS = [
-        'min_boxes' => [1, 20],
+        'min_boxes' => [1, 50],
         'max_boxes' => [1, 50],
-        'target_backlog_per_box' => [50, 100000],
-        'scale_up_cooldown_s' => [30, 3600],
-        'scale_down_idle_s' => [60, 86400],
+        'target_backlog_per_box' => [1, 100000],
+        'scale_up_cooldown_s' => [0, 3600],
+        'scale_down_idle_s' => [0, 86400],
         'min_box_lifetime_s' => [0, 86400],
         'per_domain_rate' => [1, 100],
     ];
@@ -54,6 +62,20 @@ class AutoscalerConfig
     public static function enabled(): bool
     {
         return (bool) self::all()['enabled'];
+    }
+
+    /** Auto-rebuild the worker snapshot on git-HEAD drift (kill-switch). */
+    public static function autoSnapshot(): bool
+    {
+        return (bool) self::all()['auto_snapshot'];
+    }
+
+    /** Git HEAD the current worker snapshot was built from (null if never built/tracked). */
+    public static function snapshotHead(): ?string
+    {
+        $v = self::all()['snapshot_head'] ?? null;
+
+        return $v !== null && $v !== '' ? (string) $v : null;
     }
 
     public static function minBoxes(): int

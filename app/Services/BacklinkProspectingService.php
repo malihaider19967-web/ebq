@@ -74,7 +74,7 @@ class BacklinkProspectingService
         }
         sort($competitorDomains);
 
-        $cacheKey = sprintf('ebq_backlink_prospects:%d:%s', $website->id, hash('xxh3', implode('|', $competitorDomains)));
+        $cacheKey = sprintf('ebq_backlink_prospects:%s:%s', $website->id, hash('xxh3', implode('|', $competitorDomains)));
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             $cached['cached'] = true;

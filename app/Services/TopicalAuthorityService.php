@@ -70,7 +70,7 @@ class TopicalAuthorityService
      */
     public function map(Website $website): array
     {
-        $cacheKey = sprintf('ebq_topical_authority:%d', $website->id);
+        $cacheKey = sprintf('ebq_topical_authority:%s', $website->id);
         $cached = Cache::get($cacheKey);
         if (is_array($cached)) {
             return $cached;

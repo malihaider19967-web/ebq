@@ -15,6 +15,11 @@ namespace App\Support;
  *  - CRAWL_FINALIZE: the long post-crawl analysis (AnalyzeSiteJob, ≤1200s) —
  *                 runs ONLY on the pinned permanent box so a scale-down drain can
  *                 never interrupt a finalize. See infra/crawler/autoscaling.md.
+ *  - FLEET:       node provisioning / bootstrap / tenant moves (admin-triggered).
+ *                 Runs ONLY on the pinned WEB box as ROOT (ebq-queue-fleet in
+ *                 ebq.conf) because it SSHes/rsyncs to new boxes using root's key.
+ *                 Long (≤1800s) — kept off the request thread so the admin UI
+ *                 never hits the FPM 120s timeout.
  */
 final class Queues
 {
@@ -27,4 +32,6 @@ final class Queues
     public const CRAWL = 'crawl';
 
     public const CRAWL_FINALIZE = 'crawl-finalize';
+
+    public const FLEET = 'fleet';
 }

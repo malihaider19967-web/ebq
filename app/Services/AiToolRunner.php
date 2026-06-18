@@ -207,7 +207,7 @@ class AiToolRunner
     private function cacheKey(Website $website, string $toolId, array $input): string
     {
         $hash = hash('xxh3', json_encode($input) ?: '');
-        return sprintf('ai_tool:%s:%d:%s', $toolId, $website->id, $hash);
+        return sprintf('ai_tool:%s:%s:%s', $toolId, $website->id, $hash);
     }
 
     private function logCredits(Website $website, ?string $userId, string $toolId, AiToolResult $result, bool $cached): void

@@ -48,7 +48,7 @@ class AiRelatedKeywordsService
         }
 
         $cacheKey = sprintf(
-            'ai_related_keywords:%s:%d:%s',
+            'ai_related_keywords:%s:%s:%s',
             self::PROMPT_VERSION,
             $websiteId,
             hash('xxh3', mb_strtolower($keyword))

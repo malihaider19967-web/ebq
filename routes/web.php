@@ -284,6 +284,9 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::post('/fleet/{node}/drain', [\App\Http\Controllers\Admin\FleetController::class, 'drain'])->name('fleet.drain');
     Route::post('/fleet/{node}/destroy', [\App\Http\Controllers\Admin\FleetController::class, 'destroy'])->name('fleet.destroy');
 
+    // Fleet UI E2E test report (screenshot slideshow from the latest Dusk run)
+    Route::get('/fleet-test', [\App\Http\Controllers\Admin\FleetTestController::class, 'index'])->name('fleet-test');
+
     // Database-shard node fleet (App\Http\Controllers\Admin\DbFleetController)
     Route::get('/db-fleet', [\App\Http\Controllers\Admin\DbFleetController::class, 'index'])->name('db-fleet.index');
     Route::post('/db-fleet/settings', [\App\Http\Controllers\Admin\DbFleetController::class, 'settings'])->name('db-fleet.settings');

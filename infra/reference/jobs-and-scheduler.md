@@ -26,6 +26,35 @@ flags / framework defaults (effectively `tries=1` the way these workers are run)
 `REDIS_QUEUE_RETRY_AFTER=1320` must stay above the longest timeout (`AnalyzeSiteJob`
 1200s) on **both** boxes — see deployment doc.
 
+### Horizon (queue observability) — LIVE
+
+All queues (except `fleet`) now run under **Laravel Horizon**. Dashboard at **`/horizon`**.
+Topology in `config/horizon.php`:
+- Supervisors `web` (interactive+default, 300s), `worker-crawl` (crawl, 300s), `worker-heavy`
+  (sync+crawl-finalize, 1200s). The **`fleet` queue is NOT under Horizon** — it runs as **root**
+  (SSH keys), so it stays a standalone root `queue:work` (supervisor `ebq-queue-fleet`).
+- **Per-box scoping is via the `environments` map keyed by APP_ENV.** ⚠️ Horizon merges
+  `defaults` into EVERY environment (`array_replace_recursive`), so `defaults` is kept **empty**
+  and each supervisor is defined only inside the environment(s) that should run it — otherwise a
+  supervisor in `defaults` runs on every box. Mapping: web box `APP_ENV=local`→`web`; pinned
+  worker `APP_ENV=worker`→`worker-crawl`+`worker-heavy`; ephemeral `APP_ENV=worker-ephemeral`→
+  `worker-crawl`. The per-box APP_ENV/FLEET_NODE_ID/HORIZON_NAME are stamped into each box's `.env`
+  (pinned: manually; ephemeral: by `WorkerFleetService::bootstrap`).
+- **How it runs per box:** web box → Supervisor program `ebq-horizon` (`php artisan horizon`,
+  www-data, in `/etc/supervisor/conf.d/ebq.conf`). Pinned worker B + ephemeral → a single
+  `horizon` Docker service (`docker-compose.worker.yml` / `docker-compose.ephemeral.yml`),
+  replacing the old per-queue `queue:work` services. Horizon owns process count (no `replicas`).
+- **`/horizon` is admin-gated.** ⚠️ The parent provider's default auth is
+  `Gate::check('viewHorizon') || app()->environment('local')`; since this box runs **APP_ENV=local
+  in production**, `HorizonServiceProvider::boot()` re-sets `Horizon::auth()` to the gate **without**
+  the local bypass (admins only). Do not revert that, or `/horizon` becomes world-readable.
+- **Metrics:** `horizon:snapshot` runs every 5 min (`routes/console.php`). On code deploy, run
+  `horizon:terminate` so each box's master restarts on the new code (the Supervisor/Docker
+  `restart` brings it back). Horizon metadata lives in its own Redis connection (`database.redis.horizon`, DB 3).
+- **Per-physical-box counts** (Horizon is per-queue, not per-box): `App\Support\FleetMetrics`
+  keeps in-flight/finished/failed counters per box (queue events keyed by `FLEET_NODE_ID`), shown
+  on the crawler fleet page for safe-drain decisions.
+
 ## Jobs (`app/Jobs/*.php`)
 
 Legend: **U** = `ShouldBeUnique` (`uniqueId` shown). All times in seconds.

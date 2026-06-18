@@ -47,9 +47,14 @@ class CrawlValueRank
                 $bindings[] = $id;
                 $bindings[] = $rank;
             }
-            $idList = $chunk->implode(',');
+            // Bind the IN-list ids as parameters too — ULID ids are strings, so a
+            // raw `IN (01KVB…)` interpolation would be parsed as column names.
+            $inPlaceholders = implode(',', array_fill(0, $chunk->count(), '?'));
+            foreach ($chunk as $id) {
+                $bindings[] = $id;
+            }
             DB::update(
-                'UPDATE website_pages SET value_rank = CASE id '.implode(' ', $cases).' END WHERE id IN ('.$idList.')',
+                'UPDATE website_pages SET value_rank = CASE id '.implode(' ', $cases).' END WHERE id IN ('.$inPlaceholders.')',
                 $bindings,
             );
         }

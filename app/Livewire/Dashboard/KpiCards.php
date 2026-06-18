@@ -72,7 +72,7 @@ class KpiCards extends Component
             // the date range alone doesn't change, so without the version these KPIs
             // stayed stale for the whole TTL after a re-sync.
             $cacheKey = sprintf(
-                'kpis:%d:%s:%s:%d',
+                'kpis:%s:%s:%s:%d',
                 $this->websiteId,
                 $currentStart->toDateString(),
                 $currentEnd->toDateString(),

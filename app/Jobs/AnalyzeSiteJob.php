@@ -143,7 +143,7 @@ class AnalyzeSiteJob implements ShouldQueue
     private function flushSubscribers(CrawlSite $crawlSite): void
     {
         foreach ($crawlSite->websites()->pluck('id') as $wid) {
-            \App\Services\ReportCache::flushWebsite((int) $wid);
+            \App\Services\ReportCache::flushWebsite((string) $wid);
         }
     }
 
@@ -260,7 +260,7 @@ class AnalyzeSiteJob implements ShouldQueue
                 foreach ($rows as $r) {
                     $path = parse_url($r->affected_url, PHP_URL_PATH) ?: '/';
                     foreach ($subscriberIds as $wid) {
-                        MatchRedirectFor404Job::dispatch((int) $wid, $path, (int) $r->impact)->onQueue(\App\Support\Queues::CRAWL);
+                        MatchRedirectFor404Job::dispatch((string) $wid, $path, (int) $r->impact)->onQueue(\App\Support\Queues::CRAWL);
                     }
                 }
             });

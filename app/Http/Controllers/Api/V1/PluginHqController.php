@@ -65,7 +65,7 @@ class PluginHqController extends Controller
         [$start, $end, $prevStart, $prevEnd, $rangeKey] = $this->resolveRange($request);
 
         $payload = Cache::remember(
-            sprintf('hq:overview:v1:%d:%s:%d', $website->id, $rangeKey, ReportCache::version($website->id)),
+            sprintf('hq:overview:v1:%s:%s:%d', $website->id, $rangeKey, ReportCache::version($website->id)),
             now()->addHours(24),
             fn () => $this->buildOverviewPayload($website, $start, $end, $prevStart, $prevEnd, $rangeKey),
         );

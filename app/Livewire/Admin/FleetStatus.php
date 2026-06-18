@@ -32,6 +32,10 @@ class FleetStatus extends Component
         return view('livewire.admin.fleet-status', [
             'nodes' => $nodes,
             'cfg' => $cfg,
+            // Per-box in-flight / finished / failed (shared-Redis counters keyed by
+            // node id). Horizon shows per-QUEUE metrics; this is per physical BOX,
+            // so an operator can see a box is idle before draining it.
+            'metrics' => \App\Support\FleetMetrics::forMany($nodes->pluck('id')),
             'summary' => [
                 'enabled' => (bool) $cfg['enabled'],
                 'backlog' => $backlog,

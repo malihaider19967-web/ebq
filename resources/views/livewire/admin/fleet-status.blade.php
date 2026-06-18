@@ -36,6 +36,9 @@
                     <th class="px-4 py-2.5 text-left font-medium">Status</th>
                     <th class="px-4 py-2.5 text-left font-medium">Private IP</th>
                     <th class="px-4 py-2.5 text-left font-medium">Type</th>
+                    <th class="px-4 py-2.5 text-right font-medium" title="Jobs this box is processing right now — wait for 0 before draining">In-flight</th>
+                    <th class="px-4 py-2.5 text-right font-medium" title="Jobs this box has completed since it started">Finished</th>
+                    <th class="px-4 py-2.5 text-right font-medium" title="Jobs that failed on this box since it started">Failed</th>
                     <th class="px-4 py-2.5 text-right font-medium">Age</th>
                     <th class="px-4 py-2.5 text-left font-medium">Health</th>
                     <th class="px-4 py-2.5 text-left font-medium">Last seen</th>
@@ -54,6 +57,10 @@
                         </td>
                         <td class="px-4 py-2.5 tabular-nums text-slate-600 dark:text-slate-300">{{ $n->private_ip ?? '—' }}</td>
                         <td class="px-4 py-2.5 text-slate-600 dark:text-slate-300">{{ $n->server_type ?? '—' }}</td>
+                        @php $m = $metrics[$n->id] ?? ['running' => 0, 'done' => 0, 'failed' => 0]; @endphp
+                        <td class="px-4 py-2.5 text-right tabular-nums font-semibold {{ $m['running'] > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-400' }}" title="{{ $m['running'] > 0 ? 'busy — draining now would wait for these to finish' : 'idle — safe to drain' }}">{{ $m['running'] }}</td>
+                        <td class="px-4 py-2.5 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ number_format($m['done']) }}</td>
+                        <td class="px-4 py-2.5 text-right tabular-nums {{ $m['failed'] > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-400' }}">{{ number_format($m['failed']) }}</td>
                         <td class="px-4 py-2.5 text-right tabular-nums text-slate-600 dark:text-slate-300">{{ $n->ageMinutes() }}m</td>
                         <td class="px-4 py-2.5">
                             @if ($n->is_healthy === true)<span class="text-emerald-600 dark:text-emerald-400">healthy</span>
@@ -75,10 +82,10 @@
                         </td>
                     </tr>
                 @empty
-                    <tr><td colspan="8" class="px-4 py-8 text-center text-sm text-slate-400">No worker nodes.</td></tr>
+                    <tr><td colspan="11" class="px-4 py-8 text-center text-sm text-slate-400">No worker nodes.</td></tr>
                 @endforelse
             </tbody>
         </table>
     </div>
-    <p class="text-[11px] text-slate-400">Live — refreshes every 5s. The queue is central Redis, so a new box just pulls crawl jobs; no rebalancing.</p>
+    <p class="text-[11px] text-slate-400">Live — refreshes every 5s. The queue is central Redis, so a new box just pulls crawl jobs; no rebalancing. <span class="text-slate-500">In-flight</span> = jobs running on that box right now — wait for <span class="font-mono">0</span> before draining (a drain also lets any in-flight job finish via the 360s stop-grace). Finished/Failed are cumulative since the box started. Full per-queue metrics: <a href="{{ url('/horizon') }}" class="text-indigo-600 hover:underline dark:text-indigo-400">Horizon</a>.</p>
 </div>

@@ -46,7 +46,7 @@ class CrossSiteBenchmarkService
     public function forWebsite(Website $website, ?string $country = null): array
     {
         $cacheKey = sprintf(
-            'ebq_xsite_benchmark:%d:%s',
+            'ebq_xsite_benchmark:%s:%s',
             $website->id,
             strtolower((string) $country ?: 'global'),
         );

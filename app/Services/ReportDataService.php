@@ -735,7 +735,7 @@ class ReportDataService
         [$start, $end] = $this->resolveRange($startDate, $endDate, 28);
 
         $key = sprintf(
-            'report:cannibalization:v1:%d:%s:%s:%d:%s:%d',
+            'report:cannibalization:v1:%s:%s:%s:%d:%s:%d',
             $websiteId,
             $start->toDateString(),
             $end->toDateString(),
@@ -841,7 +841,7 @@ class ReportDataService
         return Cache::remember(
             // v2: row shape gained `page` + `page_position` (ranking URL).
             sprintf(
-                'report:strikingDistance:v2:%d:%s:%s:%d:%s:%d',
+                'report:strikingDistance:v2:%s:%s:%s:%d:%s:%d',
                 $websiteId,
                 $start->toDateString(),
                 $end->toDateString(),
@@ -1007,7 +1007,7 @@ class ReportDataService
 
         return Cache::remember(
             sprintf(
-                'report:contentDecay:v1:%d:%d:%s:%s:%d',
+                'report:contentDecay:v1:%s:%d:%s:%s:%d',
                 $websiteId,
                 $limit,
                 $country ?? 'all',
@@ -1206,7 +1206,7 @@ class ReportDataService
 
         return Cache::remember(
             sprintf(
-                'report:indexingFails:v1:%d:%d:%d:%s:%s:%d',
+                'report:indexingFails:v1:%s:%d:%d:%s:%s:%d',
                 $websiteId,
                 $windowDays,
                 $limit,
@@ -1282,7 +1282,7 @@ class ReportDataService
         $country = $this->normalizeCountry($country);
 
         return Cache::remember(
-            sprintf('report:insightCounts:v1:%d:%s:%d', $websiteId, $country ?? 'all', ReportCache::version($websiteId)),
+            sprintf('report:insightCounts:v1:%s:%s:%d', $websiteId, $country ?? 'all', ReportCache::version($websiteId)),
             now()->addHours(24),
             fn () => [
                 'cannibalizations' => count($this->cannibalizationReport($websiteId, null, null, 50, $country)),
@@ -1308,7 +1308,7 @@ class ReportDataService
     {
         return Cache::remember(
             sprintf(
-                'report:quickWins:v1:%d:%d:%s:%d',
+                'report:quickWins:v1:%s:%d:%s:%d',
                 $websiteId,
                 $limit,
                 Carbon::yesterday(config('app.timezone'))->toDateString(),
@@ -1432,7 +1432,7 @@ class ReportDataService
     {
         return Cache::remember(
             sprintf(
-                'report:topCountries:v1:%d:%d:%s:%d',
+                'report:topCountries:v1:%s:%d:%s:%d',
                 $websiteId,
                 $limit,
                 Carbon::yesterday(config('app.timezone'))->toDateString(),

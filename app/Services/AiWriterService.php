@@ -208,7 +208,7 @@ class AiWriterService
             ? substr(hash('sha256', mb_strtolower($customPrompt)), 0, 12)
             : '0';
         $cacheKey = sprintf(
-            'ai_writer_v24:%d:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s:%s',
+            'ai_writer_v24:%s:%d:%s:%s:%s:%s:%d:%d:%s:%s:%s:%s',
             $website->id,
             $postId,
             hash('xxh3', mb_strtolower($keyword)),

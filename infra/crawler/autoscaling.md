@@ -41,9 +41,67 @@ One row per worker box (mirrors the keyword-server fleet pattern). `app/Models/W
 
 A new box boots from a **snapshot** (Docker + the `ebq-worker` image + `docker-compose.worker.yml`
 + `docker/worker/Dockerfile` + the web box's **public** deploy key in `authorized_keys`). The
-web box then **pushes**: `rsync` code (NO `--delete`) + a worker `.env` and runs
-`docker compose up -d` over SSH with `/root/.ssh/id_ed25519_worker`. **No private key or API
-token ever lands on an ephemeral box.**
+web box then **pushes** over SSH (`/root/.ssh/id_ed25519_worker`). **No private key or API token
+ever lands on an ephemeral box.** `bootstrap()` does, in order:
+1. `rsync` code (NO `--delete`, excludes `vendor/` among others).
+2. `rsync vendor/` **separately, WITH `--delete`** — vendor is excluded from step 1, so without
+   this a Composer change never reaches a worker (its vendor stays frozen at snapshot age).
+   Makes "composer change → redeploy" enough; no snapshot rebuild. Verified: a fresh box was
+   2,705 vendor files behind the web box before this.
+3. `rsync` the worker `.env`, then **stamp per-box identity**: `APP_ENV=worker-ephemeral`
+   (selects the crawl-only Horizon supervisor), `FLEET_NODE_ID` + `HORIZON_NAME` (per-box queue
+   counters + dashboard label). Stamp uses `grep||sed||echo` per key — NO nested double-quotes
+   (an earlier for-loop version silently no-op'd FLEET_NODE_ID inside the ssh double-quotes).
+4. `docker compose up -d --force-recreate --remove-orphans`. **`--force-recreate` is essential:**
+   the box boots from a snapshot whose containers auto-start (`restart:always`) on OLD code, and
+   `up -d` alone will NOT recreate a container whose service config is unchanged — so a code-only
+   deploy would leave the long-running worker (Horizon master) running **stale code in memory**
+   (volume-mounted files update; the PHP process does not). `--force-recreate` rebuilds the
+   container every bootstrap so Horizon reloads the freshly-rsynced code. Verified by uptime reset
+   (container "Up 3 min" → "Up 14 s") and a sentinel file present in the new code.
+
+The box runs a single **Horizon** master (`docker-compose.ephemeral.yml` → `php artisan horizon`),
+crawl-only via the `worker-ephemeral` env. See [../reference/jobs-and-scheduler.md](../reference/jobs-and-scheduler.md) (Horizon section).
+
+### Reliability — "box runs old code" is two failure modes, both handled
+
+A fresh box boots from the snapshot, whose containers `restart:always` → they auto-start the
+snapshot's OLD code immediately. Two ways that bites, both now permanent-fixed:
+1. **Resync happened but the worker holds old code in memory** → bootstrap step 4 uses
+   `up -d --force-recreate`, which restarts the Horizon master AFTER the rsync, so it loads the
+   new code. ("Supervisor activated after the code update.")
+2. **Resync never happened** (bootstrap aborted, e.g. `waitForSsh` timed out because the box came
+   up after the wait) → the box was left stuck at `provisioning`, running snapshot code forever AND
+   blocking scale-up. Fixes: (a) bootstrap **stops the snapshot's stale containers on connect**
+   (step 0 `docker compose down`) so old code stops pulling jobs even mid-bootstrap; (b) `waitForSsh`
+   raised to ~7.5 min; (c) **`FleetAutoscale::recoverStuck()`** runs every tick — re-runs the
+   idempotent `bootstrap()` on any box stuck at `provisioning` (recovers late-SSH boxes), reaps
+   `failed` boxes, and destroys boxes stuck > `PROVISION_STUCK_MINUTES` (18). So the fleet self-heals
+   without manual intervention; nothing sits on old code or blocks the loop.
+
+**Deeper root fix: rebuild the worker snapshot "cold"** — current code baked in AND the worker
+containers NOT auto-starting. **Script: `scripts/worker/build-worker-snapshot.sh`** — provisions a
+temp box from the current `HCLOUD_WORKER_IMAGE` (reuses Docker + the `ebq-worker` image + deploy
+key), rsyncs current code+vendor+`.env.worker`+`docker-compose.ephemeral.yml`, runs
+`docker compose down` (so a fresh box auto-starts NOTHING), powers off, snapshots, prints the new
+image id. Then set `HCLOUD_WORKER_IMAGE` to it (+ `.env.worker`) and `cache:forget fleet:snapshots:worker`.
+Re-run after any deploy you want baked into the base image; bootstrap still rsyncs current code on
+top, so the snapshot only needs refreshing occasionally.
+
+**Auto-refresh on git-HEAD drift (so the snapshot self-maintains):**
+- `AutoscalerConfig` tracks `snapshot_id` + `snapshot_head` (the git HEAD the snapshot was built from)
+  and an `auto_snapshot` kill-switch (toggle at /admin/fleet — turn OFF while working on the server so
+  it doesn't rebuild repeatedly).
+- **`ebq:refresh-worker-snapshot`** (scheduled hourly, `runInBackground` + `withoutOverlapping` + an
+  internal Cache lock): if `auto_snapshot` is on and current HEAD ≠ `snapshot_head`, it runs the build
+  script, then sets `snapshot_id`=new image + `snapshot_head`=HEAD. `--force` rebuilds regardless.
+- **Provision-time gate** (`FleetAutoscale::snapshotReady`): before creating a box, if HEAD drifted it
+  kicks the (self-locked) rebuild and **defers** scale-up to a later tick — so a box is never built
+  from a stale base, and the hourly job not having run yet doesn't matter. It defers across 2-min ticks
+  (each ~instant), it does NOT block one tick for the ~15-min build. With `auto_snapshot` OFF, no
+  gate/defer — provisioning uses whatever `snapshot_id`/`HCLOUD_WORKER_IMAGE` is set.
+- HEAD-based drift fits the workflow: uncommitted edits don't move HEAD (no rebuild while hacking on the
+  box); a commit (a real deploy) does → one background rebuild.
 
 ## Operator prerequisites (must be set up before real provisioning)
 
@@ -67,6 +125,19 @@ These are infra one-time setup, not code:
    ```
    Without this a new box's workers crash-loop on "Connection timed out" (the firewall drops
    them) and can't pull jobs. (Found during the first live provision test, 2026-06-17.)
+8. **MariaDB GRANT for the worker SUBNET on the PRIMARY DB** — separate layer from `ufw`: ufw lets
+   the TCP connection through, but MariaDB still rejects the host with `[1130] Host '10.0.0.X' is
+   not allowed to connect` unless the app user is granted for that host. Shard nodes already do this
+   in `DbFleetService::bootstrap` (`CREATE USER 'ebquser'@'10.0.0.%'` + GRANT). The **primary** DB
+   is *registered*, not bootstrapped, so it needs it once (as root on 10.0.0.2):
+   ```sql
+   CREATE USER IF NOT EXISTS 'ebquser'@'10.0.0.%' IDENTIFIED BY PASSWORD '<same hash as @10.0.0.3>';
+   GRANT ALL PRIVILEGES ON `ebq_v2`.* TO 'ebquser'@'10.0.0.%';  -- + ebq, ebq_shard1 to match
+   FLUSH PRIVILEGES;
+   ```
+   The `10.0.0.%` wildcard covers ALL current + future ephemeral worker IPs. Applied 2026-06-18 —
+   before it, every autoscaled worker failed 100% of DB jobs with `[1130]`. Re-apply if the primary
+   DB is ever rebuilt.
 7. **`server_type` must be a line your account/location offers** — these boxes use `cx` (shared
    Intel, e.g. `cx23` in fsn1); `cpx*` (AMD) returned "unsupported location for server type".
    The default is `cx23`; pick at `/admin/fleet`.

@@ -95,7 +95,7 @@ class SiteGraphAnalyzer
         }
     }
 
-    private function homepageId(CrawlSite $crawlSite): ?int
+    private function homepageId(CrawlSite $crawlSite): ?string
     {
         $rootHash = WebsitePage::hashUrl($crawlSite->homepageUrl());
         $id = WebsitePage::where('crawl_site_id', $crawlSite->id)->where('url_hash', $rootHash)->value('id');

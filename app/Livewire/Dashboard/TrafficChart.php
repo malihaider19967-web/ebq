@@ -56,7 +56,7 @@ class TrafficChart extends Component
             // days inside this fixed window invalidates the cache (date range alone
             // doesn't change after a same-window correction).
             $cacheKey = sprintf(
-                'traffic_chart:v3:%d:%d:%s:%s:%s:%d',
+                'traffic_chart:v3:%s:%s:%s:%s:%s:%d',
                 $this->websiteId,
                 (string) $user->id,
                 str_replace('/', '_', $tz),

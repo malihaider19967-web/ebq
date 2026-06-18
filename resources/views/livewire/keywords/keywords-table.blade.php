@@ -38,7 +38,7 @@
         </div>
     </div>
 
-    @if ($rows instanceof \Illuminate\Contracts\Pagination\LengthAwarePaginator && $rows->isNotEmpty())
+    @if ($rows instanceof \Illuminate\Contracts\Pagination\Paginator && $rows->isNotEmpty())
         <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <div class="overflow-x-auto">
                 <table class="w-full text-xs">

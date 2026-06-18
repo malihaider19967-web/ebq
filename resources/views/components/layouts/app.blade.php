@@ -75,14 +75,10 @@
                         'match_routes' => ['admin.crawler.'],
                     ],
                     [
+                        // Unified compute + data fleet page (crawl workers + DB shards as tabs).
                         'route' => 'admin.fleet.index',
                         'label' => 'Fleet',
-                        'match_routes' => ['admin.fleet.'],
-                    ],
-                    [
-                        'route' => 'admin.db-fleet.index',
-                        'label' => 'DB Fleet',
-                        'match_routes' => ['admin.db-fleet.'],
+                        'match_routes' => ['admin.fleet.', 'admin.db-fleet.'],
                     ],
                     [
                         'route' => 'admin.marketing.index',

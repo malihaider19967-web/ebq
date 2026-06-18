@@ -69,7 +69,7 @@ class AiContentBriefService
         }
         $country = $country !== '' ? strtolower($country) : 'us';
         $cacheKey = sprintf(
-            'ai_content_brief_v3:%d:%s:%s',
+            'ai_content_brief_v3:%s:%s:%s',
             $website->id,
             hash('xxh3', mb_strtolower($keyword)),
             $country,
@@ -98,7 +98,7 @@ class AiContentBriefService
         // v3 sharpened the suggested_outline vs. subtopics distinction so
         //     they're no longer near-duplicates in the UI.
         $cacheKey = sprintf(
-            'ai_content_brief_v3:%d:%s:%s',
+            'ai_content_brief_v3:%s:%s:%s',
             $website->id,
             hash('xxh3', mb_strtolower($keyword)),
             $country,

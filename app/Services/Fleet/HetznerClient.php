@@ -109,6 +109,38 @@ class HetznerClient
     }
 
     /**
+     * Available snapshot images, optionally filtered by a label selector
+     * (e.g. 'role=ebq-crawl-worker' or 'role=ebq-db-node'). Powers the admin
+     * snapshot dropdowns so an operator picks a real image id instead of typing
+     * one (a wrong id => Hetzner "image not found" at provision time).
+     *
+     * @return array{ok:bool, snapshots:array<int,array{id:int,description:string,status:string,created:?string}>, error:?string}
+     */
+    public function listSnapshots(?string $selector = null): array
+    {
+        $query = ['type' => 'snapshot', 'per_page' => 50];
+        if ($selector !== null && $selector !== '') {
+            $query['label_selector'] = $selector;
+        }
+        $out = $this->request('get', '/images', $query);
+        if (! $out['ok']) {
+            return ['ok' => false, 'snapshots' => [], 'error' => $out['error']];
+        }
+        $images = array_filter($out['json']['images'] ?? [], static fn ($im): bool => ($im['status'] ?? '') === 'available');
+        // Latest first — Hetzner `created` is ISO-8601, which sorts lexically.
+        usort($images, static fn ($a, $b): int => strcmp((string) ($b['created'] ?? ''), (string) ($a['created'] ?? '')));
+        $snapshots = array_map(static fn (array $im): array => [
+            'id' => (int) $im['id'],
+            'description' => (string) ($im['description'] ?? ''),
+            'status' => (string) ($im['status'] ?? ''),
+            // Date + time (UTC), e.g. "2026-06-18 00:42".
+            'created' => isset($im['created']) ? str_replace('T', ' ', substr((string) $im['created'], 0, 16)) : null,
+        ], $images);
+
+        return ['ok' => true, 'snapshots' => array_values($snapshots), 'error' => null];
+    }
+
+    /**
      * @param  array<string,mixed>  $payload  query (GET) or body (POST)
      * @return array{ok:bool, status:?int, json:?array, error:?string}
      */

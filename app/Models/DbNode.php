@@ -141,6 +141,47 @@ class DbNode extends Model
         return $this->tenant_count === 0 && $this->site_count === 0;
     }
 
+    /**
+     * Recompute tenant_count / site_count for EVERY node from actual data, and
+     * persist any that drifted. These columns are otherwise only bumped by
+     * {@see \App\Services\Sharding\ShardMover} moves — organic signups and new
+     * crawl-sites land on the primary via NULL db_node_id / crawl_node_id and so
+     * never increment its counters, which is how the primary drifts. Run this on
+     * the fleet page (and after moves) so the counts self-heal.
+     *
+     * tenant_count = distinct website owners whose effective node is this node;
+     * site_count   = crawl_sites whose effective node is this node. NULL routes to
+     * the pinned primary, so COALESCE(node_id, primaryId) gives the effective node.
+     *
+     * @return array<string,array{tenants:int,sites:int}> authoritative counts by node id
+     */
+    public static function reconcileCounts(): array
+    {
+        $primaryId = static::where('is_pinned', true)->value('id');
+        if ($primaryId === null) {
+            return static::all()->mapWithKeys(fn (self $n) => [$n->id => ['tenants' => $n->tenant_count, 'sites' => $n->site_count]])->all();
+        }
+
+        $tenants = Website::query()
+            ->selectRaw('COALESCE(db_node_id, ?) AS node_id, COUNT(DISTINCT user_id) AS c', [$primaryId])
+            ->groupBy('node_id')->pluck('c', 'node_id');
+        $sites = CrawlSite::query()
+            ->selectRaw('COALESCE(crawl_node_id, ?) AS node_id, COUNT(*) AS c', [$primaryId])
+            ->groupBy('node_id')->pluck('c', 'node_id');
+
+        $map = [];
+        foreach (static::all() as $node) {
+            $t = (int) ($tenants[$node->id] ?? 0);
+            $s = (int) ($sites[$node->id] ?? 0);
+            $map[$node->id] = ['tenants' => $t, 'sites' => $s];
+            if ($node->tenant_count !== $t || $node->site_count !== $s) {
+                $node->forceFill(['tenant_count' => $t, 'site_count' => $s])->saveQuietly();
+            }
+        }
+
+        return $map;
+    }
+
     public function ageMinutes(): int
     {
         return (int) ($this->provisioned_at?->diffInMinutes(now()) ?? $this->created_at?->diffInMinutes(now()) ?? 0);

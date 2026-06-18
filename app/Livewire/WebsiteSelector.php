@@ -25,18 +25,18 @@ class WebsiteSelector extends Component
         $sessionId = session('current_website_id');
         $ids = array_column($this->websites, 'id');
 
-        $this->websiteId = in_array($sessionId, $ids, true) ? $sessionId : ($ids[0] ?? 0);
+        $this->websiteId = in_array($sessionId, $ids, true) ? $sessionId : ($ids[0] ?? null);
 
         if ($this->websiteId) {
             session(['current_website_id' => $this->websiteId]);
         }
     }
 
-    public function updatedWebsiteId(int $value): void
+    public function updatedWebsiteId(string $value): void
     {
         $ids = array_column($this->websites, 'id');
         if (! in_array($value, $ids, true)) {
-            $value = (int) ($ids[0] ?? 0);
+            $value = (string) ($ids[0] ?? '');
             $this->websiteId = $value;
         }
 

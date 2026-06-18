@@ -35,7 +35,7 @@ class ResearchAggregateService
     public function cacheKey(string $websiteId, string $keyword, string $country): string
     {
         return sprintf(
-            '%s:%d:%s:%s',
+            '%s:%s:%s:%s',
             self::CACHE_KEY_PREFIX,
             $websiteId,
             hash('xxh3', mb_strtolower($keyword)),

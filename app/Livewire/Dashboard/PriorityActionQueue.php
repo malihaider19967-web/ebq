@@ -97,7 +97,7 @@ class PriorityActionQueue extends Component
         $version = \App\Services\ReportCache::version($this->websiteId);
 
         return Cache::remember(
-            sprintf('action-queue:%d:%d:%s', $this->websiteId, $version, $country ?? 'all'),
+            sprintf('action-queue:%s:%d:%s', $this->websiteId, $version, $country ?? 'all'),
             600,
             fn (): array => app(ActionQueueService::class)->groupedActions($this->websiteId, $country),
         );

@@ -1,6 +1,6 @@
 # Crawl-ONLY worker stack for AUTOSCALED ephemeral boxes. The bootstrap copies this
 # over docker-compose.worker.yml on each new box, so an ephemeral box runs only the
-# page-fetch pipeline (`--queue=crawl`, <=300s jobs) — never the long crawl-finalize
+# page-fetch pipeline (crawl queue, <=300s jobs) — never the long crawl-finalize
 # (AnalyzeSiteJob) or sync queues, which stay on the pinned permanent box. That way a
 # scale-down drain can never interrupt a finalize. See infra/crawler/autoscaling.md.
 #
@@ -14,6 +14,11 @@ services:
     stop_grace_period: 360s
     volumes: [ "/var/www/ebq:/var/www/ebq" ]
     working_dir: /var/www/ebq
-    command: php -d memory_limit=2048M artisan queue:work redis --queue=crawl --sleep=3 --tries=3 --max-time=3600 --timeout=300
-    deploy:
-      replicas: 5
+    # Single Horizon master per box. It spawns + supervises the crawl worker
+    # processes itself, sized by the `worker-ephemeral` environment in
+    # config/horizon.php — which runs the crawl-ONLY supervisor. That environment
+    # is selected because bootstrap stamps APP_ENV=worker-ephemeral into this box's
+    # .env. SIGTERM → Horizon gracefully terminates its workers; the 360s stop-grace
+    # lets the in-flight page-fetch finish before the box is removed. (No `replicas`
+    # — Horizon owns process count, not Docker.)
+    command: php artisan horizon

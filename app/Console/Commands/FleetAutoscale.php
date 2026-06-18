@@ -11,6 +11,7 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Process;
 use Illuminate\Support\Facades\Queue;
 
 /**
@@ -35,6 +36,9 @@ class FleetAutoscale extends Command
 
     private const MARKER = 'autoscaler:scale_down_since';
 
+    /** Give up + replace a box that hasn't finished bootstrapping after this long. */
+    private const PROVISION_STUCK_MINUTES = 18;
+
     public function handle(WorkerFleetService $fleet): int
     {
         if (! AutoscalerConfig::enabled()) {
@@ -45,6 +49,7 @@ class FleetAutoscale extends Command
         if (! $dry) {
             $fleet->reconcile();
             $this->reapDrained($fleet);
+            $this->recoverStuck($fleet);
         }
 
         $backlog = $this->backlog();
@@ -81,6 +86,13 @@ class FleetAutoscale extends Command
         if (! app(HetznerClient::class)->configured()) {
             $this->say("scale-up skip: HCLOUD_TOKEN not configured — {$ctx}", $dry);
 
+            return;
+        }
+        // Don't build a box from a STALE base: if auto-snapshot is on and the snapshot
+        // wasn't built from the current git HEAD, kick a background rebuild and DEFER
+        // provisioning until it's fresh (the hourly refresh may not have run yet). This
+        // skips the tick (retries every 2 min); it does NOT block 15 min in one tick.
+        if (! $this->snapshotReady($dry, $ctx)) {
             return;
         }
         if ($dry) {
@@ -131,6 +143,63 @@ class FleetAutoscale extends Command
                 $fleet->destroy($node);
             }
         }
+    }
+
+    /**
+     * Self-heal half-provisioned boxes so the fleet recovers WITHOUT manual help —
+     * the whole point being an operator can use /admin/fleet and trust it:
+     *  - FAILED unpinned boxes (bad image, vanished server) → destroy; the scale
+     *    loop provisions a fresh one next tick.
+     *  - boxes stuck at 'provisioning' (bootstrap aborted — e.g. SSH came up after
+     *    the wait window) → RE-RUN bootstrap (it's idempotent), which rsyncs current
+     *    code + force-recreates the Horizon container. So a box can never sit running
+     *    the snapshot's OLD code, nor block scale-up forever. If it's been stuck too
+     *    long it's genuinely broken → destroy and let the loop replace it.
+     * bootstrap() now also stops the snapshot's stale containers on connect, so even
+     * mid-recovery a box isn't pulling jobs with old code.
+     */
+    private function recoverStuck(WorkerFleetService $fleet): void
+    {
+        foreach (WorkerNode::where('is_pinned', false)->where('status', WorkerNode::STATUS_FAILED)->get() as $node) {
+            $this->say("reaping failed node {$node->id} ({$node->last_error})", false);
+            $fleet->destroy($node);
+        }
+
+        foreach (WorkerNode::where('is_pinned', false)->where('status', WorkerNode::STATUS_PROVISIONING)->get() as $node) {
+            if ($node->ageMinutes() >= self::PROVISION_STUCK_MINUTES) {
+                $this->say("provisioning stuck {$node->ageMinutes()}m — destroying node {$node->id} ({$node->last_error})", false);
+                $fleet->destroy($node);
+
+                continue;
+            }
+            $this->say("re-bootstrapping stuck node {$node->id} (age {$node->ageMinutes()}m)", false);
+            $fleet->bootstrap($node);
+        }
+    }
+
+    /**
+     * Safe to provision from the current snapshot? When auto-snapshot is on and the
+     * snapshot's git HEAD != deployed HEAD, kick a (self-locked, background) rebuild and
+     * return false so scale-up DEFERS to a later tick — never building a box from a stale
+     * base. No-op (true) when auto-snapshot is off (operator manages the image manually).
+     */
+    private function snapshotReady(bool $dry, string $ctx): bool
+    {
+        if (! AutoscalerConfig::autoSnapshot()) {
+            return true;
+        }
+        $head = trim((string) Process::run('git -C /var/www/ebq rev-parse HEAD')->output());
+        if ($head === '' || $head === AutoscalerConfig::snapshotHead()) {
+            return true;
+        }
+        if (! $dry) {
+            // ebq:refresh-worker-snapshot self-locks → this just ensures a build is running
+            // (don't wait up to an hour for the scheduled one). Detached: never blocks the tick.
+            Process::run('nohup php /var/www/ebq/artisan ebq:refresh-worker-snapshot >/dev/null 2>&1 &');
+        }
+        $this->say("scale-up deferred: worker snapshot rebuilding for HEAD {$head} — {$ctx}", $dry);
+
+        return false;
     }
 
     private function backlog(): int

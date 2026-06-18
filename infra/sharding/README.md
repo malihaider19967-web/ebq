@@ -1,9 +1,32 @@
 # Sharding — full-ULID, multi-node tenant + crawl sharding
 
-> Status: **built on branch `feature/db-sharding-ulid`** (not yet merged/deployed). Validated on
-> sqlite (suite: 0 new failures vs baseline) and end-to-end on a throwaway docker MariaDB. The
-> production cutover (re-derive onto a ULID schema) + real Hetzner node provisioning are gated on
-> operator setup. Plan: repo-root `SHARDING_PLAN.md`.
+> Status: **deployed to production** (full ULID on `ebq_v2`, both boxes) and **acceptance-proven on a
+> genuinely separate Hetzner DB node** (2026-06-17). A live tenant (`dubaiexplorer.ae`) was moved
+> primary→real-node `10.0.0.4`→back, with the migrating lock observed flipping in real time, row-count
+> verify, anchor flips, source purge, and accurate fleet counts on both moves. Plan: repo-root
+> `SHARDING_PLAN.md`. Branch: `feature/db-sharding-ulid` (pending merge to main).
+>
+> **Provisioning a real node — operator path (proven):**
+> 1. Build the MariaDB snapshot once: `bash scripts/db/build-mariadb-snapshot.sh` → prints an image id →
+>    set `HCLOUD_DB_IMAGE=<id>` in `.env` (+ `.env.worker`), `php artisan config:clear`, restart FPM.
+> 2. `/admin/db-fleet` → **Provision** (role tenant-shard|crawl-shard) → **Bootstrap**. Bootstrap is
+>    **self-sufficient**: it pushes `99-ebq.cnf` (`bind-address=0.0.0.0`, binlog, `server_id`=IP last
+>    octet, buffer pool), restarts MariaDB, creates the app DB + `ebquser@'10.0.0.%'` grant, opens
+>    `ufw`, then migrates the schema over the network — so it works even on a vanilla MariaDB box.
+> 3. The pinned **primary** must also be reachable as a node from both boxes:
+>    `GRANT ALL ON ebq_v2.* TO 'ebquser'@'10.0.0.2'` and `@'10.0.0.3'` (needed for move-*back* to primary).
+>
+> **Admin UI runs fleet ops asynchronously (2026-06-17):** provision / bootstrap / migrate / move /
+drain are dispatched as `App\Jobs\Fleet\*` jobs on the **`fleet` queue**, processed ONLY by the
+**root** `ebq-queue-fleet` Supervisor worker on the web box (it SSHes/rsyncs with root's key and can
+run for minutes — never in the FPM request). Restart that worker after editing fleet/mover code.
+The whole DB-shard + crawl-worker + tenant-move + **crawl-site-move** lifecycle is UI-proven via
+`tests/Browser/FleetUiTest.php` (Dusk); the run is shown as a slideshow at **`/admin/fleet-test`**.
+
+Gotchas learned: ephemeral boxes recycle private IPs → `DbFleetService` (and `WorkerFleetService`) SSH use
+> `UserKnownHostsFile=/dev/null` so a changed host key never blocks bootstrap; bootstrap SQL is piped via
+> **stdin** (not `mysql -e "…"`) to avoid nested shell-quoting eating backticks/passwords; `db_nodes.
+> last_error` is `varchar(255)` so error writes are truncated.
 
 EBQ shards its database across MariaDB nodes in **two independent dimensions**, behind one routing
 layer. In single-node mode every anchor is NULL → the default connection → behaviour is identical to
@@ -61,8 +84,31 @@ are kept. Integrity is now app-enforced:
   the web box runs `migrate` over the node connection) / `migrateNode` / `drain` / `destroy` (refuses a
   non-empty node).
 - **`App\Support\DbFleetConfig`** — `Setting`-backed defaults (server_type, snapshot_id, placement, caps).
-- **`ebq:db-node`** command + **`/admin/db-fleet`** panel (`DbFleetController`).
+- **`ebq:db-node`** command + the **"Database shards" tab on the unified `/admin/fleet` page**
+  (`FleetController::index` renders both fleets; `DbFleetController` still owns the DB-fleet POST
+  actions/data). `/admin/db-fleet` now **302-redirects to `/admin/fleet#data`** (old links still work).
+  The page is one tabbed, self-documented screen — "Crawl workers" (compute, live via Livewire poll)
+  and "Database shards" (data); a collapsible "How the fleet works" block documents the model. Tab
+  state persists in the URL hash; the Data tab gently full-reloads (10s) to surface provisioning→active.
 - `config/services.php` `hetzner.db_image` + `hetzner.db_firewall_id`.
+- **Server-type dropdowns** (`DbFleetController::SERVER_TYPES`, `FleetController::SERVER_TYPES`) are
+  hardcoded slug=>label lists. Verified against the live Hetzner API for this account (fsn1, 2026-06-17):
+  the Intel CX line is **cx23**(2/4) / **cx33**(4/8) / **cx43**(8/16) / **cx53**(16/32) — there is **no
+  cx22/cx32**, and an invalid slug fails at provision time. An earlier list had `cx22`/`cx32` (nonexistent)
+  and shifted specs; re-confirm via `GET /v1/server_types` if the catalog changes.
+- **Move form** (Database-shards tab): the `id` field is a **searchable `<select>`** whose options switch
+  with **Kind** — `tenant`→users that own websites (id=user id), `crawl`→crawl-sites (id=crawl_site id).
+  Options + a client-side filter are built from `moveOptions` (passed by `DbFleetController::index`);
+  small datasets so all options ship inline.
+- **Node counts** (`db_nodes.tenant_count` / `site_count`): these columns are only ever bumped by
+  `ShardMover` increment/decrement on **moves** — organic signups / new crawl-sites land on the primary
+  via NULL `db_node_id`/`crawl_node_id` and are **never** counted, so the **primary drifts low** (it had
+  1/1 stored vs 2/2 actual). Fix: **`DbNode::reconcileCounts()`** recomputes every node from actual data
+  (`COUNT(DISTINCT user_id)` / `COUNT(*)` grouped by `COALESCE(node_id, primaryId)`) and persists drift;
+  `FleetController::index` calls it on every render, so the table self-heals. `tenant_count` = distinct
+  website owners on the node; `site_count` = crawl-sites on the node. `DbNode::isEmpty()` (destroy guard)
+  reads these — safe because the only drifting node (primary) is pinned/undeletable, and shard nodes only
+  receive data via counted moves.
 
 ## Move / backup (`ebq:shard`)
 
@@ -84,7 +130,11 @@ node_b has the rows, node_a purged, anchors flipped.
   (today nodes run the full set; cross-tier FKs are dropped so the unused central tables are harmless).
 - Entity-keyed job routing (`TrackKeywordRankJob`, `RunCustomPageAudit`, `RunCompetitorDiscovery` resolve
   their website then set `ShardContext`).
-- Production re-derive cutover + real Hetzner node provisioning (xplate.com acceptance) — operator-gated.
+- **DONE (2026-06-17):** production re-derive cutover (ULID/`ebq_v2`) + real Hetzner DB-node
+  provisioning + live tenant move/move-back acceptance on a separate box (10.0.0.4).
+- Per-node `server_id` is the private-IP last octet (unique within the /24) — revisit if a node ever
+  lands outside `10.0.0.0/24` or for cross-shard replication topology.
+- Offsite Storage Box backups + `feature/db-sharding-ulid` → main merge still pending.
 
 ## Key files
 Models: `app/Models/DbNode.php`, `Concerns/UsesTenantConnection.php`, `Concerns/UsesCrawlConnection.php`.
@@ -92,4 +142,7 @@ Routing: `app/Support/{ShardManager,ShardContext,ShardTables,DbFleetConfig}.php`
 `app/Http/Middleware/ResolveShardContext.php`. Fleet: `app/Services/Fleet/DbFleetService.php`,
 `app/Console/Commands/DbNodeCommand.php`, `app/Http/Controllers/Admin/DbFleetController.php`.
 Sharding ops: `app/Services/Sharding/{ShardCleanup,ShardMover}.php`, `app/Console/Commands/ShardCommand.php`.
+Snapshot builder: `scripts/db/build-mariadb-snapshot.sh` (builds the `HCLOUD_DB_IMAGE` MariaDB image).
+Note: `ShardMover` increments the target node's `tenant_count`/`site_count` **and decrements the source's**
+on a move (keeps `/admin/db-fleet` counts accurate across move + move-back).
 Migrations: `…_create_db_nodes_table`, `…_add_shard_anchors`, `…_drop_cross_tier_foreign_keys`.

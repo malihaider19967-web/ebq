@@ -35,6 +35,7 @@ class ShardMover
         $user = User::findOrFail($userId);
         $websiteIds = $user->websites()->pluck('id')->map(fn ($v) => (string) $v)->all();
         $source = ShardCleanup::connectionFor($user->db_node_id);
+        $sourceNodeId = $user->db_node_id;
         $dest = $target->connectionName();
 
         if ($websiteIds === []) {
@@ -71,6 +72,9 @@ class ShardMover
                 $this->cleanup->purgeWebsiteTenantData($wid, $source);
             }
 
+            if ($sourceNodeId !== null && $sourceNodeId !== $target->id) {
+                DbNode::where('id', $sourceNodeId)->where('tenant_count', '>', 0)->decrement('tenant_count');
+            }
             $target->increment('tenant_count');
             ShardManager::flush();
 
@@ -91,6 +95,7 @@ class ShardMover
     {
         $site = \App\Models\CrawlSite::findOrFail($crawlSiteId);
         $source = ShardCleanup::connectionFor($site->crawl_node_id);
+        $sourceNodeId = $site->crawl_node_id;
         $dest = $target->connectionName();
         if (! $this->connectionExists($dest)) {
             throw new \RuntimeException("target connection {$dest} is not registered");
@@ -106,6 +111,9 @@ class ShardMover
 
             $site->update(['crawl_node_id' => $target->id]);
             $this->cleanup->purgeCrawlSiteData($crawlSiteId, $source);
+            if ($sourceNodeId !== null && $sourceNodeId !== $target->id) {
+                DbNode::where('id', $sourceNodeId)->where('site_count', '>', 0)->decrement('site_count');
+            }
             $target->increment('site_count');
             ShardManager::flush();
         } finally {
@@ -122,7 +130,11 @@ class ShardMover
         DB::connection($source)->table($table)->whereRaw($where)->orderBy('id')
             ->chunk(1000, function ($rows) use ($table, $dest, &$copied): void {
                 $batch = array_map(fn ($r) => (array) $r, $rows->all());
-                DB::connection($dest)->table($table)->insert($batch);
+                // insertOrIgnore (not insert): ULID PKs are globally unique, so a row
+                // already present on the target is the SAME logical row — skip it. Makes
+                // a re-run / partially-completed move idempotent instead of hitting a
+                // duplicate-key error. The row-count verify still confirms completeness.
+                DB::connection($dest)->table($table)->insertOrIgnore($batch);
                 $copied += count($batch);
             });
 

@@ -3,13 +3,15 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\Fleet\BootstrapDbNodeJob;
+use App\Jobs\Fleet\MigrateDbNodeJob;
+use App\Jobs\Fleet\MoveShardJob;
+use App\Jobs\Fleet\ProvisionDbNodeJob;
 use App\Models\DbNode;
 use App\Services\Fleet\DbFleetService;
-use App\Services\Sharding\ShardMover;
 use App\Support\DbFleetConfig;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\View\View;
 
 /**
  * Admin "Database fleet" panel — the DbNode equivalent of {@see FleetController}.
@@ -20,20 +22,46 @@ use Illuminate\View\View;
  */
 class DbFleetController extends Controller
 {
-    private const SERVER_TYPES = [
-        'cx23' => 'cx23 — 4 vCPU / 8 GB',
-        'cx33' => 'cx33 — 8 vCPU / 16 GB',
+    /**
+     * Hetzner server types (slug => human). Slugs + specs verified against the
+     * live Hetzner API for this account (fsn1). cx = shared Intel, cpx = shared
+     * AMD, ccx = dedicated AMD. Keep in sync if Hetzner's catalog changes.
+     * Public: the unified /admin/fleet page ({@see FleetController::index}) reuses it.
+     */
+    public const SERVER_TYPES = [
+        'cx23' => 'cx23 — 2 vCPU / 4 GB',
+        'cx33' => 'cx33 — 4 vCPU / 8 GB',
+        'cx43' => 'cx43 — 8 vCPU / 16 GB',
         'cpx41' => 'cpx41 — 8 vCPU / 16 GB (AMD)',
         'ccx33' => 'ccx33 — 8 dedicated vCPU / 32 GB',
     ];
 
-    public function index(): View
+    /**
+     * The DB-shard fleet now lives as the "Database shards" tab on the unified
+     * /admin/fleet page. Keep this GET so old links/bookmarks still resolve.
+     */
+    public function index(): RedirectResponse
     {
-        return view('admin.db-fleet.index', [
-            'nodes' => DbNode::orderByDesc('is_pinned')->orderBy('role')->orderBy('id')->get(),
-            'cfg' => DbFleetConfig::all(),
-            'serverTypes' => self::SERVER_TYPES,
-        ]);
+        // '#data' opens the "Database shards" tab on the unified page (read by its JS).
+        return redirect(route('admin.fleet.index').'#data');
+    }
+
+    /**
+     * Move-form options, reused by the unified fleet page. A "tenant" move is keyed
+     * by USER id (ShardMover::moveTenant moves that user + all their websites' data),
+     * so only users who own websites are valid tenants. A "crawl" move is keyed by
+     * crawl_site id (domain). Returns ['tenant' => [{id,label}], 'crawl' => [...]].
+     */
+    public static function moveOptions(): array
+    {
+        $tenants = \App\Models\User::whereHas('websites')->orderBy('name')->get(['id', 'name', 'email'])
+            ->map(fn ($u) => ['id' => (string) $u->id, 'label' => trim(($u->name ?: '—').' — '.$u->email)])
+            ->values();
+        $crawlSites = \App\Models\CrawlSite::orderBy('normalized_domain')->get(['id', 'normalized_domain'])
+            ->map(fn ($s) => ['id' => (string) $s->id, 'label' => $s->normalized_domain])
+            ->values();
+
+        return ['tenant' => $tenants, 'crawl' => $crawlSites];
     }
 
     public function settings(Request $request): RedirectResponse
@@ -60,29 +88,28 @@ class DbFleetController extends Controller
         return back()->with('status', "Primary node registered ({$node->name}).");
     }
 
-    public function provision(Request $request, DbFleetService $fleet): RedirectResponse
+    public function provision(Request $request): RedirectResponse
     {
         $role = $request->input('role') === DbNode::ROLE_CRAWL ? DbNode::ROLE_CRAWL : DbNode::ROLE_TENANT;
-        $node = $fleet->provision($role);
-        if ($node->status === DbNode::STATUS_FAILED) {
-            return back()->with('error', "Provision failed: {$node->last_error}");
-        }
+        // Provision + bootstrap run on the FLEET queue (web box, root): they SSH to
+        // the new box and can take minutes — far past the request timeout.
+        ProvisionDbNodeJob::dispatch($role);
 
-        return back()->with('status', "Provisioned node {$node->id}. Run bootstrap to configure + migrate it.");
+        return back()->with('status', 'Provisioning a new '.$role.' node in the background — its status will update from provisioning → active here.');
     }
 
-    public function bootstrap(DbNode $node, DbFleetService $fleet): RedirectResponse
+    public function bootstrap(DbNode $node): RedirectResponse
     {
-        return $fleet->bootstrap($node)
-            ? back()->with('status', "Bootstrapped node {$node->id}.")
-            : back()->with('error', "Bootstrap failed: {$node->fresh()?->last_error}");
+        BootstrapDbNodeJob::dispatch($node->id);
+
+        return back()->with('status', "Bootstrapping node {$node->id} in the background (configure + migrate).");
     }
 
-    public function migrate(DbNode $node, DbFleetService $fleet): RedirectResponse
+    public function migrate(DbNode $node): RedirectResponse
     {
-        return $fleet->migrateNode($node)
-            ? back()->with('status', "Schema migrated on node {$node->id}.")
-            : back()->with('error', "Migrate failed: {$node->fresh()?->last_error}");
+        MigrateDbNodeJob::dispatch($node->id);
+
+        return back()->with('status', "Migrating schema on node {$node->id} in the background.");
     }
 
     public function drain(DbNode $node, DbFleetService $fleet): RedirectResponse
@@ -99,7 +126,7 @@ class DbFleetController extends Controller
             : back()->with('error', $node->fresh()?->last_error ?: 'Cannot destroy this node.');
     }
 
-    public function move(Request $request, ShardMover $mover): RedirectResponse
+    public function move(Request $request): RedirectResponse
     {
         $data = $request->validate([
             'kind' => ['required', 'in:tenant,crawl'],
@@ -107,14 +134,10 @@ class DbFleetController extends Controller
             'to' => ['required', 'string', 'exists:db_nodes,id'],
         ]);
         $target = DbNode::findOrFail($data['to']);
-        try {
-            $counts = $data['kind'] === 'crawl'
-                ? $mover->moveCrawlSite($data['id'], $target)
-                : $mover->moveTenant($data['id'], $target);
-        } catch (\Throwable $e) {
-            return back()->with('error', 'Move failed: '.$e->getMessage());
-        }
+        // Runs on the FLEET queue: the move holds a migrating lock + chunk-copies,
+        // which can take a while. The node counts / anchors update here when done.
+        MoveShardJob::dispatch($data['kind'], $data['id'], $target->id);
 
-        return back()->with('status', "Moved {$data['kind']} {$data['id']} → {$target->name}: ".array_sum($counts).' rows.');
+        return back()->with('status', "Move started: {$data['kind']} {$data['id']} → {$target->name} (running in background).");
     }
 }

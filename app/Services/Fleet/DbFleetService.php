@@ -6,6 +6,7 @@ use App\Models\DbNode;
 use App\Support\DbFleetConfig;
 use App\Support\ShardManager;
 use Illuminate\Support\Facades\Artisan;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
 
@@ -118,9 +119,36 @@ class DbFleetService
             return false;
         }
         $ip = $node->private_ip;
-        $ssh = 'ssh -i /root/.ssh/id_ed25519_worker -o BatchMode=yes -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10';
+        // Ephemeral cloud boxes recycle private IPs, so a previously-seen IP can
+        // come back with a different host key. Pin nothing (UserKnownHostsFile=
+        // /dev/null) so a recycled IP never trips "REMOTE HOST IDENTIFICATION
+        // HAS CHANGED" and blocks bootstrap.
+        $ssh = 'ssh -i /root/.ssh/id_ed25519_worker -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10';
         if (! $this->waitForSsh($ip, $ssh)) {
             $node->update(['last_error' => 'box not SSH-reachable within timeout']);
+
+            return false;
+        }
+
+        // Make MariaDB remote-reachable + binlog-enabled here (not just baked into
+        // the snapshot) so bootstrap is self-sufficient on any MariaDB box and
+        // survives a snapshot that ships the distro default (bind 127.0.0.1).
+        // server_id = private-IP last octet → unique per node (needed for binlog/
+        // replication). Config pushed via stdin to avoid nested shell quoting.
+        $serverId = max(1, (int) substr((string) strrchr($ip, '.'), 1));
+        $cnf = "[mysqld]\n"
+            ."bind-address            = 0.0.0.0\n"
+            ."server_id               = {$serverId}\n"
+            ."log_bin                 = /var/log/mysql/mysql-bin\n"
+            ."log_bin_index           = /var/log/mysql/mysql-bin.index\n"
+            ."binlog_format           = ROW\n"
+            ."expire_logs_days        = 7\n"
+            ."innodb_buffer_pool_size = 512M\n"
+            ."max_connections         = 200\n";
+        $cfgOk = $this->runWithInput("{$ssh} root@{$ip} 'cat > /etc/mysql/mariadb.conf.d/99-ebq.cnf'", $cnf)
+            && $this->run("{$ssh} root@{$ip} 'mkdir -p /var/log/mysql && chown mysql:mysql /var/log/mysql && systemctl restart mariadb'");
+        if (! $cfgOk) {
+            $node->update(['last_error' => 'MariaDB server-config (bind/binlog) step failed']);
 
             return false;
         }
@@ -129,13 +157,16 @@ class DbFleetService
         $dbPass = (string) config('database.connections.global.password');
         $db = $node->db_name;
         $sql = sprintf(
-            "CREATE DATABASE IF NOT EXISTS \\`%s\\`; "
+            "CREATE DATABASE IF NOT EXISTS `%s`; "
             ."CREATE USER IF NOT EXISTS '%s'@'10.0.0.%%' IDENTIFIED BY '%s'; "
-            ."GRANT ALL PRIVILEGES ON \\`%s\\`.* TO '%s'@'10.0.0.%%'; FLUSH PRIVILEGES;",
+            ."GRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'10.0.0.%%'; FLUSH PRIVILEGES;",
             $db, $dbUser, addslashes($dbPass), $db, $dbUser
         );
-        // The snapshot must allow local root (socket) mysql; configure + firewall.
-        $r1 = $this->run("{$ssh} root@{$ip} \"mysql -e \\\"{$sql}\\\" && ufw allow from 10.0.0.0/24 to any port 3306 proto tcp || true\"");
+        // Pipe SQL via stdin to remote `mysql` (not `mysql -e "…"`) so backticks and
+        // the password never pass through a nested ssh/shell quoting layer. The
+        // snapshot allows local root via unix_socket. Firewall opened separately.
+        $r1 = $this->runWithInput("{$ssh} root@{$ip} mysql", $sql);
+        $this->run("{$ssh} root@{$ip} 'ufw allow from 10.0.0.0/24 to any port 3306 proto tcp || true'");
 
         ShardManager::flush();
         $migrated = $this->migrateNode($node);
@@ -160,6 +191,15 @@ class DbFleetService
         if (! config("database.connections.{$conn}")) {
             (new ShardManager)->register();
         }
+        // During bootstrap the node is still 'provisioning' (not in
+        // REGISTERABLE_STATUSES), so ShardManager skips it. Register its
+        // connection directly from its own IP/db so we can migrate before active.
+        if (! config("database.connections.{$conn}") && $node->private_ip && $node->db_name) {
+            $labels = $node->labels ?? [];
+            $port = is_array($labels) && isset($labels['port']) ? (int) $labels['port'] : null;
+            config(["database.connections.{$conn}" => (new ShardManager)->buildConfig($node->private_ip, $node->db_name, $port)]);
+            DB::purge($conn);
+        }
         if (! config("database.connections.{$conn}")) {
             $node->update(['last_error' => "connection {$conn} not registered (no private_ip/db_name?)"]);
 
@@ -170,7 +210,7 @@ class DbFleetService
 
             return true;
         } catch (\Throwable $e) {
-            $node->update(['last_error' => 'migrate failed: '.$e->getMessage()]);
+            $node->update(['last_error' => mb_substr('migrate failed: '.$e->getMessage(), 0, 250)]);
             Log::error('DbFleet: migrate failed', ['node' => $node->id, 'error' => $e->getMessage()]);
 
             return false;
@@ -220,6 +260,18 @@ class DbFleetService
     {
         try {
             return Process::timeout(600)->run($cmd)->successful();
+        } catch (\Throwable $e) {
+            Log::warning('DbFleet: command failed', ['cmd' => $cmd, 'error' => $e->getMessage()]);
+
+            return false;
+        }
+    }
+
+    /** Like {@see run()} but feeds $input to the command's stdin (e.g. piping SQL to mysql). */
+    private function runWithInput(string $cmd, string $input): bool
+    {
+        try {
+            return Process::input($input)->timeout(600)->run($cmd)->successful();
         } catch (\Throwable $e) {
             Log::warning('DbFleet: command failed', ['cmd' => $cmd, 'error' => $e->getMessage()]);
 

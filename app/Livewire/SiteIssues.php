@@ -90,7 +90,7 @@ class SiteIssues extends Component
     {
         $version = \App\Services\ReportCache::version($this->websiteId);
         $groups = Cache::remember(
-            sprintf('action-queue:%d:%d:all', $this->websiteId, $version),
+            sprintf('action-queue:%s:%d:all', $this->websiteId, $version),
             600,
             fn (): array => app(ActionQueueService::class)->groupedActions($this->websiteId, null),
         );

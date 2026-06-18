@@ -36,3 +36,14 @@ Schedule::command('ebq:check-worker-nodes')->everyFiveMinutes()->withoutOverlapp
 // Keep the self-hosted keyword API fleet's health/queue snapshot warm so the
 // load balancer routes to live, least-busy servers.
 Schedule::command('ebq:check-keyword-servers')->everyFiveMinutes();
+
+// Horizon metrics snapshot — powers the throughput/runtime graphs on /horizon.
+// Runs on the web box's scheduler; metrics live in the shared Redis so they cover
+// every box's supervisors.
+Schedule::command('horizon:snapshot')->everyFiveMinutes();
+
+// Keep the crawl-worker snapshot in sync with the deployed code: rebuild it when git
+// HEAD drifts, then point the autoscaler at it. Background (a build is ~15 min) +
+// withoutOverlapping + an internal lock so it never double-builds or blocks the
+// scheduler. No-op unless the autoscaler's `auto_snapshot` kill-switch is on.
+Schedule::command('ebq:refresh-worker-snapshot')->hourly()->withoutOverlapping(30)->runInBackground();

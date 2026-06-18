@@ -33,7 +33,7 @@ class DeleteWebsiteData extends Command
             return self::FAILURE;
         }
 
-        return $all ? $this->handleAll() : $this->handleOne((int) $websiteArg);
+        return $all ? $this->handleAll() : $this->handleOne((string) $websiteArg);
     }
 
     private function handleOne(string $websiteId): int
@@ -133,10 +133,10 @@ class DeleteWebsiteData extends Command
                 try {
                     $this->deleteWebsite($website);
                     $deleted++;
-                    $this->line(sprintf('  deleted #%d (%s)', $website->id, $website->domain));
+                    $this->line(sprintf('  deleted #%s (%s)', $website->id, $website->domain));
                 } catch (\Throwable $e) {
                     $failed++;
-                    $this->error(sprintf('  failed #%d (%s): %s', $website->id, $website->domain, $e->getMessage()));
+                    $this->error(sprintf('  failed #%s (%s): %s', $website->id, $website->domain, $e->getMessage()));
                 }
             }
         });
