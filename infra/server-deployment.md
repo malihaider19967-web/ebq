@@ -67,11 +67,14 @@ Points `DB_HOST`/`REDIS_HOST` at `10.0.0.2`.
 (built from `./docker/worker` Dockerfile on the box, ~948 MB), `network_mode: host`,
 `restart: always`, bind-mount `/var/www/ebq:/var/www/ebq`:
 
-| Service | replicas | Command |
-|---|---|---|
-| `crawl` | **5** | `php -d memory_limit=2048M artisan queue:work redis --queue=crawl … --timeout=1200` (page-fetch pipeline) |
-| `finalize` | **1** | `php -d memory_limit=2048M artisan queue:work redis --queue=crawl-finalize … --timeout=1300` (the long `AnalyzeSiteJob`; pinned box only — `stop_grace_period: 360s`) |
-| `sync` | **1** | `php -d memory_limit=512M artisan queue:work redis --queue=sync … --timeout=600` |
+Queues now run under **Laravel Horizon** (one `ebq-horizon-1` container running the Horizon
+master; supervisors/pools come from `config/horizon.php`, selected by `APP_ENV=worker`), NOT
+the old per-service raw `queue:work` replicas:
+
+| Horizon pool | procs | queues | timeout | Notes |
+|---|---|---|---|---|
+| `worker-crawl` (`$crawlPool`) | `CRAWLER_MAX_PROCESSES`=**16** | `crawl` | **300s** | page-fetch pipeline (`CrawlPassJob`/`CrawlPageBatchJob`) |
+| `worker-heavy` (`$heavyPool`) | **4** | `sync`, `crawl-finalize` | **1200s** | the long `AnalyzeSiteJob` (pinned box only) + GA/GSC sync |
 
 So the crawl pipeline + finalize + GA/GSC sync run **here**; Box A never crawls.
 `REDIS_QUEUE_RETRY_AFTER=1320` must stay above the longest job timeout. **Autoscaled ephemeral

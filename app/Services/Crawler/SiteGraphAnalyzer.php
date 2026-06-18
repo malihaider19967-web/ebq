@@ -27,24 +27,71 @@ class SiteGraphAnalyzer
 
     private function recomputeInboundCounts(string $crawlSiteId): void
     {
-        // Reset, then set from aggregated discovered edges in a SINGLE join-update
-        // (one query instead of one UPDATE per linked page).
-        WebsitePage::where('crawl_site_id', $crawlSiteId)->update(['inbound_link_count' => 0]);
+        // Aggregate inbound edges per target page in PHP by streaming the discovered
+        // edges (keyset pagination, bounded memory: one int per linked page). The
+        // result is written in bounded id-keyset chunks below.
+        //
+        // This replaces a whole-site `UPDATE ... JOIN` (and a whole-site reset). On
+        // large sites (40k–168k pages) those single statements held InnoDB row locks
+        // long enough to trip `innodb_lock_wait_timeout` (SQLSTATE 1205) — fatal here
+        // because the finalize contends with live CrawlPageBatchJob writes to the same
+        // website_pages rows. See infra/crawler/known-issues.md (2026-06-18 incident).
+        $counts = [];
+        foreach (
+            DB::table('website_internal_links')
+                ->where('crawl_site_id', $crawlSiteId)
+                ->where('status', 'discovered')
+                ->whereNotNull('to_page_id')
+                ->select('id', 'to_page_id')
+                ->lazyById(5000, 'id') as $r
+        ) {
+            $counts[$r->to_page_id] = ($counts[$r->to_page_id] ?? 0) + 1;
+        }
 
+        // Reset every page to 0 in bounded chunks, then write the non-zero counts
+        // grouped by value — a handful of small UPDATEs instead of two table-wide ones.
+        $this->resetColumnChunked($crawlSiteId, 'inbound_link_count', 0);
+        $this->writeGroupedChunked($crawlSiteId, 'inbound_link_count', $counts);
+    }
+
+    /**
+     * Set $column = $value for every page of the site in bounded id-keyset chunks so
+     * each UPDATE locks at most ~2000 rows (a table-wide UPDATE trips 1205 mid-crawl).
+     */
+    private function resetColumnChunked(string $crawlSiteId, string $column, mixed $value): void
+    {
         DB::table('website_pages')
-            ->where('website_pages.crawl_site_id', $crawlSiteId)
-            ->joinSub(
-                DB::table('website_internal_links')
-                    ->where('crawl_site_id', $crawlSiteId)
-                    ->where('status', 'discovered')
-                    ->select('to_page_id', DB::raw('COUNT(*) as c'))
-                    ->groupBy('to_page_id'),
-                'edges',
-                'edges.to_page_id',
-                '=',
-                'website_pages.id',
-            )
-            ->update(['inbound_link_count' => DB::raw('edges.c')]);
+            ->where('crawl_site_id', $crawlSiteId)
+            ->select('id')
+            ->orderBy('id')
+            ->chunkById(2000, function ($rows) use ($column, $value): void {
+                $ids = array_map(static fn ($r) => $r->id, $rows->all());
+                if ($ids !== []) {
+                    DB::table('website_pages')->whereIn('id', $ids)->update([$column => $value]);
+                }
+            }, 'id');
+    }
+
+    /**
+     * Write $column from a [pageId => value] map, grouped by value and chunked to
+     * 1000 ids per UPDATE (bounded lock scope). Pages absent from the map are left as
+     * the caller reset them.
+     *
+     * @param  array<string,int>  $valueByPage
+     */
+    private function writeGroupedChunked(string $crawlSiteId, string $column, array $valueByPage): void
+    {
+        $idsByValue = [];
+        foreach ($valueByPage as $id => $v) {
+            $idsByValue[$v][] = $id;
+        }
+        foreach ($idsByValue as $v => $ids) {
+            foreach (array_chunk($ids, 1000) as $chunk) {
+                WebsitePage::where('crawl_site_id', $crawlSiteId)
+                    ->whereIn('id', $chunk)
+                    ->update([$column => $v]);
+            }
+        }
     }
 
     private function recomputeClickDepth(CrawlSite $crawlSite): void
@@ -80,19 +127,12 @@ class SiteGraphAnalyzer
             }
         }
 
-        // Reset all to null (unreachable), then write computed depths in bulk grouped
-        // by depth value — a handful of UPDATEs instead of one per page.
-        WebsitePage::where('crawl_site_id', $crawlSiteId)->update(['click_depth' => null]);
-
-        $idsByDepth = [];
-        foreach ($depth as $id => $d) {
-            $idsByDepth[$d][] = $id;
-        }
-        foreach ($idsByDepth as $d => $ids) {
-            foreach (array_chunk($ids, 1000) as $chunk) {
-                WebsitePage::where('crawl_site_id', $crawlSiteId)->whereIn('id', $chunk)->update(['click_depth' => $d]);
-            }
-        }
+        // Reset all to null (unreachable), then write computed depths grouped by depth
+        // value — both in bounded chunks (table-wide UPDATEs trip 1205 mid-crawl, same
+        // as the inbound-count pass above). Depth 0 (homepage) is a real value here, so
+        // it is written by the grouped pass; only unreachable pages stay null.
+        $this->resetColumnChunked($crawlSiteId, 'click_depth', null);
+        $this->writeGroupedChunked($crawlSiteId, 'click_depth', $depth);
     }
 
     private function homepageId(CrawlSite $crawlSite): ?string

@@ -62,9 +62,34 @@ If `AnalyzeSiteJob` throws partway, its `failed()` handler still marks the run `
   inbound-count + click-depth BFS (O(V+E)). Assumes the link graph fits in RAM.
 - **`AnalyzeSiteJob` 1200s timeout** — repeated analyze timeouts on very large sites are the
   known "crawls not finishing" failure mode. `retry_after` (1320s) sits just above it.
+  `tries=2` (since 2026-06-18) so one transient failure no longer strands the run.
 - **Referrer / external-link sampling** — broken-referrer sampling (5/target, ~50k edge cap)
   and external-link checking (≤25/page, ≤500 total) are bounded, so on pathological fan-in or
   link-heavy pages the coverage is partial by design.
+
+### 2026-06-18 incident — finalize failed on large sites (1205 lock-wait + finalize loop)
+Two `AnalyzeSiteJob`s failed (`MaxAttemptsExceeded`) on 39k- and 168k-page sites; one site
+was left stuck in `finalizing`. Two compounding causes, both fixed:
+1. **Table-wide UPDATEs in `SiteGraphAnalyzer`** — `recomputeInboundCounts` did a whole-site
+   `UPDATE … JOIN` (+ whole-site reset) and `recomputeClickDepth` a whole-site reset. On
+   40k–168k-row sites these held InnoDB row locks long enough to trip
+   `innodb_lock_wait_timeout` (**SQLSTATE 1205**) — because finalize **contends with live
+   `CrawlPageBatchJob` writes** to the same `website_pages` rows. **Fix:** both passes now
+   compute in PHP (keyset stream) and write in **bounded id-keyset chunks**
+   (`resetColumnChunked` / `writeGroupedChunked`). `CrawlValueRank::assign` was already chunked.
+2. **Supervisor finalize loop / overlapping finalizes** — `CrawlSupervisor` re-dispatches
+   `AnalyzeSiteJob` for any stalled `FINALIZING` run, but a slow-but-alive finalize (≤1200s)
+   doesn't bump `updated_at`, so a **second concurrent finalize** could start and fight the
+   first for the same row locks. **Fix:** `AnalyzeSiteJob` now carries
+   `WithoutOverlapping('analyze-site:'.$crawlRunId)->dontRelease()->expireAfter(1500)` — the
+   duplicate is dropped, the lock auto-expires if a holder dies hard. With `failed()` finalizing
+   the run after `tries=2`, the loop is broken.
+
+> Upstream contributor (crawl side, not yet fixed): the 50 sibling `CrawlPageBatchJob`
+> **timeouts** that day broke `Bus::batch` completion and left pages selected-but-unfetched.
+> `pages_seen` is incremented at **selection** (`CrawlPassJob.php:117`), not at successful
+> fetch, so a run can hit its page cap with pages never actually crawled — the crawl looks
+> "done at cap" while incomplete.
 
 ## Transitional cruft
 

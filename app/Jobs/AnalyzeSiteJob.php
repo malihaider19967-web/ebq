@@ -12,6 +12,7 @@ use App\Services\Crawler\SiteIssueDetector;
 use App\Support\Crawler\BlockDetector;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -27,7 +28,15 @@ class AnalyzeSiteJob implements ShouldQueue
     use Queueable;
 
     public int $timeout = 1200;
-    public int $tries = 1;
+
+    // tries=2: a single transient failure (e.g. a lock-wait timeout, or a worker
+    // recycle) used to permanently fail finalization and strand the run. One retry
+    // recovers it. retry_after (1320s) stays above $timeout so a still-running attempt
+    // is never re-reserved underneath us (see infra/crawler/known-issues.md).
+    public int $tries = 2;
+
+    // Wait between attempts so a contended DB or a slow site has time to settle.
+    public int $backoff = 120;
 
     /** Severity → page-score penalty. */
     private const PENALTY = ['critical' => 40, 'high' => 25, 'medium' => 12, 'low' => 5];
@@ -38,6 +47,26 @@ class AnalyzeSiteJob implements ShouldQueue
         // only), so an autoscale scale-down draining an ephemeral box can never kill
         // a 1200s analysis mid-flight. See infra/crawler/autoscaling.md.
         $this->onQueue(\App\Support\Queues::CRAWL_FINALIZE);
+    }
+
+    /**
+     * Never let two finalizes for the same run overlap. The crawl-supervisor
+     * re-dispatches AnalyzeSiteJob for any FINALIZING run that looks stalled, but a
+     * slow-but-alive finalize (up to $timeout) does not bump the run's updated_at —
+     * so without this guard the supervisor would start a SECOND concurrent finalize
+     * that fights the first for row locks on the same website_pages (the SQLSTATE
+     * 1205 incident, 2026-06-18). dontRelease() drops the duplicate outright;
+     * expireAfter() releases the lock if a holder dies hard (so we never wedge).
+     *
+     * @return array<int,object>
+     */
+    public function middleware(): array
+    {
+        return [
+            (new WithoutOverlapping('analyze-site:'.$this->crawlRunId))
+                ->dontRelease()
+                ->expireAfter($this->timeout + 300),
+        ];
     }
 
     /**

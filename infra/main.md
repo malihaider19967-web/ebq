@@ -239,6 +239,16 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-06-18 (crawl finalize — large-site 1205 lock-wait + finalize loop)** — Fixed two
+  compounding `AnalyzeSiteJob` failure modes that stranded large-site finalizations (39k &
+  168k pages): (1) `SiteGraphAnalyzer` did **whole-site UPDATEs** of `inbound_link_count` /
+  `click_depth` that tripped `innodb_lock_wait_timeout` (1205) while contending with live
+  crawl writes → now computes in PHP and writes in **bounded id-keyset chunks**
+  (`resetColumnChunked`/`writeGroupedChunked`); (2) the supervisor re-dispatched finalize on
+  slow-but-alive runs → **overlapping finalizes** fighting for locks → added
+  `WithoutOverlapping` + `tries=2`/`backoff` to `AnalyzeSiteJob`. New test
+  `tests/Feature/SiteGraphAnalyzerTest.php`. Corrected stale Horizon worker-pool table in
+  `server-deployment.md`. Detail: [crawler/known-issues.md](./crawler/known-issues.md).
 - **2026-06-17 (full-ULID + multi-node sharding — on branch `feature/db-sharding-ulid`)** — Re-keyed the
   whole schema to **ULID** (`char(26)`; framework/Sanctum/pivot surrogate ids stay bigint) and built
   **two-dimensional sharding**: tenant-by-owner + crawl-by-domain, behind one routing layer
