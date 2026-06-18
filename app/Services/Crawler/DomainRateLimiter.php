@@ -3,48 +3,39 @@
 namespace App\Services\Crawler;
 
 use App\Models\CrawlSite;
-use App\Models\WorkerNode;
 use App\Support\AutoscalerConfig;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Redis;
 
 /**
- * Per-domain crawl politeness + fleet block coordination.
+ * Adaptive PER-DOMAIN crawl rate. Each domain has its own req/sec ceiling that ramps:
+ * starts at `per_domain_rate` (admin floor, e.g. 10/s), and `ebq:ramp-crawl-rates` bumps
+ * it by `crawler.rate_step` (10) every clean interval up to `crawler.rate_max` (100) while
+ * the domain isn't pushing back. The moment a fetch is blocked, the domain RESETS to the
+ * floor (recordBlock) and a cooldown stops it ramping again for a bit — so we probe faster
+ * and faster until the site complains, then back off. Per domain, never global-across-domains.
  *
- * RATE is per-SERVER, not fleet-global: each worker box fetches a domain from its OWN
- * public IP, so the target sees N distinct sources — politeness is per source-IP. Each
- * box gets its own `per_domain_rate` req/s/domain budget (keyed by FLEET_NODE_ID), so
- * fleet throughput for one domain = `per_domain_rate` × boxes (the point of >1 server).
- *
- * BLOCK coordination is PER-DOMAIN (never global): when a box is blocked on a domain it
- * records itself fleet-wide (a set of blocked server ids, with a cooldown). Then:
- *   - some (not all) boxes blocked  -> the rest go CAUTIOUS (quarter rate) so their IPs
- *     don't get blocked too;
- *   - ALL active boxes blocked      -> direct is hopeless, fall back to PROXIES for that
- *     domain until the cooldown clears and direct is retried.
- * Proxies are otherwise OFF (crawler.use_proxies) so each box uses its own IP.
- *
- * Redis-backed (RateLimiter + the shared cache store). See infra/crawler/autoscaling.md.
+ * Fetches go through the proxy pool first (PageCrawlProcessor), so this is the DOMAIN's total
+ * rate (across whatever IPs), which is the right politeness unit. Redis-backed (RateLimiter +
+ * shared cache). See infra/crawler/autoscaling.md.
  */
 class DomainRateLimiter
 {
-    /** Block until a token for this domain (on THIS server) is free (or max wait elapses). */
+    private const RATE_KEY = 'crawl-rate-cur:';     // current adaptive rate for a domain
+    private const BLOCK_KEY = 'crawl-blocked:';     // set during a domain's block cooldown
+    private const LAT_KEY = 'crawl-lat:';           // recent fetch-latency samples (capped list)
+    private const BASE_KEY = 'crawl-lat-base:';     // the domain's "healthy" baseline latency
+
+    /** Block until a token for this domain is free (or the max wait elapses). */
     public function throttle(?string $domain): void
     {
         $domain = $this->normalize($domain);
         if ($domain === '') {
             return;
         }
-        $rate = max(1, AutoscalerConfig::perDomainRate());
-        // Some servers already blocked here → ease off so we don't get blocked too.
-        if ($this->blockState($domain) === 'cautious') {
-            $rate = max(1, (int) ceil($rate / 4));
-        }
-        // Per SERVER (this box) — each box has its own per-domain budget.
-        $server = $this->server();
-        $key = 'crawl-rate:'.$domain.':'.$server;
+        $rate = $this->currentRate($domain);
+        $key = 'crawl-rate:'.$domain;
         $maxWaitMs = max(0, (int) config('crawler.rate_max_wait_ms', 5000));
         $waited = 0;
 
@@ -54,62 +45,141 @@ class DomainRateLimiter
                 return;
             }
             if ($waited >= $maxWaitMs) {
-                Log::info('DomainRateLimiter: max wait reached, proceeding', ['domain' => $domain, 'rate' => $rate]);
-
-                return;
+                return; // fail-open: a rare over-rate fetch beats a stuck crawl
             }
             usleep(100_000); // 100ms
             $waited += 100;
         }
     }
 
-    /** Record that THIS server got blocked on the domain (fleet-wide, for the cooldown window). */
+    /** This domain's current adaptive rate (req/sec). Defaults to the floor. */
+    public function currentRate(?string $domain): int
+    {
+        $domain = $this->normalize($domain);
+        if ($domain === '') {
+            return $this->floor();
+        }
+        $v = Redis::connection()->get(self::RATE_KEY.$domain);
+
+        return $v !== null ? max($this->floor(), (int) $v) : $this->floor();
+    }
+
+    /** Persist a domain's adaptive rate (clamped floor..max). Used by the ramp command. */
+    public function setRate(?string $domain, int $rate): void
+    {
+        $domain = $this->normalize($domain);
+        if ($domain === '') {
+            return;
+        }
+        $rate = max($this->floor(), min($this->max(), $rate));
+        // TTL so a domain that stops being crawled forgets its rate and starts fresh.
+        Redis::connection()->setex(self::RATE_KEY.$domain, 3600, $rate);
+    }
+
+    /** A fetch on this domain got blocked → drop to the floor + hold the ramp for the cooldown. */
     public function recordBlock(?string $domain): void
     {
         $domain = $this->normalize($domain);
         if ($domain === '') {
             return;
         }
-        $cooldown = max(60, (int) config('crawler.block_cooldown_s', 600));
-        $set = 'crawl-blocked-servers:'.$domain;
+        $cooldown = max(30, (int) config('crawler.block_cooldown_s', 600));
         $r = Redis::connection();
-        $r->sadd($set, $this->server());
-        $r->expire($set, $cooldown);
-        Log::info('DomainRateLimiter: block recorded', ['domain' => $domain, 'server' => $this->server()]);
+        $r->setex(self::RATE_KEY.$domain, 3600, $this->floor());
+        $r->setex(self::BLOCK_KEY.$domain, $cooldown, 1);
+        Log::info('DomainRateLimiter: blocked → rate reset to floor', ['domain' => $domain, 'floor' => $this->floor()]);
     }
 
-    /** Should this domain be fetched through a pool proxy right now? (= every box is blocked). */
-    public function shouldUseProxy(?string $domain): bool
-    {
-        return $this->blockState($domain) === 'proxy';
-    }
-
-    /** 'direct' (default) | 'cautious' (some boxes blocked) | 'proxy' (all active boxes blocked). */
-    public function blockState(?string $domain): string
+    /** Is this domain in a post-block cooldown (don't ramp it up yet)? */
+    public function inBlockCooldown(?string $domain): bool
     {
         $domain = $this->normalize($domain);
-        if ($domain === '') {
-            return 'direct';
-        }
-        $blocked = (int) Redis::connection()->scard('crawl-blocked-servers:'.$domain);
-        if ($blocked <= 0) {
-            return 'direct';
-        }
-        $active = $this->activeBoxes();
 
-        return ($active > 0 && $blocked >= $active) ? 'proxy' : 'cautious';
+        return $domain !== '' && (bool) Redis::connection()->exists(self::BLOCK_KEY.$domain);
     }
 
-    /** Active worker boxes, cached briefly so the crawl hot-path doesn't hit the DB per fetch. */
-    private function activeBoxes(): int
+    /** Record a fetch's latency (ms) so the smart policy can spot the site slowing down. */
+    public function recordFetch(?string $domain, int $latencyMs): void
     {
-        return (int) Cache::remember('fleet:active-box-count', 30, fn (): int => WorkerNode::billable()->count());
+        $domain = $this->normalize($domain);
+        if ($domain === '' || $latencyMs <= 0) {
+            return;
+        }
+        $r = Redis::connection();
+        $k = self::LAT_KEY.$domain;
+        $r->lpush($k, $latencyMs);
+        $r->ltrim($k, 0, 49);   // keep the last 50 samples
+        $r->expire($k, 300);
     }
 
-    /** This box's identity (its own public IP ≈ FLEET_NODE_ID); falls back to hostname. */
-    private function server(): string
+    /**
+     * SMART adaptive step (AIMD), called per crawling domain by ebq:ramp-crawl-rates:
+     *  - just blocked  → hold at the floor (recordBlock already reset it);
+     *  - site SLOWING  → recent latency well above the healthy baseline → multiplicative
+     *    DECREASE (halve) BEFORE we get hard-blocked;
+     *  - healthy       → additive INCREASE (+step) toward the max, and refresh the baseline.
+     *
+     * @return array{action:string,rate:int,lat:?int,base:?int}
+     */
+    public function adjust(?string $domain): array
     {
-        return (string) (config('fleet.node_id') ?: gethostname());
+        $domain = $this->normalize($domain);
+        $cur = $this->currentRate($domain);
+        if ($domain === '' || $this->inBlockCooldown($domain)) {
+            return ['action' => 'cooldown', 'rate' => $cur, 'lat' => null, 'base' => null];
+        }
+
+        $r = Redis::connection();
+        $samples = array_map('intval', $r->lrange(self::LAT_KEY.$domain, 0, -1));
+        $minSamples = max(1, (int) config('crawler.rate_min_samples', 8));
+
+        if (count($samples) < $minSamples) {
+            // Not enough signal yet — gentle additive increase.
+            $new = min($this->max(), $cur + $this->step());
+            $this->setRate($domain, $new);
+
+            return ['action' => $new > $cur ? 'up' : 'hold', 'rate' => $new, 'lat' => null, 'base' => null];
+        }
+
+        $avg = (int) round(array_sum($samples) / count($samples));
+        $base = (int) ($r->get(self::BASE_KEY.$domain) ?: 0);
+        if ($base <= 0) {
+            $base = $avg; // first reading establishes the healthy baseline
+            $r->setex(self::BASE_KEY.$domain, 3600, $base);
+        }
+        $degradeFactor = (float) config('crawler.rate_degrade_factor', 1.5);
+
+        if ($avg > $base * $degradeFactor) {
+            // Site is slowing under load → back off HARD (multiplicative decrease).
+            $new = max($this->floor(), (int) floor($cur / 2));
+            $action = 'down(slow)';
+        } else {
+            // Healthy → additive increase, and track the lowest avg as the baseline.
+            $new = min($this->max(), $cur + $this->step());
+            if ($avg < $base) {
+                $r->setex(self::BASE_KEY.$domain, 3600, $avg);
+            }
+            $action = $new > $cur ? 'up' : 'hold';
+        }
+        $this->setRate($domain, $new);
+
+        return ['action' => $action, 'rate' => $new, 'lat' => $avg, 'base' => $base];
+    }
+
+    /** Ramp floor = the admin per_domain_rate setting (the starting rate). */
+    private function floor(): int
+    {
+        return max(1, AutoscalerConfig::perDomainRate());
+    }
+
+    private function max(): int
+    {
+        return max($this->floor(), (int) config('crawler.rate_max', 100));
+    }
+
+    private function step(): int
+    {
+        return max(1, (int) config('crawler.rate_step', 10));
     }
 
     /** Collapse a host or URL to the CrawlSite normalized form so all hosts of a domain share one bucket. */

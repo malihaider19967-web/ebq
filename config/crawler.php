@@ -53,10 +53,19 @@ return [
     // direct-only (e.g. if the proxy pool is unhealthy).
     'use_proxies' => (bool) env('CRAWLER_USE_PROXIES', true),
 
-    // Block coordination (DomainRateLimiter): when a box is blocked on a domain it's
-    // recorded fleet-wide for this many seconds. While SOME boxes are blocked the rest go
-    // cautious (1/4 rate); when ALL active boxes are blocked, direct is hopeless.
+    // On a block, the domain's adaptive rate resets to the floor and won't ramp again for
+    // this cooldown (DomainRateLimiter::recordBlock).
     'block_cooldown_s' => (int) env('CRAWLER_BLOCK_COOLDOWN_S', 600),
+
+    // Smart per-domain adaptive crawl rate (AIMD — ebq:ramp-crawl-rates every minute). The
+    // rate starts at the admin autoscaler.per_domain_rate (floor) and ramps by rate_step each
+    // clean minute up to rate_max. If a domain's recent fetch latency rises above
+    // baseline × rate_degrade_factor it backs off (halves) BEFORE getting blocked.
+    // rate_min_samples = fetches needed before the latency signal is trusted.
+    'rate_step' => (int) env('CRAWLER_RATE_STEP', 10),
+    'rate_max' => (int) env('CRAWLER_RATE_MAX', 100),
+    'rate_degrade_factor' => (float) env('CRAWLER_RATE_DEGRADE_FACTOR', 1.5),
+    'rate_min_samples' => (int) env('CRAWLER_RATE_MIN_SAMPLES', 8),
 
     // Incremental crawling — adaptive recrawl interval (days). A page's interval
     // backs off geometrically from min→max while it keeps coming back unchanged,

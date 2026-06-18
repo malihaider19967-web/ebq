@@ -37,6 +37,10 @@ Schedule::command('ebq:check-worker-nodes')->everyFiveMinutes()->withoutOverlapp
 // load balancer routes to live, least-busy servers.
 Schedule::command('ebq:check-keyword-servers')->everyFiveMinutes();
 
+// Smart per-domain crawl-rate controller (AIMD): ramp each crawling domain up while it's
+// healthy, back it off the moment latency climbs or it blocks. See DomainRateLimiter.
+Schedule::command('ebq:ramp-crawl-rates')->everyMinute()->withoutOverlapping();
+
 // Horizon metrics snapshot — powers the throughput/runtime graphs on /horizon.
 // Runs on the web box's scheduler; metrics live in the shared Redis so they cover
 // every box's supervisors.

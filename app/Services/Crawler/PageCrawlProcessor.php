@@ -241,7 +241,10 @@ class PageCrawlProcessor
         // IP. crawler.use_proxies=false forces direct-only (e.g. if the pool is unhealthy).
         $useProxies = (bool) config('crawler.use_proxies', true);
         $proxy = ($useProxies && $this->pool->available()) ? $this->pool->pick() : null;
+        $t0 = microtime(true);
         $res = $this->fetcher->fetch($page->url, $conditional, $timeout, $proxy);
+        // Feed the smart rate policy: rising latency ⇒ it backs the domain off before a block.
+        $this->rateLimiter->recordFetch($domain, (int) round((microtime(true) - $t0) * 1000));
 
         $blocked = $res['ok'] ? $this->blockDetector->classify([
             'status' => (int) $res['status'], 'body' => $res['body'], 'headers' => $res['headers'],
