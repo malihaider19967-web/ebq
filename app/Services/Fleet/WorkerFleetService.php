@@ -113,10 +113,7 @@ class WorkerFleetService
             return false;
         }
         $ip = $node->private_ip;
-        $sshKey = '/root/.ssh/id_ed25519_worker';
-        // Pin nothing (UserKnownHostsFile=/dev/null): ephemeral boxes recycle private
-        // IPs, so a returning IP with a new host key must not trip a key-mismatch.
-        $ssh = "ssh -i {$sshKey} -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10";
+        $ssh = $this->sshCmd();
 
         // A fresh box needs ~30-60s to boot before it accepts SSH — wait for it.
         if (! $this->waitForSsh($ip, $ssh)) {
@@ -191,8 +188,7 @@ class WorkerFleetService
     {
         $node->update(['status' => WorkerNode::STATUS_DRAINING, 'drain_started_at' => now()]);
         if ($node->private_ip) {
-            $ssh = 'ssh -i /root/.ssh/id_ed25519_worker -o BatchMode=yes -o ConnectTimeout=15';
-            $this->remote($ssh, $node->private_ip, 'docker compose -f docker-compose.worker.yml stop');
+            $this->remote($this->sshCmd(15), $node->private_ip, 'docker compose -f docker-compose.worker.yml stop');
         }
         Log::info('WorkerFleet: draining', ['node' => $node->id]);
     }
@@ -256,6 +252,19 @@ class WorkerFleetService
         }
 
         return false;
+    }
+
+    /**
+     * SSH command prefix with the flags EVERY box command needs. Critically
+     * StrictHostKeyChecking=no + UserKnownHostsFile=/dev/null: ephemeral boxes RECYCLE
+     * private IPs, so a returning IP has a new host key — without these the connection
+     * trips "REMOTE HOST IDENTIFICATION HAS CHANGED" and fails. (drain() omitted these
+     * once, so drains silently no-op'd on recycled IPs — the box never stopped.) Always
+     * build the ssh string here so bootstrap + drain can't diverge again.
+     */
+    private function sshCmd(int $connectTimeout = 10): string
+    {
+        return "ssh -i /root/.ssh/id_ed25519_worker -o BatchMode=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout={$connectTimeout}";
     }
 
     /**
