@@ -4,7 +4,7 @@ HOW TO RESUME THIS CLAUDE CODE SESSION
 Run from the project root (/var/www/ebq):
 
   # Resume THIS exact conversation by its session id:
-  claude --resume 894c8b8d-379a-4c1e-ab82-12a5180e7332
+  claude --resume b9e7a986-13f4-408c-afbd-a145af6c5bc6
 
   # ...or pick it from an interactive list of past sessions:
   claude --resume          # then arrow to this one
@@ -13,28 +13,68 @@ Run from the project root (/var/www/ebq):
   claude --continue
 
 Full history is persisted on disk at:
-  /root/.claude/projects/-var-www-ebq/894c8b8d-379a-4c1e-ab82-12a5180e7332.jsonl
-So the conversation context comes back intact.
+  /root/.claude/projects/-var-www-ebq/b9e7a986-13f4-408c-afbd-a145af6c5bc6.jsonl
 
 
-CAVEATS FOR THIS SESSION
-------------------------
-1. The in-session background watcher (basepaws completion poller) dies when the
-   shell closes. That's fine — the CRAWLS run on the WORKER BOX, independent of
-   your shell, so closing the shell does NOT stop or affect any crawl. You just
-   lose the auto-report.
-
-2. Resuming restores the CONVERSATION, not the running processes. Crawls will
-   have continued on their own; just ask to re-check their live state.
-
-3. Watch crawl progress any time at:  /admin/crawler
+CAVEATS
+-------
+1. Resuming restores the CONVERSATION, not running processes. Crawls + the
+   autoscaler keep running on their own (worker box + scheduler); re-check live
+   state with: php artisan tinker, /admin/fleet, /horizon.
+2. Background watchers I start in a shell die when the shell closes — harmless.
 
 
-WHERE THINGS STAND (2026-06-16)
--------------------------------
-- Shared-crawl re-architecture is deployed on both boxes (web + worker).
-- New admin "Crawler" panel (/admin/crawler) is live (web box). NOT committed yet.
-- basepaws (crawl_site 8) crawl is STARVED behind the backfill flood (~3,475 jobs
-  in the crawl queue from 7 other domains); it was parked at seen=3108/fetched=2966.
-  Option on the table: focused reset (abort the other 7 crawls + clear the crawl
-  queue, NOT sync; re-dispatch basepaws alone) so it finishes fast.
+WHERE THINGS STAND (2026-06-18) — FLEET / HORIZON / AUTOSCALER ARC
+-----------------------------------------------------------------
+Big picture: migrated queues to Laravel Horizon, unified the admin fleet page,
+and made the crawl-worker autoscaler actually work + self-heal. Authoritative
+docs: infra/crawler/autoscaling.md + infra/reference/jobs-and-scheduler.md.
+
+DONE + verified live:
+- Horizon is the queue backend. Per-box supervisors via APP_ENV (web=local,
+  pinned worker=worker, ephemeral=worker-ephemeral). `fleet` queue stays a ROOT
+  queue:work (ebq-queue-fleet). /horizon is admin-gated (local-bypass overridden).
+- /admin/fleet = one tabbed, self-documented page (crawl workers + DB shards).
+  Server-type lists verified vs live Hetzner API; snapshot DROPDOWN (latest-first,
+  date/time; read-only when auto_snapshot is on).
+- DB grant: ebquser@10.0.0.% on the PRIMARY db (10.0.0.2) so ephemeral workers can
+  connect. Was the cause of "new worker fails ALL jobs" ([1130]). Shards self-grant.
+- Bootstrap robustness: stops snapshot's stale containers on connect,
+  --force-recreate (worker reloads new code), waitForSsh 7.5min, and a remote()
+  helper that always `cd`s into the project dir (kills the relative-path bug).
+- *** THE root-cause fix ***: the autoscaler runs via the scheduler as WWW-DATA,
+  which CANNOT read /root/.ssh/id_ed25519_worker (root-only) → every autoscaler
+  bootstrap's SSH timed out → boxes stuck on snapshot code (recoverStuck, also
+  www-data, couldn't fix them). FIX: autoscaler now DISPATCHES to the ROOT fleet
+  queue — scaleUp -> ProvisionCrawlWorkerJob, recoverStuck -> BootstrapCrawlWorkerJob
+  (new). Verified: a stuck box bootstrapped in 8s via the root queue -> active.
+- Self-healing: FleetAutoscale::recoverStuck re-bootstraps stuck boxes / reaps
+  failed ones (now via the root queue).
+- Cold worker snapshot built (id 398736889) via scripts/worker/build-worker-snapshot.sh
+  — current code, nothing auto-starts on boot. HCLOUD_WORKER_IMAGE=398736889.
+- Auto-snapshot on git-HEAD drift: AutoscalerConfig snapshot_id+snapshot_head +
+  auto_snapshot kill-switch; ebq:refresh-worker-snapshot (hourly, background) +
+  a provision-time gate (snapshotReady) that defers scale-up while rebuilding.
+- Per-box in-flight/finished/failed counters (FleetMetrics), retry-leak fixed.
+
+Committed + pushed: eee2179 on feature/db-sharding-ulid (origin =
+git@github.com:malihaider19967-web/ebq.git).
+
+*** AFTER EVERY COMMIT ***: sync AutoscalerConfig snapshot_head to the new HEAD,
+else auto-snapshot triggers a needless rebuild:
+  php artisan tinker --execute='\App\Support\AutoscalerConfig::update(["snapshot_head"=>trim(shell_exec("git rev-parse HEAD"))]);'
+
+KNOWN PENDING / GOTCHAS:
+- Snapshot rebuild now runs on the ROOT fleet queue (app/Jobs/Fleet/RefreshWorkerSnapshotJob).
+  ebq:refresh-worker-snapshot + FleetAutoscale::snapshotReady are thin DISPATCHERS
+  (www-data-safe). The ~15-min build blocks the single-process fleet queue while it
+  runs — fine, since provisioning is deferred during a rebuild anyway.
+- Autoscaler still has TEST values: target_backlog_per_box=5, max_boxes=3. Set
+  production values at /admin/fleet when done testing. (Hard-min floors were removed.)
+- APP_ENV=local in production (pre-existing). Horizon scoping + the /horizon gate
+  both account for it — don't "fix" APP_ENV without checking those.
+
+LIVE STATE at handoff:
+- Boxes: pinned 10.0.0.3 (active) + ephemeral 10.0.0.4 (active, processing).
+- Autoscaler enabled; backlog was ~41, desired=3 (would dispatch a 3rd box).
+- /admin/fleet (Crawl workers tab) + /horizon show it all live.

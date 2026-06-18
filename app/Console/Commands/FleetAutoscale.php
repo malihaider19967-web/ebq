@@ -2,6 +2,9 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\Fleet\BootstrapCrawlWorkerJob;
+use App\Jobs\Fleet\ProvisionCrawlWorkerJob;
+use App\Jobs\Fleet\RefreshWorkerSnapshotJob;
 use App\Models\WorkerNode;
 use App\Services\Fleet\HetznerClient;
 use App\Services\Fleet\WorkerFleetService;
@@ -38,6 +41,9 @@ class FleetAutoscale extends Command
 
     /** Give up + replace a box that hasn't finished bootstrapping after this long. */
     private const PROVISION_STUCK_MINUTES = 18;
+
+    /** Cache-key prefix: a re-bootstrap is already queued for this node (avoid piling up). */
+    private const REBOOTSTRAP_MARK = 'autoscaler:rebootstrap:';
 
     public function handle(WorkerFleetService $fleet): int
     {
@@ -100,14 +106,13 @@ class FleetAutoscale extends Command
 
             return;
         }
-        $node = $fleet->provision();
-        if ($node->status === WorkerNode::STATUS_FAILED) {
-            Log::error('FleetAutoscale: scale-up provision failed', ['node' => $node->id, 'error' => $node->last_error]);
-
-            return;
-        }
-        $fleet->bootstrap($node);
-        $this->say("scaled up: node {$node->id} — {$ctx}", false);
+        // Dispatch to the FLEET queue (ROOT) — do NOT provision+bootstrap here. This
+        // command runs via the scheduler as www-data, which cannot read root's
+        // /root/.ssh/id_ed25519_worker, so an in-process bootstrap's SSH always times out
+        // and the box gets stuck on snapshot code. The root ebq-queue-fleet worker has the
+        // key. (Next tick's "a node is still provisioning" gate prevents double-dispatch.)
+        ProvisionCrawlWorkerJob::dispatch();
+        $this->say("scaled up: dispatched ProvisionCrawlWorkerJob (fleet queue) — {$ctx}", false);
     }
 
     private function scaleDown(WorkerFleetService $fleet, bool $dry, string $ctx): void
@@ -168,12 +173,19 @@ class FleetAutoscale extends Command
         foreach (WorkerNode::where('is_pinned', false)->where('status', WorkerNode::STATUS_PROVISIONING)->get() as $node) {
             if ($node->ageMinutes() >= self::PROVISION_STUCK_MINUTES) {
                 $this->say("provisioning stuck {$node->ageMinutes()}m — destroying node {$node->id} ({$node->last_error})", false);
-                $fleet->destroy($node);
+                $fleet->destroy($node); // destroy is a Hetzner API call → fine as www-data
 
                 continue;
             }
-            $this->say("re-bootstrapping stuck node {$node->id} (age {$node->ageMinutes()}m)", false);
-            $fleet->bootstrap($node);
+            // Re-bootstrap on the ROOT fleet queue (this command is www-data; bootstrap
+            // SSHes with root's key). Cache marker so we don't pile up bootstrap jobs while
+            // one is already running (~15 min) on the single-process fleet queue.
+            if (Cache::has(self::REBOOTSTRAP_MARK.$node->id)) {
+                continue;
+            }
+            Cache::put(self::REBOOTSTRAP_MARK.$node->id, 1, 720);
+            $this->say("re-bootstrapping stuck node {$node->id} (age {$node->ageMinutes()}m) via fleet queue", false);
+            BootstrapCrawlWorkerJob::dispatch($node->id);
         }
     }
 
@@ -192,10 +204,10 @@ class FleetAutoscale extends Command
         if ($head === '' || $head === AutoscalerConfig::snapshotHead()) {
             return true;
         }
-        if (! $dry) {
-            // ebq:refresh-worker-snapshot self-locks → this just ensures a build is running
-            // (don't wait up to an hour for the scheduled one). Detached: never blocks the tick.
-            Process::run('nohup php /var/www/ebq/artisan ebq:refresh-worker-snapshot >/dev/null 2>&1 &');
+        if (! $dry && ! Cache::has(RefreshWorkerSnapshotJob::IN_PROGRESS)) {
+            // Build runs on the ROOT fleet queue (it SSHes; this command is www-data and
+            // can't read the key). Self-locked, so a duplicate dispatch is harmless.
+            RefreshWorkerSnapshotJob::dispatch();
         }
         $this->say("scale-up deferred: worker snapshot rebuilding for HEAD {$head} — {$ctx}", $dry);
 
