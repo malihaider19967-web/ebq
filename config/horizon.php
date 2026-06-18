@@ -28,8 +28,11 @@ $crawlPool = [
     'queue' => ['crawl'],
     'balance' => 'auto',
     'autoScalingStrategy' => 'size',
-    'maxProcesses' => 5,
-    'balanceMaxShift' => 2,
+    // Crawling is I/O-bound (workers spend ~all their page-cycle WAITING on network/DB,
+    // not on CPU — boxes idle at load ~0.5/2 vCPU). So run many more workers than cores:
+    // 16/box fills that wait time with concurrent fetches. Tune via CRAWLER_MAX_PROCESSES.
+    'maxProcesses' => (int) env('CRAWLER_MAX_PROCESSES', 16),
+    'balanceMaxShift' => 4,
     'balanceCooldown' => 3,
     'maxTime' => 3600,
     'maxJobs' => 0,
