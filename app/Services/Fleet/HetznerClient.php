@@ -88,6 +88,28 @@ class HetznerClient
     }
 
     /**
+     * Whether a snapshot/image id still exists in this Hetzner project.
+     *
+     * Tri-state on purpose: callers must NOT confuse "couldn't reach the API" with
+     * "the image is gone" — only a definitive 404 should trigger a snapshot rebuild.
+     *
+     * @return bool|null true = exists, false = confirmed gone (404),
+     *                   null = couldn't determine (no token / network / 5xx)
+     */
+    public function imageExists(int $id): ?bool
+    {
+        $out = $this->request('get', "/images/{$id}");
+        if ($out['ok']) {
+            return true;
+        }
+        if (($out['status'] ?? null) === 404) {
+            return false;
+        }
+
+        return null;
+    }
+
+    /**
      * List servers we manage (by label). Used by reconcile to find orphans.
      *
      * @return array{ok:bool, servers:array<int,array{id:int,name:string,status:string,private_ip:?string}>, error:?string}

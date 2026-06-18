@@ -80,6 +80,21 @@ class WorkerFleetService
             return $node->refresh();
         }
 
+        // Defense-in-depth: confirm the snapshot still exists before asking Hetzner to
+        // build from it, so a deleted image fails clearly here instead of as a raw 422
+        // "image not found" (the autoscaler gates on this too, but a manual
+        // ebq:fleet-worker provision reaches here directly). A null (couldn't verify) is
+        // left to createServer rather than blocking on a transient API blip.
+        if ($this->hetzner->imageExists((int) $image) === false) {
+            $node->update([
+                'status' => WorkerNode::STATUS_FAILED,
+                'last_error' => "Worker snapshot {$image} not found in Hetzner — rebuild it (ebq:refresh-worker-snapshot) and set snapshot_id at /admin/fleet.",
+            ]);
+            Log::error('WorkerFleet: provision aborted — snapshot missing', ['node' => $node->id, 'image' => $image]);
+
+            return $node->refresh();
+        }
+
         $result = $this->hetzner->createServer($node->name, [
             'server_type' => AutoscalerConfig::serverType(),
             'image' => $image,

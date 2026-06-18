@@ -95,11 +95,19 @@ top, so the snapshot only needs refreshing occasionally.
 - **`ebq:refresh-worker-snapshot`** (scheduled hourly, `runInBackground` + `withoutOverlapping` + an
   internal Cache lock): if `auto_snapshot` is on and current HEAD ≠ `snapshot_head`, it runs the build
   script, then sets `snapshot_id`=new image + `snapshot_head`=HEAD. `--force` rebuilds regardless.
-- **Provision-time gate** (`FleetAutoscale::snapshotReady`): before creating a box, if HEAD drifted it
-  kicks the (self-locked) rebuild and **defers** scale-up to a later tick — so a box is never built
-  from a stale base, and the hourly job not having run yet doesn't matter. It defers across 2-min ticks
-  (each ~instant), it does NOT block one tick for the ~15-min build. With `auto_snapshot` OFF, no
-  gate/defer — provisioning uses whatever `snapshot_id`/`HCLOUD_WORKER_IMAGE` is set.
+- **Provision-time gates** (run before a box is created, every scale-up):
+  1. **Snapshot exists** (`FleetAutoscale::snapshotExists` → `HetznerClient::imageExists`): the configured
+     `snapshot_id` must still resolve to a live image. `imageExists` is **tri-state** — a confirmed 404
+     means gone (→ rebuild if `auto_snapshot`, else skip with an actionable error); a transient API error
+     (`null`) just holds the tick without triggering a rebuild. Added 2026-06-18 after a deleted snapshot
+     made `createServer` 422 ("image not found") every tick and the autoscaler **looped provision→reap**
+     a dead node (the git-HEAD gate below let it through because HEAD still matched). `provision()` repeats
+     the check as defense-in-depth for the manual `ebq:fleet-worker` path.
+  2. **HEAD not drifted** (`FleetAutoscale::snapshotReady`): if HEAD drifted it kicks the (self-locked)
+     rebuild and **defers** scale-up to a later tick — so a box is never built from a stale base. It defers
+     across 2-min ticks (each ~instant), it does NOT block one tick for the ~15-min build. With
+     `auto_snapshot` OFF, no drift gate — provisioning uses whatever `snapshot_id`/`HCLOUD_WORKER_IMAGE` is set
+     (the existence gate still applies).
 - HEAD-based drift fits the workflow: uncommitted edits don't move HEAD (no rebuild while hacking on the
   box); a commit (a real deploy) does → one background rebuild.
 

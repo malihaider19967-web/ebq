@@ -137,4 +137,34 @@ class WorkerFleetTest extends TestCase
         $this->assertDatabaseHas('worker_nodes', ['id' => $pinned->id]); // still there
         Http::assertNothingSent();
     }
+
+    public function test_image_exists_is_tri_state(): void
+    {
+        Http::fake([
+            'api.hetzner.cloud/v1/images/111' => Http::response(['image' => ['id' => 111]], 200),
+            'api.hetzner.cloud/v1/images/404404' => Http::response(['error' => ['message' => 'image not found']], 404),
+            'api.hetzner.cloud/v1/images/500500' => Http::response(['error' => ['message' => 'boom']], 500),
+        ]);
+        $c = app(HetznerClient::class);
+
+        $this->assertTrue($c->imageExists(111), '200 → exists');
+        $this->assertFalse($c->imageExists(404404), 'confirmed 404 → gone');
+        $this->assertNull($c->imageExists(500500), '5xx → unknown, never treated as gone');
+    }
+
+    public function test_provision_aborts_when_snapshot_missing(): void
+    {
+        AutoscalerConfig::update(['snapshot_id' => '999999']);
+        Http::fake([
+            'api.hetzner.cloud/v1/images/*' => Http::response(['error' => ['message' => 'image not found']], 404),
+            'api.hetzner.cloud/v1/servers' => Http::response(['server' => ['id' => 1]], 201), // must NOT be reached
+        ]);
+
+        $node = app(WorkerFleetService::class)->provision();
+
+        $this->assertSame(WorkerNode::STATUS_FAILED, $node->status);
+        $this->assertStringContainsString('not found in Hetzner', (string) $node->last_error);
+        // It bailed on the existence preflight — never attempted to create the server.
+        Http::assertNotSent(fn ($req) => $req->method() === 'POST' && str_contains($req->url(), '/servers'));
+    }
 }

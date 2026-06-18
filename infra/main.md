@@ -239,6 +239,14 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-06-18 (autoscaler — snapshot-existence preflight)** — Before provisioning a crawl box
+  the autoscaler now verifies the configured worker **snapshot still exists in Hetzner**
+  (`HetznerClient::imageExists`, tri-state; `FleetAutoscale::snapshotExists` gate +
+  `WorkerFleetService::provision` defense-in-depth) — complementing the existing git-HEAD-drift
+  gate. A deleted snapshot otherwise made `createServer` 422 every tick and the autoscaler
+  **looped provision→reap** a dead node (observed after a snapshot was deleted during unrelated
+  Hetzner cleanup). Confirmed-missing → rebuild (if `auto_snapshot`) or skip with an actionable
+  error. 2 new tests. Doc: [crawler/autoscaling.md](./crawler/autoscaling.md).
 - **2026-06-18 (crawl finalize — large-site 1205 lock-wait + finalize loop)** — Fixed two
   compounding `AnalyzeSiteJob` failure modes that stranded large-site finalizations (39k &
   168k pages): (1) `SiteGraphAnalyzer` did **whole-site UPDATEs** of `inbound_link_count` /

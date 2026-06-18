@@ -115,10 +115,18 @@ class FleetAutoscale extends Command
 
             return;
         }
-        // Don't build a box from a STALE base: if auto-snapshot is on and the snapshot
-        // wasn't built from the current git HEAD, kick a background rebuild and DEFER
-        // provisioning until it's fresh (the hourly refresh may not have run yet). This
-        // skips the tick (retries every 2 min); it does NOT block 15 min in one tick.
+        // Preflight 1 — the configured snapshot must still EXIST in Hetzner. Without
+        // this, a deleted snapshot makes provision() 422 ("image not found") every
+        // tick and the autoscaler loops provision→reap a dead node (2026-06-18: the
+        // worker snapshot was deleted during unrelated Hetzner cleanup; HEAD still
+        // matched so the drift gate below let it through).
+        if (! $this->snapshotExists($dry, $ctx)) {
+            return;
+        }
+        // Preflight 2 — don't build a box from a STALE base: if auto-snapshot is on and
+        // the snapshot wasn't built from the current git HEAD, kick a background rebuild
+        // and DEFER provisioning until it's fresh (the hourly refresh may not have run
+        // yet). Skips the tick (retries every 2 min); does NOT block 15 min in one tick.
         if (! $this->snapshotReady($dry, $ctx)) {
             return;
         }
@@ -221,6 +229,44 @@ class FleetAutoscale extends Command
      * return false so scale-up DEFERS to a later tick — never building a box from a stale
      * base. No-op (true) when auto-snapshot is off (operator manages the image manually).
      */
+    /**
+     * Verify the configured worker snapshot still exists in Hetzner before we try to
+     * build a box from it. Confirmed-missing → rebuild (if auto_snapshot) or skip with
+     * an actionable error; can't-verify (transient API error) → just hold this tick and
+     * retry, without triggering a rebuild on a network blip.
+     */
+    private function snapshotExists(bool $dry, string $ctx): bool
+    {
+        $id = AutoscalerConfig::snapshotId();
+        if ($id === null) {
+            $this->say("scale-up skip: no worker snapshot configured — build one (ebq:refresh-worker-snapshot) and set snapshot_id at /admin/fleet — {$ctx}", $dry);
+
+            return false;
+        }
+
+        $exists = app(HetznerClient::class)->imageExists((int) $id);
+        if ($exists === true) {
+            return true;
+        }
+        if ($exists === null) {
+            $this->say("scale-up skip: could not verify worker snapshot {$id} exists (Hetzner API) — {$ctx}", $dry);
+
+            return false;
+        }
+
+        // Confirmed gone (404). Self-heal via rebuild if auto-snapshot is on.
+        if (AutoscalerConfig::autoSnapshot()) {
+            if (! $dry && ! Cache::has(RefreshWorkerSnapshotJob::IN_PROGRESS)) {
+                RefreshWorkerSnapshotJob::dispatch();
+            }
+            $this->say("scale-up deferred: worker snapshot {$id} missing in Hetzner — rebuilding — {$ctx}", $dry);
+        } else {
+            $this->say("scale-up skip: worker snapshot {$id} not found in Hetzner and auto_snapshot is OFF — rebuild it (ebq:refresh-worker-snapshot) and set snapshot_id at /admin/fleet — {$ctx}", $dry);
+        }
+
+        return false;
+    }
+
     private function snapshotReady(bool $dry, string $ctx): bool
     {
         if (! AutoscalerConfig::autoSnapshot()) {
