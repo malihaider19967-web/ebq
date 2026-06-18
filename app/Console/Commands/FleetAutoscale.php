@@ -22,12 +22,14 @@ use Illuminate\Support\Facades\Queue;
  *
  *   desired = clamp(ceil(crawlBacklog / target_backlog_per_box), min, max)
  *
- * Scale UP one box per tick (gated by a cooldown + "no node still provisioning")
- * so a spike ramps over ~10 min instead of fanning out instantly. Scale DOWN one
- * box per tick, conservatively: backlog must stay low for the whole idle window,
- * the box must be past its minimum (hourly-billed) lifetime, and the pinned box is
- * never touched. A killed worker's in-flight work is recovered by stop_grace +
- * retry_after + CrawlSupervisor, so drains are safe.
+ * ONE box per change, then OBSERVE — never fan out or cascade on a momentary backlog
+ * wobble. Scale UP: at most one box, gated by "no node still provisioning" AND a settle
+ * window (wait scale_up_cooldown_s since the fleet last changed size, so a freshly-active
+ * box can draw down the backlog before we add another). Scale DOWN: at most one box per
+ * idle window — the idle clock RE-ARMS after each drain, so a transient dip can't drain the
+ * whole fleet (3→2 stops at the max_boxes cap, it won't barrel to 1). Boxes must be past
+ * their minimum (hourly-billed) lifetime; the pinned box is never touched. A killed worker's
+ * in-flight work is recovered by stop_grace + retry_after + CrawlSupervisor, so drains are safe.
  *
  * `--dry-run` logs the decision without calling Hetzner.
  */
@@ -38,6 +40,11 @@ class FleetAutoscale extends Command
     protected $description = 'Scale the crawl-worker fleet up/down to match crawl-queue backlog.';
 
     private const MARKER = 'autoscaler:scale_down_since';
+
+    /** Re-armed whenever the fleet size CHANGES; scale-up waits a cooldown from it to observe. */
+    private const SETTLE_MARK = 'autoscaler:fleet_settled_since';
+
+    private const LAST_BILLABLE = 'autoscaler:last_billable';
 
     /** Give up + replace a box that hasn't finished bootstrapping after this long. */
     private const PROVISION_STUCK_MINUTES = 18;
@@ -63,6 +70,16 @@ class FleetAutoscale extends Command
         $desired = WorkerFleetService::desiredFromBacklog($backlog);
         $ctx = "backlog={$backlog} billable={$billable} desired={$desired}";
 
+        // Whenever the fleet size CHANGES (a box finished provisioning and became billable, or
+        // one was reaped), re-arm the settle clock so the next scale-UP waits a full cooldown to
+        // SEE the effect before adding another box. "Add one, then observe."
+        if (! $dry && $billable !== (int) Cache::get(self::LAST_BILLABLE, $billable)) {
+            Cache::put(self::SETTLE_MARK, now()->timestamp, 86400);
+        }
+        if (! $dry) {
+            Cache::put(self::LAST_BILLABLE, $billable, 86400);
+        }
+
         if ($desired > $billable) {
             $this->clearMarker($dry);
             $this->scaleUp($fleet, $dry, $ctx);
@@ -83,9 +100,13 @@ class FleetAutoscale extends Command
 
             return;
         }
-        $last = WorkerNode::max('provisioned_at');
-        if ($last && Carbon::parse($last)->diffInSeconds(now()) < AutoscalerConfig::scaleUpCooldownSeconds()) {
-            $this->say("scale-up skip: cooldown — {$ctx}", $dry);
+        // Observe window: wait a full cooldown since the fleet last changed size, so a freshly
+        // active box has had time to draw down the backlog before we decide we need ANOTHER one.
+        // Combined with the provisioning gate above → strictly one box added per observe window.
+        $settled = (int) Cache::get(self::SETTLE_MARK, 0);
+        if ($settled > 0 && now()->timestamp - $settled < AutoscalerConfig::scaleUpCooldownSeconds()) {
+            $wait = AutoscalerConfig::scaleUpCooldownSeconds() - (now()->timestamp - $settled);
+            $this->say("scale-up skip: observing last fleet change (~{$wait}s left) — {$ctx}", $dry);
 
             return;
         }
@@ -136,6 +157,11 @@ class FleetAutoscale extends Command
             return;
         }
         $fleet->drain($node);
+        // Re-arm the idle clock so we drain only ONE box per idle window: the next drain must
+        // wait a fresh scale_down_idle_s of SUSTAINED desired<billable. Without this a momentary
+        // backlog dip cascaded into draining multiple boxes in consecutive ticks (3→2→1 instead
+        // of stopping at the max_boxes cap). One step, then re-observe.
+        Cache::put(self::MARKER, now()->timestamp, 86400);
         $this->say("scaling down: draining node {$node->id} — {$ctx}", false);
     }
 
