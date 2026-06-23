@@ -145,6 +145,35 @@ overwrite the pinned box's; it is intentionally box-local.)
 > that, snapshots stay current automatically (the build rsyncs current code). Until then the autoscaler's
 > `snapshotExists` gate keeps the fleet from looping on a missing image, and the **pinned box handles all
 > crawl load** — correctness is unaffected, only elastic scale-up is paused.
+>
+> **This actually happened and was recovered 2026-06-23.** Both `398793967` (snapshot) and
+> `398736889` (its base) were gone — confirmed via `HetznerClient::imageExists()` returning
+> `false` for both, which is why a real `provision` attempt logged `WorkerFleet: provision
+> aborted — snapshot missing` and the autoscaler reaped the failed node every tick. Since
+> `docker/worker/Dockerfile` lives only on the worker box (not in the repo — see above), there
+> was no way to rebuild the image from a stock OS + Dockerfile either. Recovery path used: boot
+> a temp box from a Hetzner **stock** `ubuntu-24.04` system image, `docker save ebq-worker:8.3`
+> off the still-alive **pinned** box (10.0.0.3) piped straight into `docker load` on the temp box
+> (no local tarball needed — `ssh ... save | ssh ... load` relayed through the web box), rsync
+> current code+vendor+`.env.worker`, then snapshot cold. **Gotcha hit on the first attempt:** a
+> truly-from-scratch box has never had `bootstrap/cache/` (or the `storage/framework/*`
+> subdirs) created — `WorkerFleetService::bootstrap()` only runs `rm -f bootstrap/cache/*.php`,
+> it assumes the directory already exists (true for every *incremental* rebuild, since those
+> provision FROM the previous working snapshot — false for a from-scratch build). Container
+> crash-looped on `PackageManifest.php: The /var/www/ebq/bootstrap/cache directory must be
+> present and writable.` until `mkdir -p bootstrap/cache storage/framework/{cache/data,sessions,views}
+> storage/logs` was run once, then re-snapshotted. New snapshot: `400739386`. Verified with a
+> real `ebq:fleet-worker provision` → container stable, Horizon started clean, 8 Redis
+> connections from the new box's IP confirmed it was actually polling the crawl queue → drained
+> + destroyed the test node. **If a snapshot is ever rebuilt fully from scratch again, add the
+> directory creation to `build-worker-snapshot.sh` (or bake empty dirs into a base image) so
+> this doesn't repeat.**
+>
+> Also found + fixed while testing this: `ebq:fleet-worker drain/destroy/bootstrap --id=`
+> (`app/Console/Commands/FleetWorker.php`'s `node()` helper) did `(int) $this->option('id')` on
+> a ULID — left over from before the ULID migration, silently mangled e.g.
+> `01kvta9tq98p8kv81zhnstk1ew` into `1` and always failed with "--id is required...". Fixed to
+> a plain string lookup.
 
 ## Operator prerequisites (must be set up before real provisioning)
 

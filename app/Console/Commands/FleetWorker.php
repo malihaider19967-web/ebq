@@ -160,8 +160,8 @@ class FleetWorker extends Command
 
     private function node(): ?WorkerNode
     {
-        $id = (int) $this->option('id');
-        $node = $id ? WorkerNode::find($id) : null;
+        $id = (string) $this->option('id');
+        $node = $id !== '' ? WorkerNode::find($id) : null;
         if (! $node) {
             $this->error('--id is required and must reference an existing worker_nodes row');
         }
