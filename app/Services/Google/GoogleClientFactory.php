@@ -4,6 +4,7 @@ namespace App\Services\Google;
 
 use App\Models\GoogleAccount;
 use Google\Client as GoogleClient;
+use GuzzleHttp\Client as GuzzleClient;
 use Illuminate\Support\Facades\Log;
 
 class GoogleClientFactory
@@ -13,6 +14,13 @@ class GoogleClientFactory
         $client = new GoogleClient();
         $client->setClientId(config('services.google.client_id'));
         $client->setClientSecret(config('services.google.client_secret'));
+        // Google\Client's default HTTP client has no read timeout — a stalled
+        // response on a large account (e.g. Search Analytics on a huge property)
+        // can block curl_exec() indefinitely, and the queue job's own $timeout
+        // (pcntl SIGALRM) doesn't reliably interrupt a blocking libcurl read.
+        // An explicit client-side timeout turns that into a catchable/retryable
+        // failure instead of an unbounded hang. See infra/data-sources/sync-jobs.md.
+        $client->setHttpClient(new GuzzleClient(['connect_timeout' => 10, 'timeout' => 120]));
 
         $token = [
             'access_token' => $account->access_token,

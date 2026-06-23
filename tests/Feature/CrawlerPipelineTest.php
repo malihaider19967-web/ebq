@@ -41,7 +41,7 @@ class CrawlerPipelineTest extends TestCase
 
     private function seedGsc(Website $website): void
     {
-        foreach ([['https://example.com/', 5], ['https://example.com/a', 10], ['https://example.com/b', 2]] as [$url, $clicks]) {
+        foreach ([['https://example.com/', 5], ['https://example.com/a', 10], ['https://example.com/b', 2], ['https://example.com/c', 0]] as [$url, $clicks]) {
             SearchConsoleData::create([
                 'website_id' => $website->id,
                 'date' => now()->subDays(3)->toDateString(),
@@ -56,15 +56,15 @@ class CrawlerPipelineTest extends TestCase
     private function runCrawl(Website $website): CrawlRun
     {
         $run = CrawlRun::create([
-            'website_id' => $website->id, 'trigger' => CrawlRun::TRIGGER_MANUAL,
+            'crawl_site_id' => $website->crawl_site_id, 'trigger' => CrawlRun::TRIGGER_MANUAL,
             'status' => CrawlRun::STATUS_RUNNING, 'started_at' => now(),
         ]);
 
-        app(CrawlFrontierBuilder::class)->build($website);
+        app(CrawlFrontierBuilder::class)->build($website->crawlSite);
 
         // Two passes so stub pages discovered via on-page links (e.g. /missing) get crawled too.
         for ($pass = 0; $pass < 2; $pass++) {
-            $ids = WebsitePage::where('website_id', $website->id)->due()->pluck('id')->all();
+            $ids = WebsitePage::where('crawl_site_id', $website->crawl_site_id)->due()->pluck('id')->all();
             if ($ids === []) {
                 break;
             }
@@ -73,7 +73,7 @@ class CrawlerPipelineTest extends TestCase
 
         (new AnalyzeSiteJob($run->id))->handle(
             app(SiteGraphAnalyzer::class), app(SiteIssueDetector::class), app(BlockDetector::class),
-            app(\App\Services\Crawler\InternalLinkSuggester::class)
+            app(\App\Services\Crawler\InternalLinkSuggester::class), app(\App\Support\Crawler\TermExtractor::class)
         );
 
         return $run->fresh();
@@ -92,7 +92,7 @@ class CrawlerPipelineTest extends TestCase
             'https://example.com/c' => $r('<html><head><title>Cee Page Title Here</title><meta name="description" content="Cee description long enough to be valid for the tests here."></head><body><h1>Cee</h1><p>'.str_repeat('cee ', 60).'</p></body></html>'),
             'https://example.com/missing' => $r('not found', 404),
             'https://broken.iana.org/x' => $r('gone', 404),
-            'https://example.com/sitemap.xml' => $r('<?xml version="1.0"?><urlset><url><loc>https://example.com/</loc></url><url><loc>https://example.com/c</loc></url></urlset>'),
+            'https://example.com/sitemap.xml' => $r('<?xml version="1.0"?><urlset><url><loc>https://example.com/</loc></url></urlset>'),
             '*' => $r('<html><body>fb</body></html>'),
         ]);
 
@@ -104,20 +104,22 @@ class CrawlerPipelineTest extends TestCase
         $run = $this->runCrawl($website);
 
         // Inventory
-        $a = WebsitePage::where('website_id', $website->id)->where('url_hash', WebsitePage::hashUrl('https://example.com/a'))->first();
+        $a = WebsitePage::where('crawl_site_id', $website->crawl_site_id)->where('url_hash', WebsitePage::hashUrl('https://example.com/a'))->first();
         $this->assertSame(200, $a->http_status);
         $this->assertFalse((bool) $a->is_indexable, 'noindex page should be non-indexable');
-        $missing = WebsitePage::where('website_id', $website->id)->where('url_hash', WebsitePage::hashUrl('https://example.com/missing'))->first();
+        $missing = WebsitePage::where('crawl_site_id', $website->crawl_site_id)->where('url_hash', WebsitePage::hashUrl('https://example.com/missing'))->first();
         $this->assertSame(404, $missing->http_status);
 
-        // Graph: /b has inbound links; /c is an orphan (sitemap-only, unlinked)
-        $b = WebsitePage::where('website_id', $website->id)->where('url_hash', WebsitePage::hashUrl('https://example.com/b'))->first();
+        // Graph: /b has inbound links; /c is an orphan (GSC-only, unlinked, NOT in
+        // sitemap — sitemap-listed pages are excluded from orphan_page by design,
+        // see SiteIssueDetector::detectForPage).
+        $b = WebsitePage::where('crawl_site_id', $website->crawl_site_id)->where('url_hash', WebsitePage::hashUrl('https://example.com/b'))->first();
         $this->assertGreaterThanOrEqual(1, (int) $b->inbound_link_count);
-        $c = WebsitePage::where('website_id', $website->id)->where('url_hash', WebsitePage::hashUrl('https://example.com/c'))->first();
+        $c = WebsitePage::where('crawl_site_id', $website->crawl_site_id)->where('url_hash', WebsitePage::hashUrl('https://example.com/c'))->first();
         $this->assertSame(0, (int) $c->inbound_link_count);
 
         // Findings
-        $types = CrawlFinding::where('website_id', $website->id)->where('status', 'open')->pluck('type')->all();
+        $types = CrawlFinding::where('crawl_site_id', $website->crawl_site_id)->where('status', 'open')->pluck('type')->all();
         $this->assertContains('noindex_important', $types);
         $this->assertContains('broken_page', $types);
         $this->assertContains('broken_internal', $types);
@@ -146,7 +148,7 @@ class CrawlerPipelineTest extends TestCase
         $user = User::factory()->create();
         $website = Website::factory()->withBothSources()->create(['user_id' => $user->id, 'domain' => 'example.com']);
         $page = WebsitePage::create([
-            'website_id' => $website->id, 'url' => 'https://example.com/b',
+            'crawl_site_id' => $website->crawl_site_id, 'url' => 'https://example.com/b',
             'url_hash' => WebsitePage::hashUrl('https://example.com/b'),
         ]);
 

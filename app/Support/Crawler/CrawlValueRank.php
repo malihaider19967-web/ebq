@@ -20,7 +20,7 @@ class CrawlValueRank
         return $query
             ->orderByRaw('source_gsc desc')
             ->orderByRaw('source_sitemap desc')
-            ->orderByRaw('CHAR_LENGTH(url) asc')
+            ->orderByRaw('LENGTH(url) asc')
             ->orderBy('id');
     }
 

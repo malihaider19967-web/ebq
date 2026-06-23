@@ -20,6 +20,14 @@ return [
     'max_passes' => (int) env('CRAWLER_MAX_PASSES', 6), // deprecated: superseded by pages_per_pass (CrawlPassJob now derives its own runaway ceiling)
     'max_pages_per_run' => (int) env('CRAWLER_MAX_PAGES_PER_RUN', 200000),
 
+    // Universal hard ceiling on pages crawled per SITE, regardless of plan. Caps the
+    // cost of AnalyzeSiteJob (link-graph BFS, issue detection, scoring) on huge domains
+    // (100k+ pages) that would otherwise blow finalize timeouts/memory. The owner's
+    // plan max_crawl_pages (Plan::max_crawl_pages / User::crawlPageLimit) is now an
+    // ACCOUNT-WIDE pool spread across all the owner's sites — this is the per-site
+    // floor/ceiling that pool gets divided against. See Website::crawlPageCap().
+    'max_pages_per_site' => (int) env('CRAWLER_MAX_PAGES_PER_SITE', 20000),
+
     // Fairness: max pages a single pass enqueues before yielding the crawl queue to
     // other sites. Small enough that one large site can't monopolise the 5 shared
     // crawl workers; large enough to keep per-pass overhead low. The multi-pass loop
@@ -133,5 +141,12 @@ return [
 
         // Disable a proxy after this many consecutive failures (0 = never).
         'max_failures' => (int) env('CRAWLER_PROXY_MAX_FAILURES', 5),
+
+        // Scheduled `ebq:proxy-list-refresh` (pulls free public proxy lists every
+        // 30min, see routes/console.php) — OFF by default. The command itself is
+        // unaffected by this flag and can always be run manually (artisan or the
+        // admin /admin/proxies "Import now" button); this only gates the
+        // automatic schedule firing.
+        'auto_import' => (bool) env('CRAWLER_PROXY_AUTO_IMPORT', false),
     ],
 ];

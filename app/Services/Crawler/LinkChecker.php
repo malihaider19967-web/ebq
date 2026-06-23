@@ -18,7 +18,13 @@ class LinkChecker
     private const TIMEOUT = 8;
     private const CONCURRENCY = 10;
 
-    public function __construct(private readonly SafeHttpGuard $guard) {}
+    /** Statuses that can be a block/rate-limit false positive rather than a real dead link. */
+    private const FALLBACK_STATUSES = [403, 405, 429, 501];
+
+    public function __construct(
+        private readonly SafeHttpGuard $guard,
+        private readonly ProxyPool $proxies,
+    ) {}
 
     /**
      * @param  array<int,array{href:string,anchor?:string}>  $links
@@ -96,7 +102,7 @@ class LinkChecker
 
                 if ($resp instanceof Response) {
                     $status = $resp->status();
-                    if (in_array($status, [403, 405, 501], true)) {
+                    if (in_array($status, self::FALLBACK_STATUSES, true)) {
                         $status = $this->getFallback($link['href']) ?? $status;
                     }
                     $history = array_filter(array_map('trim', explode(',', (string) $resp->header('X-Guzzle-Redirect-History'))));
@@ -118,10 +124,37 @@ class LinkChecker
 
     private function getFallback(string $url): ?int
     {
+        $status = $this->fetchGetStatus($url, null);
+        if ($status !== null && $status < 400) {
+            return $status;
+        }
+
+        // Direct GET still looks dead — could be a real 404, or the host
+        // blocking our IP/UA (anti-bot, rate-limit). Retry once via the
+        // proxy pool before trusting the direct result.
+        if ($this->proxies->enabled()) {
+            $proxy = $this->proxies->pick();
+            if ($proxy !== null) {
+                $proxied = $this->fetchGetStatus($url, $proxy);
+                if ($proxied !== null && $proxied < 400) {
+                    $this->proxies->markSuccess($proxy);
+
+                    return $proxied;
+                }
+                $this->proxies->markFailure($proxy);
+            }
+        }
+
+        return $status;
+    }
+
+    private function fetchGetStatus(string $url, ?string $proxy): ?int
+    {
         try {
             return Http::timeout(self::TIMEOUT)
                 ->connectTimeout(self::TIMEOUT)
                 ->withUserAgent(CrawlFetcher::UA)
+                ->withOptions(array_filter(['proxy' => $proxy], static fn ($v) => $v !== null))
                 ->get($url)
                 ->status();
         } catch (\Throwable) {

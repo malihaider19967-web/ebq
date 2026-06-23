@@ -3,20 +3,27 @@
 namespace App\Services\Crawler;
 
 use App\Models\Proxy;
+use Illuminate\Http\Client\Pool;
+use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 /**
  * The crawler's outbound proxy pool. Merges admin-managed proxies (the `proxies`
  * table) with proxies parsed from proxylist.txt in the project root, normalises
  * them to Guzzle proxy URLs, and hands out one at a time for anti-blocking
- * retries. DB-backed proxies get basic health tracking (auto-disabled after
- * repeated failures).
+ * retries. DB-backed proxies get basic health tracking — `markFailure()` (called
+ * from real production use: `PageAuditService`, `LinkChecker`, `PageCrawlProcessor`)
+ * auto-DELETES a proxy after repeated real-world failures. The separate
+ * `ebq:proxy-list-refresh` synthetic health check never deletes/deactivates —
+ * see that command's docblock.
  */
 class ProxyPool
 {
     private const CACHE_KEY = 'crawler:proxypool:urls';
     private const CACHE_TTL = 60;
+    private const HEALTH_TEST_URL = 'https://api.ipify.org';
 
     public function enabled(): bool
     {
@@ -85,6 +92,13 @@ class ProxyPool
         ]);
     }
 
+    /**
+     * Records a failure from REAL production use (audit link-check, crawler
+     * fetch/link-check) — not a synthetic health-check ping. After
+     * `max_failures` such failures the proxy is deleted outright, not just
+     * deactivated: a service genuinely tried to use it and it didn't work,
+     * repeatedly, so it's not worth keeping the row around.
+     */
     public function markFailure(?string $url): void
     {
         if ($url === null) {
@@ -96,12 +110,51 @@ class ProxyPool
             return; // file-sourced proxy — not health-tracked here
         }
         $proxy->fail_count++;
-        $proxy->last_used_at = now();
         if ($max > 0 && $proxy->fail_count >= $max) {
-            $proxy->active = false;
+            $proxy->delete();
             Cache::forget(self::CACHE_KEY); // drop it from the live pool now
+
+            return;
         }
+        $proxy->last_used_at = now();
         $proxy->save();
+    }
+
+    /**
+     * Concurrently live-tests proxy URLs via a real HTTPS round-trip (cert
+     * verification ON — catches MITM, see `ebq:proxy-list-refresh` docblock).
+     * Shared by the import command and the dead-proxy pruner so both use the
+     * exact same test semantics.
+     *
+     * @param  list<string>  $urls
+     * @return array<string,bool> url => reachable
+     */
+    public function testBatch(array $urls, int $concurrency = 25, int $timeout = 6): array
+    {
+        $results = [];
+        foreach (array_chunk(array_values(array_unique($urls)), max(1, $concurrency)) as $batch) {
+            $responses = Http::pool(function (Pool $httpPool) use ($batch, $timeout) {
+                $calls = [];
+                foreach ($batch as $i => $url) {
+                    $calls[] = $httpPool->as((string) $i)
+                        ->timeout($timeout)
+                        ->connectTimeout($timeout)
+                        ->withOptions(['proxy' => $url])
+                        ->get(self::HEALTH_TEST_URL);
+                }
+
+                return $calls;
+            });
+
+            foreach ($batch as $i => $url) {
+                $resp = $responses[(string) $i] ?? null;
+                $results[$url] = $resp instanceof Response
+                    && $resp->successful()
+                    && (bool) filter_var(trim($resp->body()), FILTER_VALIDATE_IP);
+            }
+        }
+
+        return $results;
     }
 
     /**

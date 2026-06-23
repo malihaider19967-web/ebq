@@ -147,7 +147,9 @@ class CrawlSite extends Model
     /**
      * Recompute effective_cap = max crawl page cap across subscribers. Returns the
      * new value. Used when a subscriber joins/leaves so the shared crawl is deep
-     * enough for the highest-tier user.
+     * enough for the highest-tier user. Each subscriber's own crawlPageCap() now
+     * reflects their account-pooled budget (hard-capped per site), not a flat
+     * plan number — see Website::crawlPageCap().
      */
     public function recomputeEffectiveCap(): int
     {

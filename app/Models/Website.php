@@ -692,18 +692,42 @@ class Website extends Model
     }
 
     /**
-     * Resolved max pages a crawl run may fetch for this site: the owner's plan
-     * cap (max_crawl_pages) when set, otherwise the global crawler budget. Always
-     * a positive integer, so the crawler can use it directly as the run budget.
+     * Resolved max pages a crawl run may fetch for THIS site. Two layers:
+     *  1. A universal hard per-site ceiling (config('crawler.max_pages_per_site'))
+     *     that applies to every website regardless of plan — this is what bounds
+     *     finalize cost (SiteGraphAnalyzer/SiteIssueDetector) on huge domains.
+     *  2. The owner's plan max_crawl_pages is an ACCOUNT-WIDE pool shared across
+     *     all of the owner's websites (not a per-site number). This site's share
+     *     of that pool is whatever's left after the owner's OTHER sites have each
+     *     consumed up to the hard cap.
+     * Always a positive integer, so the crawler can use it directly as the run budget.
      */
     public function crawlPageCap(): int
     {
-        $planLimit = $this->owner?->crawlPageLimit();
-        if ($planLimit !== null && $planLimit > 0) {
-            return (int) $planLimit;
+        $hardCap = max(1, (int) config('crawler.max_pages_per_site', 20000));
+        $quota = $this->owner?->crawlPageLimit(); // account-wide pool; null = unlimited
+
+        if ($quota === null || $quota <= 0) {
+            return $hardCap;
         }
 
-        return max(1, (int) config('crawler.max_pages_per_run', 200000));
+        $usedByOtherSites = $this->owner->websites()
+            ->where('id', '!=', $this->id)
+            ->get(['id', 'crawl_site_id'])
+            ->sum(function (Website $w) use ($hardCap): int {
+                if (! $w->crawl_site_id) {
+                    return 0;
+                }
+
+                $crawled = WebsitePage::where('crawl_site_id', $w->crawl_site_id)
+                    ->whereNotNull('last_crawled_at')->count();
+
+                return min($hardCap, $crawled);
+            });
+
+        $remaining = max(0, $quota - $usedByOtherSites);
+
+        return max(1, min($hardCap, $remaining));
     }
 
     public function backlinks(): HasMany

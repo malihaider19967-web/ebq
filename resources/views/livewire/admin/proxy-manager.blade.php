@@ -16,7 +16,23 @@
         @unless ($poolEnabled)
             <span class="text-xs text-amber-600 dark:text-amber-400">Set <code>CRAWLER_PROXY_ENABLED=true</code> to use the pool.</span>
         @endunless
+
+        <span class="ml-auto inline-flex items-center gap-2 text-xs">
+            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium {{ $autoImportEnabled ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' }}">
+                Auto-import (free lists): {{ $autoImportEnabled ? 'on, every 30min' : 'off' }}
+            </span>
+            <button wire:click="importNow" wire:loading.attr="disabled" wire:target="importNow"
+                class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">
+                <span wire:loading wire:target="importNow" class="inline-flex h-3 w-3 animate-spin rounded-full border-2 border-slate-400 border-t-transparent"></span>
+                Import now
+            </button>
+        </span>
     </div>
+    <p class="-mt-3 text-[11px] text-slate-400 dark:text-slate-500">
+        "Import now" queues a background fetch + live-test of new candidates from iplocate/free-proxy-list +
+        proxifly/free-proxy-list — only passing ones get added. Existing proxies are checked separately, every
+        15min, and removed the moment they fail (<code>ebq:proxy-pool-prune</code>, always on).
+    </p>
 
     @if ($notice)
         <div class="rounded-lg bg-indigo-50 px-4 py-2 text-sm text-indigo-800 dark:bg-indigo-500/10 dark:text-indigo-300">{{ $notice }}</div>
@@ -38,7 +54,70 @@
     </div>
 
     {{-- Proxy list --}}
-    <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+    <div
+        x-data="{
+            running: false,
+            done: 0,
+            total: 0,
+            failed: 0,
+            passed: 0,
+            current: null,
+            concurrency: 5,
+            async retestAll(ids) {
+                if (this.running || ! ids.length) return;
+                if (! confirm(`Retest all ${ids.length} proxies? Any that fail will be removed immediately.`)) return;
+                this.running = true; this.done = 0; this.total = ids.length; this.failed = 0; this.passed = 0;
+                const queue = [...ids];
+                const worker = async () => {
+                    while (queue.length) {
+                        const id = queue.shift();
+                        this.current = id;
+                        try {
+                            await $wire.test(id, true);
+                            const r = $wire.testResults[id] || '';
+                            r.startsWith('ok') ? this.passed++ : this.failed++;
+                        } catch (e) { this.failed++; }
+                        this.done++;
+                    }
+                };
+                await Promise.all(Array.from({ length: Math.min(this.concurrency, ids.length) }, worker));
+                this.current = null;
+                this.running = false;
+            },
+        }"
+        class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900"
+    >
+        <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 dark:border-slate-800 dark:bg-slate-800/50">
+            <div class="text-xs text-slate-500 dark:text-slate-400">
+                <span x-show="!running">{{ $proxies->count() }} proxies tracked.</span>
+                <span x-show="running" x-cloak class="inline-flex items-center gap-2 font-medium text-indigo-600 dark:text-indigo-400">
+                    <svg class="h-3.5 w-3.5 animate-spin" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                    Retesting <span x-text="done"></span>/<span x-text="total"></span>…
+                    <span class="text-emerald-600 dark:text-emerald-400" x-text="passed + ' ok'"></span>
+                    <span class="text-red-600 dark:text-red-400" x-text="failed + ' fail'"></span>
+                </span>
+                <span x-show="!running && total > 0" x-cloak class="font-medium text-slate-700 dark:text-slate-200">
+                    Done — <span class="text-emerald-600 dark:text-emerald-400" x-text="passed + ' ok'"></span>,
+                    <span class="text-red-600 dark:text-red-400" x-text="failed + ' fail'"></span>.
+                </span>
+            </div>
+            <div class="flex items-center gap-3">
+                <div x-show="running" x-cloak class="h-1.5 w-32 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
+                    <div class="h-full bg-indigo-600 transition-all" :style="`width: ${total ? (done / total * 100) : 0}%`"></div>
+                </div>
+                <button
+                    @click="retestAll(@js($proxies->pluck('id')))"
+                    :disabled="running || {{ $proxies->isEmpty() ? 'true' : 'false' }}"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
+                >
+                    <svg x-show="!running" class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+                    <span x-text="running ? 'Retesting…' : 'Retest all'"></span>
+                </button>
+            </div>
+        </div>
+        <div class="border-b border-slate-100 bg-amber-50 px-4 py-1.5 text-[11px] text-amber-700 dark:border-slate-800 dark:bg-amber-500/10 dark:text-amber-300">
+            "Retest all" deletes any proxy that fails, immediately — unlike the single row "Test" button, which only records the failure.
+        </div>
         <table class="min-w-full divide-y divide-slate-200 text-sm dark:divide-slate-800">
             <thead class="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500 dark:bg-slate-800/50 dark:text-slate-400">
                 <tr>
@@ -52,9 +131,12 @@
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                 @forelse ($proxies as $p)
                     @php $masked = preg_replace('#://([^:/@]+):[^@]*@#', '://$1:***@', $p->url); @endphp
-                    <tr>
+                    <tr :class="current === '{{ $p->id }}' ? 'bg-indigo-50/60 dark:bg-indigo-500/10' : ''">
                         <td class="px-4 py-2 font-mono text-xs text-slate-800 dark:text-slate-200">
-                            {{ $masked }}
+                            <span class="inline-flex items-center gap-1.5">
+                                <svg x-show="current === '{{ $p->id }}'" x-cloak class="h-3 w-3 flex-none animate-spin text-indigo-500" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                                {{ $masked }}
+                            </span>
                             @if (isset($testResults[$p->id]))
                                 <div class="mt-0.5 text-[11px] {{ str_starts_with($testResults[$p->id], 'ok') ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400' }}">{{ $testResults[$p->id] }}</div>
                             @endif
@@ -69,9 +151,9 @@
                             <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {{ $p->active ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400' }}">{{ $p->active ? 'active' : 'disabled' }}</span>
                         </td>
                         <td class="px-4 py-2 text-right text-xs">
-                            <button wire:click="test('{{ $p->id }}')" wire:loading.attr="disabled" class="font-medium text-indigo-600 hover:underline dark:text-indigo-400">Test</button>
-                            <button wire:click="toggle('{{ $p->id }}')" class="ml-3 font-medium text-slate-600 hover:underline dark:text-slate-300">{{ $p->active ? 'Disable' : 'Enable' }}</button>
-                            <button wire:click="delete('{{ $p->id }}')" wire:confirm="Delete this proxy?" class="ml-3 font-medium text-red-600 hover:underline dark:text-red-400">Delete</button>
+                            <button wire:click="test('{{ $p->id }}')" wire:loading.attr="disabled" wire:target="test('{{ $p->id }}')" :disabled="running" class="font-medium text-indigo-600 hover:underline dark:text-indigo-400 disabled:opacity-50">Test</button>
+                            <button wire:click="toggle('{{ $p->id }}')" :disabled="running" class="ml-3 font-medium text-slate-600 hover:underline dark:text-slate-300 disabled:opacity-50">{{ $p->active ? 'Disable' : 'Enable' }}</button>
+                            <button wire:click="delete('{{ $p->id }}')" wire:confirm="Delete this proxy?" :disabled="running" class="ml-3 font-medium text-red-600 hover:underline dark:text-red-400 disabled:opacity-50">Delete</button>
                         </td>
                     </tr>
                 @empty

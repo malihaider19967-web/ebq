@@ -51,3 +51,13 @@ Schedule::command('horizon:snapshot')->everyFiveMinutes();
 // withoutOverlapping + an internal lock so it never double-builds or blocks the
 // scheduler. No-op unless the autoscaler's `auto_snapshot` kill-switch is on.
 Schedule::command('ebq:refresh-worker-snapshot')->hourly()->withoutOverlapping(30)->runInBackground();
+
+// Import NEW candidate proxies from free public lists (iplocate + proxifly).
+// OFF by default (CRAWLER_PROXY_AUTO_IMPORT) — the command can always be run
+// manually via artisan or the admin /admin/proxies "Import now" button.
+Schedule::command('ebq:proxy-list-refresh')->everyThirtyMinutes()->withoutOverlapping()
+    ->when(fn () => (bool) config('crawler.proxy.auto_import'));
+
+// Always on regardless of the import flag above — keeps the pool clean by
+// live-testing every already-tracked proxy and deleting the ones that fail.
+Schedule::command('ebq:proxy-pool-prune')->everyFifteenMinutes()->withoutOverlapping();

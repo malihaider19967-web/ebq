@@ -10,6 +10,7 @@ use App\Support\Audit\KeywordStrategyAnalyzer;
 use App\Support\Audit\PageLocaleResolver;
 use App\Services\LighthouseClient;
 use App\Support\Audit\RecommendationEngine;
+use App\Services\Crawler\ProxyPool;
 use App\Support\Audit\SafeHttpGuard;
 use App\Support\Audit\SerpGlCountryPrompt;
 use App\Support\Audit\SerpLocaleDefaults;
@@ -27,10 +28,18 @@ class PageAuditService
 
     private const LINK_POOL_CONCURRENCY = 10;
 
+    /** Statuses that can be a block/rate-limit false positive rather than a real dead link. */
+    private const LINK_FALLBACK_STATUSES = [403, 405, 429, 501];
+
+    private const LINK_CHECK_UA = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/124.0.6367.207 Safari/537.36';
+
     /** Cap the HTML body we parse to protect libxml / memory. */
     private const MAX_BODY_BYTES = 5_000_000;
 
-    public function __construct(private readonly SafeHttpGuard $guard) {}
+    public function __construct(
+        private readonly SafeHttpGuard $guard,
+        private readonly ProxyPool $proxies,
+    ) {}
 
     /**
      * `$lite = true` skips the two slowest optional stages (link checking
@@ -1187,7 +1196,7 @@ class PageAuditService
                     $calls[] = $pool->as((string) $i)
                         ->timeout(self::LINK_TIMEOUT)
                         ->connectTimeout(self::LINK_TIMEOUT)
-                        ->withUserAgent('Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/124.0.6367.207 Safari/537.36')
+                        ->withUserAgent(self::LINK_CHECK_UA)
                         ->withOptions([
                             'allow_redirects' => [
                                 'max' => 3,
@@ -1215,8 +1224,8 @@ class PageAuditService
 
                 if ($resp instanceof Response) {
                     $status = $resp->status();
-                    if (in_array($status, [403, 405, 501], true)) {
-                        $status = $this->getFallback($link['href']);
+                    if (in_array($status, self::LINK_FALLBACK_STATUSES, true)) {
+                        $status = $this->getFallback($link['href']) ?? $status;
                     }
                 } else {
                     $error = $resp instanceof \Throwable ? $resp->getMessage() : 'unknown';
@@ -1243,11 +1252,38 @@ class PageAuditService
             return null;
         }
 
+        $status = $this->fetchGetStatus($url, null);
+        if ($status !== null && $status < 400) {
+            return $status;
+        }
+
+        // Direct GET still looks dead — could be a real 404, or the host
+        // blocking our IP/UA (anti-bot, rate-limit). Retry once via the
+        // crawler's proxy pool before trusting the direct result.
+        if ($this->proxies->enabled()) {
+            $proxy = $this->proxies->pick();
+            if ($proxy !== null) {
+                $proxied = $this->fetchGetStatus($url, $proxy);
+                if ($proxied !== null && $proxied < 400) {
+                    $this->proxies->markSuccess($proxy);
+
+                    return $proxied;
+                }
+                $this->proxies->markFailure($proxy);
+            }
+        }
+
+        return $status;
+    }
+
+    private function fetchGetStatus(string $url, ?string $proxy): ?int
+    {
         try {
             $resp = Http::timeout(self::LINK_TIMEOUT)
                 ->connectTimeout(self::LINK_TIMEOUT)
-                ->withUserAgent('Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/124.0.6367.207 Safari/537.36')
-                ->withOptions([
+                ->withUserAgent(self::LINK_CHECK_UA)
+                ->withOptions(array_filter([
+                    'proxy' => $proxy,
                     'allow_redirects' => [
                         'max' => 3,
                         'strict' => true,
@@ -1260,7 +1296,7 @@ class PageAuditService
                             }
                         },
                     ],
-                ])
+                ], static fn ($v) => $v !== null))
                 ->get($url);
 
             return $resp->status();

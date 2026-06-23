@@ -39,8 +39,11 @@ Typical wall-time: full ≈ 60–120s, lite ≈ 15–30s, guest ≈ 15–30s.
    html-lang; `SerpLocaleDefaults::forSerperRequest()` fills a missing `gl` from `hl`. A
    user-chosen `serp_gl` overrides when valid.
 5. **Link check** (full only) — `checkLinks()` `:1150`: dedupe to `MAX_LINKS_CHECKED = 100`,
-   guard each, HEAD in pools of `LINK_POOL_CONCURRENCY = 10` with `LINK_TIMEOUT = 8s`; 403/405/501
-   fall back to a GET; `>=400` or null → broken.
+   guard each, HEAD in pools of `LINK_POOL_CONCURRENCY = 10` with `LINK_TIMEOUT = 8s`;
+   403/405/**429**/501 fall back to a GET, and if that GET *also* still looks dead, one more
+   GET retry through the crawler's `ProxyPool` (`crawler.proxy.*`) before trusting the result;
+   `>=400` or null → broken. Mirrored in `App\Services\Crawler\LinkChecker` for the crawler
+   pipeline — keep both in sync (fixed together 2026-06-20, see changelog).
 6. **Keyword strategy** — `fetchTargetKeywords()` aggregates the page's GSC queries (last
    `effectiveGscKeywordLookbackDays`, top 50 by impressions); `KeywordStrategyAnalyzer::analyze()`
    scores placement of the primary query (or manual override) across title/meta/H1/headings/body.
@@ -120,8 +123,12 @@ poller never hangs.
 - **Flesch is English-centric.** `estimateSyllables()` strips non-ASCII, so the Flesch number
   is unreliable for non-Latin pages; the SERP gap-table guards against skew (`fleschStatus`,
   10–95 band) but the raw `readability.flesch` in the blob is still computed.
-- **Link check is best-effort.** Capped at 100 unique links; 403/405/501 hosts (bot-blocking)
-  fall back to GET, but a host that blocks both HEAD and GET reads as broken (false positive).
+- **Link check is best-effort.** Capped at 100 unique links; 403/405/429/501 hosts (bot-blocking
+  or rate-limiting) fall back to GET, then to one proxied GET retry via `ProxyPool` if that
+  also fails — but a host that blocks HEAD, GET, *and* every proxy IP still reads as broken
+  (false positive). Fixed 2026-06-20: 429 (rate-limit) wasn't in the fallback list at all
+  before, so e.g. `apps.apple.com` 429-ing the HEAD check got flagged broken instantly with no
+  retry — see knowledge changelog.
 - **No content-hash re-audit gate.** A persisted `PageAuditReport` is reused indefinitely; the
   live-score path won't re-audit on content change unless the post's `modified` time is newer
   than `audited_at` (see live-score doc). Manual re-audit always overwrites.

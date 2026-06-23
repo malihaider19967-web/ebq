@@ -57,8 +57,10 @@ class Plan extends Model
         'stripe_price_id_yearly',
         'trial_days',
         'max_websites',
-        // Max pages fetched per crawl run for sites on this plan (highest-value
-        // pages first). null = unlimited (global crawler.max_pages_per_run).
+        // Account-wide page budget pooled across ALL of the owner's sites (highest-
+        // value pages first within each). Each site is still hard-capped at
+        // config('crawler.max_pages_per_site') regardless. null = no pool (sites
+        // just get the hard per-site cap). See Website::crawlPageCap().
         'max_crawl_pages',
         'features',
         // Sparse map of bullet-index => YouTube URL for the optional

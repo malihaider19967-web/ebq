@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Jobs\CrawlPageBatchJob;
+use App\Jobs\CrawlPassJob;
 use App\Jobs\CrawlSitemapDeltaJob;
 use App\Jobs\CrawlWebsitePagesJob;
 use App\Models\CrawlRun;
@@ -45,17 +46,17 @@ class CrawlSchedulingTest extends TestCase
         $website = Website::factory()->withBothSources()->create(['user_id' => $user->id, 'domain' => 'example.com']);
         $website->sitemaps()->create(['path' => 'https://example.com/sitemap.xml', 'source' => 'manual']);
         // /old is already known; /new is not.
-        WebsitePage::create(['website_id' => $website->id, 'url' => 'https://example.com/old', 'url_hash' => WebsitePage::hashUrl('https://example.com/old')]);
+        WebsitePage::create(['crawl_site_id' => $website->crawl_site_id, 'url' => 'https://example.com/old', 'url_hash' => WebsitePage::hashUrl('https://example.com/old')]);
 
         (new CrawlSitemapDeltaJob($website->id))->handle(app(\App\Support\Crawler\SitemapUrlExtractor::class));
 
         $this->assertDatabaseHas('website_pages', [
-            'website_id' => $website->id,
+            'crawl_site_id' => $website->crawl_site_id,
             'url_hash' => WebsitePage::hashUrl('https://example.com/new'),
             'source_sitemap' => true,
         ]);
         // Exactly the new URL was added (old + new = 2 rows).
-        $this->assertSame(2, WebsitePage::where('website_id', $website->id)->count());
+        $this->assertSame(2, WebsitePage::where('crawl_site_id', $website->crawl_site_id)->count());
         Queue::assertPushed(CrawlWebsitePagesJob::class);
     }
 
@@ -69,8 +70,12 @@ class CrawlSchedulingTest extends TestCase
         $user = User::factory()->create();
         $website = Website::factory()->withBothSources()->create(['user_id' => $user->id, 'domain' => 'example.com']);
         $website->sitemaps()->create(['path' => 'https://example.com/sitemap.xml', 'source' => 'manual']);
-        WebsitePage::create(['website_id' => $website->id, 'url' => 'https://example.com/old', 'url_hash' => WebsitePage::hashUrl('https://example.com/old')]);
+        WebsitePage::create(['crawl_site_id' => $website->crawl_site_id, 'url' => 'https://example.com/old', 'url_hash' => WebsitePage::hashUrl('https://example.com/old')]);
 
+        // Reset the fake: withBothSources() itself dispatches ReprocessCompetitiveData
+        // on the gsc_google_account_id null->set transition (Website::updated hook) —
+        // unrelated to the delta job under test, so don't let it count as "pushed".
+        Queue::fake();
         (new CrawlSitemapDeltaJob($website->id))->handle(app(\App\Support\Crawler\SitemapUrlExtractor::class));
 
         Queue::assertNothingPushed();
@@ -82,7 +87,7 @@ class CrawlSchedulingTest extends TestCase
         $user = User::factory()->create();
         $crawled = Website::factory()->create(['user_id' => $user->id, 'domain' => 'crawled.com', 'gsc_site_url' => 'sc-domain:crawled.com']);
         $never = Website::factory()->create(['user_id' => $user->id, 'domain' => 'never.com', 'gsc_site_url' => 'sc-domain:never.com']);
-        CrawlRun::create(['website_id' => $crawled->id, 'trigger' => 'scheduled', 'status' => 'completed', 'started_at' => now()->subDay()]);
+        CrawlRun::create(['crawl_site_id' => $crawled->crawl_site_id, 'trigger' => 'scheduled', 'status' => 'completed', 'started_at' => now()->subDay()]);
 
         $this->artisan('ebq:crawl-websites --backfill')->assertSuccessful();
 
@@ -103,8 +108,14 @@ class CrawlSchedulingTest extends TestCase
 
         (new CrawlWebsitePagesJob($website->id, CrawlRun::TRIGGER_MANUAL))->handle(app(CrawlFrontierBuilder::class));
 
-        $this->assertDatabaseHas('crawl_runs', ['website_id' => $website->id, 'status' => 'running']);
-        $this->assertDatabaseHas('website_pages', ['website_id' => $website->id, 'url_hash' => WebsitePage::hashUrl('https://example.com/p')]);
+        $this->assertDatabaseHas('crawl_runs', ['crawl_site_id' => $website->crawl_site_id, 'status' => 'running']);
+        $this->assertDatabaseHas('website_pages', ['crawl_site_id' => $website->crawl_site_id, 'url_hash' => WebsitePage::hashUrl('https://example.com/p')]);
+
+        // The orchestrator hands off to the multi-pass loop (CrawlPassJob), which is
+        // what actually fans the due pages out into a Bus::batch of CrawlPageBatchJob.
+        $run = CrawlRun::where('crawl_site_id', $website->crawl_site_id)->first();
+        Bus::assertDispatched(CrawlPassJob::class, fn ($job) => $job->crawlRunId === $run->id);
+        (new CrawlPassJob($run->id, $website->crawl_site_id))->handle();
         Bus::assertBatched(fn ($batch) => $batch->jobs->first() instanceof CrawlPageBatchJob);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Pages;
 
+use App\Jobs\RunCustomPageAudit;
 use App\Models\CustomPageAudit;
 use App\Models\GoogleAccount;
 use App\Models\PageAuditReport;
@@ -250,7 +251,7 @@ class PageDetail extends Component
         $this->serpCountryModalOpen = true;
     }
 
-    public function confirmPageAuditWithSerpCountry(PageAuditService $pageAuditService): void
+    public function confirmPageAuditWithSerpCountry(): void
     {
         if (! $this->serpCountryModalOpen) {
             return;
@@ -263,7 +264,7 @@ class PageDetail extends Component
         }
 
         $this->serpCountryModalOpen = false;
-        $this->finalizePageAudit($pageAuditService, strtolower(trim($this->serpCountryGl)));
+        $this->finalizePageAudit(strtolower(trim($this->serpCountryGl)));
     }
 
     public function cancelPageAuditSerpCountryModal(): void
@@ -272,13 +273,22 @@ class PageDetail extends Component
         $this->serpCountryRecommendationHint = null;
     }
 
-    private function finalizePageAudit(PageAuditService $pageAuditService, ?string $serpGlUserOverride): void
+    private function finalizePageAudit(?string $serpGlUserOverride): void
     {
         $this->auditMessage = null;
 
         $user = Auth::user();
         if (! $user || ! $user->canViewWebsiteId($this->websiteId) || $this->pageUrl === '') {
             $this->setAuditMessage('You do not have permission to audit this page.', 'error');
+
+            return;
+        }
+
+        // Already queued/running for this exact page — go straight to the
+        // status list instead of spending a paid audit run twice.
+        $active = CustomPageAudit::findActiveFor($this->websiteId, $this->pageUrl, $user->id);
+        if ($active instanceof CustomPageAudit) {
+            $this->redirect(route('custom-audit.index'), navigate: true);
 
             return;
         }
@@ -292,20 +302,18 @@ class PageDetail extends Component
         }
         RateLimiter::hit($rateKey, 60);
 
-        try {
-            $report = $pageAuditService->audit($this->websiteId, $this->pageUrl, null, false, $serpGlUserOverride);
-            CustomPageAudit::recordRun(
-                $this->websiteId,
-                $user->id,
-                $this->pageUrl,
-                $report,
-                null,
-                CustomPageAudit::SOURCE_PAGE_DETAIL,
-            );
-            $this->redirect(route('page-audits.show', $report), navigate: true);
-        } catch (\Throwable $e) {
-            $this->setAuditMessage('Audit failed: '.$e->getMessage(), 'error');
-        }
+        $audit = CustomPageAudit::queue(
+            websiteId: $this->websiteId,
+            userId: $user->id,
+            pageUrl: $this->pageUrl,
+            targetKeyword: '',
+            serpSampleGl: $serpGlUserOverride,
+            source: CustomPageAudit::SOURCE_PAGE_DETAIL,
+        );
+
+        RunCustomPageAudit::dispatch($audit->id, $audit->website_id);
+
+        $this->redirect(route('custom-audit.index'), navigate: true);
     }
 
     public function generateGoogleSnippet(): void

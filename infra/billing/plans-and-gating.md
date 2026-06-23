@@ -28,7 +28,7 @@ Seeded idempotently by `PlanSeeder` (`updateOrCreate` by `slug`). Caps below are
 | `stripe_price_id_monthly` / `_yearly` | string? | Stripe price IDs (nullable; `price_*` regex-validated). Checkout uses yearly. |
 | `trial_days` | int | Cashier `trialDays()` at checkout. |
 | `max_websites` | int? | Site cap. null=unlimited. → `User::websiteLimit()`. |
-| `max_crawl_pages` | int? | Pages a crawl run may fetch for this plan's sites. null=global crawler budget. → `Website::crawlPageCap()`. |
+| `max_crawl_pages` | int? | ACCOUNT-WIDE page budget pooled across all of the owner's sites (not per-site). Each site is still hard-capped at `crawler.max_pages_per_site` regardless. null=no pool (hard per-site cap still applies). → `Website::crawlPageCap()`. |
 | `features` | array | Marketing bullet list (plain strings) for /pricing + WP wizard. |
 | `feature_videos` | array? | Sparse `bulletIndex => YouTube URL` map; kept separate from `features`. |
 | `plan_features` | array | **The 9-key boolean entitlement matrix** (the gating ceiling). |
@@ -72,10 +72,17 @@ Derived helpers: `effectiveTier()` (slug), `isPro()`, `isAtLeast($slug)`,
   (no stored column), oldest sites by `created_at` stay active, sites past the limit
   are frozen. A downgrade therefore freezes the newest sites on the next read.
   `canAddWebsite()` gates onboarding/add-site.
-- **Crawl cap** — `Website::crawlPageCap()` (line 683): owner's `max_crawl_pages`
-  when set+positive, else `config('crawler.max_pages_per_run')`. Always a positive int
-  the crawler uses directly as the run budget. (Cross-ref `infra/crawler/data-model.md`
-  — the shared crawl is fetched at the **max cap among subscribers**.)
+- **Crawl cap** — `Website::crawlPageCap()` (line 705): two layers. (1) a universal
+  hard per-site ceiling, `config('crawler.max_pages_per_site')` (default 20,000),
+  applied to every website regardless of plan — this bounds `AnalyzeSiteJob`'s
+  finalize cost on huge domains. (2) the owner's `max_crawl_pages` is an
+  ACCOUNT-WIDE pool shared across all the owner's sites; this site's cap is
+  `min(hard cap, pool remaining after the owner's OTHER sites' usage)`, floored
+  at 1 (never 0 — a site is never fully blocked, just reduced to homepage-only).
+  Pool usage per sibling site is itself capped at the hard ceiling, so the
+  formula has no recursion. Always a positive int the crawler uses directly as
+  the run budget. (Cross-ref `infra/crawler/data-model.md` — the shared crawl
+  is fetched at the **max cap among subscribers**, unchanged by this.)
 
 ## Feature-flag resolution chain (`Website::effectiveFeatureFlags()`, line 200)
 

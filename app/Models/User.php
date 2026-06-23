@@ -442,9 +442,11 @@ class User extends Authenticatable implements MustVerifyEmail
     }
 
     /**
-     * Max pages a single crawl run may fetch for this user's sites, from the
-     * effective plan. null = unlimited (the global crawler.max_pages_per_run
-     * applies). See Website::crawlPageCap() for the resolved integer.
+     * This user's ACCOUNT-WIDE page budget, pooled across ALL of their owned
+     * websites (not a per-site number) — see Website::crawlPageCap(), which
+     * derives each site's individual share of this pool, hard-capped at
+     * config('crawler.max_pages_per_site') regardless of plan. null = no
+     * account pool (each site still gets the hard per-site cap).
      */
     public function crawlPageLimit(): ?int
     {

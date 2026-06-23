@@ -20,9 +20,15 @@ disagree, re-verify on the box — this file is a snapshot.
 **Serves the EBQ app:** Apache2 on `:80`/`:443` (TLS via Let's Encrypt/certbot), vhost
 `ebq.io` → `DocumentRoot /var/www/ebq/public`, PHP via **PHP-FPM** unix socket
 `/run/php/php8.3-fpm.sock`. FPM pool `www`: `pm=dynamic`, **`max_children=20`**, start 2 /
-min-spare 1 / max-spare 12, **`request_terminate_timeout=120`** (widened after the 504
-incident — memory `fpm-pool-504-starvation`). Opcache: `validate_timestamps=0` → code
-changes need a **full FPM restart** (memory `CLAUDE.local.md`).
+min-spare 1 / max-spare 12, **`request_terminate_timeout=400`** (widened from 120 after the
+504 incident — memory `fpm-pool-504-starvation` — then widened again 120→400 to cover the
+**AI Writer 504s**: `set_time_limit(360)` + chained Serper/LLM calls up to ~5min wall time
+were getting killed by FPM at 120s, see [ai/writer.md](./ai/writer.md)). The vhost
+(`ebq.io-le-ssl.conf`) also sets **`ProxyTimeout 400`** for the same reason — the global
+`Timeout 60` in `ebq-hardening.conf` (client-facing) is untouched, but mod_proxy_fcgi has no
+per-`<Location>` timeout, so the AI-writer-driven backend wait had to be raised vhost-wide.
+Opcache: `validate_timestamps=0` → code changes need a **full FPM restart** (memory
+`CLAUDE.local.md`).
 
 **Data services (shared with Box B over `10.0.0.2`):**
 - **MariaDB 10.11** (⚠️ MariaDB, not MySQL — Laravel `mysql` driver) — db **`ebq`**, listening

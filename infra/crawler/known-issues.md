@@ -55,6 +55,38 @@ If `AnalyzeSiteJob` throws partway, its `failed()` handler still marks the run `
   dominated by per-page fetch latency (proxy `on_block` retries + politeness delay + target
   speed), not the pipeline. It's the biggest lever on "big sites take a long time" and is
   un-investigated.
+- **Proxy pool: import vs. health-check are two separate commands (2026-06-20) — don't
+  conflate them.** Both live-test via the shared `ProxyPool::testBatch()` (concurrent
+  HTTPS GET to `api.ipify.org`, cert verification ON — catches dead nodes AND the rarer
+  MITM ones that swap in a self-signed cert; confirmed against a live sample of
+  `iplocate/free-proxy-list` + `proxifly/free-proxy-list`, both `scheme://host:port` form).
+  1. **`ebq:proxy-list-refresh`** — import-only, never touches already-tracked rows. Pulls
+     candidate URLs from free public lists (`--source` repeatable; a failed source just
+     warns and is skipped), tests a random `--limit` sample of *new* ones, inserts only the
+     passers (label `free-proxy-list (auto)`). Scheduled `everyThirtyMinutes` but **gated
+     OFF by default** via `CRAWLER_PROXY_AUTO_IMPORT` (`config/crawler.php` `proxy.auto_import`)
+     — the command itself always works regardless of the flag; only the *automatic* firing is
+     gated. Manual trigger: `php artisan ebq:proxy-list-refresh`, or the admin
+     `/admin/proxies` **"Import now"** button (dispatches `RunProxyListRefreshJob` on the
+     `default` queue so the click doesn't block on a multi-source fetch + test pass).
+  2. **`ebq:proxy-pool-prune`** — health-check-only, never imports. Tests every
+     already-tracked proxy and **deletes it immediately on a single failed test** — no
+     fail_count/threshold, each run is a fresh independent check. Scheduled
+     `everyFifteenMinutes`, **always on**, NOT gated by `auto_import` (that flag only
+     controls new imports; the pool must stay clean even with import off).
+  3. **Real-usage failures** — `ProxyPool::markFailure()`, called from actual production use
+     (`PageAuditService`/`LinkChecker`'s broken-link checkers, `PageCrawlProcessor`'s
+     page-fetch retry) — still deletes after `CRAWLER_PROXY_MAX_FAILURES` consecutive real
+     failures, independent of the two scheduled commands above.
+  4. **Admin "Retest all"** (`/admin/proxies`) — manual bulk sweep, same delete-on-first-fail
+     semantics as the pruner, client-driven (Alpine, concurrency 5, live progress).
+  Both scheduled commands run only on the web box's scheduler (`schedule:work`), so no
+  worker-box (box B) deploy is needed for changes to either — box B only needed redeploying
+  because `ProxyPool.php` itself (the shared `testBatch()`/`markFailure()` code) is also used
+  by `LinkChecker`/`PageCrawlProcessor`, which DO run there.
+  Free proxies are inherently low-trust (unknown operators, can see plaintext HTTP and
+  attempt HTTPS MITM) — fine for the crawler's anti-block use case (fetching public pages),
+  would NOT be fine for anything carrying credentials/PII.
 
 ## Large-site pressure points
 
@@ -96,6 +128,18 @@ was left stuck in `finalizing`. Two compounding causes, both fixed:
 > `pages_seen` is incremented at **selection** (`CrawlPassJob.php:117`), not at successful
 > fetch, so a run can hit its page cap with pages never actually crawled — the crawl looks
 > "done at cap" while incomplete.
+
+### 2026-06-23 — per-site hard cap to bound finalize cost on huge sites
+Even with the 2026-06-18 fixes above, sites like xplate.com (100k+ pages) still made
+`AnalyzeSiteJob` slow/risky to finalize — more crawled pages directly means more graph
+edges, findings, and link-suggestion candidates for finalize to chew through, no matter how
+well each step is chunked. **Fix:** a universal hard ceiling,
+`config('crawler.max_pages_per_site')` (default 20,000, env `CRAWLER_MAX_PAGES_PER_SITE`),
+now bounds every site's crawl depth regardless of plan. The owner's plan `max_crawl_pages`
+was reinterpreted from a flat per-site number into an **account-wide pool** shared across
+all the owner's sites — each site's actual cap is `min(hard cap, pool remaining after the
+owner's other sites' usage)`, floored at 1 (never blocked outright). See
+`Website::crawlPageCap()` and `infra/billing/plans-and-gating.md`.
 
 ## Transitional cruft
 

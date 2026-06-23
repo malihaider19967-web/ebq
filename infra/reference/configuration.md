@@ -141,7 +141,7 @@ knobs:
 | `CRAWLER_STRIP_QUERY_PARAMS` | true | collapse `?utm=…` variants; `keep_query_params` = page/p/paged |
 | `CRAWLER_PRUNE_BODY_TEXT` | **false** | irreversible body_text trim — OFF (no DB backups). Memory `term-extraction` |
 | `CRAWLER_EGRESS_IP` | — | worker box public IP shown to clients for WAF allowlisting |
-| `CRAWLER_PROXY_ENABLED` / `_MODE` / `_FILE` / `_MAX_FAILURES` | false / on_block / `proxylist.txt` / 5 | proxy pool (`App\Services\Crawler\ProxyPool`) |
+| `CRAWLER_PROXY_ENABLED` / `_MODE` / `_FILE` / `_MAX_FAILURES` / `_AUTO_IMPORT` | false / on_block / `proxylist.txt` / 5 / **false** | proxy pool (`App\Services\Crawler\ProxyPool`). `_AUTO_IMPORT` gates only the scheduled free-list import (`ebq:proxy-list-refresh`); the always-on prune (`ebq:proxy-pool-prune`, deletes dead proxies every 15min) is unaffected by it — see [crawler/known-issues.md](../crawler/known-issues.md) |
 
 ## audit.php  (`config/audit.php`)
 

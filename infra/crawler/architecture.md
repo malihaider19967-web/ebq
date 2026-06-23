@@ -78,7 +78,11 @@ Every read resolves the website → `crawl_site_id` + the owner's
 `crawlPageCap()`, and filters `value_rank <= cap` (nulls treated as in-window).
 So a cap-1000 user sees the top 1,000 pages; a cap-100k user sees up to 100k — of
 the **same** crawl. Verified: with 3 ranked pages, a cap-2 user sees 2, a cap-1000
-user sees 3.
+user sees 3. As of 2026-06-23, this per-website `cap` is the **smaller of** a
+universal per-site hard ceiling (`config('crawler.max_pages_per_site')`, default
+20,000) and whatever remains of the owner's account-wide plan pool
+(`max_crawl_pages`) after their other sites' usage — see
+`Website::crawlPageCap()` and `infra/billing/plans-and-gating.md`.
 
 ## Write path (one crawl per domain)
 
@@ -112,10 +116,10 @@ when a crawl finalizes.
 
 - **Subscribe / charge** — `CrawlSiteBootstrapper::subscribeWebsite()` (called from
   both add flows: `ConnectGoogle`, `WebsitesList`): logs a `crawl_reuse` usage
-  charge (`units_consumed = min(crawled pages, cap)` — visibility only, no enforced
-  budget yet) and dispatches a crawl **only if** no completed crawl exists or this
-  user's cap exceeds what's already crawled. If a fresh shared crawl already covers
-  the cap → **instant reuse, no crawl**.
+  charge (`units_consumed = min(crawled pages, cap)` — `cap` is the enforced
+  budget, see `Website::crawlPageCap()`) and dispatches a crawl **only if** no
+  completed crawl exists or this user's cap exceeds what's already crawled. If a
+  fresh shared crawl already covers the cap → **instant reuse, no crawl**.
 - **Live progress** — `CrawlBanner` shows `min(pages_seen, cap)/cap` so a cap-1000
   user sees `500/1,000` while a cap-100k user sees `500/100,000` for the same run.
   `CrawlRun` has a `finalizing` state ("computing your results") between fetch and

@@ -126,6 +126,13 @@ disambiguation (never interchangeable) and declines long-form drafts (points to 
   as advisory-only, so a flaky classifier never blocks legit users.
 - **Writer generation is fully synchronous** (up to ~4 min wall time at 16k tokens). The
   controllers raise `set_time_limit(360)`; the Mistral timeout ceiling is 300s.
+- **504 footgun: `set_time_limit` is the innermost of three nested timeouts** — Apache's
+  proxy_fcgi wait to PHP-FPM and FPM's `request_terminate_timeout` both sit outside it and
+  will kill the request first if they're shorter. Fixed 2026-06-20: FPM `request_terminate_timeout`
+  120→400 and vhost `ProxyTimeout` 400 added (`ebq.io-le-ssl.conf`) — see
+  [server-deployment.md](../server-deployment.md). Any future bump to the writer's
+  `set_time_limit`/Mistral timeout must raise these two outer layers to match, or 504s come
+  back.
 - **Brand voice is NOT injected by `AiWriterService`/`AiBlockEditorService` directly** —
   those build their own prompts; voice injection rides the `ContextBuilder`/tool path.
 - **Snippet-rewriter heredoc gotcha**: identifier is `EBQ_PROMPT_MODE_BLOCK` because a

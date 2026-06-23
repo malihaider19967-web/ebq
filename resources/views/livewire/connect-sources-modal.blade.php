@@ -1,6 +1,6 @@
 <div
     x-data="{ show: false }"
-    x-on:open-connect-sources.window="show = true; $wire.open($event.detail?.websiteId ?? 0)"
+    x-on:open-connect-sources.window="show = true; $wire.open($event.detail?.websiteId ?? null)"
     x-on:keydown.escape.window="show = false"
 >
     <div x-show="show" x-cloak class="fixed inset-0 z-50 flex items-center justify-center px-4">

@@ -210,6 +210,12 @@
                     case 'faq':
                         text = (v || []).map(qa => `Q: ${qa.question}\nA: ${qa.answer}`).join('\n\n');
                         break;
+                    case 'schema':
+                        text = (v || []).map(s => `${s.type}:\n${JSON.stringify(s.json_ld, null, 2)}`).join('\n\n');
+                        break;
+                    case 'json':
+                        text = this.copyTextForJsonTool(this.activeTool?.id, v);
+                        break;
                     default:
                         text = JSON.stringify(v, null, 2);
                 }
@@ -218,6 +224,48 @@
                     this.copied = true;
                     setTimeout(() => { this.copied = false; }, 1500);
                 } catch (e) { /* ignore */ }
+            },
+
+            copyTextForJsonTool(toolId, v) {
+                v = v || {};
+                switch (toolId) {
+                    case 'seo-meta':
+                        return [
+                            `SEO Title: ${v.seo_title || ''}`,
+                            `Meta Description: ${v.seo_description || ''}`,
+                            `OG Title: ${v.og_title || ''}`,
+                            `OG Description: ${v.og_description || ''}`,
+                        ].join('\n');
+                    case 'ad-copy':
+                        return [
+                            'Headlines:', ...(v.headlines || []).map(h => `- ${h}`),
+                            '', 'Descriptions:', ...(v.descriptions || []).map(d => `- ${d}`),
+                        ].join('\n');
+                    case 'email-copy':
+                        return [
+                            'Subject lines:', ...(v.subject_lines || []).map(s => `- ${s}`),
+                            '', `Preview: ${v.preview_text || ''}`, '', v.body || '',
+                        ].join('\n');
+                    case 'outline-generator':
+                        return [
+                            v.h1 || '',
+                            ...(v.sections || []).flatMap(sec => [
+                                `\n## ${sec.h2 || ''}`,
+                                ...(sec.subtopics || []).map(s => `- ${s}`),
+                            ]),
+                        ].join('\n');
+                    case 'content-brief':
+                        return [
+                            `H1: ${v.suggested_h1 || ''}`,
+                            `Angle: ${v.angle || ''} | ~${v.recommended_word_count || 0} words | Schema: ${v.suggested_schema_type || ''}`,
+                            '', 'Outline:', ...(v.suggested_outline || []).map(h => `- ${typeof h === 'string' ? h : h.h2}`),
+                            '', 'Subtopics:', ...(v.subtopics || []).map(t => `- ${t}`),
+                            '', 'Must-have entities:', ...(v.must_have_entities || []).map(t => `- ${t}`),
+                            '', 'People also ask:', ...(v.people_also_ask || []).map(q => `- ${q}`),
+                        ].join('\n');
+                    default:
+                        return JSON.stringify(v, null, 2);
+                }
             },
 
             formatDate(iso) {
@@ -747,8 +795,158 @@
                                         </ul>
                                     </template>
 
-                                    {{-- schema / json — code block --}}
-                                    <template x-if="result.output_type === 'schema' || result.output_type === 'json'">
+                                    {{-- seo-meta: fixed 4-field json --}}
+                                    <template x-if="result.output_type === 'json' && activeTool.id === 'seo-meta'">
+                                        <dl class="space-y-3">
+                                            <template x-for="field in [['seo_title','SEO Title'],['seo_description','Meta Description'],['og_title','OG Title'],['og_description','OG Description']]" :key="field[0]">
+                                                <div class="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/60">
+                                                    <dt class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400" x-text="field[1]"></dt>
+                                                    <dd class="mt-1 text-sm text-slate-800 dark:text-slate-100" x-text="result.value?.[field[0]] || ''"></dd>
+                                                </div>
+                                            </template>
+                                        </dl>
+                                    </template>
+
+                                    {{-- ad-copy: headlines[] + descriptions[] --}}
+                                    <template x-if="result.output_type === 'json' && activeTool.id === 'ad-copy'">
+                                        <div class="space-y-4">
+                                            <div>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Headlines</p>
+                                                <ul class="mt-1 space-y-1">
+                                                    <template x-for="(h, i) in (result.value?.headlines || [])" :key="i">
+                                                        <li class="rounded-lg bg-slate-50 p-2 text-sm dark:bg-slate-800/60" x-text="h"></li>
+                                                    </template>
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Descriptions</p>
+                                                <ul class="mt-1 space-y-1">
+                                                    <template x-for="(d, i) in (result.value?.descriptions || [])" :key="i">
+                                                        <li class="rounded-lg bg-slate-50 p-2 text-sm dark:bg-slate-800/60" x-text="d"></li>
+                                                    </template>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    {{-- email-copy: subject_lines[] + preview_text + body --}}
+                                    <template x-if="result.output_type === 'json' && activeTool.id === 'email-copy'">
+                                        <div class="space-y-4">
+                                            <div>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Subject lines</p>
+                                                <ul class="mt-1 space-y-1">
+                                                    <template x-for="(s, i) in (result.value?.subject_lines || [])" :key="i">
+                                                        <li class="rounded-lg bg-slate-50 p-2 text-sm dark:bg-slate-800/60" x-text="s"></li>
+                                                    </template>
+                                                </ul>
+                                            </div>
+                                            <div>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Preview text</p>
+                                                <p class="mt-1 text-sm text-slate-800 dark:text-slate-100" x-text="result.value?.preview_text || ''"></p>
+                                            </div>
+                                            <div>
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Body</p>
+                                                <div class="mt-1 whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm leading-relaxed dark:bg-slate-800/60" x-text="result.value?.body || ''"></div>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    {{-- outline-generator: h1 + sections[{h2, subtopics[]}] --}}
+                                    <template x-if="result.output_type === 'json' && activeTool.id === 'outline-generator'">
+                                        <div class="space-y-3">
+                                            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100" x-text="result.value?.h1 || ''"></h3>
+                                            <template x-for="(sec, i) in (result.value?.sections || [])" :key="i">
+                                                <div class="rounded-lg border border-slate-100 bg-slate-50 p-3 dark:border-slate-800 dark:bg-slate-800/60">
+                                                    <p class="text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="sec.h2"></p>
+                                                    <ul class="mt-1 list-disc space-y-0.5 pl-5">
+                                                        <template x-for="(sub, j) in (sec.subtopics || [])" :key="j">
+                                                            <li class="text-xs text-slate-600 dark:text-slate-300" x-text="sub"></li>
+                                                        </template>
+                                                    </ul>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+
+                                    {{-- content-brief: outline/subtopics/entities/paa/depth --}}
+                                    <template x-if="result.output_type === 'json' && activeTool.id === 'content-brief'">
+                                        <div class="space-y-4">
+                                            <div class="flex flex-wrap gap-2">
+                                                <span class="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                                                    Angle: <span x-text="result.value?.angle"></span>
+                                                </span>
+                                                <span class="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                                                    ~<span x-text="result.value?.recommended_word_count"></span> words
+                                                </span>
+                                                <span class="rounded-full bg-indigo-100 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                                                    Schema: <span x-text="result.value?.suggested_schema_type"></span>
+                                                </span>
+                                            </div>
+                                            <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100" x-text="result.value?.suggested_h1 || ''"></h3>
+
+                                            <div x-show="(result.value?.suggested_outline || []).length">
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Suggested outline</p>
+                                                <ol class="mt-1 list-decimal space-y-0.5 pl-5">
+                                                    <template x-for="(h, i) in (result.value?.suggested_outline || [])" :key="i">
+                                                        <li class="text-sm text-slate-700 dark:text-slate-200" x-text="typeof h === 'string' ? h : h.h2"></li>
+                                                    </template>
+                                                </ol>
+                                            </div>
+
+                                            <div x-show="(result.value?.subtopics || []).length">
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Subtopics</p>
+                                                <div class="mt-1 flex flex-wrap gap-1.5">
+                                                    <template x-for="(t, i) in (result.value?.subtopics || [])" :key="i">
+                                                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200" x-text="t"></span>
+                                                    </template>
+                                                </div>
+                                            </div>
+
+                                            <div x-show="(result.value?.must_have_entities || []).length">
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Must-have entities</p>
+                                                <div class="mt-1 flex flex-wrap gap-1.5">
+                                                    <template x-for="(t, i) in (result.value?.must_have_entities || [])" :key="i">
+                                                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700 dark:bg-slate-800 dark:text-slate-200" x-text="t"></span>
+                                                    </template>
+                                                </div>
+                                            </div>
+
+                                            <div x-show="(result.value?.people_also_ask || []).length">
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">People also ask</p>
+                                                <ul class="mt-1 list-disc space-y-0.5 pl-5">
+                                                    <template x-for="(q, i) in (result.value?.people_also_ask || [])" :key="i">
+                                                        <li class="text-sm text-slate-700 dark:text-slate-200" x-text="q"></li>
+                                                    </template>
+                                                </ul>
+                                            </div>
+
+                                            <div x-show="(result.value?.internal_link_targets || []).length">
+                                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Internal link targets</p>
+                                                <ul class="mt-1 space-y-1">
+                                                    <template x-for="(lnk, i) in (result.value?.internal_link_targets || [])" :key="i">
+                                                        <li class="truncate text-xs text-indigo-600 dark:text-indigo-400" x-text="lnk.url || lnk"></li>
+                                                    </template>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </template>
+
+                                    {{-- schema-suggestions: [{type, json_ld}] --}}
+                                    <template x-if="result.output_type === 'schema'">
+                                        <div class="space-y-3">
+                                            <template x-for="(s, i) in (result.value || [])" :key="i">
+                                                <div class="rounded-lg border border-slate-100 dark:border-slate-800">
+                                                    <div class="flex items-center justify-between rounded-t-lg bg-slate-50 px-3 py-2 dark:bg-slate-800/60">
+                                                        <span class="text-sm font-semibold text-slate-800 dark:text-slate-100" x-text="s.type"></span>
+                                                    </div>
+                                                    <pre class="max-h-64 overflow-auto rounded-b-lg bg-slate-900 p-3 text-xs leading-relaxed text-slate-100 dark:bg-slate-950"><code x-text="JSON.stringify(s.json_ld, null, 2)"></code></pre>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </template>
+
+                                    {{-- fallback — any other/unrecognized json shape --}}
+                                    <template x-if="result.output_type === 'json' && !['seo-meta','ad-copy','email-copy','outline-generator','content-brief'].includes(activeTool.id)">
                                         <pre class="max-h-[480px] overflow-auto rounded-lg bg-slate-900 p-3 text-xs leading-relaxed text-slate-100 dark:bg-slate-950"><code x-text="JSON.stringify(result.value, null, 2)"></code></pre>
                                     </template>
                                 </div>

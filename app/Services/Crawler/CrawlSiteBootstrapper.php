@@ -13,8 +13,9 @@ use Illuminate\Support\Facades\Bus;
 /**
  * Single entry point for both add-flows (onboarding + WebsitesList): a website
  * SUBSCRIBES to its shared crawl_site (the model hook already created/linked it),
- * gets "charged" its crawl-page allocation (logged usage — there is no enforced
- * budget yet), and triggers a crawl only when one is actually needed:
+ * logs its crawl-page usage against the owner's account pool (Website::crawlPageCap()
+ * is now the actual enforcement point — see its docblock), and triggers a crawl
+ * only when one is actually needed:
  *  - no completed crawl exists for the domain yet, or
  *  - this user's cap is larger than what's already been crawled (crawl deeper).
  * When a fresh shared crawl already covers this user's cap, nothing is crawled —
@@ -35,8 +36,9 @@ class CrawlSiteBootstrapper
         $crawledPages = WebsitePage::where('crawl_site_id', $crawlSite->id)
             ->whereNotNull('last_crawled_at')->count();
 
-        // Charge: this user consumes up to their cap of the shared crawl (the page
-        // count already available, bounded by their plan). Visibility/analytics only.
+        // Charge: log usage against this user's account-pooled, per-site-capped
+        // budget (cap already reflects both the hard per-site ceiling and the
+        // remaining account pool — see Website::crawlPageCap()).
         $this->logger->log(
             'crawl.subscribed',
             userId: $website->user_id,

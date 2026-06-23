@@ -239,6 +239,70 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-06-23 (GSC sync — high-volume account stale since 2026-04-16, real root cause)** —
+  `namesforfreefire.com`'s ~38k-row GSC account (the single biggest in `search_console_data`)
+  never synced; `SyncSearchConsoleData` failed nightly with no logged exception. First pass
+  raised `timeout` 600→3600 (+`redis-long`, `backoff=120`, per-window watermark/logging — still
+  good changes) but live re-testing showed the job still hung on window 1 for over an hour with
+  zero CPU progress. Real causes, confirmed live: (1) **`Google\Client`'s default HTTP client has
+  no read timeout** — a stalled response can block `curl_exec()` forever, and the job's own
+  pcntl-based `$timeout` doesn't reliably interrupt a blocking libcurl read, so raising it alone
+  never fixed anything; fixed with an explicit Guzzle `connect_timeout=10`/`timeout=120` in
+  `GoogleClientFactory::make` (benefits every Google API caller, not just this job). (2) **no
+  overlap guard** — a run outliving `redis-long`'s `retry_after` (3900s) got a duplicate
+  dispatched on top of it; confirmed two live Redis reservations for the same website fighting
+  over the same upserts. Fixed with `WithoutOverlapping('sync-search-console:'.$websiteId)`
+  (same pattern as `AnalyzeSiteJob`). Docs: [data-sources/sync-jobs.md](./data-sources/sync-jobs.md)
+  §Gotchas, [data-sources/google-oauth.md](./data-sources/google-oauth.md).
+- **2026-06-20 (proxy pool — final shape: import OFF by default, prune always ON)** —
+  Settled after several iterations same day (see the two entries directly below for the
+  history). Current state, fully detailed in
+  [crawler/known-issues.md](./crawler/known-issues.md): `ebq:proxy-list-refresh`
+  (import-only, new candidates from free lists, scheduled but gated OFF by
+  `CRAWLER_PROXY_AUTO_IMPORT`, manual override via artisan or the admin "Import now"
+  button → `RunProxyListRefreshJob`) is now fully separate from `ebq:proxy-pool-prune`
+  (health-check-only, deletes any tracked proxy that fails a fresh test, always
+  scheduled every 15min regardless of the import flag). Both share
+  `ProxyPool::testBatch()` (cert-verified concurrent HTTPS test). Admin "Retest all" and
+  real-usage `markFailure()` are two more, independent deletion paths — four total,
+  intentionally not unified, see known-issues.md for which is which.
+- **2026-06-20 (admin proxy screen — "Retest all" with delete-on-fail, superseded detail
+  below by the pruner)** — Added an Alpine-driven "Retest all" sweep to `/admin/proxies`
+  (concurrency 5, live per-row spinner + progress bar). Deliberately distinct from the
+  synthetic auto-refresh job: this is a manual admin sweep, so
+  `ProxyManager::test($id, deleteOnFail: true)` removes a proxy on the spot the moment it
+  fails — the single-row "Test" button keeps the old non-destructive behavior. Confirm
+  dialog before starting (irreversible per row).
+- **2026-06-20 (proxy pool auto-refresh from a free public list — superseded, see entry
+  above)** — Added `ebq:proxy-list-refresh` (scheduled `everyThirtyMinutes`,
+  `routes/console.php`), which pulls `iplocate/free-proxy-list`'s `all-proxies.txt`,
+  live-tests a random sample (real HTTPS GET, cert verification ON) before trusting any
+  of it, and writes only the passing ones into `proxies` (feeds the same pool used by the
+  broken-link checker fix above and the crawler's anti-block retries). Verified before
+  building: manually curl-tested a sample first — ~45% of HTTP candidates worked, SOCKS5
+  mostly dead, and one SOCKS5 node
+  was actively MITM-ing HTTPS (self-signed cert swap) — confirms untested import of a free
+  list is not safe; cert-verify-on testing is the load-bearing safety check, not optional.
+  Docs: [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-20 (page-audit broken-link false positive — 429 + proxy retry)** — User-reported
+  false "broken link" (`apps.apple.com` rate-limiting the audit's HEAD check with 429). Root
+  cause: `PageAuditService::checkLinks()`/`getFallback()` only fell back to GET on
+  403/405/501 — 429 went straight to "broken" with zero retry. Fixed in both the single-page
+  audit checker (`PageAuditService.php:1150,1239`) and its near-duplicate in the crawler
+  pipeline (`Crawler/LinkChecker.php`): added 429 to the fallback-trigger list, and if the
+  plain GET retry *still* looks dead, one more GET attempt through the crawler's `ProxyPool`
+  (`crawler.proxy.*`, already live in prod with 4 active proxies) before trusting the result.
+  Docs: `infra/audits/page-audit.md` §Gotchas + pipeline step 5.
+- **2026-06-20 (AI Writer 504s — outer timeout layers shorter than the inner one)** — Blog-post
+  generation intermittently 504'd. Root cause: the writer is fully synchronous, `set_time_limit(360)`
+  + Mistral calls up to 300s (chained Serper+LLM up to ~5min, see `ai/writer.md`), but the two layers
+  *outside* PHP were shorter — Apache's proxy_fcgi backend wait used the global `Timeout 60`
+  (`ebq-hardening.conf`) and FPM's `request_terminate_timeout` was **120**. Whichever hit first killed
+  the request mid-LLM-call → 504, regardless of the generous PHP-level limit. Fixed by raising FPM
+  `request_terminate_timeout` 120→**400** and adding vhost-level `ProxyTimeout 400` to
+  `ebq.io-le-ssl.conf` (mod_proxy_fcgi has no per-`<Location>` timeout, so this is vhost-wide for the
+  PHP backend only — the client-facing `Timeout 60` is untouched). See `server-deployment.md` and
+  `ai/writer.md` §Gotchas.
 - **2026-06-18 (finalize timeout for extreme sites — code-based, no env edit)** — A ~168k-page/~1.5M-edge
   site (xplate) finalized past the 1200s timeout even after the graph + memory fixes (it's just slow:
   graph → value_rank → `detect` → suggester → scores, all chunked/bounded so no OOM, but minutes of work).

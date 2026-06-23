@@ -105,6 +105,8 @@ Empty result → the `Website` saved hook skips linking (placeholder row).
 
 `CrawlSiteBootstrapper::subscribeWebsite()` logs a `client_activities` row via
 `ClientActivityLogger`: `type='crawl.subscribed'`, `provider='crawl_reuse'`,
-`units_consumed = min(crawled_pages, cap)`, attributed to the website owner. **Logging only —
-no enforced budget yet.** It then dispatches a crawl **only if** no completed run exists or
-this user's cap exceeds what's already crawled (otherwise instant reuse).
+`units_consumed = min(crawled_pages, cap)`, attributed to the website owner. `cap` here
+**is** the enforced budget — `Website::crawlPageCap()` is the real enforcement point
+(hard per-site ceiling + account-pooled remaining quota, see plans-and-gating.md). It then
+dispatches a crawl **only if** no completed run exists or this user's cap exceeds what's
+already crawled (otherwise instant reuse).

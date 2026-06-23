@@ -11,8 +11,15 @@ their cadence and windowing, and the GSC/GA presence-degradation contract every 
 | `SyncAnalyticsData` (`app/Jobs/SyncAnalyticsData.php`) | GA4 Data API | `analytics_data` (upsert) | Same nightly fan-out; 365-day backfill on create/connect. |
 | `SyncPageIndexingStatus` (`app/Jobs/SyncPageIndexingStatus.php`) | GSC URL Inspection | `page_indexing_statuses` (updateOrCreate) | **On demand** — not in the nightly fan-out. Dispatched from page/plugin flows for top-clicked pages. |
 
-Both `timeout=600`; SC/GA `tries=2`, indexing `tries=1` (per-page loop is idempotent but the
-URL-Inspection quota is tight, so no auto-retry).
+`SyncAnalyticsData`/indexing `timeout=600`; **`SyncSearchConsoleData` is `timeout=3600` on the
+dedicated `redis-long` connection** (retry_after 3900 > timeout, same pattern as `AnalyzeSiteJob` —
+see `config/queue.php`) because high-volume GSC accounts (tens of thousands of rows/week) can
+exceed 600s paging + upserting a 30-day window. SC/GA `tries=2` (SC also `backoff=120`), indexing
+`tries=1` (per-page loop is idempotent but the URL-Inspection quota is tight, so no auto-retry).
+`SyncSearchConsoleData` also carries a `WithoutOverlapping('sync-search-console:'.$websiteId)`
+job middleware (`expireAfter($timeout+300)`, `dontRelease()`, same pattern as `AnalyzeSiteJob`) —
+without it, a run that outlives `retry_after` gets a duplicate dispatched on top of it (two
+concurrent copies fighting over the same upserts; this actually happened, see incident below).
 
 ## Cadence & dispatch
 
@@ -42,6 +49,11 @@ URL-Inspection quota is tight, so no auto-retry).
   reformatted to ISO.
 - This is **incremental-by-upsert, not delta**: each run re-fetches the window and upserts, so
   late-arriving GSC data (GSC backfills ~2–3 days) is corrected on the next run. No high-water mark.
+- `SyncSearchConsoleData` updates `last_search_console_sync_at` (+ `ReportCache::flushWebsite`)
+  **after every 7-day window**, not just at the end — so a run that dies partway through a
+  high-volume account still leaves the rows it already upserted visible, and the watermark
+  reflects partial progress instead of staying permanently null. Each window also logs its row
+  count (`storage/logs/laravel.log`) so a stalled run is visible instead of silent.
 
 ## Upsert keys
 
@@ -102,6 +114,28 @@ until they upgrade, so syncing it would waste Google quota — the job returns e
   aggregation reads forced index work — see `data-model.md` for the online-ALTER index history.
 - A missing/failed Google token throws inside the job's API call; jobs catch per-website (warning
   log) so one bad account doesn't abort the whole nightly fan-out.
+- **2026-06-23 incident — `namesforfreefire.com` GSC stale since 2026-04-16.** A single
+  high-volume GSC account (~38k rows, the single biggest in `search_console_data`) consistently
+  exceeded the old `timeout=600`, with nothing logged (the timeout kill happens before `handle()`
+  gets a chance to log anything). First fix attempt (`timeout` 600→3600 + redis-long + per-window
+  watermark/logging) was deployed and re-tested live — the job still hung on window 1 for over an
+  hour with **zero CPU progress** and no DB query in flight. Root-caused to two compounding bugs,
+  confirmed live:
+  1. **`Google\Client`'s default HTTP client has no read timeout.** A manual replay of the exact
+     same `searchanalytics.query` call (5 dimensions, 7-day window, paginated to 124,582 rows)
+     completed in ~15s when an explicit Guzzle `timeout` was set — proving the API/account/quota
+     were never the problem. Without that explicit timeout, a stalled response can block
+     `curl_exec()` indefinitely, and the job's own `$timeout` (pcntl `SIGALRM`) doesn't reliably
+     interrupt a blocking libcurl read — so raising the job timeout alone never actually fixed
+     anything, it just delayed the same unbounded hang. Fixed in `GoogleClientFactory::make`
+     (`connect_timeout=10`, `timeout=120` — see `google-oauth.md`).
+  2. **No overlap guard.** Once one run outlived `redis-long`'s `retry_after` (3900s), Redis
+     dispatched a duplicate on top of the still-running original — confirmed via the
+     `*:sync:reserved` zset showing **two live reservations for the same website** simultaneously,
+     each fighting the other over the same `search_console_data` upserts. Fixed with
+     `WithoutOverlapping('sync-search-console:'.$websiteId)` (see above).
+  Confirmed pcntl is present on the worker Docker image (`ebq-worker:8.3`) — not a missing
+  extension, purely the missing client-side timeout + missing overlap guard.
 
 ## Key files
 

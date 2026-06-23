@@ -14,6 +14,12 @@ use Livewire\Component;
  * proxies (any common format), toggle/delete, and test one against ipify to see
  * its exit IP. The pool also merges proxylist.txt at runtime; "Import from file"
  * pulls those into the DB so the worker box reads them over the shared database.
+ *
+ * "Retest all" (client-driven, see proxy-manager.blade.php) calls `test()` with
+ * `deleteOnFail = true` for every row — a deliberate bulk sweep, so a failure
+ * there deletes the proxy on the spot instead of just decaying its fail_count.
+ * This is intentionally different from the background `ebq:proxy-list-refresh`
+ * job, which never deletes/deactivates on a failed synthetic check.
  */
 class ProxyManager extends Component
 {
@@ -80,19 +86,43 @@ class ProxyManager extends Component
         $this->notice = 'Proxy deleted.';
     }
 
-    public function test(string $id): void
+    /** Manual trigger for `ebq:proxy-list-refresh` — the scheduled auto-import is OFF by
+     *  default (`CRAWLER_PROXY_AUTO_IMPORT`); this queues a one-off run on demand. */
+    public function importNow(): void
+    {
+        abort_unless((bool) Auth::user()?->is_admin, 403);
+        \App\Jobs\RunProxyListRefreshJob::dispatch();
+        $this->notice = 'Import queued — refresh this page in a bit to see new proxies.';
+    }
+
+    /**
+     * @param  bool  $deleteOnFail  Used by the "Retest all" sweep on the admin screen —
+     *                               a deliberate bulk re-check, so a failure there deletes
+     *                               the row immediately instead of just decaying fail_count.
+     *                               The single-row "Test" button never deletes.
+     */
+    public function test(string $id, bool $deleteOnFail = false): void
     {
         abort_unless((bool) Auth::user()?->is_admin, 403);
         $p = Proxy::find($id);
         if (! $p) {
             return;
         }
+        $ok = false;
         try {
-            $ip = Http::timeout(15)->withOptions(['proxy' => $p->url])->get('https://api.ipify.org')->body();
-            $this->testResults[$id] = filter_var(trim($ip), FILTER_VALIDATE_IP) ? 'ok: exit IP '.trim($ip) : 'unexpected: '.mb_substr($ip, 0, 40);
-            $p->update(['last_ok_at' => now(), 'last_used_at' => now(), 'fail_count' => 0]);
+            $ip = trim((string) Http::timeout(15)->withOptions(['proxy' => $p->url])->get('https://api.ipify.org')->body());
+            $ok = (bool) filter_var($ip, FILTER_VALIDATE_IP);
+            $this->testResults[$id] = $ok ? 'ok: exit IP '.$ip : 'unexpected: '.mb_substr($ip, 0, 40);
         } catch (\Throwable $e) {
             $this->testResults[$id] = 'failed: '.mb_substr($e->getMessage(), 0, 60);
+        }
+
+        if ($ok) {
+            $p->update(['last_ok_at' => now(), 'last_used_at' => now(), 'fail_count' => 0]);
+        } elseif ($deleteOnFail) {
+            $p->delete();
+            unset($this->testResults[$id]);
+        } else {
             $p->increment('fail_count');
         }
         Cache::forget('crawler:proxypool:urls');
@@ -105,6 +135,7 @@ class ProxyManager extends Component
             'poolEnabled' => $this->pool()->enabled(),
             'poolMode' => config('crawler.proxy.mode'),
             'activeCount' => Proxy::where('active', true)->count(),
+            'autoImportEnabled' => (bool) config('crawler.proxy.auto_import'),
         ]);
     }
 }
