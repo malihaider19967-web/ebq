@@ -126,6 +126,35 @@ Per-server `api_key`/`webhook_secret` are admin-entered and encrypted at rest; n
 - One in-flight check per server is serialized by the server's own `/queue` (`running: 0|1`);
   the pool routes around busy ones by queue depth.
 
+## Admin live queue (added 2026-06-23)
+
+`/admin/keyword-servers` shows a "Live queue" panel above the server list: every
+`KeywordApiRequest` still `queued`/`running`, across all servers, with server, type/mode,
+keyword(s)/URL (`KeywordApiRequest::keywordSummary()` — first 3 seeds + "+N more", or the
+URL for website/page mode), the requesting user, and queued-at. Built because there was no
+way to see what's backed up without grepping logs — the existing per-server "Last result"
+panel only ever shows the single most recent request, any status. `user()`/`website()`
+relations were missing on the model entirely (only `server()` existed) — added both.
+
+## Ideas results cached for the calendar month, shared across users (added 2026-06-23)
+
+`KeywordIdeaFinder` (seed expansion + website/page discovery — NOT the Volume Finder's
+per-keyword metrics, which already has its own rolling cache via `KeywordMetricsService`)
+now checks `KeywordIdeasMonthlyCache` before dispatching: same seeds (order/case
+insensitive) or same URL+scope, same location/language → same cached result, **instantly**,
+no queue dispatch, no node load, shared across every user — not just the original
+searcher. Deliberately calendar-month, not a rolling N-day TTL (explicit product
+decision): the cache key embeds `Y-m` and `Cache::put()` expires at `now()->endOfMonth()`,
+so a new month is a guaranteed miss even if the TTL math were ever off.
+
+`KeywordFinderPool::dispatchIdeas()` was split to expose `buildIdeasPayload()` (the
+mode+payload normalization) so the cache key is computed from the *exact* same normalized
+data a real dispatch would send — no risk of the cache-key logic drifting out of sync with
+what actually gets POSTed. `KeywordIdeaFinder::run()` checks the cache first; on a miss it
+dispatches as before and stashes the cache key in `$pendingCacheKey` (a public Livewire
+property, so it survives the poll round-trip); `poll()` writes the result into that key once
+the webhook completes it. UI shows an indigo "Instant result" badge when `$fromCache` is true.
+
 ## Gotchas / known issues
 
 - **Needs maintained Google Ads logins.** A logged-out server returns `409`/`needsLogin` and

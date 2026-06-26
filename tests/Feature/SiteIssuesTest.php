@@ -58,4 +58,25 @@ class SiteIssuesTest extends TestCase
             ->assertDontSee('/thin')
             ->assertSee('Back to all issue types');
     }
+
+    public function test_gsc_sourced_finding_gets_its_own_heading_not_mixed_with_crawl_findings(): void
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->create(['user_id' => $user->id, 'domain' => 'example.com']);
+        $cs = $website->crawl_site_id;
+        CrawlRun::create(['crawl_site_id' => $cs, 'trigger' => 'manual', 'status' => 'completed', 'started_at' => now()->subMinutes(2), 'finished_at' => now()]);
+
+        $brokenUrl = WebsitePage::create(['crawl_site_id' => $cs, 'url' => 'https://example.com/dead', 'url_hash' => WebsitePage::hashUrl('https://example.com/dead'), 'http_status' => 404, 'is_indexable' => false, 'source_sitemap' => true, 'last_crawled_at' => now()]);
+        $gscOnly = WebsitePage::create(['crawl_site_id' => $cs, 'url' => 'https://example.com/from-gsc', 'url_hash' => WebsitePage::hashUrl('https://example.com/from-gsc'), 'http_status' => 200, 'is_indexable' => true, 'source_gsc' => true, 'last_crawled_at' => now()]);
+
+        CrawlFinding::create(['crawl_site_id' => $cs, 'page_id' => $brokenUrl->id, 'category' => 'sitemap', 'type' => 'sitemap_broken_url', 'severity' => 'high', 'impact' => 0, 'affected_url' => $brokenUrl->url, 'affected_url_hash' => CrawlFinding::hashUrl($brokenUrl->url), 'status' => 'open', 'first_seen_at' => now(), 'last_seen_at' => now()]);
+        CrawlFinding::create(['crawl_site_id' => $cs, 'page_id' => $gscOnly->id, 'category' => 'sitemap', 'type' => 'indexed_not_in_sitemap', 'severity' => 'low', 'impact' => 0, 'affected_url' => $gscOnly->url, 'affected_url_hash' => CrawlFinding::hashUrl($gscOnly->url), 'status' => 'open', 'first_seen_at' => now(), 'last_seen_at' => now()]);
+        session(['current_website_id' => $website->id]);
+
+        Livewire::actingAs($user)
+            ->test(SiteIssues::class, ['issueKey' => 'crawl_sitemap'])
+            ->assertSee('From Google Search Console')
+            ->assertSee('Sitemap broken url')
+            ->assertSee('Indexed not in sitemap');
+    }
 }

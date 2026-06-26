@@ -86,6 +86,22 @@ class KeywordFinderPool
      */
     public function dispatchIdeas(array $opts, ?string $userId = null, ?string $websiteId = null, ?KeywordApiServer $only = null, ?string $countryKey = null): KeywordApiRequest
     {
+        [$mode, $payload] = $this->buildIdeasPayload($opts, $countryKey);
+
+        return $this->dispatch(KeywordApiRequest::TYPE_IDEAS, $mode, $payload, $userId, $websiteId, $only);
+    }
+
+    /**
+     * Normalizes raw ideas-lookup opts into the (mode, payload) pair
+     * {@see dispatchIdeas} would send — split out so callers (the monthly
+     * ideas cache) can compute the exact same cache key a dispatch would use,
+     * without duplicating the seed/URL normalization logic and risking drift.
+     *
+     * @param  array{seeds?: list<string>, url?: string, scope?: string, location?: string, language?: string}  $opts
+     * @return array{0: string, 1: array<string, mixed>}
+     */
+    public function buildIdeasPayload(array $opts, ?string $countryKey = null): array
+    {
         $location = KeywordFinderLocations::resolveLocation($opts['location'] ?? $countryKey);
         $language = KeywordFinderLocations::resolveLanguage($opts['language'] ?? null);
 
@@ -117,7 +133,7 @@ class KeywordFinderPool
             $payload['country_key'] = $countryKey;
         }
 
-        return $this->dispatch(KeywordApiRequest::TYPE_IDEAS, $mode, $payload, $userId, $websiteId, $only);
+        return [$mode, $payload];
     }
 
     /**

@@ -1,0 +1,334 @@
+<!DOCTYPE html><html dir="ltr" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>SERFIX | Full-Featured SEO Platform for Arabic &amp; English</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-primary": "#ffffff",
+                    "primary-fixed-dim": "#89ceff",
+                    "on-primary-container": "#003751",
+                    "on-primary-fixed": "#001e2f",
+                    "surface": "#f7f9fc",
+                    "accent-orange": "#FF622D",
+                    "border-subtle": "#E2E8F0",
+                    "error": "#ba1a1a",
+                    "on-tertiary-container": "#4d2b00",
+                    "primary-container": "#0ea5e9",
+                    "outline": "#6e7881",
+                    "on-error-container": "#93000a",
+                    "surface-variant": "#e0e3e6",
+                    "tertiary-container": "#de8712",
+                    "background": "#f7f9fc",
+                    "on-secondary": "#ffffff",
+                    "on-tertiary-fixed": "#2c1600",
+                    "success-teal": "#0EA5E9",
+                    "secondary-fixed": "#e2e0fc",
+                    "inverse-surface": "#2d3133",
+                    "primary": "#006591",
+                    "surface-container-high": "#e6e8eb",
+                    "surface-tint": "#006591",
+                    "surface-container-lowest": "#ffffff",
+                    "surface-container-highest": "#e0e3e6",
+                    "on-background": "#191c1e",
+                    "inverse-on-surface": "#eff1f4",
+                    "secondary-container": "#e2e0fc",
+                    "on-error": "#ffffff",
+                    "on-secondary-fixed-variant": "#45455b",
+                    "secondary": "#5d5c74",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed-variant": "#004c6e",
+                    "tertiary-fixed-dim": "#ffb86e",
+                    "outline-variant": "#bec8d2",
+                    "data-purple": "#C297FF",
+                    "on-surface": "#191c1e",
+                    "secondary-fixed-dim": "#c6c4df",
+                    "on-surface-variant": "#3e4850",
+                    "surface-dim": "#d8dadd",
+                    "inverse-primary": "#89ceff",
+                    "surface-container": "#eceef1",
+                    "on-secondary-fixed": "#1a1a2e",
+                    "surface-bright": "#f7f9fc",
+                    "error-container": "#ffdad6",
+                    "on-secondary-container": "#63627a",
+                    "on-tertiary-fixed-variant": "#693c00",
+                    "surface-white": "#FFFFFF",
+                    "surface-container-low": "#f2f4f7",
+                    "tertiary": "#8a5100",
+                    "primary-fixed": "#c9e6ff",
+                    "tertiary-fixed": "#ffdcbd"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "md": "16px",
+                    "sm": "8px",
+                    "xxl": "48px",
+                    "lg": "24px",
+                    "base": "4px",
+                    "xs": "4px",
+                    "gutter": "24px",
+                    "xl": "32px",
+                    "container-max": "1440px"
+            },
+            "fontFamily": {
+                    "headline-xl-mobile": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "body-md": ["Inter"],
+                    "body-sm": ["Inter"],
+                    "label-md": ["Inter"],
+                    "label-sm": ["Inter"],
+                    "headline-xl": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-md": ["Inter"]
+            },
+            "fontSize": {
+                    "headline-xl-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "700"}],
+                    "headline-lg": ["28px", {"lineHeight": "36px", "letterSpacing": "-0.01em", "fontWeight": "600"}],
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "body-sm": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "600"}],
+                    "label-sm": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                    "headline-xl": ["36px", {"lineHeight": "44px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-md": ["20px", {"lineHeight": "28px", "fontWeight": "600"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        body { font-family: 'Inter', sans-serif; -webkit-font-smoothing: antialiased; }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+    </style>
+</head>
+<body class="bg-surface text-on-surface">
+<!-- TopNavBar -->
+<nav class="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-gutter h-16 bg-surface-white border-b border-border-subtle">
+<div class="flex items-center gap-xl max-w-container-max mx-auto w-full">
+<div class="flex items-center gap-xl flex-grow">
+<span class="font-headline-lg text-headline-lg font-bold text-primary">SERFIX</span>
+<div class="hidden md:flex gap-lg">
+<a class="font-label-md text-label-md text-primary border-b-2 border-primary font-bold pb-1" href="#">Features</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors" href="#">Comparison</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors" href="#">Pricing</a>
+<a class="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors" href="#">Trial</a>
+</div>
+</div>
+<div class="flex items-center gap-md">
+<button class="font-label-md text-label-md px-md py-sm text-primary hover:bg-surface-container-low transition-all">EN/AR</button>
+<button class="bg-primary-container text-on-primary font-label-md text-label-md px-lg py-sm rounded-lg hover:brightness-110 active:scale-95 duration-150 transition-all">Get Started</button>
+</div>
+</div>
+</nav>
+<main class="pt-16">
+<!-- Hero Section -->
+<section class="relative bg-surface-white px-gutter py-xxl flex flex-col items-center text-center">
+<div class="max-w-4xl mt-xl">
+<h1 class="font-headline-xl text-headline-xl md:text-6xl mb-lg text-on-surface tracking-tight">
+                    All the SEO tools you need. <br class="hidden md:block">
+<span class="text-primary-container">At a third of the price.</span>
+</h1>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-xl max-w-2xl mx-auto leading-relaxed">
+                    SERFIX gives you keyword research, technical auditing, content scoring, backlink analysis, and rank tracking — with native Arabic and English support built in. One platform. One price.
+                </p>
+<div class="flex flex-col sm:flex-row gap-md justify-center items-center">
+<button class="bg-primary-container text-on-primary px-xl py-md rounded-xl font-label-md text-label-md w-full sm:w-auto shadow-lg hover:shadow-primary-container/20 transition-all">Start Free Trial</button>
+<a class="flex items-center gap-sm font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors" href="#pricing">
+                        See pricing <span class="material-symbols-outlined">arrow_downward</span>
+</a>
+</div>
+</div>
+</section>
+<!-- Features Section -->
+<section class="bg-surface-container-low py-xxl px-gutter">
+<div class="max-w-container-max mx-auto">
+<div class="text-center mb-xl">
+<h2 class="font-headline-xl text-headline-xl text-on-surface mb-sm">Everything you need to rank.</h2>
+<div class="h-1 w-24 bg-primary-container mx-auto"></div>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-lg">
+<div class="bg-surface-white p-lg border border-border-subtle rounded-xl hover:shadow-md transition-shadow">
+<span class="material-symbols-outlined text-primary-container mb-md" data-icon="search">search</span>
+<h3 class="font-headline-md text-headline-md mb-sm text-on-surface">Keyword Research</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Comprehensive data for both Arabic and English markets. Discover high-intent search terms others miss.</p>
+</div>
+<div class="bg-surface-white p-lg border border-border-subtle rounded-xl hover:shadow-md transition-shadow">
+<span class="material-symbols-outlined text-primary-container mb-md" data-icon="terminal">terminal</span>
+<h3 class="font-headline-md text-headline-md mb-sm text-on-surface">Technical Site Audit</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Deep-crawl your site for performance, indexing, and mobile-friendliness issues in minutes.</p>
+</div>
+<div class="bg-surface-white p-lg border border-border-subtle rounded-xl hover:shadow-md transition-shadow">
+<span class="material-symbols-outlined text-primary-container mb-md" data-icon="monitoring">monitoring</span>
+<h3 class="font-headline-md text-headline-md mb-sm text-on-surface">Rank Tracking</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Hyper-local rank tracking across any city in the GCC. Monitor your progress daily.</p>
+</div>
+<div class="bg-surface-white p-lg border border-border-subtle rounded-xl hover:shadow-md transition-shadow">
+<span class="material-symbols-outlined text-primary-container mb-md" data-icon="link">link</span>
+<h3 class="font-headline-md text-headline-md mb-sm text-on-surface">Backlink Analysis</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Audit your profile and find new link-building opportunities from high-authority MENA domains.</p>
+</div>
+<div class="bg-surface-white p-lg border border-border-subtle rounded-xl hover:shadow-md transition-shadow">
+<span class="material-symbols-outlined text-primary-container mb-md" data-icon="edit_note">edit_note</span>
+<h3 class="font-headline-md text-headline-md mb-sm text-on-surface">Content Scoring</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">AI-powered optimization for your articles. Write content that both users and Google will love.</p>
+</div>
+<div class="bg-surface-white p-lg border border-border-subtle rounded-xl hover:shadow-md transition-shadow">
+<span class="material-symbols-outlined text-primary-container mb-md" data-icon="hub">hub</span>
+<h3 class="font-headline-md text-headline-md mb-sm text-on-surface">GA + GSC Integration</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Connect your Google Analytics and Search Console for a unified view of your traffic and performance.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- CTA Banner 1 -->
+<section class="bg-primary-container py-xl px-gutter text-center">
+<h2 class="font-headline-lg text-headline-lg text-on-primary mb-md">Same features. One-third the price.</h2>
+<button class="bg-surface-white text-primary-container px-xl py-md rounded-xl font-label-md text-label-md hover:shadow-xl transition-all">Start Your 14-Day Free Trial</button>
+</section>
+<!-- Arabic Advantage Section -->
+<section class="bg-surface-white py-xxl px-gutter">
+<div class="max-w-container-max mx-auto">
+<div class="text-center mb-xl">
+<h2 class="font-headline-xl text-headline-xl text-on-surface mb-md">Built for markets where Arabic matters.</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant max-w-2xl mx-auto">Global tools often treat Arabic as an afterthought. We built SERFIX from the ground up to understand it natively.</p>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-xl">
+<div class="p-lg border border-border-subtle rounded-xl bg-surface-container-low">
+<span class="material-symbols-outlined text-accent-orange mb-md text-3xl" data-icon="psychology">psychology</span>
+<h3 class="font-headline-md text-headline-md mb-sm">Dialect-Aware Research</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Identify search intent differences between Khaleeji, Egyptian, and Maghrebi dialects.</p>
+</div>
+<div class="p-lg border border-border-subtle rounded-xl bg-surface-container-low">
+<span class="material-symbols-outlined text-accent-orange mb-md text-3xl" data-icon="account_tree">account_tree</span>
+<h3 class="font-headline-md text-headline-md mb-sm">Morphological Clustering</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Group thousands of Arabic word variations into logical clusters for accurate tracking.</p>
+</div>
+<div class="p-lg border border-border-subtle rounded-xl bg-surface-container-low">
+<span class="material-symbols-outlined text-accent-orange mb-md text-3xl" data-icon="align_horizontal_right">align_horizontal_right</span>
+<h3 class="font-headline-md text-headline-md mb-sm">RTL Technical Audit</h3>
+<p class="font-body-md text-body-md text-on-surface-variant">Detect hreflang errors and RTL CSS issues that specifically impact right-to-left sites.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Comparison Table -->
+<section class="bg-surface-container-low py-xxl px-gutter overflow-x-auto"><div class="max-w-container-max mx-auto"><div class="text-center mb-xl"><h2 class="font-headline-xl text-headline-xl text-on-surface mb-sm">More features. Lower price.</h2><p class="font-body-md text-body-md text-on-surface-variant">Every plan includes bilingual Arabic/English support — full, not limited.</p></div><table class="w-full border-collapse border border-border-subtle bg-surface-white rounded-lg overflow-hidden shadow-sm"><thead><tr class="bg-surface-container-high"><th class="p-md text-left font-label-md text-label-md text-on-surface-variant uppercase border-b border-border-subtle">Feature</th><th class="p-md text-center font-label-md text-label-md text-on-surface-variant uppercase border-b border-border-subtle">SEMrush</th><th class="p-md text-center font-label-md text-label-md text-on-surface-variant uppercase border-b border-border-subtle">Ahrefs</th><th class="p-md text-center font-label-md text-label-md text-on-primary bg-primary-container border-b border-primary uppercase">SERFIX</th></tr></thead><tbody><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">Keyword Research</td><td class="p-md text-center"><span class="material-symbols-outlined text-primary text-xl">check</span></td><td class="p-md text-center"><span class="material-symbols-outlined text-primary text-xl">check</span></td><td class="p-md text-center bg-primary/5"><span class="material-symbols-outlined text-primary-container text-xl font-bold">check_circle</span></td></tr><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">Technical Site Audit</td><td class="p-md text-center"><span class="material-symbols-outlined text-primary text-xl">check</span></td><td class="p-md text-center"><span class="material-symbols-outlined text-primary text-xl">check</span></td><td class="p-md text-center bg-primary/5"><span class="material-symbols-outlined text-primary-container text-xl font-bold">check_circle</span></td></tr><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">Rank Tracking</td><td class="p-md text-center"><span class="material-symbols-outlined text-primary text-xl">check</span></td><td class="p-md text-center"><span class="material-symbols-outlined text-primary text-xl">check</span></td><td class="p-md text-center bg-primary/5"><span class="material-symbols-outlined text-primary-container text-xl font-bold">check_circle</span></td></tr><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">Backlink Analysis</td><td class="p-md text-center"><span class="material-symbols-outlined text-primary text-xl">check</span></td><td class="p-md text-center"><span class="material-symbols-outlined text-primary text-xl">check</span></td><td class="p-md text-center bg-primary/5"><span class="material-symbols-outlined text-primary-container text-xl font-bold">check_circle</span></td></tr><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">Orphan Link Detection</td><td class="p-md text-center text-error"><span class="material-symbols-outlined">close</span></td><td class="p-md text-center text-error"><span class="material-symbols-outlined">close</span></td><td class="p-md text-center bg-primary/5"><span class="material-symbols-outlined text-accent-orange text-xl font-bold">check_circle</span></td></tr><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">AI Content Studio</td><td class="p-md text-center"><span class="material-symbols-outlined text-primary text-xl">check</span></td><td class="p-md text-center text-error"><span class="material-symbols-outlined">close</span></td><td class="p-md text-center bg-primary/5"><span class="material-symbols-outlined text-accent-orange text-xl font-bold">check_circle</span></td></tr><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">Long Form Article Writing</td><td class="p-md text-center text-error"><span class="material-symbols-outlined">close</span></td><td class="p-md text-center text-error"><span class="material-symbols-outlined">close</span></td><td class="p-md text-center bg-primary/5"><span class="material-symbols-outlined text-accent-orange text-xl font-bold">check_circle</span></td></tr><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">Quick Win Finder</td><td class="p-md text-center text-error"><span class="material-symbols-outlined">close</span></td><td class="p-md text-center text-error"><span class="material-symbols-outlined">close</span></td><td class="p-md text-center bg-primary/5"><span class="material-symbols-outlined text-accent-orange text-xl font-bold">check_circle</span></td></tr><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">Action Insights (GSC + GA4)</td><td class="p-md text-center"><span class="material-symbols-outlined text-primary text-xl">check</span></td><td class="p-md text-center"><span class="material-symbols-outlined text-primary text-xl">check</span></td><td class="p-md text-center bg-primary/5"><span class="material-symbols-outlined text-primary-container text-xl font-bold">check_circle</span></td></tr><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">Scheduled Reports</td><td class="p-md text-center font-label-sm text-label-sm">Pro+</td><td class="p-md text-center font-label-sm text-label-sm">Pro+</td><td class="p-md text-center bg-primary/5 font-label-sm text-label-sm">Pro+</td></tr><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">White-label Reports</td><td class="p-md text-center font-label-sm text-label-sm">Pro+</td><td class="p-md text-center text-error"><span class="material-symbols-outlined">close</span></td><td class="p-md text-center bg-primary/5 font-label-sm text-label-sm">Agency+</td></tr><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">Native Arabic SEO Support</td><td class="p-md text-center text-error"><span class="material-symbols-outlined">close</span></td><td class="p-md text-center text-error"><span class="material-symbols-outlined">close</span></td><td class="p-md text-center bg-primary/5"><span class="material-symbols-outlined text-primary-container text-xl font-bold">check_circle</span></td></tr><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">Bilingual Audit (AR/EN)</td><td class="p-md text-center text-error"><span class="material-symbols-outlined">close</span></td><td class="p-md text-center text-error"><span class="material-symbols-outlined">close</span></td><td class="p-md text-center bg-primary/5"><span class="material-symbols-outlined text-primary-container text-xl font-bold">check_circle</span></td></tr><tr class="border-b border-border-subtle hover:bg-surface-container-lowest transition-colors"><td class="p-md font-body-sm text-body-sm">WordPress Plugin</td><td class="p-md text-center"><span class="material-symbols-outlined text-primary text-xl">check</span></td><td class="p-md text-center"><span class="material-symbols-outlined text-primary text-xl">check</span></td><td class="p-md text-center bg-primary/5"><span class="material-symbols-outlined text-primary-container text-xl font-bold">check_circle</span></td></tr><tr class="font-bold"><td class="p-md text-headline-md font-headline-md">Starting Price</td><td class="p-md text-center text-on-surface-variant">$117/mo</td><td class="p-md text-center text-on-surface-variant">$108/mo</td><td class="p-md text-center text-primary-container bg-primary/10 text-2xl">$14/mo</td></tr></tbody></table></div></section>
+<!-- CTA Banner 2 -->
+<section class="bg-[#1A1A2E] py-xl px-gutter text-center">
+<h2 class="font-headline-lg text-headline-lg text-on-primary mb-md">14 days. Full access. No card.</h2>
+<p class="font-body-md text-white/70 mb-lg">Experience the full power of SERFIX for zero risk.</p>
+<button class="bg-primary-container text-on-primary px-xl py-md rounded-xl font-label-md text-label-md hover:brightness-110 transition-all">Claim Your Trial Now</button>
+</section>
+<!-- Who is this for Section -->
+<section class="bg-surface-white py-xxl px-gutter">
+<div class="max-w-container-max mx-auto">
+<div class="text-center mb-xl">
+<h2 class="font-headline-xl text-headline-xl text-on-surface mb-sm">Who is this for?</h2>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-3 gap-lg">
+<div class="p-xl border border-border-subtle rounded-2xl flex flex-col items-center text-center bg-surface-container-lowest hover:-translate-y-1 transition-transform">
+<div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-lg">
+<span class="material-symbols-outlined text-primary text-3xl">corporate_fare</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-md">In-house SEO Manager</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Stop fighting with tools that don't understand your regional traffic. Get accurate reports for your CMO in both languages.</p>
+</div>
+<div class="p-xl border border-border-subtle rounded-2xl flex flex-col items-center text-center bg-surface-container-lowest hover:-translate-y-1 transition-transform">
+<div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-lg">
+<span class="material-symbols-outlined text-primary text-3xl">group</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-md">Marketing Agency</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Scale your client list without scaling your tool budget. Pro white-labeling for GCC clients as standard.</p>
+</div>
+<div class="p-xl border border-border-subtle rounded-2xl flex flex-col items-center text-center bg-surface-container-lowest hover:-translate-y-1 transition-transform">
+<div class="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-lg">
+<span class="material-symbols-outlined text-primary text-3xl">store</span>
+</div>
+<h3 class="font-headline-md text-headline-md mb-md">SME Business Owner</h3>
+<p class="font-body-sm text-body-sm text-on-surface-variant">Powerful enough for experts, simple enough for founders. Get high-end features at a price that makes sense for your stage.</p>
+</div>
+</div>
+</div>
+</section>
+<!-- Pricing Section -->
+<section class="bg-surface-container-low py-xxl px-gutter" id="pricing"><div class="max-w-container-max mx-auto"><div class="text-center mb-xl"><h2 class="font-headline-xl text-headline-xl text-on-surface mb-sm">Transparent Pricing</h2><p class="font-body-md text-body-md text-on-surface-variant mb-lg">Scale your SEO from solo projects to regional agencies.</p><div class="flex items-center justify-center gap-md mb-xl"><span class="font-label-md text-label-md text-on-surface-variant">Monthly</span><button class="w-12 h-6 bg-primary-container rounded-full relative p-1"><div class="w-4 h-4 bg-surface-white rounded-full absolute right-1"></div></button><span class="font-label-md text-label-md text-on-surface">Annual <span class="text-success-teal text-xs">(-25%)</span></span></div></div><div class="grid grid-cols-1 md:grid-cols-3 gap-lg max-w-container-max mx-auto"><!-- Solo --><div class="bg-surface-white p-xl rounded-xl border border-border-subtle flex flex-col"><h3 class="font-headline-md text-headline-md mb-base">Solo</h3><div class="mb-lg"><span class="text-4xl font-bold">$14</span><span class="text-on-surface-variant">/mo</span><p class="text-xs text-on-surface-variant mt-1">Billed annually ($19 monthly)</p></div><ul class="space-y-sm mb-xl flex-grow"><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 3 Projects</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 1 Team Seat</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 100k Crawl Budget</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 100 Rank Tracking keywords</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 250 Keyword Research searches</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 60k AI tokens</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 5 Long Form Articles</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> Bilingual Audit &amp; Arabic Support</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> WordPress Plugin</li><li class="flex items-center gap-sm font-body-sm text-body-sm text-on-surface-variant/50"><span class="material-symbols-outlined text-sm">close</span> Scheduled Reports</li></ul><button class="w-full py-sm border border-primary text-primary rounded-lg font-label-md text-label-md hover:bg-primary/5 transition-all">Select Plan</button></div><!-- Pro --><div class="bg-surface-white p-xl rounded-xl border-2 border-primary-container shadow-xl flex flex-col relative transform md:-translate-y-4"><div class="absolute -top-4 left-1/2 -translate-x-1/2 bg-primary-container text-on-primary px-md py-1 rounded-full text-xs font-bold uppercase">Most Popular</div><h3 class="font-headline-md text-headline-md mb-base">Pro</h3><div class="mb-lg"><span class="text-4xl font-bold">$37</span><span class="text-on-surface-variant">/mo</span><p class="text-xs text-on-surface-variant mt-1">Billed annually ($49 monthly)</p></div><ul class="space-y-sm mb-xl flex-grow"><li class="flex items-center gap-sm font-body-sm text-body-sm font-bold"><span class="material-symbols-outlined text-success-teal text-sm">check</span> All Solo features</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 10 Projects</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 3 Team Seats</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 300k Crawl Budget</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 500 Rank Tracking keywords</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 1,000 Keyword Research searches</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 150k AI tokens</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 15 Long Form Articles</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> Scheduled Reports</li><li class="flex items-center gap-sm font-body-sm text-body-sm text-on-surface-variant/50"><span class="material-symbols-outlined text-sm">close</span> White-label Reports</li></ul><button class="w-full py-sm bg-primary-container text-on-primary rounded-lg font-label-md text-label-md hover:brightness-110 transition-all">Select Plan</button></div><!-- Agency --><div class="bg-surface-white p-xl rounded-xl border border-border-subtle flex flex-col"><h3 class="font-headline-md text-headline-md mb-base">Agency</h3><div class="mb-lg"><span class="text-4xl font-bold">$74</span><span class="text-on-surface-variant">/mo</span><p class="text-xs text-on-surface-variant mt-1">Billed annually ($99 monthly)</p></div><ul class="space-y-sm mb-xl flex-grow"><li class="flex items-center gap-sm font-body-sm text-body-sm font-bold"><span class="material-symbols-outlined text-success-teal text-sm">check</span> All Pro features</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 30 Projects</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 10 Team Seats</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 1M Crawl Budget</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 2,000 Rank Tracking keywords</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 4,000 Keyword Research searches</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 600k AI tokens</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> 50 Long Form Articles</li><li class="flex items-center gap-sm font-body-sm text-body-sm"><span class="material-symbols-outlined text-success-teal text-sm">check</span> White-label Reports</li></ul><button class="w-full py-sm border border-primary text-primary rounded-lg font-label-md text-label-md hover:bg-primary/5 transition-all">Select Plan</button></div></div><div class="mt-xl text-center space-y-sm"><p class="font-label-sm text-label-sm text-accent-orange font-bold">SEMrush starts at $117/mo. Ahrefs at $108/mo. You do the math.</p><p class="font-body-sm text-body-sm text-on-surface-variant">All plans include a free 14-day trial. No credit card required.</p></div></div></section>
+<!-- Final CTA Section -->
+<section class="bg-surface-white py-xxl px-gutter">
+<div class="max-w-4xl mx-auto text-center">
+<h2 class="font-headline-xl text-headline-xl mb-md">Ready to dominate Arabic search?</h2>
+<p class="font-body-lg text-body-lg text-on-surface-variant mb-xl">The SEO platform built for the GCC. English and Arabic. Every feature. One price.</p>
+<div class="flex flex-col sm:flex-row gap-md justify-center items-center">
+<button class="bg-primary-container text-on-primary px-xl py-md rounded-xl font-label-md text-label-md w-full sm:w-auto shadow-lg hover:shadow-primary-container/20 transition-all">Start Free Trial Now</button>
+<button class="border border-primary-container text-primary-container px-xl py-md rounded-xl font-label-md text-label-md w-full sm:w-auto hover:bg-primary/5 transition-all">Request Demo</button>
+</div>
+</div>
+</section>
+</main>
+<!-- Footer -->
+<footer class="w-full py-xl px-gutter grid grid-cols-1 md:grid-cols-4 gap-lg max-w-container-max mx-auto border-t border-border-subtle">
+<div class="col-span-1 md:col-span-1">
+<span class="font-headline-md text-headline-md font-bold text-primary">SERFIX</span>
+<p class="mt-md font-body-sm text-body-sm text-on-surface-variant">Native Arabic &amp; English SEO for the GCC Market.</p>
+<p class="mt-xl font-label-sm text-label-sm text-on-surface-variant">© 2026 SERFIX GCC. All rights reserved.</p>
+</div>
+<div>
+<h5 class="font-label-md text-label-md mb-md">Product</h5>
+<ul class="space-y-sm">
+<li class=""><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-all" href="#">Features</a></li>
+<li class=""><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-all" href="#">Pricing</a></li>
+<li class=""><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-all" href="#">Trial</a></li>
+</ul>
+</div>
+<div>
+<h5 class="font-label-md text-label-md mb-md">Offices</h5>
+<ul class="space-y-sm">
+
+<li class=""><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-all" href="#">Dubai Office</a></li>
+</ul>
+</div>
+<div>
+<h5 class="font-label-md text-label-md mb-md">Legal</h5>
+<ul class="space-y-sm">
+<li class=""><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-all" href="#">Privacy Policy</a></li>
+<li class=""><a class="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-all" href="#">Terms of Service</a></li>
+</ul>
+</div>
+</footer>
+<script>
+        // Simple micro-interactions
+        document.querySelectorAll('button').forEach(button => {
+            button.addEventListener('mousedown', () => {
+                button.classList.add('scale-95');
+            });
+            button.addEventListener('mouseup', () => {
+                button.classList.remove('scale-95');
+            });
+            button.addEventListener('mouseleave', () => {
+                button.classList.remove('scale-95');
+            });
+        });
+
+        // Navigation scroll effect
+        window.addEventListener('scroll', () => {
+            const nav = document.querySelector('nav');
+            if (window.scrollY > 20) {
+                nav.classList.add('shadow-md');
+            } else {
+                nav.classList.remove('shadow-md');
+            }
+        });
+    </script>
+
+
+</body></html>

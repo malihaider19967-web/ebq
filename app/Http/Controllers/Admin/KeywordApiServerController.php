@@ -42,9 +42,20 @@ class KeywordApiServerController extends Controller
             ->get()
             ->keyBy('keyword_api_server_id');
 
+        // Live queue: every request still queued/running, across all servers —
+        // which keyword(s)/URL and which user, so an operator can see what's
+        // backed up without grepping logs.
+        $queued = KeywordApiRequest::query()
+            ->whereIn('status', [KeywordApiRequest::STATUS_QUEUED, KeywordApiRequest::STATUS_RUNNING])
+            ->with(['server:id,name', 'user:id,name,email'])
+            ->orderBy('created_at')
+            ->limit(200)
+            ->get();
+
         return view('admin.keyword-servers.index', [
             'servers' => $servers,
             'lastRequests' => $lastRequests,
+            'queued' => $queued,
             'editId' => (int) request()->integer('edit'),
             'showCreate' => request()->boolean('new'),
         ]);

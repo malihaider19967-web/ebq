@@ -39,6 +39,15 @@ class CrawlReportService
         CrawlFinding::CATEGORY_SECURITY => ['title' => 'Mixed content', 'desc' => 'HTTPS pages loading plain-http resources — browsers block or warn on these.', 'sev' => 'high'],
     ];
 
+    /**
+     * Finding types whose EXISTENCE requires GSC data (not just severity) — every
+     * other finding type fires from crawl data alone, GSC only ever bumps
+     * severity. Search Console history can lag real-world site state by days, so
+     * these carry real false-positive risk and get their own section/heading in
+     * the UI instead of being mixed into pure-crawl findings.
+     */
+    private const GSC_SOURCED_TYPES = ['indexed_not_in_sitemap'];
+
     /** @var array<int,array{cs:?int,cap:int,clicks:array<string,int>}> per-request memo */
     private array $ctx = [];
 
@@ -84,6 +93,22 @@ class CrawlReportService
     private function impactFor(string $websiteId, string $urlHash): int
     {
         return (int) ($this->context($websiteId)['clicks'][$urlHash] ?? 0);
+    }
+
+    /**
+     * Cache wrapper for the post-crawl finding aggregates below — these only
+     * change when a new crawl run completes (or new GSC data lands, which also
+     * bumps the same version per {@see ReportCache}), so it's safe to hold them
+     * until then instead of re-running the underlying queries on every page
+     * load. Deliberately NOT used for summary()/anything reflecting the
+     * CURRENT run's live status (running/finalizing) — that has to stay
+     * real-time for the crawl-progress banner.
+     */
+    private function remember(string $tag, string $websiteId, \Closure $compute): mixed
+    {
+        $key = "crawl-rpt:{$tag}:{$websiteId}:v".ReportCache::version($websiteId);
+
+        return Cache::remember($key, now()->addHours(24), $compute);
     }
 
     /** Window a website_pages query to this user's cap (value_rank <= cap; nulls visible). */
@@ -183,6 +208,11 @@ class CrawlReportService
      */
     public function actionGroups(string $websiteId): array
     {
+        return $this->remember('actionGroups', $websiteId, fn (): array => $this->computeActionGroups($websiteId));
+    }
+
+    private function computeActionGroups(string $websiteId): array
+    {
         $rows = $this->findingsBase($websiteId)
             ->select('category', DB::raw('COUNT(*) as c'),
                 DB::raw("SUM(CASE WHEN severity='critical' THEN 1 ELSE 0 END) as crit"),
@@ -280,6 +310,11 @@ class CrawlReportService
      */
     public function typeBreakdown(string $category, string $websiteId, string $severity = ''): array
     {
+        return $this->remember("typeBreakdown:{$category}:{$severity}", $websiteId, fn (): array => $this->computeTypeBreakdown($category, $websiteId, $severity));
+    }
+
+    private function computeTypeBreakdown(string $category, string $websiteId, string $severity): array
+    {
         $base = $this->findingsBase($websiteId, $category);
         if ($severity !== '') {
             $base->where('severity', $severity);
@@ -301,13 +336,20 @@ class CrawlReportService
             } elseif ((int) $r->med > 0) {
                 $sev = 'medium';
             }
-            $out[] = ['type' => $r->type, 'label' => $this->typeLabel($r->type), 'count' => (int) $r->c, 'severity' => $sev];
+            $out[] = ['type' => $r->type, 'label' => $this->typeLabel($r->type), 'count' => (int) $r->c, 'severity' => $sev, 'gsc_sourced' => $this->isGscSourced($r->type)];
         }
 
         $tier = ['critical' => 0, 'high' => 1, 'medium' => 2, 'low' => 3];
-        usort($out, fn (array $a, array $b): int => ($tier[$a['severity']] <=> $tier[$b['severity']]) ?: ($b['count'] <=> $a['count']));
+        // GSC-sourced types sort to the bottom regardless of severity tier — they
+        // get their own section in the UI, not mixed into the crawl-derived list.
+        usort($out, fn (array $a, array $b): int => ($a['gsc_sourced'] <=> $b['gsc_sourced']) ?: ($tier[$a['severity']] <=> $tier[$b['severity']]) ?: ($b['count'] <=> $a['count']));
 
         return $out;
+    }
+
+    public function isGscSourced(string $type): bool
+    {
+        return in_array($type, self::GSC_SOURCED_TYPES, true);
     }
 
     /** Human label for a finding type, e.g. 'missing_image_alt' → 'Missing image alt'. */
@@ -328,9 +370,11 @@ class CrawlReportService
                 'title' => $f->affected_url,
                 'subtitle' => ($source ? 'On '.$this->shortUrl($source).' · ' : '').$this->describe($f),
                 'metric' => null,
-                'fix_url' => $source,
+                // The fix lives on the SOURCE page (it owns the bad link), not the
+                // off-site target — route to our Page Health view for that page,
+                // same as every other finding, instead of opening the live site.
+                'fix_url' => $source ? route('link-structure.index', ['url' => $source, 'issue' => $f->type]) : null,
                 'fix_feature' => 'link_structure',
-                'fix_new_tab' => true,
             ];
         }
 
@@ -338,7 +382,7 @@ class CrawlReportService
             'title' => $this->shortUrl($f->affected_url),
             'subtitle' => $this->describe($f),
             'metric' => $impact > 0 ? number_format($impact).' clicks (28d)' : null,
-            'fix_url' => route('link-structure.index', ['url' => $f->affected_url]),
+            'fix_url' => route('link-structure.index', ['url' => $f->affected_url, 'issue' => $f->type]),
             'fix_feature' => 'link_structure',
         ];
     }
@@ -349,6 +393,11 @@ class CrawlReportService
      * @return array<int,array<string,mixed>>
      */
     public function categoryFindings(string $category, string $websiteId, int $limit = 200): array
+    {
+        return $this->remember("categoryFindings:{$category}:{$limit}", $websiteId, fn (): array => $this->computeCategoryFindings($category, $websiteId, $limit));
+    }
+
+    private function computeCategoryFindings(string $category, string $websiteId, int $limit): array
     {
         $rows = $this->findingsBase($websiteId, $category)
             ->orderByRaw("CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END")
@@ -523,6 +572,7 @@ class CrawlReportService
 
         return [
             'page' => [
+                'id' => $page->id,
                 'url' => $page->url,
                 'title' => $page->title,
                 'http_status' => $page->http_status,
@@ -711,6 +761,248 @@ class CrawlReportService
             'sitemap_noindex_url' => 'Sitemap lists a non-indexable URL',
             'crawl_blocked' => 'Crawler blocked ('.($d['reason'] ?? 'unknown').')',
             default => ucfirst(str_replace('_', ' ', $f->type)),
+        };
+    }
+
+    /**
+     * Concrete "what to do" instructions per finding type — the actual fix
+     * action, not just a restatement of the problem. Every type the catalog
+     * produces has an entry (no generic fallback) so the Page Health panel
+     * never leaves a user without a next step.
+     */
+    public function fixGuidance(string $type): string
+    {
+        return match ($type) {
+            'broken_internal' => 'Update or remove the link on the source page below so it points at a live URL — or restore/redirect the dead target.',
+            'broken_external' => 'Replace the link with a working URL, or remove it if the destination is permanently gone.',
+            'external_redirect' => 'Update the link to point straight at the final destination — skip the redirect hop.',
+            'broken_page' => 'Restore this page, 301-redirect it to the closest live equivalent, or return 410 if it should stay gone for good. Then fix or remove every internal link pointing here (listed below).',
+            'noindex_important' => 'Remove the noindex directive (meta robots tag or X-Robots-Tag header) — this page already earns search traffic, so noindex is actively hiding it.',
+            'canonical_mismatch' => 'Either remove the canonical tag (if this page should rank on its own) or 301-redirect it to the canonical target — right now it ranks despite telling Google not to.',
+            'orphan_page' => 'Add at least one internal link to this page from relevant existing content — Google relies on internal links to find and re-crawl it.',
+            'deep_page' => 'Add internal links from higher-level pages (homepage, category/hub pages) to shorten the click path — pages many clicks deep get crawled and ranked less.',
+            'thin_content' => 'Expand the page with substantive, unique content (aim for 200+ words) or merge it into a more complete page if it can\'t stand alone.',
+            'redirecting_url' => 'Update every internal link/sitemap entry pointing at this URL to use the final destination directly, instead of routing through a redirect.',
+            'redirect_chain_too_long' => 'Point the link straight at the final destination — collapse the chain to a single hop.',
+            'duplicate_title' => 'Write a unique, specific title for this page. Check the other pages listed below — they need unique titles too.',
+            'duplicate_meta_description' => 'Write a unique meta description summarizing THIS page\'s content. Check the other pages listed below.',
+            'duplicate_content' => 'Rewrite this page with unique content, or pick one canonical version and 301-redirect/canonicalize the rest to it (see the other URLs below).',
+            'missing_self_hreflang' => 'Add a <link rel="alternate" hreflang="..." href="THIS-page-url"> tag pointing at this page itself, alongside the existing alternates.',
+            'hreflang_canonical_conflict' => 'Make the canonical tag point at this page itself (not elsewhere) — a page can\'t be both "the right page for this locale" (hreflang) and "not the right page" (canonical pointing away).',
+            'missing_title' => 'Add a unique <title> tag, ideally 15–60 characters, describing this specific page.',
+            'title_too_long' => 'Shorten the <title> tag to under ~60 characters so it doesn\'t get truncated in search results.',
+            'title_too_short' => 'Expand the <title> tag — under 15 characters rarely gives search engines or users enough context.',
+            'missing_meta_description' => 'Add a meta description (~50–160 characters) summarizing the page — it drives the search-result snippet.',
+            'meta_description_too_long' => 'Shorten the meta description to under ~160 characters so it isn\'t truncated in search results.',
+            'missing_h1' => 'Add a single <h1> heading that states what the page is about.',
+            'multiple_h1' => 'Keep exactly one <h1> per page — demote the extras to <h2> or lower.',
+            'broken_heading_order' => 'Fix the heading order so levels don\'t skip (e.g. no <h3> directly after an <h1> with no <h2> between) — it confuses both users and search engines about the page\'s outline.',
+            'missing_image_alt' => 'Add descriptive alt text to every image listed — it\'s required for accessibility and helps image search.',
+            'missing_open_graph' => 'Add Open Graph tags (og:title, og:description, og:image at minimum) so shared links render properly on social platforms.',
+            'missing_twitter_card' => 'Add Twitter Card meta tags (twitter:card, twitter:title, twitter:image) for proper rendering when shared on X/Twitter.',
+            'missing_structured_data' => 'Add relevant JSON-LD structured data (e.g. Article, Product, FAQPage) so this page is eligible for rich results.',
+            'invalid_structured_data' => 'Fix the malformed JSON-LD block(s) — run the page through Google\'s Rich Results Test to see the exact parse error.',
+            'slow_response' => 'Investigate server/page latency for this URL — caching, a CDN, or optimizing slow backend calls will speed this up.',
+            'mixed_content' => 'Change every plain-http:// resource listed below to https:// — browsers block or warn on http resources on an https page.',
+            'robots_blocked_important' => 'Remove or narrow the Disallow rule in robots.txt for this path — it\'s currently blocking a page the site itself treats as real (sitemap-listed or internally linked).',
+            'sitemap_broken_url' => 'Remove this URL from the sitemap (it 404s/errors) — a sitemap should only list live, working URLs.',
+            'sitemap_redirect_url' => 'Update the sitemap to list the final destination URL directly, not the redirecting one.',
+            'sitemap_noindex_url' => 'Either remove this URL from the sitemap or make it indexable — listing a non-indexable page in the sitemap sends Google a contradictory signal.',
+            'indexed_not_in_sitemap' => 'Add this URL to the sitemap — Google already indexes it via Search Console, so the sitemap should reflect that too.',
+            'crawl_blocked' => 'The site is bot-walling our crawler (CAPTCHA/403/429) — check firewall/WAF rules for an allowance, or this and every check below it can\'t run.',
+            default => 'Review this finding\'s detail and address the underlying cause.',
+        };
+    }
+
+    /**
+     * "About this issue" copy for the Site Audit PDF export — explains WHY a
+     * finding type matters (impact on rankings/UX/crawl budget), paired with
+     * fixGuidance()'s WHAT-TO-DO. Every type has a real entry; no generic
+     * fallback, matching the standard set by professional audit tools.
+     */
+    public function auditAbout(string $type): string
+    {
+        return match ($type) {
+            'broken_internal' => 'Internal links pointing at dead pages waste crawl budget and strand any link equity flowing through them — and they\'re a broken experience for any visitor who clicks.',
+            'broken_external' => 'A link to a dead external page is a poor user experience and can make the page look unmaintained, which search engines weigh when assessing content quality.',
+            'external_redirect' => 'Linking through an unnecessary redirect adds latency and a small amount of link-equity loss per hop, and increases the odds the destination eventually breaks.',
+            'broken_page' => 'A page returning an error wastes whatever links/sitemap entries/search-engine trust point at it, and any visitor who lands here hits a dead end.',
+            'noindex_important' => 'A noindex directive tells search engines to drop this page from their index entirely. If the page is structurally important (linked, sitemap-listed, or the homepage), this is usually accidental and actively hides traffic-worthy content.',
+            'canonical_mismatch' => 'A canonical tag tells search engines "don\'t rank this URL, rank that one instead." When the page is structurally important but still gets traffic, the canonical is actively working against the page\'s own visibility.',
+            'orphan_page' => 'Pages with no internal links pointing to them are harder for search engines to discover and re-crawl, and receive no internal link equity — both hurt ranking potential.',
+            'deep_page' => 'Pages buried many clicks from the homepage get crawled less frequently and are seen as less important by search engines, which weigh proximity to the homepage as a relevance signal.',
+            'thin_content' => 'Pages with very little text give search engines little to work with when deciding what queries the page is relevant for, and tend to underperform fuller competing pages.',
+            'redirecting_url' => 'A URL that immediately redirects elsewhere shouldn\'t be the one referenced by internal links or the sitemap — it adds an avoidable hop on every visit.',
+            'redirect_chain_too_long' => 'Each redirect hop adds latency and a small amount of link-equity loss; chains of 3+ also risk search engines giving up before reaching the final page.',
+            'duplicate_title' => 'Search engines use the title tag to understand and display what a page is about. Identical titles across pages make it harder for search engines to tell them apart and decide which one to rank.',
+            'duplicate_meta_description' => 'A duplicate meta description is a missed opportunity to differentiate each page in search results and wastes the snippet that drives click-through from the results page.',
+            'duplicate_content' => 'Search engines generally index and rank only one version of duplicate content, so the others compete against themselves for the same ranking slot instead of earning their own.',
+            'missing_self_hreflang' => 'A page with hreflang alternates needs a self-referencing entry so search engines can confirm which page in the set is "this one" — without it, the whole hreflang group can be interpreted as unreliable.',
+            'hreflang_canonical_conflict' => 'hreflang says "this page is the right one for this locale" while canonical says "no, defer to this other page" — that\'s a direct contradiction search engines may resolve in either direction unpredictably.',
+            'missing_title' => 'The title tag is one of the strongest on-page relevance signals and is almost always shown verbatim as the clickable headline in search results — a missing title hurts both rankings and click-through.',
+            'title_too_long' => 'Search engines truncate long titles in the results page, which can cut off the part meant to entice a click.',
+            'title_too_short' => 'A very short title rarely communicates enough about the page to either search engines or searchers deciding whether to click.',
+            'missing_meta_description' => 'Without a meta description, search engines auto-generate a snippet from page text, which is frequently irrelevant or unappealing — hurting click-through even when the page ranks well.',
+            'meta_description_too_long' => 'Search engines truncate long meta descriptions in results, which can cut the snippet off mid-sentence.',
+            'missing_h1' => 'The H1 is the strongest heading-level signal of what the page is about, for both users skimming the page and search engines parsing its structure.',
+            'multiple_h1' => 'Multiple H1s dilute the single clearest "this page is about X" signal a heading hierarchy is meant to provide.',
+            'broken_heading_order' => 'A heading hierarchy that skips levels (e.g. H1 straight to H3) breaks the outline search engines and assistive technology rely on to understand page structure.',
+            'missing_image_alt' => 'Alt text is required for screen readers (accessibility/legal exposure) and is also how search engines understand and index images for image search.',
+            'missing_open_graph' => 'Without Open Graph tags, shared links render with no preview image/title/description on social platforms — links to the page look broken or unappealing when shared.',
+            'missing_twitter_card' => 'Without Twitter Card tags, links shared on X/Twitter fall back to a bare URL instead of a rich preview, reducing click-through from social shares.',
+            'missing_structured_data' => 'Structured data is what makes a page eligible for rich results (star ratings, FAQs, breadcrumbs, etc.) in search — without it, the listing looks plainer than competitors who have it.',
+            'invalid_structured_data' => 'Malformed JSON-LD is silently ignored by search engines — the page loses any rich-result eligibility the structured data was meant to provide, with no visible error on the page itself.',
+            'slow_response' => 'Slow-loading pages hurt user experience directly and are a known ranking factor — search engines also crawl slow sites less thoroughly since each fetch costs more of the crawl budget.',
+            'mixed_content' => 'Browsers actively block or visibly warn on http resources loaded by an https page, which can break page functionality or show a "not secure" indicator to visitors.',
+            'robots_blocked_important' => 'A robots.txt Disallow rule prevents search engines from crawling the page at all — far more severe than noindex, since the page can\'t even be evaluated for ranking.',
+            'sitemap_broken_url' => 'A sitemap is a direct signal of "crawl and index this" — listing a URL that errors wastes crawl budget search engines could spend on real pages, and signals a poorly maintained sitemap.',
+            'sitemap_redirect_url' => 'Listing a redirecting URL in the sitemap costs an extra hop for every crawl of that entry, for no benefit over listing the final destination directly.',
+            'sitemap_noindex_url' => 'Listing a non-indexable page in the sitemap sends search engines a direct contradiction: "index this" vs. the page\'s own "don\'t index me."',
+            'indexed_not_in_sitemap' => 'A page Google already indexes but that\'s missing from the sitemap relies entirely on other discovery paths (links, manual submission) — the sitemap should be the complete, authoritative list.',
+            'crawl_blocked' => 'If the site itself blocks our crawler, every other check on it is unreliable or simply can\'t run — this is the most foundational issue to resolve first.',
+            default => 'An issue detected during the site crawl that affects search visibility or user experience.',
+        };
+    }
+
+    /**
+     * Every open finding relevant to one page — both findings ABOUT it
+     * (matched by affected_url_hash) and findings SOURCED from it
+     * (broken_external/external_redirect, where affected_url is the
+     * off-site target, not this page — those are matched by page_id
+     * instead). Powers the Page Health panel: one unified "everything
+     * wrong with this page" view instead of bouncing between single-issue
+     * fix links that all used to land on the same context-free page.
+     *
+     * @return list<array<string,mixed>>
+     */
+    public function pageFindings(string $websiteId, string $url, string $pageId): array
+    {
+        $hash = WebsitePage::hashUrl($url);
+
+        $rows = $this->findingsBase($websiteId)
+            ->where(function (Builder $q) use ($hash, $pageId): void {
+                $q->where('affected_url_hash', $hash)
+                    ->orWhere(function (Builder $q2) use ($pageId): void {
+                        $q2->where('page_id', $pageId)->whereIn('type', ['broken_external', 'external_redirect']);
+                    });
+            })
+            ->with('page:id,url')
+            ->orderByRaw("CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END")
+            ->get();
+
+        return $rows->map(fn (CrawlFinding $f): array => [
+            'type' => $f->type,
+            'category' => $f->category,
+            'severity' => $f->severity,
+            'label' => $this->typeLabel($f->type),
+            'description' => $this->describe($f),
+            'guidance' => $this->fixGuidance($f->type),
+            'detail' => $f->detail ?? [],
+            'is_outbound' => in_array($f->type, ['broken_external', 'external_redirect'], true),
+            'gsc_sourced' => $this->isGscSourced($f->type),
+            'source_url' => $f->page?->url,
+            'affected_url' => $f->affected_url,
+        ])->all();
+    }
+
+    /**
+     * Full sitewide audit, source data for the Site Audit PDF export. One row
+     * per finding TYPE across every category (not scoped to one category like
+     * typeBreakdown()), bucketed Errors/Warnings/Notices the way every major
+     * audit tool (Semrush included) frames severity for a non-technical reader,
+     * plus a "Start here" priority shortlist so the client isn't left to figure
+     * out which of ~30 issue types to tackle first on their own.
+     *
+     * @return array<string,mixed>
+     */
+    public function auditExport(string $websiteId): array
+    {
+        return $this->remember('auditExport', $websiteId, fn (): array => $this->computeAuditExport($websiteId));
+    }
+
+    private function computeAuditExport(string $websiteId): array
+    {
+        $summary = $this->summary($websiteId);
+        $cutoff = Carbon::now()->subDays(7);
+
+        $rows = $this->findingsBase($websiteId)
+            ->select('type', DB::raw('COUNT(*) as c'),
+                DB::raw("SUM(CASE WHEN severity='critical' THEN 1 ELSE 0 END) as crit"),
+                DB::raw("SUM(CASE WHEN severity='high' THEN 1 ELSE 0 END) as high"),
+                DB::raw("SUM(CASE WHEN severity='medium' THEN 1 ELSE 0 END) as med"))
+            ->groupBy('type')->get();
+
+        // "New since the last week" per type — the same trend signal Semrush's
+        // own export shows (a delta sub-number under each issue's count) so a
+        // recurring client report reads as "X new this week", not just a
+        // restated total that looks unchanged.
+        $newCounts = $this->findingsBase($websiteId)
+            ->where('first_seen_at', '>=', $cutoff)
+            ->select('type', DB::raw('COUNT(*) as c'))->groupBy('type')->pluck('c', 'type');
+
+        $items = [];
+        foreach ($rows as $r) {
+            $sev = 'low';
+            if ((int) $r->crit > 0) {
+                $sev = 'critical';
+            } elseif ((int) $r->high > 0) {
+                $sev = 'high';
+            } elseif ((int) $r->med > 0) {
+                $sev = 'medium';
+            }
+
+            $samples = $this->findingsBase($websiteId)
+                ->where('type', $r->type)->orderByDesc('id')->limit(10)->pluck('affected_url')->all();
+
+            $items[] = [
+                'type' => $r->type,
+                'label' => $this->typeLabel($r->type),
+                'count' => (int) $r->c,
+                'new_count' => (int) ($newCounts[$r->type] ?? 0),
+                'severity' => $sev,
+                'about' => $this->auditAbout($r->type),
+                'fix' => $this->fixGuidance($r->type),
+                'gsc_sourced' => $this->isGscSourced($r->type),
+                'sample_urls' => $samples,
+            ];
+        }
+
+        $tier = ['critical' => 0, 'high' => 1, 'medium' => 2, 'low' => 3];
+        usort($items, fn (array $a, array $b): int => ($tier[$a['severity']] <=> $tier[$b['severity']]) ?: ($b['count'] <=> $a['count']));
+
+        $errors = array_values(array_filter($items, fn (array $i): bool => in_array($i['severity'], ['critical', 'high'], true)));
+        $warnings = array_values(array_filter($items, fn (array $i): bool => $i['severity'] === 'medium'));
+        $notices = array_values(array_filter($items, fn (array $i): bool => $i['severity'] === 'low'));
+
+        return [
+            'health_score' => $summary['health_score'] ?? null,
+            'health_grade' => $this->healthGrade($summary['health_score'] ?? null),
+            'pages_crawled' => $summary['pages_total'] ?? null,
+            'crawled_at' => $summary['last_crawled_at'] ?? null,
+            // Top 5 highest-volume critical/high issues — a genuine shortlist,
+            // not a restatement of Errors (capped well below its real count).
+            'priority' => array_slice($errors, 0, 5),
+            'errors' => $errors,
+            'warnings' => $warnings,
+            'notices' => $notices,
+            'total_issues' => array_sum(array_column($items, 'count')),
+        ];
+    }
+
+    /** Plain letter grade for the health score — easier for a non-technical
+     *  reader to anchor on than a bare 0–100 number. */
+    private function healthGrade(?int $score): ?string
+    {
+        if ($score === null) {
+            return null;
+        }
+
+        return match (true) {
+            $score >= 90 => 'A',
+            $score >= 75 => 'B',
+            $score >= 60 => 'C',
+            $score >= 40 => 'D',
+            default => 'F',
         };
     }
 

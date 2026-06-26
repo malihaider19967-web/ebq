@@ -90,6 +90,48 @@
             The webhook endpoint is <code class="rounded bg-slate-100 px-1">{{ url(config('services.keyword_finder.webhook_path')) }}</code>.
         </div>
 
+        {{-- Live queue: every request still queued/running, across all servers --}}
+        <div class="rounded-md border border-slate-200 bg-white">
+            <div class="flex items-center justify-between px-4 py-3">
+                <h2 class="text-sm font-semibold text-slate-800">Live queue</h2>
+                <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium text-slate-600">{{ $queued->count() }} in flight</span>
+            </div>
+            @if ($queued->isEmpty())
+                <p class="border-t border-slate-100 px-4 py-3 text-xs text-slate-500">Nothing queued right now.</p>
+            @else
+                <div class="overflow-x-auto border-t border-slate-100">
+                    <table class="w-full text-xs">
+                        <thead class="bg-slate-50 text-[10px] uppercase tracking-wide text-slate-500">
+                            <tr>
+                                <th class="px-3 py-2 text-left">Status</th>
+                                <th class="px-3 py-2 text-left">Server</th>
+                                <th class="px-3 py-2 text-left">Type</th>
+                                <th class="px-3 py-2 text-left">Keyword / URL</th>
+                                <th class="px-3 py-2 text-left">User</th>
+                                <th class="px-3 py-2 text-left">Queued at</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach ($queued as $req)
+                                <tr>
+                                    <td class="px-3 py-2">
+                                        <span class="rounded-full px-1.5 py-0.5 text-[10px] font-semibold {{ $req->status === 'running' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600' }}">
+                                            {{ ucfirst($req->status) }}
+                                        </span>
+                                    </td>
+                                    <td class="px-3 py-2 text-slate-700">{{ $req->server?->name ?? '—' }}</td>
+                                    <td class="px-3 py-2 text-slate-700">{{ $req->type }}@if($req->mode) <span class="text-slate-400">/ {{ $req->mode }}</span>@endif</td>
+                                    <td class="px-3 py-2 text-slate-700">{{ $req->keywordSummary() }}</td>
+                                    <td class="px-3 py-2 text-slate-700">{{ $req->user?->name ?? $req->user?->email ?? '— (admin test)' }}</td>
+                                    <td class="px-3 py-2 text-slate-500">{{ $req->created_at?->diffForHumans() }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            @endif
+        </div>
+
         {{-- Create panel --}}
         <details id="new-server" class="rounded-md border border-slate-200 bg-white" @if($showCreate) open @endif>
             <summary class="cursor-pointer select-none px-4 py-3 text-sm font-semibold text-slate-800">New server</summary>

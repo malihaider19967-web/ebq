@@ -74,6 +74,38 @@ class LinkStructureTest extends TestCase
             ->assertSee('https://example.com/'); // the referring page is listed
     }
 
+    public function test_page_health_shows_the_open_finding_with_fix_guidance(): void
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->create(['user_id' => $user->id, 'domain' => 'example.com']);
+        $this->seedCrawl($website); // /dead carries a broken_internal finding
+        session(['current_website_id' => $website->id]);
+
+        Livewire::actingAs($user)
+            ->test(LinkStructurePanel::class)
+            ->set('pageUrl', 'https://example.com/dead')
+            ->set('issueType', 'broken_internal')
+            ->call('analyze')
+            ->assertSee('Page Health')
+            ->assertSee('Broken internal')
+            ->assertSee("You're here", false)
+            ->assertSee('Update or remove the link'); // start of the broken_internal guidance text
+    }
+
+    public function test_page_health_shows_clean_state_when_no_open_findings(): void
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->create(['user_id' => $user->id, 'domain' => 'example.com']);
+        $this->seedCrawl($website); // /about has zero findings
+        session(['current_website_id' => $website->id]);
+
+        Livewire::actingAs($user)
+            ->test(LinkStructurePanel::class)
+            ->set('pageUrl', 'https://example.com/about')
+            ->call('analyze')
+            ->assertSee('No open issues for this page');
+    }
+
     public function test_link_structure_flags_a_genuine_orphan(): void
     {
         $user = User::factory()->create();

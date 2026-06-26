@@ -24,7 +24,7 @@ class CrawlParamAndExternalTest extends TestCase
         $this->assertSame('https://x.com/clean', FrontierUrl::collapse('https://x.com/clean'));
     }
 
-    public function test_broken_external_row_shows_source_page_and_does_not_link_to_link_structure(): void
+    public function test_broken_external_row_shows_source_page_and_fixes_via_its_page_health(): void
     {
         $user = User::factory()->create();
         $website = Website::factory()->create(['user_id' => $user->id, 'domain' => 'example.com']);
@@ -41,9 +41,13 @@ class CrawlParamAndExternalTest extends TestCase
         $ext = collect($rows)->firstWhere('title', 'https://dead.example.org/x');
 
         $this->assertNotNull($ext);
-        $this->assertStringContainsString('/blog/post', $ext['subtitle']);             // shows WHERE it is
-        $this->assertSame('https://example.com/blog/post', $ext['fix_url']);            // opens the source page
-        $this->assertStringNotContainsString('link-structure', (string) $ext['fix_url']); // NOT link-structure
-        $this->assertTrue($ext['fix_new_tab']);                                          // opens in a new tab
+        $this->assertStringContainsString('/blog/post', $ext['subtitle']); // shows WHERE it is
+        // Fix routes to OUR Page Health view for the source page (not the live
+        // site) — same destination every other finding type uses, carrying which
+        // issue sent the user here so it's not a context-free landing.
+        $this->assertStringContainsString('link-structure', (string) $ext['fix_url']);
+        $this->assertStringContainsString('blog%2Fpost', (string) $ext['fix_url']);
+        $this->assertStringContainsString('issue=broken_external', (string) $ext['fix_url']);
+        $this->assertArrayNotHasKey('fix_new_tab', $ext);
     }
 }

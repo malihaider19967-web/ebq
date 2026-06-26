@@ -29,7 +29,107 @@
     @endif
 
     @if ($structure)
-        @php $pg = $structure['page']; @endphp
+        @php
+            $pg = $structure['page'];
+            $issueTones = [
+                'critical' => ['bg' => 'bg-rose-50 dark:bg-rose-500/5', 'border' => 'border-rose-200 dark:border-rose-500/20', 'badge' => 'bg-rose-100 text-rose-700 dark:bg-rose-500/15 dark:text-rose-300'],
+                'high' => ['bg' => 'bg-amber-50 dark:bg-amber-500/5', 'border' => 'border-amber-200 dark:border-amber-500/20', 'badge' => 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300'],
+                'medium' => ['bg' => 'bg-blue-50 dark:bg-blue-500/5', 'border' => 'border-blue-200 dark:border-blue-500/20', 'badge' => 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300'],
+                'low' => ['bg' => 'bg-slate-50 dark:bg-slate-800/40', 'border' => 'border-slate-200 dark:border-slate-700', 'badge' => 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'],
+            ];
+        @endphp
+
+        {{-- Page Health: every open issue for this URL, with concrete fix steps.
+             This is the universal "Fix" destination for every finding type in the
+             crawl report — not just link-structure ones — so it carries its own
+             context per issue instead of assuming the visitor already knows why
+             they're here. --}}
+        <div class="rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+            <div class="border-b border-slate-100 px-4 py-2.5 dark:border-slate-800">
+                <div class="text-[13px] font-semibold">Page Health</div>
+                <p class="text-[11px] text-slate-400">Every open issue found on this page, with what to do about it.</p>
+            </div>
+            @if ($issues === [])
+                <div class="px-4 py-8 text-center text-[12px] text-emerald-700 dark:text-emerald-400">✓ No open issues for this page.</div>
+            @else
+                <ul class="divide-y divide-slate-100 dark:divide-slate-800">
+                    @foreach ($issues as $issue)
+                        @php
+                            $tone = $issueTones[$issue['severity']] ?? $issueTones['low'];
+                            $isHighlighted = $highlightType !== '' && $issue['type'] === $highlightType;
+                            $d = $issue['detail'];
+                        @endphp
+                        <li class="px-4 py-3 {{ $isHighlighted ? $tone['bg'].' border-l-4 '.$tone['border'] : '' }}">
+                            <div class="flex flex-wrap items-center gap-2">
+                                @if ($isHighlighted)
+                                    <span class="rounded bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">You're here</span>
+                                @endif
+                                <span class="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide {{ $tone['badge'] }}">{{ $issue['severity'] }}</span>
+                                <span class="text-[13px] font-semibold text-slate-900 dark:text-slate-100">{{ $issue['label'] }}</span>
+                                @if ($issue['gsc_sourced'])
+                                    <span class="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" title="From Search Console history, which can lag the live site by a few days">From Search Console</span>
+                                @endif
+                            </div>
+                            <p class="mt-1 text-[12px] text-slate-600 dark:text-slate-300">
+                                @if ($issue['is_outbound'])
+                                    This page links to <span class="font-medium">{{ $issue['affected_url'] }}</span> — {{ $issue['description'] }}.
+                                @else
+                                    {{ $issue['description'] }}.
+                                @endif
+                            </p>
+                            <p class="mt-1.5 flex gap-1.5 text-[12px] text-slate-700 dark:text-slate-200">
+                                <span aria-hidden="true">→</span><span>{{ $issue['guidance'] }}</span>
+                            </p>
+
+                            {{-- Type-specific supporting context, straight from the finding's detail. --}}
+                            @if (! empty($d['other_urls']))
+                                <div class="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                    Also affected:
+                                    @foreach (array_slice($d['other_urls'], 0, 5) as $u)
+                                        <a href="{{ $u }}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline dark:text-indigo-400">{{ $u }}</a>@if (! $loop->last), @endif
+                                    @endforeach
+                                    @if (count($d['other_urls']) > 5) (+{{ count($d['other_urls']) - 5 }} more) @endif
+                                </div>
+                            @endif
+                            @if (! empty($d['hreflangs']))
+                                <div class="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                    Declared hreflang alternates:
+                                    @foreach ($d['hreflangs'] as $h)
+                                        <span class="ml-1 rounded bg-slate-100 px-1 py-0.5 font-mono dark:bg-slate-800">{{ $h['hreflang'] ?? '?' }}</span>
+                                    @endforeach
+                                </div>
+                            @endif
+                            @if (! empty($d['urls']))
+                                <div class="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                    @foreach (array_slice($d['urls'], 0, 5) as $u)
+                                        <div class="truncate font-mono">{{ $u }}</div>
+                                    @endforeach
+                                    @if (count($d['urls']) > 5)<div>(+{{ count($d['urls']) - 5 }} more)</div>@endif
+                                </div>
+                            @endif
+                            @if (! empty($d['redirect_target']))
+                                <div class="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">Redirects to: <span class="font-mono">{{ $d['redirect_target'] }}</span></div>
+                            @endif
+                            @if (! empty($d['canonical']))
+                                <div class="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">Canonical points to: <span class="font-mono">{{ $d['canonical'] }}</span></div>
+                            @endif
+                            @if (! empty($d['path']))
+                                <div class="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">Blocked path: <span class="font-mono">{{ $d['path'] }}</span></div>
+                            @endif
+                            @if (! empty($d['referrers']))
+                                <div class="mt-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                    Linked from:
+                                    @foreach (array_slice($d['referrers'], 0, 5) as $r)
+                                        <a href="{{ $r['url'] }}" target="_blank" rel="noopener" class="text-indigo-600 hover:underline dark:text-indigo-400">{{ $r['url'] }}</a>@if (! $loop->last), @endif
+                                    @endforeach
+                                </div>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+            @endif
+        </div>
+
         {{-- Focus page summary --}}
         <div class="rounded-xl border border-indigo-200 bg-indigo-50/50 p-4 dark:border-indigo-500/20 dark:bg-indigo-500/5">
             <div class="flex flex-wrap items-center justify-between gap-2">
