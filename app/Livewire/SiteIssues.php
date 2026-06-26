@@ -196,6 +196,7 @@ class SiteIssues extends Component
             'rows' => $grouped ? null : $this->rows(),
             'typeOptions' => $this->typeOptions(),
             'isCrawl' => $this->isCrawl(),
+            'typeIsGscSourced' => $this->isCrawl() && $this->type !== '' && app(CrawlReportService::class)->isGscSourced($this->type),
         ]);
     }
 }

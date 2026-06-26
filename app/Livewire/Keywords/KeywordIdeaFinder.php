@@ -5,6 +5,7 @@ namespace App\Livewire\Keywords;
 use App\Livewire\Keywords\Concerns\TracksKeyword;
 use App\Models\KeywordApiRequest;
 use App\Services\KeywordFinder\KeywordFinderPool;
+use App\Services\KeywordFinder\KeywordIdeasMonthlyCache;
 use App\Support\KeywordFinderLocations;
 use App\Support\KeywordProviderConfig;
 use Illuminate\Support\Facades\Auth;
@@ -50,6 +51,17 @@ class KeywordIdeaFinder extends Component
     public ?string $errorMessage = null;
 
     public bool $hasRun = false;
+
+    /** True when the current results came straight from the monthly shared cache. */
+    public bool $fromCache = false;
+
+    /**
+     * Set by run() right before dispatching, consumed by poll() once the
+     * server's result lands — the monthly cache key this lookup should warm
+     * on success. Null whenever this run was itself served from cache (no
+     * dispatch happened, nothing new to write back).
+     */
+    public ?string $pendingCacheKey = null;
 
     // ── Results table state (sort / filter / paginate) ──────────────────────
     /** Sort column: keyword | volume | competitionIndex | cpc. */
@@ -124,8 +136,9 @@ class KeywordIdeaFinder extends Component
 
     public function run(KeywordFinderPool $pool): void
     {
-        $this->reset(['requestId', 'status', 'results', 'errorMessage', 'page']);
+        $this->reset(['requestId', 'status', 'results', 'errorMessage', 'page', 'pendingCacheKey']);
         $this->hasRun = false;
+        $this->fromCache = false;
 
         if (! KeywordProviderConfig::usingKeywordFinder()) {
             $this->errorMessage = 'Keyword discovery requires the self-hosted Keyword Planner provider, which is not currently enabled.';
@@ -162,10 +175,27 @@ class KeywordIdeaFinder extends Component
             $opts['seeds'] = $seeds;
         }
 
+        // Same seeds/URL + location/language, looked up by anyone this
+        // calendar month, get the same answer instantly — no queue, no node
+        // load, no wait. The key embeds Y-m, so it's automatically a miss
+        // again once the month turns over.
+        [$mode, $normalizedPayload] = $pool->buildIdeasPayload($opts);
+        $cacheKey = KeywordIdeasMonthlyCache::key($mode, $normalizedPayload);
+        $cached = KeywordIdeasMonthlyCache::get($cacheKey);
+        if ($cached !== null) {
+            $this->results = $cached;
+            $this->hasRun = true;
+            $this->fromCache = true;
+            $this->status = KeywordApiRequest::STATUS_COMPLETED;
+
+            return;
+        }
+
         $request = $pool->dispatchIdeas($opts, userId: Auth::id());
         $this->hasRun = true;
         $this->requestId = $request->request_id;
         $this->status = $request->status;
+        $this->pendingCacheKey = $cacheKey;
 
         if ($request->status === KeywordApiRequest::STATUS_FAILED) {
             $this->errorMessage = $request->error;
@@ -200,6 +230,13 @@ class KeywordIdeaFinder extends Component
         $rows = $request->result['results'] ?? [];
         $this->results = is_array($rows) ? array_values(array_filter($rows, 'is_array')) : [];
         $this->requestId = null;
+
+        // Warm the shared monthly cache so the next person who searches the
+        // same seeds/URL this month gets this exact result, instantly.
+        if ($this->pendingCacheKey !== null) {
+            KeywordIdeasMonthlyCache::put($this->pendingCacheKey, $this->results);
+            $this->pendingCacheKey = null;
+        }
     }
 
     public function isPolling(): bool

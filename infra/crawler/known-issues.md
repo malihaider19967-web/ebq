@@ -42,6 +42,66 @@ If `AnalyzeSiteJob` throws partway, its `failed()` handler still marks the run `
 (so it isn't stuck `running`), but findings / score / link graph may be partial. The run's
 `notes` records the failure. Chosen over leaving runs wedged on huge sites.
 
+## Exports & reporting
+
+### Site Audit PDF export (added 2026-06-23)
+`GET /site-audit/download` (`SiteAuditExportController`, `feature:link_structure` +
+`throttle:10,1`) renders the crawler's full sitewide finding catalog as a branded PDF — the
+crawl-data equivalent of Semrush's "Site Audit: Issues" export, which was used as the
+reference for structure (Errors/Warnings/Notices tiers, per-issue "About this issue" + "How
+to fix" copy) but deliberately exceeded in a few ways:
+- **Real sample affected URLs** per issue type (capped 10 + a "+N more" line) — Semrush's
+  own static export shows bare counts only, no URLs.
+- **Health score with a letter grade** (A–F, `CrawlReportService::healthGrade()`) up front
+  — a bare 0–100 number means little to a non-technical reader on its own.
+- **"New this week" badge** per issue type (`first_seen_at >= now()-7d`), mirroring the
+  small delta sub-number Semrush shows under its own "Amount" column.
+- **"Start here" priority shortlist** — top 5 critical/high issues ranked by volume, shown
+  before the full Errors/Warnings/Notices breakdown, so the reader isn't left to guess which
+  of ~30 issue types to tackle first.
+
+Source data: `CrawlReportService::auditExport($websiteId)` — one row per finding TYPE
+across **all** categories (not scoped to one category like `typeBreakdown()`), bucketed by
+severity tier (critical/high → errors, medium → warnings, low → notices) — paired with
+`auditAbout()` (new, "why this matters" copy for all ~37 types) and the existing
+`fixGuidance()` ("what to do"). GSC-sourced types (`isGscSourced()`) get the same amber
+caveat note as the dashboard/Page Health views (crawl-only-over-GSC-gating principle,
+documented above under "crawler findings must stand on crawl data alone").
+
+Rendering: `CrawlAuditPdfRenderer` (dompdf, mirrors the pre-existing `ReportPdfRenderer`
+used for the Growth Report email PDF) → `resources/views/pdf/site-audit.blade.php` +
+`pdf/partials/site-audit-section.blade.php`.
+
+**Whitelabeling reuses the existing system as-is** — no new feature flag was needed.
+`ReportBranding`/`ReportBrandingResolver` (plan-gated on `report_whitelabel`, currently true
+only on the Agency plan — see `PlanSeeder`) already existed for the Growth Report PDF; this
+export just calls the same resolver. `?whitelabel=0` lets an eligible user pull the plain
+EBQ-branded copy on demand instead (e.g. to send to EBQ support) — the resolver itself
+still enforces the plan gate either way, so a non-eligible plan always gets EBQ branding
+regardless of this query param.
+
+UI entry point: an "Export PDF" button on the dashboard's Priority Action Queue widget
+(`resources/views/livewire/dashboard/priority-action-queue.blade.php`) — plain `<a href>`
+download links, not a Livewire action, since file downloads need a real navigation.
+
+### Post-crawl aggregates now cached until the next crawl (added 2026-06-23)
+`actionGroups()`, `typeBreakdown()`, `categoryFindings()`, and `auditExport()` were
+re-running their full queries (`actionGroups()` in particular does a `chunk(2000)` scan over
+every open finding just to sum per-user click impact) on every page load — slow on sites
+with a lot of open findings. Wrapped them in `CrawlReportService::remember()`, a thin
+`Cache::remember()` keyed by `ReportCache::version($websiteId)` (24h sanity TTL; real
+freshness comes from the version bump). `AnalyzeSiteJob::flushSubscribers()` already bumps
+that version at the end of **every** run outcome (completed/blocked/failed/exception), so
+this needed no new invalidation wiring — it also gets bumped by nightly GSC syncs, which is
+a harmless superset (occasionally refreshes sooner than strictly necessary, never stale
+past the next crawl).
+**Deliberately NOT cached: `summary()`.** Its `run_status`/`blocked` fields reflect the
+*current* run's live state (running/finalizing) and drive the crawl-progress banner's
+real-time polling — caching it would freeze the banner mid-crawl. `auditExport()` calls
+`summary()` directly (not the cached wrapper) since it only reads the post-crawl fields
+(health_score/pages_total/last_crawled_at), but the whole `auditExport()` result is itself
+cached as one unit, so that's still a single query pass per version, not per request.
+
 ## Reliability
 
 - **Wedge (mitigated, not eliminated).** The multi-pass loop continues only via the
@@ -269,6 +329,27 @@ If `AnalyzeSiteJob` throws partway, its `failed()` handler still marks the run `
   `broken_external` check — real 4xx/5xx — is untouched, still flags a truly dead
   click-to-chat link). Cleanup: 18 pre-existing open `external_redirect` findings across 3
   sites matched these hosts and were resolved directly.
+- **Social-profile links false-flagged `broken_external` (fixed 2026-06-25).**
+  lawncarewesleychapelfl.com's `https://x.com/WesleyLawn38331` (a live profile) was flagged
+  broken. Root cause: `LinkChecker`/`PageAuditService::checkLinks()` fetch with a
+  Googlebot-spoofed UA from the crawler's own (non-residential) IP; x.com (also linkedin.com,
+  facebook.com, instagram.com, twitter.com) WAFs routinely 403/429/999/401 that fetch profile
+  regardless of whether the link is actually dead — `LINK_FALLBACK_STATUSES` retries with a
+  plain GET from the *same* IP/UA, which gets blocked identically, so the false 403 survives
+  to the `status >= 400` check. No domain had ever been exempted from `broken_external`
+  (the existing `KNOWN_REDIRECTOR_HOSTS` allowlist only suppresses `external_redirect`).
+  Fixed in both `SiteIssueDetector::detectBrokenExternalLinks()` and
+  `PageAuditService::checkLinks()` (duplicate logic, kept in sync): added
+  `KNOWN_ANTIBOT_HOSTS` (`x.com`, `twitter.com`, `linkedin.com`, `facebook.com`,
+  `instagram.com`) + `ANTIBOT_BLOCK_STATUSES` (`401,403,429,999`). When a checked link's host
+  matches AND its status is one of those, the link is **not** flagged broken (skipped
+  entirely, no finding persisted) — logged instead (`crawler.broken_external.antibot_skip` /
+  `page_audit.broken_link.antibot_skip`) so the suppression is visible in logs without
+  creating noise for the client. A genuine 404/410/500 on these hosts is still flagged
+  normally — only the four anti-bot-shaped statuses are exempted. Because findings aren't
+  cached/sticky (re-evaluated fresh every `SiteIssueDetector` pass), this self-corrects on
+  the next crawl with no separate "recheck" mechanism needed: if x.com starts returning a
+  real 404 instead of 403, the next run flags it.
 - **Cross-site stale-render bleed in the dashboard (confirmed 2026-06-23, not yet fixed).**
   User saw a soulfamburger.com finding (wa.me redirect) while viewing childdaycaretracy.com's
   crawl report. Ruled out as a data bug — confirmed via direct DB query and
@@ -292,6 +373,66 @@ If `AnalyzeSiteJob` throws partway, its `failed()` handler still marks the run `
   retest concurrency to 1 (sequential) so it matches single-Test semantics exactly. If a
   larger, multi-account pool needs faster bulk retest later, group by credential/host and
   cap per-group concurrency instead of a flat global number.
+- **Every "Fix" button landed on the same context-free page (fixed 2026-06-23).** All ~35
+  finding types' `fix_url` routed to `/link-structure?url=X`, which only ever showed link
+  graph data (inbound/outbound/click-depth) — clicking Fix on `missing_title`,
+  `duplicate_content`, `mixed_content`, `hreflang_canonical_conflict`, etc. landed the user
+  on a page with zero information about the actual problem. Root cause:
+  `CrawlReportService::mapFinding()` always built the same generic link-structure URL
+  regardless of `$f->type`. Rebuilt into a real "Page Health" feature instead of patching
+  each type individually:
+  - `CrawlReportService::pageFindings($websiteId, $url, $pageId)` — every OPEN finding for
+    one URL in one call: matched by `affected_url_hash` for on-page types, by `page_id` +
+    `whereIn('type', ['broken_external','external_redirect'])` for the two outbound-link
+    types (their `affected_url` is the off-site target, not this page, so they can't match
+    by hash). Each row carries `label`, `description` (existing `describe()`), a NEW
+    `guidance` field (concrete "what to do" text, see `fixGuidance()` — every ~35 types has
+    a real entry, no generic fallback), and the raw `detail` for type-specific rendering.
+  - `CrawlReportService::fixGuidance(string $type): string` — one-line actionable
+    instructions per type (e.g. `missing_self_hreflang` → "Add a `<link rel=alternate
+    hreflang=... href=THIS-page-url>` tag pointing at this page itself"). This is the actual
+    value-add: every finding now tells the client what to DO, not just what's wrong.
+  - `mapFinding()` now appends `&issue={type}` to every `fix_url` (previously only the
+    generic link). `LinkStructurePanel` reads it via `#[Url(as:'issue')]`, sorts that finding
+    to the top of its Page Health list, and badges it "You're here" — so the destination
+    knows WHY the visitor landed there.
+  - `broken_external`/`external_redirect` changed too: `fix_url` used to be the literal
+    SOURCE page on the LIVE site (opened in a new tab, never touched our app at all). Now
+    routes to our Page Health view for that source page instead — consistent destination
+    for every finding type, plus the source page's other issues are visible in the same
+    place.
+  - `resources/views/livewire/link-structure/link-structure-panel.blade.php`: new "Page
+    Health" section renders every issue for the focused URL with severity, label,
+    description, guidance, and type-specific detail (duplicate siblings as links, hreflang
+    table, mixed-content URL list, redirect target, blocked robots.txt path, referrer
+    list) — reads straight from each finding's `detail` JSON, no new columns needed.
+  - `pageLinkStructure()` now also returns `page.id` (was computed internally and
+    discarded) so `pageFindings()` doesn't need a second `WebsitePage` lookup.
+  - **Gotcha hit:** `pageFindings()`'s `$pageId` param was first typed `int` —
+    `WebsitePage::id` is a ULID string, not numeric (same landmine class as
+    [[ulid-formatting-landmines]]). Fixed to `string` before it shipped.
+- **`noindex_important`/`canonical_mismatch` required GSC traffic to exist at all (fixed
+  2026-06-23).** User flagged: the crawler's OWN findings must stand on crawl data alone —
+  GSC can inform severity but must never gate whether a crawler finding exists, and GSC-only
+  signals need their own clearly-labeled section since Search Console history can lag the
+  live site by days (false-positive risk). Audit found exactly 3 pre-existing finding types
+  gated on GSC for EXISTENCE (not just severity): `noindex_important`, `canonical_mismatch`
+  (both: `if ($clicks >= ...) { add(...) }` — no clicks, no finding at all, regardless of
+  GSC presence per-subscriber) and `indexed_not_in_sitemap` (gated on `source_gsc`).
+  Re-did the first two using the same crawl-only "is this page structurally real" proxy as
+  `robots_blocked_important` (sitemap-listed OR has inbound internal links OR is the
+  homepage) — they now fire for every subscriber, GSC-connected or not; GSC clicks only
+  bump `medium`→`high`. Confirmed the existing intentional-dedup case (`?param` variant
+  pages canonicalizing to a clean URL) stays quiet without GSC too — those pages are
+  naturally neither sitemap-listed nor inbound-linked, so the proxy excludes them same as
+  before. `indexed_not_in_sitemap` has no crawl-only equivalent ("Google has this indexed"
+  is inherently a GSC-only fact) — left GSC-gated but newly marked via
+  `CrawlReportService::GSC_SOURCED_TYPES`/`isGscSourced()`. UI now visually separates: the
+  grouped issue-type view (`/issues/crawl_*`) sorts GSC-sourced types into their own amber
+  "From Google Search Console" section with a staleness caveat instead of mixing them into
+  the crawl-derived list; the Page Health panel badges any GSC-sourced finding the same way.
+  See [[crawl-only-over-gsc-gating]] — this generalizes that principle from "new checks"
+  to "audit and fix existing ones too."
 
 ## Large-site pressure points
 

@@ -10,6 +10,7 @@ use App\Models\WebsitePage;
 use App\Support\Crawler\RobotsTxtParser;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Produces the unified SEO issue catalog (crawl_findings) from the persisted
@@ -27,6 +28,15 @@ class SiteIssueDetector
     /** Click-to-chat/shortlink services that always redirect by design — never an
      *  external_redirect finding, regardless of how many hops the chain has. */
     private const KNOWN_REDIRECTOR_HOSTS = ['wa.me', 'api.whatsapp.com', 't.me', 'm.me', 'bit.ly'];
+
+    /** Social hosts whose WAF/anti-bot layer routinely 403s non-browser UAs (incl. our
+     *  Googlebot-spoofed crawler) even for perfectly live profile/page URLs. A 401/403/429/999
+     *  here is not trustworthy evidence of a real broken link, so we don't report it. Confirmed
+     *  2026-06-25: x.com/WesleyLawn38331 (live profile) flagged broken_external on 403. */
+    private const KNOWN_ANTIBOT_HOSTS = ['x.com', 'twitter.com', 'linkedin.com', 'facebook.com', 'instagram.com'];
+
+    /** Statuses these anti-bot hosts return to block scrapers, not to signal a dead link. */
+    private const ANTIBOT_BLOCK_STATUSES = [401, 403, 429, 999];
 
     /** @var array<int,array<string,mixed>> rows pending upsert, keyed by type|hash */
     private array $pending = [];
@@ -277,18 +287,23 @@ class SiteIssueDetector
             $this->add($page, CrawlFinding::CATEGORY_SITEMAP, 'sitemap_noindex_url', $sev('medium', 'low'), $clicks);
         }
 
-        // Indexability.
-        if ($status === 200 && ! $page->is_indexable && ! $page->redirect_target && str_contains((string) $page->robots_directives, 'noindex')) {
-            if ($clicks >= max(1, $importantClicks)) {
-                $this->add($page, CrawlFinding::CATEGORY_INDEXABILITY, 'noindex_important', 'high', $clicks, ['robots' => $page->robots_directives]);
-            }
+        // Indexability. Crawl-only "this page is structurally real" proxy — same
+        // one used for robots_blocked_important/sitemap checks above — so these
+        // fire for every subscriber, GSC-connected or not. GSC clicks (when
+        // present) only bump severity; they're never required for the finding to
+        // exist. Re-done 2026-06-23: both were previously gated on GSC clicks for
+        // EXISTENCE, not just severity — the crawler's own findings must stand on
+        // crawl data alone (see [[crawl-only-over-gsc-gating]]).
+        $isStructurallyReal = (bool) $page->source_sitemap || (int) $page->inbound_link_count > 0 || $page->url_hash === $homepageHash;
+        if ($status === 200 && ! $page->is_indexable && ! $page->redirect_target && str_contains((string) $page->robots_directives, 'noindex') && $isStructurallyReal) {
+            $this->add($page, CrawlFinding::CATEGORY_INDEXABILITY, 'noindex_important', $sev('high', 'medium'), $clicks, ['robots' => $page->robots_directives]);
         }
         // A page canonicalizing to a different URL is usually intentional dedup
-        // (e.g. ?name=… variants → the clean page) and not an issue. Only flag it
-        // when the canonicalized URL still earns search traffic — i.e. Google
-        // ranks a URL you're telling it to drop.
-        if (($signals['canonical_points_away'] ?? false) === true && $clicks >= max(1, $importantClicks)) {
-            $this->add($page, CrawlFinding::CATEGORY_INDEXABILITY, 'canonical_mismatch', 'high', $clicks, ['canonical' => $page->canonical_url]);
+        // (e.g. ?name=… variants → the clean page) and not an issue — those
+        // variants are typically neither sitemap-listed nor internally linked, so
+        // $isStructurallyReal already filters them out without needing GSC.
+        if (($signals['canonical_points_away'] ?? false) === true && $isStructurallyReal) {
+            $this->add($page, CrawlFinding::CATEGORY_INDEXABILITY, 'canonical_mismatch', $sev('high', 'medium'), $clicks, ['canonical' => $page->canonical_url]);
         }
 
         // International (hreflang). Checked before the indexable-only gate below
@@ -484,7 +499,18 @@ class SiteIssueDetector
                 );
             }
             $status = $p['status'];
-            if ($status === null || $status >= 400) {
+            $isUntrustedAntibotBlock = $status !== null
+                && in_array($status, self::ANTIBOT_BLOCK_STATUSES, true)
+                && $this->isKnownAntibotHost($href);
+            // 403 from any external host almost always means WAF/bot-blocking, not a dead link —
+            // not actionable by the site owner, so skip it universally.
+            $isAccessBlocked = $status === 403;
+            if ($isUntrustedAntibotBlock || $isAccessBlocked) {
+                Log::info('crawler.broken_external.antibot_skip', [
+                    'website_id' => $website->id, 'run_id' => $run->id, 'href' => $href, 'status' => $status,
+                ]);
+            }
+            if (($status === null || $status >= 400) && ! $isUntrustedAntibotBlock && ! $isAccessBlocked) {
                 $this->pending['broken_external|'.CrawlFinding::hashUrl($href)] = $this->row(
                     $website->id, $run->id, $fromId,
                     CrawlFinding::CATEGORY_BROKEN_LINK, 'broken_external', 'medium', 0.0, $href,
@@ -498,6 +524,18 @@ class SiteIssueDetector
     {
         $host = strtolower((string) parse_url($href, PHP_URL_HOST));
         foreach (self::KNOWN_REDIRECTOR_HOSTS as $d) {
+            if ($host === $d || str_ends_with($host, '.'.$d)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function isKnownAntibotHost(string $href): bool
+    {
+        $host = strtolower((string) parse_url($href, PHP_URL_HOST));
+        foreach (self::KNOWN_ANTIBOT_HOSTS as $d) {
             if ($host === $d || str_ends_with($host, '.'.$d)) {
                 return true;
             }

@@ -66,6 +66,38 @@ class KeywordApiRequest extends Model
         return $this->belongsTo(KeywordApiServer::class, 'keyword_api_server_id');
     }
 
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function website(): BelongsTo
+    {
+        return $this->belongsTo(Website::class);
+    }
+
+    /**
+     * Human-readable summary of what's being looked up — the seed keywords for
+     * `ideas`/`keywords` mode, the target URL for `website`/`page` mode, or the
+     * raw keyword list for `volume`. Used by the admin queue panel; never the
+     * user-facing UI (no per-type copy polish needed here).
+     */
+    public function keywordSummary(): string
+    {
+        $payload = $this->payload ?? [];
+        if (! empty($payload['url'])) {
+            return (string) $payload['url'];
+        }
+        $list = $payload['seeds'] ?? $payload['keywords'] ?? [];
+        if (! is_array($list) || $list === []) {
+            return '—';
+        }
+        $shown = array_slice($list, 0, 3);
+        $more = count($list) - count($shown);
+
+        return implode(', ', $shown).($more > 0 ? " +{$more} more" : '');
+    }
+
     public function markRunning(): void
     {
         $this->forceFill(['status' => self::STATUS_RUNNING])->save();

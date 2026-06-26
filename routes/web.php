@@ -8,6 +8,7 @@ use App\Http\Controllers\GuestKeywordVolumeController;
 use App\Http\Controllers\GoogleCapController;
 use App\Http\Controllers\MicrosoftOAuthController;
 use App\Http\Controllers\PageAuditController;
+use App\Http\Controllers\SiteAuditExportController;
 use App\Http\Controllers\Admin\ActivityController as AdminActivityController;
 use App\Http\Controllers\Admin\ClientController as AdminClientController;
 use App\Http\Controllers\Admin\ClientImpersonationController;
@@ -180,6 +181,9 @@ Route::middleware(['auth', 'verified', 'onboarded'])->group(function () {
         ->name('pages.show')->where('id', '.*');
     Route::view('/sitemaps', 'sitemaps.index')->middleware('feature:sitemaps')->name('sitemaps.index');
     Route::view('/link-structure', 'link-structure.index')->middleware('feature:link_structure')->name('link-structure.index');
+    Route::get('/site-audit/download', [SiteAuditExportController::class, 'download'])
+        ->middleware(['feature:link_structure', 'throttle:10,1'])
+        ->name('site-audit.download');
     Route::get('/page-audits/{pageAuditReport}', [PageAuditController::class, 'show'])
         ->middleware('feature:audits')
         ->name('page-audits.show');

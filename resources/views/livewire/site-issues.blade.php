@@ -84,11 +84,15 @@
     </div>
 
     @if ($grouped)
+        @php
+            $crawlGroups = array_values(array_filter($groups, fn ($g) => ! $g['gsc_sourced']));
+            $gscGroups = array_values(array_filter($groups, fn ($g) => $g['gsc_sourced']));
+        @endphp
         {{-- Grouped-by-type breakdown (Semrush-style): one card per issue type, not
              one undifferentiated list — click a type to drill into its affected URLs. --}}
         <div class="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
             <ul class="divide-y divide-slate-100 dark:divide-slate-800">
-                @forelse ($groups as $g)
+                @forelse ($crawlGroups as $g)
                     @php $gTone = $findingTones[$g['severity']] ?? $findingTones['low']; @endphp
                     <li>
                         <button type="button" wire:click="selectType('{{ $g['type'] }}')"
@@ -107,7 +111,39 @@
                 @endforelse
             </ul>
         </div>
+
+        @if ($gscGroups !== [])
+            {{-- Separated on purpose: these don't come from our crawl, they come from
+                 Google Search Console history, which can lag the live site by days —
+                 a page can show here as "missing from sitemap" when Google's copy of
+                 the index is just stale, not because anything's actually wrong today. --}}
+            <div class="mt-5 overflow-hidden rounded-xl border border-amber-200 bg-amber-50/40 shadow-sm dark:border-amber-500/20 dark:bg-amber-500/5">
+                <div class="border-b border-amber-100 px-4 py-2.5 dark:border-amber-500/20">
+                    <div class="text-[13px] font-semibold text-amber-900 dark:text-amber-200">From Google Search Console</div>
+                    <p class="text-[11px] text-amber-700 dark:text-amber-300">Based on Search Console history, not our own crawl — this data can be a few days old, so treat these as worth checking rather than confirmed.</p>
+                </div>
+                <ul class="divide-y divide-amber-100/70 dark:divide-amber-500/10">
+                    @foreach ($gscGroups as $g)
+                        @php $gTone = $findingTones[$g['severity']] ?? $findingTones['low']; @endphp
+                        <li>
+                            <button type="button" wire:click="selectType('{{ $g['type'] }}')"
+                                class="flex w-full items-center gap-3 px-5 py-3.5 text-left transition hover:bg-amber-100/40 dark:hover:bg-amber-500/10">
+                                <span class="rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums {{ $gTone }}">{{ number_format($g['count']) }}</span>
+                                <span class="min-w-0 flex-1 truncate text-sm font-medium text-slate-900 dark:text-slate-100">{{ $g['label'] }}</span>
+                                <span class="rounded px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide {{ $gTone }}">{{ $g['severity'] }}</span>
+                                <svg class="h-3.5 w-3.5 flex-none text-slate-400" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                            </button>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
     @else
+        @if ($typeIsGscSourced)
+            <div class="mb-3 rounded-lg border border-amber-200 bg-amber-50/40 px-3 py-2 text-[11px] text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/5 dark:text-amber-300">
+                From Google Search Console history, not our own crawl — this can lag the live site by a few days, so verify before treating these as confirmed.
+            </div>
+        @endif
         <button type="button" wire:click="clearFilters"
             class="mb-3 inline-flex items-center gap-1 text-xs font-medium text-slate-500 transition hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200">
             <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>

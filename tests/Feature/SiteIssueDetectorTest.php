@@ -327,4 +327,51 @@ class SiteIssueDetectorTest extends TestCase
             'category' => 'sitemap',
         ]);
     }
+
+    public function test_noindex_important_and_canonical_mismatch_fire_without_any_gsc_data(): void
+    {
+        $user = User::factory()->create();
+        $website = Website::factory()->create(['user_id' => $user->id, 'domain' => 'example.com']);
+        $cs = $website->crawl_site_id;
+        $run = CrawlRun::create(['crawl_site_id' => $cs, 'trigger' => 'manual', 'status' => 'running', 'started_at' => now()]);
+
+        // No SearchConsoleData at all — this subscriber never connected GSC.
+        // Both pages are sitemap-listed, the crawl-only "this page is real" signal.
+        WebsitePage::create([
+            'crawl_site_id' => $cs, 'url' => 'https://example.com/noindexed',
+            'url_hash' => WebsitePage::hashUrl('https://example.com/noindexed'),
+            'http_status' => 200, 'is_indexable' => false, 'source_sitemap' => true,
+            'robots_directives' => 'noindex', 'last_crawled_at' => now(),
+        ]);
+        WebsitePage::create([
+            'crawl_site_id' => $cs, 'url' => 'https://example.com/canon-away',
+            'url_hash' => WebsitePage::hashUrl('https://example.com/canon-away'),
+            'http_status' => 200, 'is_indexable' => false, 'source_sitemap' => true,
+            'canonical_url' => 'https://example.com/elsewhere', 'last_crawled_at' => now(),
+            'seo_signals' => ['canonical_points_away' => true],
+        ]);
+        // Same canonical-points-away shape, but NOT sitemap-listed and no inbound
+        // links — the common intentional ?param-dedup case. Must stay quiet.
+        WebsitePage::create([
+            'crawl_site_id' => $cs, 'url' => 'https://example.com/gen?name=max',
+            'url_hash' => WebsitePage::hashUrl('https://example.com/gen?name=max'),
+            'http_status' => 200, 'is_indexable' => false, 'last_crawled_at' => now(),
+            'canonical_url' => 'https://example.com/gen', 'seo_signals' => ['canonical_points_away' => true],
+        ]);
+
+        app(SiteIssueDetector::class)->detect($website->crawlSite, $run);
+
+        $this->assertDatabaseHas('crawl_findings', [
+            'crawl_site_id' => $cs, 'type' => 'noindex_important', 'severity' => 'medium',
+            'affected_url_hash' => CrawlFinding::hashUrl('https://example.com/noindexed'),
+        ]);
+        $this->assertDatabaseHas('crawl_findings', [
+            'crawl_site_id' => $cs, 'type' => 'canonical_mismatch', 'severity' => 'medium',
+            'affected_url_hash' => CrawlFinding::hashUrl('https://example.com/canon-away'),
+        ]);
+        $this->assertDatabaseMissing('crawl_findings', [
+            'crawl_site_id' => $cs, 'type' => 'canonical_mismatch',
+            'affected_url_hash' => CrawlFinding::hashUrl('https://example.com/gen?name=max'),
+        ]);
+    }
 }

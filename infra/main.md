@@ -101,7 +101,10 @@ below a 5-site cohort.
 ### Reports, action queue & anomaly ✅
 [reports/](./reports/README.md) → insights · action-queue · growth-reports
 — `ActionQueueService` merges crawl findings + GSC reports + rank drops + audits into one
-ranked queue. (`GenerateAiInsights` is still a stub.)
+ranked queue. (`GenerateAiInsights` is still a stub.) Branded PDF exports (Growth Report +
+the crawler's Site Audit) both go through `ReportBranding`/`ReportBrandingResolver`
+(plan-gated `report_whitelabel`) + dompdf — see "Site Audit PDF export" in
+[crawler/known-issues.md](./crawler/known-issues.md).
 
 ### AI suite ✅
 [ai/](./ai/README.md) → tools · writer · llm
@@ -239,6 +242,68 @@ known gaps were flagged during the sweep:
 
 ## Knowledge changelog
 
+- **2026-06-23 (keyword finder — admin live-queue panel + monthly shared ideas cache)** —
+  User: see which keyword's queued and by which user across the self-hosted keyword API
+  fleet; and cache keyword-ideas results for the current calendar month (not rolling days)
+  so a repeat search — by anyone — is instant. Added a "Live queue" panel to
+  `/admin/keyword-servers` (every queued/running `KeywordApiRequest`, all servers, with
+  user + keyword/URL — `user()`/`website()` relations were missing on the model entirely).
+  Added `KeywordIdeasMonthlyCache` (`Y-m`-keyed, expires `endOfMonth()`) wired into
+  `KeywordIdeaFinder::run()`/`poll()`; `KeywordFinderPool::dispatchIdeas()` split to expose
+  `buildIdeasPayload()` so the cache key matches the real dispatch payload exactly. Scoped
+  to the ideas/discovery flow only — the Volume Finder's per-keyword metrics already has
+  its own separate rolling cache (`KeywordMetricsService`), untouched here.
+  Details: [keywords/keyword-finder.md](./keywords/keyword-finder.md).
+- **2026-06-23 (crawler — post-crawl aggregates cached, fixing slow audit-results load)** —
+  User: crawl audit results loaded too slow, cache until the next audit. `actionGroups()`
+  (full `chunk(2000)` scan for per-user impact), `typeBreakdown()`, `categoryFindings()`,
+  `auditExport()` now go through a new `CrawlReportService::remember()` — `Cache::remember()`
+  keyed by the existing `ReportCache::version($websiteId)`, which `AnalyzeSiteJob` already
+  bumps at the end of every run. `summary()` deliberately excluded — it carries the *live*
+  run status the crawl-progress banner polls; caching it would freeze that banner mid-crawl.
+  Details: [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-23 (crawler — exportable Site Audit PDF, reusing the existing whitelabel system)**
+  — User: build a production-ready exportable audit report (Semrush's "Site Audit: Issues"
+  PDF as the reference) and surface a whitelabel option if the plan system already has one.
+  Found it already does — `ReportBranding`/`ReportBrandingResolver`/`report_whitelabel` plan
+  flag, previously only used for the Growth Report email PDF (`ReportPdfRenderer` +
+  `growth-report-pdf.blade.php`). Built the parallel crawl-audit path: `CrawlReportService
+  ::auditExport()` (sitewide rollup across all categories, bucketed Errors/Warnings/Notices
+  by severity tier, plus `auditAbout()` — "About this issue" copy for all ~37 types, paired
+  with the existing `fixGuidance()`) → `CrawlAuditPdfRenderer` (dompdf, mirrors
+  `ReportPdfRenderer`) → `pdf/site-audit.blade.php`. Went beyond Semrush's static export
+  (which shows bare counts, no URLs) with: real sample affected URLs per issue (capped 10),
+  a health-score-with-letter-grade summary, a "new this week" badge per type
+  (`first_seen_at`-based), and a "Start here" top-5 priority shortlist ranked by
+  severity×volume so a non-technical reader isn't left to figure out where to begin.
+  GSC-sourced types (`isGscSourced()`) get the same amber caveat treatment as the dashboard.
+  New route `GET /site-audit/download` (`SiteAuditExportController`, `feature:link_structure`
+  + `throttle:10,1`, immediate download not queued) with an Export PDF button on the
+  dashboard's Priority Action Queue widget; `whitelabel=0` lets a whitelabel-eligible user
+  pull the plain EBQ copy on demand. Details: [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-23 (crawler — "Fix" buttons rebuilt into a real Page Health feature)** — User
+  flagged: every finding's Fix button landed on the same generic link-structure page with
+  no relevant info, regardless of issue type. Added `CrawlReportService::pageFindings()` +
+  `fixGuidance()` (concrete per-type "what to do" text for all ~35 types) and rebuilt
+  `LinkStructurePanel`'s destination into a "Page Health" section showing every open
+  finding for that URL with guidance + type-specific detail (duplicate siblings, hreflang
+  table, mixed-content list, etc.), highlighting whichever one sent the user there via a
+  new `?issue=` param. `broken_external`/`external_redirect` Fix links now route into our
+  app instead of opening the live site in a new tab. Hit the `WebsitePage::id` ULID-as-int
+  landmine again mid-build (see [[ulid-formatting-landmines]]) — fixed before shipping.
+  Details: [crawler/known-issues.md](./crawler/known-issues.md).
+- **2026-06-23 (crawler — crawler findings must stand on crawl data alone, not GSC)** —
+  User: the crawler must be GSC-independent for its own findings; GSC can only inform
+  severity, and GSC-sourced findings need their own clearly-caveated section since Search
+  Console history can be stale. Found `noindex_important`/`canonical_mismatch` were gated
+  on GSC clicks for EXISTENCE (not just severity) — re-did both with the crawl-only
+  "structurally real" proxy (sitemap/inbound-links/homepage) already used for
+  `robots_blocked_important`. `indexed_not_in_sitemap` has no crawl-only equivalent
+  ("Google has this indexed" is inherently GSC-only) — left as-is but newly tagged via
+  `CrawlReportService::isGscSourced()`, surfaced as a separate amber-highlighted section in
+  both the grouped issue-type view and the Page Health panel. Generalizes
+  [[crawl-only-over-gsc-gating]] from "new checks" to "audit existing ones too."
+  Details: [crawler/known-issues.md](./crawler/known-issues.md).
 - **2026-06-23 (crawler — no hreflang detection at all; added two checks)** — Second
   Semrush export, this time namesforfreefire.com: 4 i18n pages flagged
   `No self-referencing hreflang` + `Conflicting hreflang and rel=canonical`. Same

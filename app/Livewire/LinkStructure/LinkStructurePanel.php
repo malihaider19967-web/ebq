@@ -22,6 +22,11 @@ class LinkStructurePanel extends Component
     #[Url(as: 'url')]
     public string $pageUrl = '';
 
+    /** Bound to ?issue= — which finding type sent the user here, so the Page
+     *  Health panel can highlight it instead of showing an undifferentiated list. */
+    #[Url(as: 'issue')]
+    public string $issueType = '';
+
     public ?string $notFound = null;
 
     public function mount(): void
@@ -56,12 +61,21 @@ class LinkStructurePanel extends Component
     {
         $website = $this->currentWebsite();
         $structure = null;
+        $issues = [];
 
         if ($website && $this->pageUrl !== '') {
             $structure = $report->pageLinkStructure($website->id, $this->pageUrl);
             $this->notFound = $structure === null
                 ? "That URL hasn't been crawled for this website yet."
                 : null;
+            if ($structure !== null) {
+                $issues = $report->pageFindings($website->id, $this->pageUrl, $structure['page']['id']);
+                if ($this->issueType !== '') {
+                    // Surface the finding that sent the user here first, instead of
+                    // making them hunt for it in a severity-sorted list.
+                    usort($issues, fn (array $a, array $b): int => ($b['type'] === $this->issueType) <=> ($a['type'] === $this->issueType));
+                }
+            }
         }
 
         // A few suggested pages to make the input discoverable.
@@ -72,6 +86,8 @@ class LinkStructurePanel extends Component
             : [];
 
         return view('livewire.link-structure.link-structure-panel', [
+            'issues' => $issues,
+            'highlightType' => $this->issueType,
             'structure' => $structure,
             'examples' => $examples,
         ]);

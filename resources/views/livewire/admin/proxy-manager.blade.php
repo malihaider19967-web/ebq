@@ -66,7 +66,7 @@
             // account/credential (rotating-IP gateway with a per-account concurrent-
             // connection cap). Concurrency>1 here exceeds that cap, the extra connections
             // get 403'd by the provider, and deleteOnFail wipes proxies that are actually
-            // fine — confirmed 2026-06-23 (single "Test" passed, "Retest all" deleted all).
+            // fine — confirmed 2026-06-23 (single 'Test' passed, 'Retest all' deleted all).
             concurrency: 1,
             async retestAll(ids) {
                 if (this.running || ! ids.length) return;

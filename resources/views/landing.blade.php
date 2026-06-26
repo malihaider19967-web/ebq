@@ -24,7 +24,6 @@
         <div aria-hidden="true" class="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[28rem] bg-[radial-gradient(ellipse_at_top,rgba(99,102,241,0.08),transparent_60%)]"></div>
 
         <div class="mx-auto max-w-4xl px-6 pb-20 pt-16 text-center lg:px-8 lg:pb-28 lg:pt-24">
-            {{-- ── Hero copy ─────────────────────────────────── --}}
             <a href="{{ route('features') }}" class="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 transition hover:border-slate-300 hover:text-slate-900">
                 <span class="h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
                 New: Anomaly alerts and backlink impact
@@ -62,13 +61,11 @@
 
             {{-- ── Hero: free instant audit (full-width search bar) ── --}}
             <div class="relative mx-auto mt-10 max-w-3xl">
-                {{-- Soft indigo glow behind the bar --}}
                 <div aria-hidden="true" class="pointer-events-none absolute -inset-x-8 -inset-y-10 -z-10 bg-[radial-gradient(55%_60%_at_50%_0%,rgba(99,102,241,0.20),transparent_70%)] blur-2xl"></div>
 
                 <form id="guest-audit-form" class="text-left" data-action="{{ route('guest-audit.store') }}" novalidate>
-                    {{-- One inline bar on desktop; stacks on mobile. --}}
                     <div class="flex flex-col rounded-[20px] bg-white p-2 shadow-[0_30px_70px_-28px_rgba(15,23,42,0.30)] ring-1 ring-slate-200/80 transition focus-within:ring-2 focus-within:ring-indigo-500/70 sm:flex-row sm:items-center sm:divide-x sm:divide-slate-200/70 divide-y divide-slate-100 sm:divide-y-0">
-                        {{-- URL (dominant) --}}
+                        {{-- URL --}}
                         <div class="flex min-w-0 flex-1 items-center gap-3 px-3 py-2.5">
                             <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-100">
                                 <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9.004 9.004 0 0 0 8.716-6.747M12 21a9.004 9.004 0 0 1-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 0 1 7.843 4.582M12 3a8.997 8.997 0 0 0-7.843 4.582m15.686 0A11.953 11.953 0 0 1 12 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0 1 21 12a8.964 8.964 0 0 1-1.318 4.682M12 21a8.997 8.997 0 0 1-7.843-4.582" /></svg>
@@ -94,7 +91,7 @@
                             </div>
                         </div>
 
-                        {{-- Country (SERP gl) --}}
+                        {{-- Country --}}
                         <div class="flex items-center gap-3 px-3 py-2.5 sm:w-44">
                             <span class="flex h-10 w-10 flex-none items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-inset ring-slate-200">
                                 <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
@@ -123,8 +120,6 @@
                     </div>
 
                     @if (\App\Support\Recaptcha::isEnabled())
-                        {{-- Captcha lives here for the 1st audit; the JS relocates it into the
-                             email modal for the 2nd audit so it's never hidden behind the popup. --}}
                         <div id="ga-captcha-hero-slot" class="mt-4 flex justify-center">
                             <div class="g-recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}"></div>
                         </div>
@@ -143,13 +138,12 @@
                     </p>
                 </form>
 
-                {{-- Confirmation shown after the email-gated (2nd) audit — report goes by email. --}}
                 <div id="ga-success" class="hidden rounded-2xl border border-emerald-200 bg-white p-8 text-center shadow-[0_30px_70px_-28px_rgba(15,23,42,0.30)]">
                     <span class="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
                         <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.75" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
                     </span>
                     <h3 class="mt-5 text-lg font-semibold text-slate-900">Check your inbox</h3>
-                    <p id="ga-success-msg" class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">We’ve emailed your audit. It lands in a minute.</p>
+                    <p id="ga-success-msg" class="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-600">We've emailed your audit. It lands in a minute.</p>
                     <a href="{{ route('register') }}" class="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
                         Create a free account for unlimited audits →
                     </a>
@@ -158,7 +152,7 @@
         </div>
     </section>
 
-    {{-- ── Name + email modal — shown on the 2nd audit (require:email) ── --}}
+    {{-- ── Email modal (2nd audit) ─────────────────────────────── --}}
     <div id="ga-email-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
         <div id="ga-email-backdrop" class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
         <div role="dialog" aria-modal="true" aria-labelledby="ga-email-title" class="relative w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5">
@@ -166,26 +160,23 @@
                 <span class="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 ring-1 ring-inset ring-indigo-100">
                     <svg class="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
                 </span>
-                <h2 id="ga-email-title" class="mt-4 text-xl font-semibold tracking-tight text-slate-900">We’ll email you this audit</h2>
-                <p id="ga-email-modal-msg" class="mt-2 text-sm leading-6 text-slate-600">This one’s on us — tell us where to send your report and we’ll deliver it to your inbox in about a minute.</p>
+                <h2 id="ga-email-title" class="mt-4 text-xl font-semibold tracking-tight text-slate-900">We'll email you this audit</h2>
+                <p id="ga-email-modal-msg" class="mt-2 text-sm leading-6 text-slate-600">This one's on us — tell us where to send your report and we'll deliver it to your inbox in about a minute.</p>
             </div>
             <form id="ga-email-form" class="px-7 pb-7 pt-5" novalidate>
                 <div class="space-y-3">
                     <div>
                         <label for="ga-name" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Your name</label>
-                        <input id="ga-name" name="name" type="text" autocomplete="name" maxlength="120" required
-                            placeholder="Jane Doe"
+                        <input id="ga-name" name="name" type="text" autocomplete="name" maxlength="120" required placeholder="Jane Doe"
                             class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
                     </div>
                     <div>
                         <label for="ga-email" class="mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500">Email address</label>
-                        <input id="ga-email" name="email" type="email" autocomplete="email" inputmode="email" required
-                            placeholder="you@company.com"
+                        <input id="ga-email" name="email" type="email" autocomplete="email" inputmode="email" required placeholder="you@company.com"
                             class="block w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 transition focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500">
                     </div>
                 </div>
                 @if (\App\Support\Recaptcha::isEnabled())
-                    {{-- The hero captcha widget is moved in here while the modal is open. --}}
                     <div id="ga-captcha-modal-slot" class="mt-4 flex justify-center"></div>
                 @endif
                 <p id="ga-email-error" role="alert" class="mt-3 hidden text-[13px] font-medium text-rose-600"></p>
@@ -199,12 +190,12 @@
                         Cancel
                     </button>
                 </div>
-                <p class="mt-3 text-center text-xs text-slate-400">We’ll only use it to send your report and occasional product tips.</p>
+                <p class="mt-3 text-center text-xs text-slate-400">We'll only use it to send your report and occasional product tips.</p>
             </form>
         </div>
     </div>
 
-    {{-- ── Signup gate modal — shown on the 3rd audit (require:signup) ── --}}
+    {{-- ── Signup gate modal (3rd audit) ──────────────────────── --}}
     <div id="ga-signup-modal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
         <div id="ga-signup-backdrop" class="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
         <div role="dialog" aria-modal="true" aria-labelledby="ga-signup-title" class="relative w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl ring-1 ring-slate-900/5">
@@ -213,7 +204,7 @@
                 <h2 id="ga-signup-title" class="mt-2 text-2xl font-semibold tracking-tight">Create your free account</h2>
             </div>
             <div class="px-7 py-6">
-                <p id="ga-signup-msg" class="text-sm leading-6 text-slate-600">You’ve used your free audits. Create a free account to keep going — no credit card required.</p>
+                <p id="ga-signup-msg" class="text-sm leading-6 text-slate-600">You've used your free audits. Create a free account to keep going — no credit card required.</p>
                 <ul class="mt-5 space-y-2.5 text-sm text-slate-700">
                     @foreach ([
                         'Unlimited page audits — on-page, keyword & competitor benchmarks',
@@ -240,497 +231,256 @@
         </div>
     </div>
 
-    {{-- ── Logo strip ───────────────────────────────────────── --}}
-    <section class="border-y border-slate-200 bg-slate-50/60 py-10">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <p class="text-center text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Connects with the tools you already trust</p>
-            <div class="mt-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-4 text-sm font-medium text-slate-400">
-                <span>Google Search Console</span>
-                <span class="hidden h-1 w-1 rounded-full bg-slate-300 sm:block"></span>
-                <span>Google Analytics 4</span>
-                <span class="hidden h-1 w-1 rounded-full bg-slate-300 sm:block"></span>
-                <span>Google Indexing API</span>
-                <span class="hidden h-1 w-1 rounded-full bg-slate-300 sm:block"></span>
-                <span>WordPress</span>
-                <span class="hidden h-1 w-1 rounded-full bg-slate-300 sm:block"></span>
-                <span>SERP data</span>
-                <span class="hidden h-1 w-1 rounded-full bg-slate-300 sm:block"></span>
-                <span>Core Web Vitals</span>
+    {{-- ── Features Section ────────────────────────────────────── --}}
+    <section class="bg-surface-container-low py-xxl px-gutter" style="background:#f2f4f7;padding:48px 24px">
+        <div class="mx-auto max-w-6xl">
+            <div class="text-center mb-8">
+                <h2 class="text-3xl font-bold text-slate-900 mb-2">Everything you need to rank.</h2>
+                <div class="h-1 w-20 bg-indigo-600 mx-auto rounded"></div>
             </div>
-        </div>
-    </section>
-
-    {{-- ── Three benefits ───────────────────────────────────── --}}
-    <section class="bg-white py-20 sm:py-24">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="mx-auto max-w-2xl text-center">
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Built for SEO operators</p>
-                <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">A workflow, not another dashboard.</h2>
-                <p class="mt-4 text-base leading-7 text-slate-600">EBQ replaces tab-switching with a single decision surface. Every signal points to an action, every action measures itself.</p>
-            </div>
-
-            {{-- ── Intro video ──────────────────────────────────── --}}
-            <div class="relative mx-auto mt-12 max-w-4xl">
-                <div aria-hidden="true" class="pointer-events-none absolute -inset-x-6 -inset-y-6 -z-10 rounded-[28px] bg-gradient-to-b from-slate-100 to-transparent"></div>
-                <div class="relative overflow-hidden rounded-2xl border border-slate-200 bg-slate-900 shadow-[0_24px_60px_-24px_rgba(15,23,42,0.18)]" style="padding-top:56.25%">
-                    <iframe
-                        class="absolute inset-0 h-full w-full"
-                        src="https://www.youtube-nocookie.com/embed/Rzme7QvSbLE"
-                        title="EBQ intro video"
-                        loading="lazy"
-                        frameborder="0"
-                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                        referrerpolicy="strict-origin-when-cross-origin"
-                        allowfullscreen></iframe>
-                </div>
-            </div>
-
-            <div class="mx-auto mt-14 grid max-w-5xl gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 sm:grid-cols-3">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 @foreach ([
-                    ['icon' => 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z', 'title' => 'Spot what changed', 'desc' => 'Anomaly detection, content decay, and indexing regressions surface in seconds — not in your next monthly review.'],
-                    ['icon' => 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z', 'title' => 'Prioritize like a PM', 'desc' => 'Striking-distance and cannibalization queries are scored by impact and ranked. Your backlog stops guessing.'],
-                    ['icon' => 'M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12z', 'title' => 'Prove what shipped', 'desc' => 'Every fix is tracked against rank, click, and CWV deltas. Reports auto-attach the evidence stakeholders need.'],
-                ] as $b)
-                    <div class="flex flex-col bg-white p-7">
-                        <div class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
-                            <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $b['icon'] }}" /></svg>
+                    ['icon' => 'M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z', 'title' => 'Keyword Research', 'desc' => 'Discover high-intent queries with striking-distance and cannibalization scoring. Know exactly what to write next.'],
+                    ['icon' => 'M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z', 'title' => 'Technical Site Audit', 'desc' => 'Deep-crawl your site for CWV, indexing, schema, and on-page issues. Every finding comes with a ranked fix.'],
+                    ['icon' => 'M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z', 'title' => 'Rank Tracking', 'desc' => 'Daily rankings overlaid with GSC clicks per query. See when a position gain stops producing traffic — and why.'],
+                    ['icon' => 'M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244', 'title' => 'Backlink Analysis', 'desc' => 'Track which links actually moved GSC clicks. Prove outreach ROI with 28-day delta reports per target page.'],
+                    ['icon' => 'M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10', 'title' => 'Content Scoring', 'desc' => 'AI-powered analysis for your articles. Understand how your content competes and what to improve for better rankings.'],
+                    ['icon' => 'M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z', 'title' => 'GA4 + GSC Integration', 'desc' => 'Connect Search Console and Analytics for a unified view of traffic, rankings, and on-page performance per URL.'],
+                ] as $f)
+                    <div class="bg-white p-6 border border-slate-200 rounded-xl hover:shadow-md transition-shadow">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 mb-4">
+                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $f['icon'] }}" /></svg>
                         </div>
-                        <h3 class="mt-5 text-base font-semibold text-slate-900">{{ $b['title'] }}</h3>
-                        <p class="mt-2 text-sm leading-6 text-slate-600">{{ $b['desc'] }}</p>
+                        <h3 class="text-base font-semibold text-slate-900 mb-2">{{ $f['title'] }}</h3>
+                        <p class="text-sm leading-6 text-slate-600">{{ $f['desc'] }}</p>
                     </div>
                 @endforeach
             </div>
         </div>
     </section>
 
-    {{-- ── Feature row 1: Cross-signal insights ─────────────── --}}
-    <section class="bg-slate-50/60 py-20 sm:py-24">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Cross-signal insights</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">
-                        Every signal becomes a task.
-                    </h2>
-                    <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        Six insight boards — cannibalization, striking distance, content decay, indexing fails, audit vs traffic, and backlink impact — produce ranked action lists, not orphan numbers.
-                    </p>
-                    <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Joins GSC × GA4 × audits × backlinks per page</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Per-country, per-device segmentation built in</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Updated daily with anomaly callouts</li>
-                    </ul>
-                </div>
-
-                {{-- Mockup: insight cards grid --}}
-                <div class="relative">
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="grid grid-cols-2 gap-3">
-                            @foreach ([
-                                ['label' => 'Cannibalizations', 'value' => '14', 'caption' => '7 high impact', 'tone' => 'amber'],
-                                ['label' => 'Striking distance', 'value' => '27', 'caption' => '12 ready to push', 'tone' => 'indigo'],
-                                ['label' => 'Content decay', 'value' => '8', 'caption' => '-32% clicks 28d', 'tone' => 'slate'],
-                                ['label' => 'Indexing fails', 'value' => '3', 'caption' => '120 lost impr', 'tone' => 'rose'],
-                            ] as $c)
-                                <div class="rounded-xl border border-slate-200 bg-white p-4">
-                                    <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">{{ $c['label'] }}</p>
-                                    <p @class([
-                                        'mt-1.5 text-2xl font-semibold tabular-nums',
-                                        'text-amber-600' => $c['tone'] === 'amber',
-                                        'text-indigo-600' => $c['tone'] === 'indigo',
-                                        'text-slate-900' => $c['tone'] === 'slate',
-                                        'text-rose-600' => $c['tone'] === 'rose',
-                                    ])>{{ $c['value'] }}</p>
-                                    <p class="mt-1 text-[11px] text-slate-500">{{ $c['caption'] }}</p>
-                                </div>
-                            @endforeach
-                        </div>
-
-                        <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Top striking-distance queries</p>
-                            <ul class="mt-3 space-y-1.5 text-[12px]">
-                                @foreach ([['best seo tools', '5.2', '12.8k', '1.2%'], ['on-page seo checklist', '7.1', '8.1k', '0.9%'], ['saas seo strategy', '11.4', '5.9k', '0.4%']] as [$q, $pos, $impr, $ctr])
-                                    <li class="flex items-center justify-between rounded-md bg-white px-2.5 py-1.5 ring-1 ring-slate-200">
-                                        <span class="truncate font-medium text-slate-800">{{ $q }}</span>
-                                        <span class="flex shrink-0 items-center gap-3 tabular-nums text-slate-500">
-                                            <span>#{{ $pos }}</span>
-                                            <span>{{ $impr }}</span>
-                                            <span>{{ $ctr }}</span>
-                                        </span>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+    {{-- ── CTA Banner 1 ────────────────────────────────────────── --}}
+    <section class="bg-indigo-600 py-12 px-6 text-center">
+        <h2 class="text-2xl font-semibold text-white mb-4">Same features. A fraction of the price.</h2>
+        <a href="{{ route('register') }}" class="inline-flex items-center justify-center bg-white text-indigo-700 px-8 py-3 rounded-xl font-semibold text-sm hover:shadow-xl transition-all">Start Your 14-Day Free Trial</a>
     </section>
 
-    {{-- ── Feature row 2: Rank tracking ─────────────────────── --}}
-    <section class="bg-white py-20 sm:py-24">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
-                {{-- Mockup: keyword table with sparkline --}}
-                <div class="order-last lg:order-first">
-                    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                        <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-                            <div>
-                                <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Tracked keywords</p>
-                                <p class="mt-0.5 text-sm font-semibold text-slate-900">United States · Mobile</p>
-                            </div>
-                            <span class="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-700">128 active</span>
-                        </div>
-                        <table class="min-w-full text-[12px]">
-                            <thead class="bg-slate-50/60 text-[10px] uppercase tracking-wider text-slate-500">
-                                <tr>
-                                    <th class="px-4 py-2 text-left font-semibold">Keyword</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Pos</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Δ</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Trend</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                @foreach ([
-                                    ['best seo tools', '2', '+3', 'M0 12 L8 10 L16 11 L24 8 L32 6 L40 4 L48 3', 'emerald'],
-                                    ['saas content marketing', '8', '+1', 'M0 8 L8 9 L16 7 L24 7 L32 6 L40 5 L48 4', 'emerald'],
-                                    ['seo audit checklist', '14', '-2', 'M0 4 L8 5 L16 7 L24 6 L32 8 L40 9 L48 11', 'rose'],
-                                    ['keyword research guide', '6', '0', 'M0 6 L8 6 L16 5 L24 6 L32 7 L40 6 L48 6', 'slate'],
-                                    ['featured snippet tips', '4', '+5', 'M0 11 L8 10 L16 9 L24 7 L32 6 L40 5 L48 3', 'emerald'],
-                                ] as [$kw, $pos, $delta, $path, $tone])
-                                    <tr class="hover:bg-slate-50/60">
-                                        <td class="px-4 py-2.5 font-medium text-slate-800">{{ $kw }}</td>
-                                        <td class="px-3 py-2.5 text-right tabular-nums text-slate-700">#{{ $pos }}</td>
-                                        <td @class([
-                                            'px-3 py-2.5 text-right tabular-nums font-semibold',
-                                            'text-emerald-600' => $tone === 'emerald',
-                                            'text-rose-600' => $tone === 'rose',
-                                            'text-slate-500' => $tone === 'slate',
-                                        ])>{{ $delta }}</td>
-                                        <td class="px-3 py-2.5">
-                                            <svg viewBox="0 0 48 14" class="ml-auto h-4 w-16" aria-hidden="true">
-                                                <path d="{{ $path }}" fill="none" stroke="{{ $tone === 'emerald' ? '#059669' : ($tone === 'rose' ? '#e11d48' : '#94a3b8') }}" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-                                            </svg>
-                                        </td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Rank tracking</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">
-                        Rankings — and the clicks they actually earn.
-                    </h2>
-                    <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        Most trackers show position. EBQ overlays GSC clicks for the exact query, so you instantly see when a rank gain stops producing traffic — and when SERP features are stealing it.
-                    </p>
-                    <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Country, device, language, and city targeting</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Competitor positions captured every check</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>SERP-feature risk flags + PAA capture</li>
-                    </ul>
-                </div>
+    {{-- ── Why EBQ ─────────────────────────────────────────────── --}}
+    <section class="bg-white py-20 sm:py-24 px-6">
+        <div class="mx-auto max-w-6xl">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-bold text-slate-900 mb-4">Built for the way modern SEO actually works.</h2>
+                <p class="text-base leading-7 text-slate-600 max-w-2xl mx-auto">Most tools show you data. EBQ turns every signal into a ranked action — so you always know what to work on next.</p>
             </div>
-        </div>
-    </section>
-
-    {{-- ── Feature row 3: Page audits ───────────────────────── --}}
-    <section class="bg-slate-50/60 py-20 sm:py-24">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Page audits</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">
-                        CWV, on-page, and content — in one pass.
-                    </h2>
-                    <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        On-demand audits combine mobile + desktop Core Web Vitals with a deep HTML analyzer and keyword-strategy review. Every finding becomes a prioritized recommendation.
-                    </p>
-                    <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Full CWV: LCP, CLS, INP, TBT, FCP, TTFB</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>SEO checks: meta, headings, schema, hreflang, alt</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>One-click resubmit via Google Indexing API</li>
-                    </ul>
-                </div>
-
-                {{-- Mockup: CWV stat grid + checklist --}}
-                <div>
-                    <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                        <div class="flex items-center justify-between">
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">/blog/saas-seo-guide</p>
-                            <span class="rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-100">Score 72</span>
-                        </div>
-
-                        <div class="mt-4 grid grid-cols-3 gap-2.5">
-                            @foreach ([
-                                ['LCP', '2.8s', 'amber'],
-                                ['CLS', '0.04', 'emerald'],
-                                ['INP', '180ms', 'emerald'],
-                                ['TBT', '410ms', 'amber'],
-                                ['FCP', '1.6s', 'emerald'],
-                                ['TTFB', '720ms', 'amber'],
-                            ] as [$lbl, $val, $tone])
-                                <div class="rounded-lg border border-slate-200 bg-white p-3">
-                                    <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ $lbl }}</p>
-                                    <p @class([
-                                        'mt-1 text-base font-semibold tabular-nums',
-                                        'text-emerald-600' => $tone === 'emerald',
-                                        'text-amber-600' => $tone === 'amber',
-                                        'text-rose-600' => $tone === 'rose',
-                                    ])>{{ $val }}</p>
-                                </div>
-                            @endforeach
-                        </div>
-
-                        <div class="mt-4 rounded-xl border border-slate-200 bg-slate-50/60 p-4">
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Top recommendations</p>
-                            <ul class="mt-3 space-y-2 text-[12px]">
-                                @foreach ([
-                                    ['rose', 'Render-blocking CSS — split into critical + async (180KB)'],
-                                    ['amber', 'Image alt missing on 7 hero/inline images'],
-                                    ['amber', 'Canonical tag missing — set to self'],
-                                    ['slate', 'Internal links: 3 orphaned, add 2 from /pricing'],
-                                ] as [$tone, $text])
-                                    <li class="flex items-start gap-2.5">
-                                        <span @class([
-                                            'mt-1 h-1.5 w-1.5 flex-none rounded-full',
-                                            'bg-rose-500' => $tone === 'rose',
-                                            'bg-amber-500' => $tone === 'amber',
-                                            'bg-slate-400' => $tone === 'slate',
-                                        ])></span>
-                                        <span class="text-slate-700">{{ $text }}</span>
-                                    </li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    {{-- ── Feature row 4: Backlink impact ───────────────────── --}}
-    <section class="bg-white py-20 sm:py-24">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="grid items-center gap-14 lg:grid-cols-2 lg:gap-20">
-                {{-- Mockup: backlink impact table --}}
-                <div class="order-last lg:order-first">
-                    <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                        <div class="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-                            <div>
-                                <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Backlink impact · last 28d</p>
-                                <p class="mt-0.5 text-sm font-semibold text-slate-900">Sorted by Δ clicks</p>
-                            </div>
-                        </div>
-                        <table class="min-w-full text-[12px]">
-                            <thead class="bg-slate-50/60 text-[10px] uppercase tracking-wider text-slate-500">
-                                <tr>
-                                    <th class="px-4 py-2 text-left font-semibold">Target page</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Links</th>
-                                    <th class="px-3 py-2 text-right font-semibold">DA</th>
-                                    <th class="px-3 py-2 text-right font-semibold">Δ clicks</th>
-                                </tr>
-                            </thead>
-                            <tbody class="divide-y divide-slate-100">
-                                @foreach ([
-                                    ['/pricing', 3, 58, '+412', 'emerald'],
-                                    ['/blog/saas-seo', 7, 49, '+186', 'emerald'],
-                                    ['/features', 2, 61, '+94', 'emerald'],
-                                    ['/blog/keyword-research', 4, 42, '+38', 'emerald'],
-                                    ['/product/ai-writer', 4, 41, '-22', 'rose'],
-                                ] as [$p, $n, $da, $delta, $tone])
-                                    <tr class="hover:bg-slate-50/60">
-                                        <td class="px-4 py-2.5 font-medium text-slate-800">{{ $p }}</td>
-                                        <td class="px-3 py-2.5 text-right tabular-nums text-slate-600">{{ $n }}</td>
-                                        <td class="px-3 py-2.5 text-right tabular-nums text-slate-600">{{ $da }}</td>
-                                        <td @class([
-                                            'px-3 py-2.5 text-right tabular-nums font-semibold',
-                                            'text-emerald-600' => $tone === 'emerald',
-                                            'text-rose-600' => $tone === 'rose',
-                                        ])>{{ $delta }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-
-                <div>
-                    <p class="text-xs font-semibold uppercase tracking-[0.2em] text-indigo-600">Backlink impact</p>
-                    <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-[2.25rem]">
-                        Prove which links actually moved the needle.
-                    </h2>
-                    <p class="mt-4 text-[15px] leading-7 text-slate-600">
-                        Upload, verify, and measure. EBQ shows you the click delta on every target page in the 28 days after a link goes live — sorted by biggest lift, so outreach proves itself.
-                    </p>
-                    <ul class="mt-7 space-y-3 text-[14px] text-slate-700">
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Live verification of presence, anchor, rel</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Bulk import or manual entry, deduped</li>
-                        <li class="flex gap-2.5"><span class="mt-1.5 h-1 w-1 flex-none rounded-full bg-slate-400"></span>Filters by DA, spam, dofollow, anchor, date</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
-    </section>
-
-    {{-- ── Workflow strip ───────────────────────────────────── --}}
-    <section class="bg-slate-50/60 py-20 sm:py-24">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="mx-auto max-w-2xl text-center">
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Workflow</p>
-                <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">A weekly rhythm your team can keep.</h2>
-            </div>
-
-            <ol class="mt-14 grid gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-200 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
                 @foreach ([
-                    ['01', 'Discover', 'Anomalies, content decay, indexing fails surface daily.'],
-                    ['02', 'Prioritize', 'Striking-distance and cannibalization scored by impact.'],
-                    ['03', 'Execute', 'Ship fixes from audits, briefs, or the WordPress sidebar.'],
-                    ['04', 'Measure', 'Reports auto-attach rank, click, and CWV deltas.'],
-                ] as [$n, $title, $desc])
-                    <li class="relative bg-white p-7">
-                        <p class="text-[11px] font-mono font-semibold tracking-wider text-slate-400">{{ $n }}</p>
-                        <h3 class="mt-3 text-base font-semibold text-slate-900">{{ $title }}</h3>
-                        <p class="mt-2 text-[13px] leading-6 text-slate-600">{{ $desc }}</p>
-                    </li>
+                    ['icon' => 'M7.5 14.25v2.25m3-4.5v4.5m3-6.75v6.75m3-9v9M6 20.25h12A2.25 2.25 0 0020.25 18V6A2.25 2.25 0 0018 3.75H6A2.25 2.25 0 003.75 6v12A2.25 2.25 0 006 20.25z', 'title' => 'Cross-signal intelligence', 'desc' => 'Joins GSC × GA4 × audits × backlinks per page. Six insight boards — cannibalization, striking distance, decay, indexing fails, audit vs traffic, backlink impact — all ranked by revenue potential.'],
+                    ['icon' => 'M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z', 'title' => 'Impact-scored actions', 'desc' => 'Every issue gets a priority score. Anomaly detection, content decay, and indexing regressions surface in seconds — not in your next monthly review. Your backlog stops guessing.'],
+                    ['icon' => 'M9 12.75 11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z', 'title' => 'Proof after every change', 'desc' => 'Every fix is tracked against rank, click, and CWV deltas. Reports auto-attach the evidence your stakeholders need — without you building a deck.'],
+                ] as $w)
+                    <div class="p-6 border border-slate-200 rounded-xl bg-slate-50/60">
+                        <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600 text-white mb-4">
+                            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $w['icon'] }}" /></svg>
+                        </div>
+                        <h3 class="text-base font-semibold text-slate-900 mb-2">{{ $w['title'] }}</h3>
+                        <p class="text-sm leading-6 text-slate-600">{{ $w['desc'] }}</p>
+                    </div>
                 @endforeach
-            </ol>
+            </div>
         </div>
     </section>
 
-    {{-- ── Reporting + WordPress pair ───────────────────────── --}}
-    <section id="wordpress" class="bg-white py-20 sm:py-24">
-        <div class="mx-auto max-w-6xl px-6 lg:px-8">
-            <div class="mx-auto max-w-2xl text-center">
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Reporting + WordPress</p>
-                <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Insights where stakeholders read them.</h2>
-                <p class="mt-4 text-base leading-7 text-slate-600">Auto-sent executive reports for leadership. Editor-side context for content teams. No tab switching.</p>
+    {{-- ── Comparison Table ────────────────────────────────────── --}}
+    <section class="overflow-x-auto bg-slate-50/60 py-20 sm:py-24 px-6">
+        <div class="mx-auto max-w-6xl">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-bold text-slate-900 mb-3">More features. Lower price.</h2>
+                <p class="text-base text-slate-600">Every plan includes bilingual audit support — full, not limited.</p>
             </div>
-
-            <div class="mt-14 grid gap-6 lg:grid-cols-2">
-                {{-- Report email mockup --}}
-                <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                    <div class="flex items-center justify-between border-b border-slate-200 pb-4">
-                        <div>
-                            <p class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Weekly Growth Report</p>
-                            <p class="mt-1 text-sm font-semibold text-slate-900">example.com · Apr 13–19</p>
-                        </div>
-                        <span class="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-100">+12% w/w</span>
-                    </div>
-
-                    <div class="mt-5 grid grid-cols-3 gap-2.5">
-                        @foreach ([['Users', '8.4k', '+12%'], ['Clicks', '3.1k', '+8%'], ['Avg pos', '14.2', '-0.6']] as [$l, $v, $d])
-                            <div class="rounded-lg border border-slate-200 bg-slate-50/60 p-3 text-center">
-                                <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">{{ $l }}</p>
-                                <p class="mt-1 text-base font-semibold tabular-nums text-slate-900">{{ $v }}</p>
-                                <p class="text-[10px] font-semibold text-emerald-600">{{ $d }}</p>
-                            </div>
+            <div class="overflow-hidden rounded-2xl border border-slate-200 shadow-sm">
+                <table class="min-w-full border-collapse bg-white text-sm">
+                    <thead>
+                        <tr class="border-b border-slate-200">
+                            <th class="py-3.5 pl-6 pr-4 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500">Feature</th>
+                            <th class="px-4 py-3.5 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">SEMrush</th>
+                            <th class="px-4 py-3.5 text-center text-[11px] font-semibold uppercase tracking-wider text-slate-500">Ahrefs</th>
+                            <th class="bg-indigo-50 px-4 py-3.5 text-center text-[11px] font-semibold uppercase tracking-wider text-indigo-700">EBQ</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @php
+                            $checkSvg  = '<svg class="mx-auto h-4 w-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>';
+                            $crossSvg  = '<svg class="mx-auto h-4 w-4 text-slate-300" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>';
+                            $ebqCheck  = '<svg class="mx-auto h-4 w-4 text-indigo-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>';
+                            $rows = [
+                                ['Keyword Research',            'check', 'check', 'ebq'],
+                                ['Technical Site Audit',        'check', 'check', 'ebq'],
+                                ['Rank Tracking',               'check', 'check', 'ebq'],
+                                ['Backlink Analysis',           'check', 'check', 'ebq'],
+                                ['Cannibalization Detection',   'cross', 'cross', 'ebq'],
+                                ['Striking-Distance Finder',    'cross', 'cross', 'ebq'],
+                                ['Anomaly Alerts',              'cross', 'cross', 'ebq'],
+                                ['Backlink Impact Measurement', 'cross', 'cross', 'ebq'],
+                                ['Action Priority Queue',       'cross', 'cross', 'ebq'],
+                                ['AI Content Studio',           'check', 'cross', 'ebq'],
+                                ['Scheduled Reports',           'paid',  'cross', 'ebq'],
+                                ['White-label Reports',         'paid',  'cross', 'agency'],
+                                ['GA4 + GSC Integration',       'check', 'partial','ebq'],
+                                ['WordPress Plugin',            'check', 'check', 'ebq'],
+                            ];
+                        @endphp
+                        @foreach ($rows as [$feature, $sem, $ahr, $ebq])
+                            <tr class="hover:bg-slate-50/40 transition-colors">
+                                <td class="py-3 pl-6 pr-4 text-[13px] font-medium text-slate-800">{{ $feature }}</td>
+                                @foreach (['sem' => $sem, 'ahr' => $ahr] as $col => $val)
+                                    <td class="px-4 py-3 text-center">
+                                        @if ($val === 'check') {!! $checkSvg !!}
+                                        @elseif ($val === 'partial') <span class="text-[11px] font-medium text-slate-400">Partial</span>
+                                        @elseif ($val === 'paid') <span class="text-[11px] font-medium text-slate-400">Paid+</span>
+                                        @else {!! $crossSvg !!}
+                                        @endif
+                                    </td>
+                                @endforeach
+                                <td class="bg-indigo-50/60 px-4 py-3 text-center">
+                                    @if ($ebq === 'agency') <span class="text-[11px] font-medium text-indigo-600">Agency+</span>
+                                    @else {!! $ebqCheck !!}
+                                    @endif
+                                </td>
+                            </tr>
                         @endforeach
-                    </div>
-
-                    <div class="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4">
-                        <p class="text-[11px] font-semibold uppercase tracking-wider text-indigo-700">Action insights</p>
-                        <ul class="mt-2 space-y-1.5 text-[12px] text-slate-700">
-                            <li>• 5 striking-distance keywords — push title + meta this sprint</li>
-                            <li>• 3 pages cannibalizing on "saas seo guide"</li>
-                            <li>• 1 indexing fail still pulling 120 impressions/wk</li>
-                        </ul>
-                    </div>
-                </div>
-
-                {{-- WordPress sidebar mockup --}}
-                <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <div class="flex items-center gap-2 border-b border-slate-200 pb-3">
-                        <span class="h-2 w-2 rounded-full bg-rose-400"></span>
-                        <span class="h-2 w-2 rounded-full bg-amber-400"></span>
-                        <span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-                        <span class="ml-2 text-[11px] font-medium text-slate-500">Gutenberg · EBQ SEO</span>
-                    </div>
-
-                    <div class="mt-4 space-y-3 text-[12px]">
-                        <div class="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Search performance · 30d</p>
-                            <div class="mt-2 grid grid-cols-4 gap-1.5">
-                                @foreach ([['Clicks', '1,284'], ['Impr', '21.4k'], ['Pos', '6.4'], ['CTR', '6.0%']] as [$l, $v])
-                                    <div class="rounded bg-white px-2 py-1.5 text-center ring-1 ring-slate-200">
-                                        <span class="block text-[9px] font-medium uppercase text-slate-500">{{ $l }}</span>
-                                        <span class="block tabular-nums font-semibold text-slate-900">{{ $v }}</span>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-
-                        <div class="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">Rank tracking</p>
-                            <div class="mt-1.5 flex items-center gap-2">
-                                <span class="rounded-md bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-900 ring-1 ring-slate-200">#4</span>
-                                <span class="text-[10px] font-semibold text-emerald-700">▲ 2</span>
-                                <span class="text-[10px] text-slate-500">"best seo tools"</span>
-                            </div>
-                        </div>
-
-                        <div class="rounded-lg border border-amber-100 bg-amber-50/60 p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-wider text-amber-700">Cannibalization</p>
-                            <p class="mt-1 text-[11px] text-slate-700">"best seo tools" splits with <span class="font-medium">/blog/seo-tools-guide</span></p>
-                        </div>
-
-                        <div class="rounded-lg border border-indigo-100 bg-indigo-50/60 p-3">
-                            <p class="text-[10px] font-semibold uppercase tracking-wider text-indigo-700">Striking distance</p>
-                            <p class="mt-1 text-[11px] text-slate-700">3 queries at pos 5–20 with below-curve CTR</p>
-                        </div>
-                    </div>
-                </div>
+                        <tr class="border-t-2 border-slate-200 font-semibold">
+                            <td class="py-4 pl-6 pr-4 text-[14px] text-slate-900">Starting Price</td>
+                            <td class="px-4 py-4 text-center text-[13px] text-slate-400 line-through">$117/mo</td>
+                            <td class="px-4 py-4 text-center text-[13px] text-slate-400 line-through">$108/mo</td>
+                            <td class="bg-indigo-50/60 px-4 py-4 text-center text-base font-bold text-indigo-600">$14/mo</td>
+                        </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </section>
 
-    {{-- ── FAQ ──────────────────────────────────────────────── --}}
-    <section id="faq" class="bg-slate-50/60 py-20 sm:py-24">
-        <div class="mx-auto max-w-3xl px-6 lg:px-8">
-            <div class="text-center">
-                <p class="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">FAQ</p>
-                <h2 class="mt-3 text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Common questions before you switch.</h2>
-            </div>
+    {{-- ── CTA Banner 2 (dark) ─────────────────────────────────── --}}
+    <section class="bg-slate-900 py-12 px-6 text-center">
+        <h2 class="text-2xl font-semibold text-white mb-3">14 days. Full access. No card.</h2>
+        <p class="text-slate-400 text-sm mb-6">Experience the full power of EBQ for zero risk.</p>
+        <a href="{{ route('register') }}" class="inline-flex items-center justify-center bg-indigo-600 text-white px-8 py-3 rounded-xl font-semibold text-sm hover:bg-indigo-500 transition-all">Claim Your Trial Now</a>
+    </section>
 
-            <div class="mt-12 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+    {{-- ── Who is this for ─────────────────────────────────────── --}}
+    <section class="bg-white py-20 sm:py-24 px-6">
+        <div class="mx-auto max-w-6xl">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-bold text-slate-900">Who is this for?</h2>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                 @foreach ([
-                    ['How long does setup take?', 'Most teams connect Search Console + GA4 and run their first audit in under ten minutes.'],
-                    ['Do you replace our weekly reporting docs?', 'Yes. EBQ sends scheduled reports with action insights, YoY comparisons, and trend deltas — ready for stakeholders.'],
-                    ['Can I invite team members and clients?', 'Yes. Roles are website-scoped with feature-level permissions. Invitees auto-accept on signup.'],
-                    ['Do you support WordPress?', 'Yes. The plugin surfaces ranking, click, and content insights directly in Gutenberg and WP admin.'],
-                    ['Is there a free plan?', 'Yes. The Free plan covers one website, basic Search Console performance, and 10 audits per month.'],
-                ] as [$q, $a])
-                    <details class="group p-6 [&_summary::-webkit-details-marker]:hidden">
-                        <summary class="flex cursor-pointer items-center justify-between gap-3 text-[15px] font-semibold text-slate-900">
-                            <span>{{ $q }}</span>
-                            <span class="flex h-6 w-6 flex-none items-center justify-center rounded-full bg-slate-100 text-slate-600 transition group-open:rotate-45 group-open:bg-slate-900 group-open:text-white">
-                                <svg class="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                            </span>
-                        </summary>
-                        <p class="mt-3 text-[14px] leading-7 text-slate-600">{{ $a }}</p>
-                    </details>
+                    ['icon' => 'M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21', 'title' => 'In-house SEO Manager', 'desc' => 'Stop fighting with tools that don\'t surface what matters. Get ranked action lists and auto-sent reports for leadership — in one workspace.'],
+                    ['icon' => 'M18 18.72a9.094 9.094 0 003.741-.479 3 3 0 00-4.682-2.72m.94 3.198l.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0112 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 016 18.719m12 0a5.971 5.971 0 00-.941-3.197m0 0A5.995 5.995 0 0012 12.75a5.995 5.995 0 00-5.058 2.772m0 0a3 3 0 00-4.681 2.72 8.986 8.986 0 003.74.477m.94-3.197a5.971 5.971 0 00-.94 3.197M15 6.75a3 3 0 11-6 0 3 3 0 016 0zm6 3a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0zm-13.5 0a2.25 2.25 0 11-4.5 0 2.25 2.25 0 014.5 0z', 'title' => 'Marketing Agency', 'desc' => 'Scale your client list without scaling your tool budget. Scheduled reports, white-label exports, and website-scoped team access as standard.'],
+                    ['icon' => 'M13.5 21v-7.5a.75.75 0 01.75-.75h3a.75.75 0 01.75.75V21m-4.5 0H2.36m11.14 0H18m0 0h3.64m-1.39 0V9.349m-16.5 11.65V9.35m0 0a3.001 3.001 0 003.75-.615A2.993 2.993 0 009.75 9.75c.896 0 1.7-.393 2.25-1.016a2.993 2.993 0 002.25 1.016c.896 0 1.7-.393 2.25-1.016a3.001 3.001 0 003.75.614m-16.5 0a3.004 3.004 0 01-.621-4.72L4.318 3.44A1.5 1.5 0 015.378 3h13.243a1.5 1.5 0 011.06.44l1.19 1.189a3 3 0 01-.621 4.72m-13.5 8.65h3.75a.75.75 0 00.75-.75V13.5a.75.75 0 00-.75-.75H6.75a.75.75 0 00-.75.75v3.75c0 .415.336.75.75.75z', 'title' => 'SME Business Owner', 'desc' => 'Powerful enough for experts, simple enough for founders. High-end SEO features at a price that makes sense for your stage — free plan included.'],
+                ] as $p)
+                    <div class="flex flex-col items-center rounded-2xl border border-slate-200 p-8 text-center bg-slate-50/60 hover:-translate-y-1 transition-transform">
+                        <div class="flex h-14 w-14 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 mb-5">
+                            <svg class="h-7 w-7" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="{{ $p['icon'] }}" /></svg>
+                        </div>
+                        <h3 class="text-base font-semibold text-slate-900 mb-3">{{ $p['title'] }}</h3>
+                        <p class="text-sm leading-6 text-slate-600">{{ $p['desc'] }}</p>
+                    </div>
                 @endforeach
             </div>
         </div>
     </section>
 
-    {{-- ── Final CTA ────────────────────────────────────────── --}}
-    <section class="bg-white py-20 sm:py-24">
-        <div class="mx-auto max-w-4xl px-6 lg:px-8">
-            <div class="rounded-3xl border border-slate-200 bg-slate-50/60 px-6 py-14 text-center sm:px-12">
-                <h2 class="text-balance text-3xl font-semibold tracking-tight text-slate-900 sm:text-4xl">Run SEO like a product team.</h2>
-                <p class="mx-auto mt-4 max-w-xl text-base leading-7 text-slate-600">Connect your data, see the next high-impact fix, and ship it before your next stand-up.</p>
-                <div class="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-                    <a href="{{ route('register') }}" class="inline-flex items-center justify-center rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800">
-                        Start free trial
-                    </a>
-                    <a href="{{ route('pricing') }}" class="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-900">
-                        See pricing
-                    </a>
+    {{-- ── Pricing ──────────────────────────────────────────────── --}}
+    <section id="pricing" class="bg-slate-50/60 py-20 sm:py-24 px-6">
+        <div class="mx-auto max-w-5xl">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-bold text-slate-900 mb-3">Transparent Pricing</h2>
+                <p class="text-base text-slate-600 mb-2">Scale your SEO from solo projects to regional agencies.</p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+
+                {{-- Solo --}}
+                <div class="bg-white p-8 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
+                    <h3 class="text-base font-semibold text-slate-900 mb-1">Solo</h3>
+                    <div class="flex items-baseline gap-1 mb-1">
+                        <span class="text-4xl font-bold text-slate-900">$14</span>
+                        <span class="text-slate-500 text-sm">/mo</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-6">Billed annually ($19 monthly)</p>
+                    <ul class="space-y-2.5 mb-8 flex-grow text-sm text-slate-700">
+                        @foreach (['3 projects', '1 team seat', '100k crawl budget', '100 tracked keywords', '250 keyword research searches/mo', '60k AI tokens/mo', '5 AI long-form articles', 'WordPress plugin', 'GA4 + GSC integration'] as $item)
+                            <li class="flex items-center gap-2.5">
+                                <svg class="h-4 w-4 flex-none text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
+                                {{ $item }}
+                            </li>
+                        @endforeach
+                        <li class="flex items-center gap-2.5 text-slate-400">
+                            <svg class="h-4 w-4 flex-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
+                            Scheduled reports
+                        </li>
+                    </ul>
+                    <a href="{{ route('register', ['plan' => 'solo']) }}" class="block w-full py-2.5 text-center rounded-xl border border-indigo-600 text-indigo-600 font-semibold text-sm hover:bg-indigo-50 transition-all">Select Plan</a>
                 </div>
+
+                {{-- Pro --}}
+                <div class="relative bg-white p-8 rounded-2xl border-2 border-indigo-600 flex flex-col shadow-xl md:-translate-y-4">
+                    <span class="absolute -top-3 left-6 inline-flex items-center rounded-full bg-indigo-600 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white">Most Popular</span>
+                    <h3 class="text-base font-semibold text-slate-900 mb-1">Pro</h3>
+                    <div class="flex items-baseline gap-1 mb-1">
+                        <span class="text-4xl font-bold text-slate-900">$37</span>
+                        <span class="text-slate-500 text-sm">/mo</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-6">Billed annually ($49 monthly)</p>
+                    <ul class="space-y-2.5 mb-8 flex-grow text-sm text-slate-700">
+                        @foreach (['All Solo features', '10 projects', '3 team seats', '300k crawl budget', '500 tracked keywords', '1,000 keyword research searches/mo', '150k AI tokens/mo', '15 AI long-form articles', 'Scheduled reports'] as $item)
+                            <li class="flex items-center gap-2.5 {{ $item === 'All Solo features' ? 'font-semibold' : '' }}">
+                                <svg class="h-4 w-4 flex-none text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
+                                {{ $item }}
+                            </li>
+                        @endforeach
+                        <li class="flex items-center gap-2.5 text-slate-400">
+                            <svg class="h-4 w-4 flex-none" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" /></svg>
+                            White-label reports
+                        </li>
+                    </ul>
+                    <a href="{{ route('register', ['plan' => 'pro']) }}" class="block w-full py-2.5 text-center rounded-xl bg-indigo-600 text-white font-semibold text-sm hover:bg-indigo-500 transition-all">Select Plan</a>
+                </div>
+
+                {{-- Agency --}}
+                <div class="bg-white p-8 rounded-2xl border border-slate-200 flex flex-col shadow-sm">
+                    <h3 class="text-base font-semibold text-slate-900 mb-1">Agency</h3>
+                    <div class="flex items-baseline gap-1 mb-1">
+                        <span class="text-4xl font-bold text-slate-900">$74</span>
+                        <span class="text-slate-500 text-sm">/mo</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-6">Billed annually ($99 monthly)</p>
+                    <ul class="space-y-2.5 mb-8 flex-grow text-sm text-slate-700">
+                        @foreach (['All Pro features', '30 projects', '10 team seats', '1M crawl budget', '2,000 tracked keywords', '4,000 keyword research searches/mo', '600k AI tokens/mo', '50 AI long-form articles', 'White-label reports'] as $item)
+                            <li class="flex items-center gap-2.5 {{ $item === 'All Pro features' ? 'font-semibold' : '' }}">
+                                <svg class="h-4 w-4 flex-none text-emerald-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>
+                                {{ $item }}
+                            </li>
+                        @endforeach
+                    </ul>
+                    <a href="{{ route('register', ['plan' => 'agency']) }}" class="block w-full py-2.5 text-center rounded-xl border border-indigo-600 text-indigo-600 font-semibold text-sm hover:bg-indigo-50 transition-all">Select Plan</a>
+                </div>
+            </div>
+            <div class="mt-8 text-center space-y-2">
+                <p class="text-xs font-semibold text-indigo-600">SEMrush starts at $117/mo. Ahrefs at $108/mo. You do the math.</p>
+                <p class="text-xs text-slate-500">All plans include a free 14-day trial. No credit card required. <a href="{{ route('pricing') }}" class="font-semibold text-slate-700 hover:underline">View full pricing →</a></p>
+            </div>
+        </div>
+    </section>
+
+    {{-- ── Final CTA ────────────────────────────────────────────── --}}
+    <section class="bg-white py-20 sm:py-24 px-6">
+        <div class="mx-auto max-w-4xl text-center">
+            <h2 class="text-3xl font-bold text-slate-900 mb-4">Ready to dominate search results?</h2>
+            <p class="text-base leading-7 text-slate-600 mb-8">The SEO platform built for teams that ship. Every feature. One price. Start free.</p>
+            <div class="flex flex-col sm:flex-row gap-4 justify-center items-center">
+                <a href="{{ route('register') }}" class="inline-flex items-center justify-center bg-indigo-600 text-white px-8 py-3 rounded-xl font-semibold text-sm hover:bg-indigo-500 transition-all shadow-lg w-full sm:w-auto">Start Free Trial Now</a>
+                <a href="{{ route('contact') }}" class="inline-flex items-center justify-center border border-indigo-600 text-indigo-600 px-8 py-3 rounded-xl font-semibold text-sm hover:bg-indigo-50 transition-all w-full sm:w-auto">Request Demo</a>
             </div>
         </div>
     </section>

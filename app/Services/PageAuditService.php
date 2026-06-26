@@ -33,6 +33,13 @@ class PageAuditService
 
     private const LINK_CHECK_UA = 'Mozilla/5.0 AppleWebKit/537.36 (KHTML, like Gecko; compatible; Googlebot/2.1; +http://www.google.com/bot.html) Chrome/124.0.6367.207 Safari/537.36';
 
+    /** Social hosts whose WAF/anti-bot layer routinely 403s non-browser UAs even for live
+     *  pages. A 401/403/429/999 here isn't trustworthy evidence of a dead link. Mirrors
+     *  SiteIssueDetector::KNOWN_ANTIBOT_HOSTS. Confirmed 2026-06-25 (x.com/WesleyLawn38331). */
+    private const KNOWN_ANTIBOT_HOSTS = ['x.com', 'twitter.com', 'linkedin.com', 'facebook.com', 'instagram.com'];
+
+    private const ANTIBOT_BLOCK_STATUSES = [401, 403, 429, 999];
+
     /** Cap the HTML body we parse to protect libxml / memory. */
     private const MAX_BODY_BYTES = 5_000_000;
 
@@ -1231,7 +1238,13 @@ class PageAuditService
                     $error = $resp instanceof \Throwable ? $resp->getMessage() : 'unknown';
                 }
 
-                if ($status === null || $status >= 400) {
+                $isUntrustedAntibotBlock = $status !== null
+                    && in_array($status, self::ANTIBOT_BLOCK_STATUSES, true)
+                    && $this->isKnownAntibotHost($link['href']);
+                if ($isUntrustedAntibotBlock) {
+                    Log::info('page_audit.broken_link.antibot_skip', ['href' => $link['href'], 'status' => $status]);
+                }
+                if (($status === null || $status >= 400) && ! $isUntrustedAntibotBlock) {
                     $broken[] = [
                         'href' => $link['href'],
                         'anchor' => $link['anchor'] ?? '',
@@ -1243,6 +1256,18 @@ class PageAuditService
         }
 
         return ['broken' => $broken, 'checked' => count($toCheck), 'skipped' => $skipped];
+    }
+
+    private function isKnownAntibotHost(string $href): bool
+    {
+        $host = strtolower((string) parse_url($href, PHP_URL_HOST));
+        foreach (self::KNOWN_ANTIBOT_HOSTS as $d) {
+            if ($host === $d || str_ends_with($host, '.'.$d)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function getFallback(string $url): ?int
